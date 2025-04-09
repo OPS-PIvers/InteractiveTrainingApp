@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Training</title>
+  <style>
+    /* Reset and base styles */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; } /* Prevent body scroll */
+    body {
+      font-family: 'Roboto', Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #333;
+      background-color: #f5f5f5;
+      display: flex; /* Use flex for layout */
+      flex-direction: column;
+      position: relative; /* Needed for fixed overlays */
+    }
+
+    /* Main container */
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .header {
+      padding: 15px;
+      background-color: #1a73e8;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 1.5rem; font-weight: 400; margin: 0; }
+    .nav-controls { display: flex; align-items: center; gap: 15px; }
+    #slideTitle { font-size: 0.9rem; opacity: 0.8; max-width: 50%; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; }
+
+    /* Slide container - uses flex to center the slide */
+    .slide-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background-color: #f5f5f5; /* Light gray background around the slide */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px; /* Padding around the slide */
+      min-height: 400px; /* Ensure a minimum height */
+    }
+
+    /* The slide itself - aspect ratio maintained by JS */
+    .slide {
+      position: relative; /* Crucial for absolute positioning of children */
+      background-color: white; /* Background of the slide area itself */
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      overflow: hidden;
+      /* Width and height set by JS to maintain aspect ratio */
+    }
+
+    /* Background image within the slide div */
+    .slide-background {
+      display: block; /* Remove extra space below img */
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 1;
+      object-fit: cover; /* Fills the entire area, cropping if necessary */
+      object-position: center; /* Center the image if it needs to be cropped */
+    }
+
+    /* Overlay elements - positioned relative to .slide */
+    .overlay {
+        position: absolute;
+        z-index: 2;
+        cursor: pointer;
+        /* Base styles - Specifics (color, border, etc.) set by JS */
+        background-color: transparent; /* Set by JS */
+        border: none; /* Set by JS */
+        border-radius: 0; /* Set by JS based on shape */
+        box-shadow: none; /* Set by JS */
+        /* Smooth Transitions for all properties */
+        transition: background-color 0.2s, border-color 0.2s, border-style 0.2s,
+                    border-width 0.2s, box-shadow 0.2s, transform 0.2s ease-out,
+                    opacity 0.5s ease-out, border-radius 0.2s; /* Added border-radius transition */
+        /* Position for overlay text */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden; /* Prevent text overflow if needed */
+    }
+
+    .overlay-text {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+        text-align: center;
+        max-width: 90%;
+        word-break: break-word;
+        line-height: 1.2;
+        pointer-events: none;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); /* Add shadow for better readability */
+    }
+
+    /* Styles for different overlay shapes (applied by JS) */
+    .overlay.shape-rectangle { border-radius: 3px; } /* Slight rounding for default rectangle */
+    .overlay.shape-roundedRectangle { border-radius: 15px; } /* More pronounced rounding */
+    .overlay.shape-oval { border-radius: 50%; } /* Makes it an oval or circle */
+
+
+    /* Revealed elements */
+    .overlay.revealed {
+        opacity: 0; /* Start hidden */
+        transition: opacity 0.5s ease-in-out, background-color 0.2s,
+                    border-color 0.2s, border-style 0.2s;
+    }
+
+    /* Hover Text (using data attribute set by JS) */
+    .overlay::after {
+        content: attr(data-hover-text); /* Get text from data attribute */
+        position: absolute;
+        bottom: -30px; /* Position below the overlay */
+        left: 50%;
+        transform: translateX(-50%); /* Center the text */
+        background-color: rgba(0, 0, 0, 0.7); /* Dark background */
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap; /* Prevent text wrapping */
+        z-index: 3;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none; /* Prevent interference */
+        transition: opacity 0.2s ease-out, visibility 0.2s ease-out;
+    }
+
+    .overlay:hover {
+        /* Hover effects can be subtle now as primary style is dynamic */
+        filter: brightness(1.1); /* Slightly brighten on hover */
+         /* Keep prominent border on hover IF outline is enabled */
+         /* This is tricky with dynamic styles, JS might need to handle hover border */
+         /* Example: JS could add a class on hover */
+    }
+     /* Example hover class (add/remove with JS) */
+    .overlay.is-hovering {
+         filter: brightness(1.1);
+         /* You could potentially override border here if needed,
+            but it might conflict with dynamic styles. */
+         /* border-width: 3px !important; */ /* Use with caution */
+    }
+
+
+    /* Show the hover text - only if no overlay text is present */
+    .overlay:not(.has-overlay-text):hover::after {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* Style for element when its modal is open */
+    .overlay.highlighted-for-modal {
+        /* Use outline instead of border to avoid layout shifts */
+        outline: 3px solid #1a73e8;
+        outline-offset: 2px; /* Space between element and outline */
+        box-shadow: 0 0 12px rgba(26, 115, 232, 0.5);
+        z-index: 105; /* Ensure it's above dimmer and modal */
+         /* Slightly dim the element itself to make outline pop */
+         /* filter: brightness(0.9); */
+    }
+
+    /* Style for temporary highlight interaction */
+     .overlay.highlighted-temporary {
+        /* Apply styles directly via JS for immediate feedback */
+        transition: background-color 0.1s, box-shadow 0.1s, filter 0.1s;
+     }
+
+    /* Control bar */
+    .control-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      background-color: #f5f5f5;
+      border-top: 1px solid #ddd;
+      flex-shrink: 0;
+    }
+    .slide-nav { display: flex; align-items: center; gap: 10px; }
+    .nav-button {
+      background-color: #1a73e8; color: white; border: none; border-radius: 4px;
+      padding: 8px 15px; cursor: pointer; font-size: 0.9rem; display: flex;
+      align-items: center; gap: 5px; transition: background-color 0.2s;
+    }
+    .nav-button:hover { background-color: #1558b7; }
+    .nav-button:disabled { background-color: #b0bec5; cursor: not-allowed; }
+    .slide-indicator { padding: 0 15px; color: #666; font-size: 0.9rem; }
+
+    /* Text modal */
+    #textModal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.75);
+      display: none; justify-content: center; align-items: center; z-index: 100;
+      opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s;
+    }
+    #textModal.visible { opacity: 1; visibility: visible; display: flex; }
+    #textModalContent {
+      background-color: white; padding: 30px; border-radius: 8px;
+      max-width: 80%; max-height: 80%; overflow: auto;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3); position: relative;
+      transform: scale(0.9); transition: transform 0.3s;
+    }
+     #textModal.visible #textModalContent { transform: scale(1); }
+    #closeModal {
+      position: absolute; top: 10px; right: 10px; background: none; border: none;
+      font-size: 1.8rem; cursor: pointer; color: #aaa; line-height: 1; padding: 0 5px;
+    }
+     #closeModal:hover { color: #333; }
+    #modalText { margin-bottom: 15px; line-height: 1.6; }
+    .modal-navigation {
+      display: flex; justify-content: space-between; margin-top: 20px;
+      padding-top: 15px; border-top: 1px solid #eee;
+    }
+    .modal-navigation button {
+      padding: 8px 16px; background-color: #1a73e8; color: white; border: none;
+      border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px;
+    }
+    .modal-navigation button:hover { background-color: #1558b7; }
+    .modal-navigation button:disabled { background-color: #b0bec5; cursor: not-allowed; }
+
+    /* Animations, Loading, Error, Spotlight, Debug etc. - UNCHANGED from previous version */
+    /* --- Animation Keyframes & Classes --- */
+      /* --- Animation Keyframes & Classes --- */
+    /* Existing */
+    @keyframes pulse_anim { 0%, 100% { transform: scale(1); opacity: 0.7; } 50% { transform: scale(1.05); opacity: 1; } }
+    @keyframes wiggle_anim { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(3deg); } 75% { transform: rotate(-3deg); } }
+    @keyframes float_anim { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
+    /* NEW Keyframes */
+    @keyframes bounce_anim { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 60% { transform: translateY(-5px); } }
+    @keyframes shake_anim { 0% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 20%, 40%, 60%, 80%, 100% { transform: translateX(4px); } }
+    @keyframes flash_anim { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+    @keyframes growShrink_anim { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    /* Spotlight text bubble animation */
+    @keyframes bubbleFadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    #spotlightTextBubble {
+        animation: bubbleFadeIn 0.3s ease-out forwards;
+    }
+
+    /* Notes panel animation */
+    @keyframes notesPanelFadeIn {
+        from { opacity: 0; transform: translate(-50%, 20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    #spotlightNotesPanel {
+        animation: notesPanelFadeIn 0.3s ease-out forwards;
+    }
+
+    /* Base Animation Classes */
+    .animate-pulse { animation: pulse_anim 2s infinite ease-in-out; }
+    .animate-wiggle { animation: wiggle_anim 0.5s infinite ease-in-out; }
+    .animate-float { animation: float_anim 3s infinite ease-in-out; }
+    .animate-bounce { animation: bounce_anim 1.5s infinite ease-in-out; }
+    .animate-shake { animation: shake_anim 0.6s infinite ease-in-out; }
+    .animate-flash { animation: flash_anim 1s infinite steps(1, end); }
+    .animate-growShrink { animation: growShrink_anim 2s infinite ease-in-out; }
+
+    /* Speed/Intensity Variants */
+    /* Pulse */
+    .animate-pulse.slow { animation-duration: 3s; }
+    .animate-pulse.medium { animation-duration: 2s; }
+    .animate-pulse.fast { animation-duration: 1s; }
+    /* Wiggle */
+    .animate-wiggle.gentle { animation-duration: 1s; transform-origin: center; } /* Gentle needs longer duration */
+    .animate-wiggle.medium { animation-duration: 0.5s; transform-origin: center; }
+    .animate-wiggle.strong { animation-duration: 0.3s; transform-origin: center; }
+    /* Float */
+    .animate-float.slow { animation-duration: 4s; }
+    .animate-float.medium { animation-duration: 3s; }
+    .animate-float.fast { animation-duration: 2s; }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(255, 255, 255, 0.8); display: flex; flex-direction: column;
+      justify-content: center; align-items: center; z-index: 1000;
+    }
+    .loading-spinner {
+      border: 5px solid #f3f3f3; border-top: 5px solid #1a73e8; border-radius: 50%;
+      width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px;
+    }
+    .loading-message { font-size: 1.2rem; color: #333; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* Error message */
+    .error-message {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      background-color: #f44336; color: white; padding: 15px 20px; border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1001; max-width: 80%;
+      display: none; /* Initially hidden */
+    }
+
+    /* Dim/Spotlight Overlay */
+    .dim-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.7); /* Adjust darkness */
+      z-index: 90; /* Below modal, above most content */
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none; /* Prevent interaction when hidden */
+      transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+      cursor: pointer; /* Indicate it's clickable to dismiss */
+    }
+    .dim-overlay.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto; /* Allow clicking the overlay to dismiss */
+    }
+    /* Style for the element being spotlighted */
+    .overlay.spotlight-active {
+        z-index: 95 !important; /* Ensure spotlighted element is above dimmer */
+        background-color: transparent !important;
+        border: 2px solid rgba(255, 255, 255, 0.9) !important; /* White highlight */
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.7), 
+                    0 0 30px rgba(255, 255, 255, 0.3) !important; /* Glowing effect */
+        cursor: default !important; /* Don't show click cursor */
+        pointer-events: none !important; /* Prevent interaction with the highlighted element */
+    }
+
+    /* Hide the "Click here" text when spotlighted */
+    .overlay.spotlight-active::after {
+        display: none !important;
+    }
+    
+    /* --- Spotlight Navigation Buttons --- */
+    @keyframes buttonPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    .spotlight-nav-button {
+      padding: 6px 12px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+
+    .spotlight-nav-button:hover:not(:disabled) {
+      background-color: #1558b7;
+      animation: buttonPulse 0.5s ease-in-out;
+    }
+
+    .spotlight-nav-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .spotlight-nav-button span {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    /* Spotlight text bubble animations */
+    @keyframes bubbleEnter {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #spotlightTextBubble {
+      animation: bubbleEnter 0.3s forwards;
+    }
+
+    /* Navigation container in spotlight text */
+    .spotlight-nav-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #eee;
+    }
+
+    /* Debug Tools */
+    .debug-info {
+      position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7);
+      color: white; padding: 10px; border-radius: 4px; font-size: 12px;
+      z-index: 1000; max-width: 300px; max-height: 200px; overflow: auto;
+      display: none; /* Hidden by default */
+    }
+    .debug-toggle {
+      position: fixed; bottom: 10px; right: 10px; /* Position toggle initially */
+      background: #1a73e8; color: white; border: none; border-radius: 4px;
+      padding: 5px 10px; font-size: 12px; cursor: pointer; z-index: 1001;
+      display: none; /* Hidden by default, enabled via debugMode flag */
+    }
+    .debug-toggle.active {
+       right: 320px; /* Move toggle when info panel is shown */
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .header h1 { font-size: 1.2rem; }
+      #slideTitle { max-width: 40%; }
+      #textModalContent { max-width: 95%; padding: 15px; }
+      .nav-button { padding: 6px 10px; font-size: 0.8rem; }
+      .slide-indicator { padding: 0 10px; }
+      .control-bar { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-message">Loading presentation...</div>
+  </div>
+
+  <!-- Dim/Spotlight Overlay -->
+  <div class="dim-overlay" id="dimOverlay"></div>
+
+  <!-- Main Container -->
+  <div class="container">
+    <div class="header">
+      <h1>Interactive Training</h1>
+      <div class="nav-controls">
+        <span id="slideTitle"></span>
+      </div>
+    </div>
+
+    <div class="slide-container" id="slideContainer">
+      <div class="slide" id="slide">
+        <img class="slide-background" id="slideBackground" src="" alt="Slide background">
+        <!-- Overlays will be added here dynamically -->
+      </div>
+    </div>
+
+    <div class="control-bar">
+      <div class="slide-nav">
+        <button id="prevSlideBtn" class="nav-button" disabled>
+          <span>←</span> Previous
+        </button>
+        <span class="slide-indicator" id="slideIndicator">Slide 1 of 1</span>
+        <button id="nextSlideBtn" class="nav-button" disabled>
+          Next <span>→</span>
+        </button>
+      </div>
+      <div>
+        <button id="restartBtn" class="nav-button">
+          <span>↺</span> Restart
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text modal -->
+  <div id="textModal">
+    <div id="textModalContent">
+      <button id="closeModal">×</button>
+      <div id="modalText"></div>
+      <div class="modal-navigation">
+        <button id="prevElementBtn">
+          <span>←</span> Previous
+        </button>
+        <button id="nextElementBtn">
+          Next <span>→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Message Area -->
+  <div id="errorMessage" class="error-message"></div>
+
+  <!-- Debug tools -->
+  <button id="debugToggle" class="debug-toggle">Debug</button>
+  <div id="debugInfo" class="debug-info"></div>
+
+
+<script>
+    // ---------- Global Variables ----------
+    const presentationId = "<?= presentationId ?>"; // Injected by GAS doGet
+    let currentSlide = null;
+    let currentSlideIndex = 0;
+    let totalSlides = 0;
+    let overlayElementsMap = new Map(); // Map<elementId, overlayDiv>
+    // Store full element data received from backend
+    let currentSlideElementsData = [];
+    let interactiveElements = []; // Subset of currentSlideElementsData with interactions/animations
+    let currentModalElementIndex = -1;
+    let currentSpotlightElementIndex = -1;
+    let spotlightableElements = [];
+    let isSpotlightActive = false;
+    let debugMode = false; // Set true for local debugging
+    let permanentlyHiddenElementsPerSlide = {}; // NEW: Track hidden elements { slideIndex: Set<elementId> }
+    
+    // NEW: Store global overlay defaults received from backend
+    let globalOverlayDefaults = {
+        shape: 'rectangle', color: '#e53935', opacity: 15, outlineEnabled: true,
+        outlineColor: '#e53935', outlineWidth: 1, outlineStyle: 'dashed',
+        textColor: '#ffffff', textSize: 14, hoverText: 'Click here'
+    };
+
+    // DOM element references (mostly unchanged)
+    const slideContainer = document.getElementById('slideContainer');
+    const slideElement = document.getElementById('slide');
+    const slideBackground = document.getElementById('slideBackground');
+    const slideIndicator = document.getElementById('slideIndicator');
+    const prevSlideBtn = document.getElementById('prevSlideBtn');
+    const nextSlideBtn = document.getElementById('nextSlideBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const slideTitleElement = document.getElementById('slideTitle');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const textModal = document.getElementById('textModal');
+    const modalTextDiv = document.getElementById('modalText');
+    const closeModalBtn = document.getElementById('closeModal');
+    const prevElementBtn = document.getElementById('prevElementBtn');
+    const nextElementBtn = document.getElementById('nextElementBtn');
+    const dimOverlay = document.getElementById('dimOverlay');
+    const errorElement = document.getElementById('errorMessage');
+    const debugToggle = document.getElementById('debugToggle');
+    const debugInfo = document.getElementById('debugInfo');
+
+    // ---------- Initialization ----------
+    window.addEventListener('load', () => { /* ... unchanged ... */
+      logDebug(`[WebApp] Starting with presentation ID: ${presentationId}`);
+      setupEventListeners();
+      setupDebugTools();
+      loadSlide(0); // Load the first slide
+      window.addEventListener('resize', handleResize);
+    });
+
+    function setupEventListeners() { /* ... unchanged ... */
+      prevSlideBtn.addEventListener('click', () => loadSlide(currentSlideIndex - 1));
+      nextSlideBtn.addEventListener('click', () => loadSlide(currentSlideIndex + 1));
+      restartBtn.addEventListener('click', () => loadSlide(0));
+      closeModalBtn.addEventListener('click', hideTextModal);
+      textModal.addEventListener('click', (e) => { if (e.target === textModal) hideTextModal(); });
+      dimOverlay.addEventListener('click', hideSpotlight);
+      prevElementBtn.addEventListener('click', navigateToPrevModalElement);
+      nextElementBtn.addEventListener('click', navigateToNextModalElement);
+    }
+
+    function setupDebugTools() { /* ... unchanged ... */
+      if (debugMode) {
+        debugToggle.style.display = 'block';
+        debugToggle.addEventListener('click', () => {
+          const showDebug = debugInfo.style.display === 'none';
+          debugInfo.style.display = showDebug ? 'block' : 'none';
+          debugToggle.classList.toggle('active', showDebug);
+          debugToggle.textContent = showDebug ? 'Hide Debug' : 'Debug';
+        });
+      } else {
+         debugToggle.style.display = 'none';
+         debugInfo.style.display = 'none';
+      }
+    }
+
+    function logDebug(message, data) { /* ... unchanged ... */
+        if (debugMode) {
+            console.log(message, data !== undefined ? data : '');
+            if (debugInfo.style.display !== 'none') {
+               const time = new Date().toLocaleTimeString();
+               debugInfo.innerHTML = `[${time}] ${message}<br>` + debugInfo.innerHTML;
+            }
+        }
+    }
+
+    function updateDebugInfo(info) { /* ... unchanged ... */
+        if (!debugMode || debugInfo.style.display === 'none') return;
+        const time = new Date().toLocaleTimeString();
+        debugInfo.innerHTML = `[${time}] ${info}<br>` + debugInfo.innerHTML;
+    }
+
+    function handleResize() { /* ... unchanged ... */
+      if (currentSlide) {
+        adjustSlideSize();
+        renderOverlays();
+      }
+    }
+
+    // ---------- Slide Loading ----------
+    function loadSlide(index) {
+        if (index < 0 || (totalSlides > 0 && index >= totalSlides)) {
+            logDebug(`[WebApp] Invalid slide index requested: ${index}`);
+            return;
+        }
+        logDebug(`[WebApp] Requesting slide index: ${index}`);
+
+        // Initialize hidden set for the target slide index if it doesn't exist
+        if (!permanentlyHiddenElementsPerSlide[index]) {
+            permanentlyHiddenElementsPerSlide[index] = new Set();
+            logDebug(`[WebApp] Initialized hidden set for slide index ${index}. Current state of all sets:`, permanentlyHiddenElementsPerSlide); // LOGGING
+        } else {
+            // Log the existing set for this slide
+            logDebug(`[WebApp] Hidden set for slide index ${index} already exists with elements:`, Array.from(permanentlyHiddenElementsPerSlide[index])); // LOGGING
+            logDebug(`[WebApp] Current state of all sets:`, permanentlyHiddenElementsPerSlide); // LOGGING
+        }
+
+        showLoading("Loading slide...");
+        hideTextModal();
+        clearOverlays();
+        overlayElementsMap.clear();
+        currentSlideElementsData = []; // Clear previous element data
+        interactiveElements = [];
+        currentModalElementIndex = -1;
+
+        google.script.run
+            .withSuccessHandler(handleSlideData)
+            .withFailureHandler(handleLoadError)
+            .getSlideDataForWebApp(presentationId, index);
+    }
+
+    /**
+     * Handles slide data received from the backend and prepares it for display.
+     * @param {Object} data - The slide data object from the backend.
+     */
+    function handleSlideData(data) {
+      logDebug(`[WebApp] Received slide data:`, data);
+      
+      // Safety timeout - ensure loading overlay gets hidden even if image loading hangs
+      const loadingTimeout = setTimeout(() => {
+        console.warn("[WebApp] Loading timeout reached, forcing hide of loading overlay");
+        hideLoading();
+      }, 5000); // 5 seconds timeout
+      
+      if (data.error) {
+        handleLoadError(data.error);
+        // Try to show minimal info if possible
+        currentSlideIndex = data.currentSlideIndex !== undefined ? data.currentSlideIndex : currentSlideIndex;
+        totalSlides = data.totalSlides !== undefined ? data.totalSlides : totalSlides;
+        updateSlideNavControls(); // Update nav buttons even on error
+        clearTimeout(loadingTimeout); // Clear the safety timeout
+        return;
+      }
+
+      currentSlide = data;
+      currentSlideIndex = data.currentSlideIndex;
+      totalSlides = data.totalSlides;
+      
+      // IMPORTANT: Store all element data, including non-interactive elements
+      currentSlideElementsData = data.elements || [];
+      
+      // Handle global overlay settings
+      if (data.globalOverlayDefaults) {
+        // Use the new structure (preferred)
+        logDebug("[WebApp] Using globalOverlayDefaults structure:", data.globalOverlayDefaults);
+        globalOverlayDefaults = data.globalOverlayDefaults;
+        overlayOpacity = data.globalOverlayDefaults.opacity !== undefined ? data.globalOverlayDefaults.opacity : 15;
+        overlayShadow = !!data.globalOverlayDefaults.outlineEnabled;
+      } else {
+        // Fallback to deprecated fields
+        logDebug("[WebApp] Using deprecated overlayOpacity/overlayShadow fields");
+        overlayOpacity = typeof data.overlayOpacity === 'number' ? data.overlayOpacity : 15;
+        overlayShadow = !!data.overlayShadow;
+      }
+      logDebug(`[WebApp] Applied overlay settings: Opacity=${overlayOpacity}%, Shadow=${overlayShadow}`);
+
+      // Filter interactive elements more carefully
+      interactiveElements = currentSlideElementsData.filter(el => {
+        const hasInteraction = el.interaction && 
+                              el.interaction.type && 
+                              el.interaction.type !== 'none';
+        const hasAnimation = el.animation && 
+                            el.animation.type && 
+                            el.animation.type !== 'none';
+        
+        // Also consider elements with overlay style but no interaction type as interactive
+        const hasOverlayStyle = el.interaction && 
+                              el.interaction.overlayStyle &&
+                              Object.keys(el.interaction.overlayStyle).length > 0;
+                              
+        return hasInteraction || hasAnimation || hasOverlayStyle;
+      });
+      
+      logDebug(`[WebApp] Found ${interactiveElements.length} interactive elements out of ${currentSlideElementsData.length} total`);
+      
+      currentModalElementIndex = -1; // Reset modal index
+
+      updateSlideNavControls(); // Update buttons and indicator
+      slideTitleElement.textContent = data.slideNotes || ''; // Display speaker notes as title
+
+      // Simplified background handling - don't rely on events that might not fire
+      if (data.backgroundUrl) {
+        logDebug("[WebApp] Setting background image...");
+        slideBackground.src = data.backgroundUrl;
+        // Don't wait for image load events - proceed immediately
+        setTimeout(() => {
+          clearTimeout(loadingTimeout);
+          onSlideContentReady();
+        }, 200); // Short delay to allow DOM updates
+      } else {
+        logDebug("[WebApp] No background image, using blank slide");
+        slideBackground.src = '';
+        clearTimeout(loadingTimeout);
+        setTimeout(onSlideContentReady, 50);
+      }
+    }
+
+    // Modified onSlideContentReady function to add error handling
+    function onSlideContentReady() {
+      try {
+        logDebug("[WebApp] Preparing slide content...");
+        adjustSlideSize(); // Calculate and apply slide dimensions
+        renderOverlays(); // Render interactive overlays based on new size
+        hideLoading(); // Hide loading indicator
+        logDebug("[WebApp] Slide ready!");
+      } catch (err) {
+        console.error("[WebApp] Error in onSlideContentReady:", err);
+        hideLoading(); // Make sure we still hide the loading overlay
+        showError("Error preparing slide: " + (err.message || err));
+      }
+    }
+
+    function adjustSlideSize() { /* ... unchanged ... */
+      if (!currentSlide || !slideContainer) return;
+      const containerWidth = slideContainer.clientWidth - 20;
+      const containerHeight = slideContainer.clientHeight - 20;
+      const slideWidthOrig = currentSlide.slideWidth || 960;
+      const slideHeightOrig = currentSlide.slideHeight || 540;
+      const slideAspectRatio = slideWidthOrig / slideHeightOrig;
+      logDebug(`[WebApp] Calculating size: Container ${containerWidth}x${containerHeight}, Original ${slideWidthOrig}x${slideHeightOrig} (Ratio: ${slideAspectRatio.toFixed(3)})`);
+      let targetWidth, targetHeight;
+      if (containerWidth / slideAspectRatio <= containerHeight) {
+        targetWidth = containerWidth;
+        targetHeight = targetWidth / slideAspectRatio;
+      } else {
+        targetHeight = containerHeight;
+        targetWidth = targetHeight * slideAspectRatio;
+      }
+      slideElement.style.width = `${targetWidth}px`;
+      slideElement.style.height = `${targetHeight}px`;
+      const scaleX = targetWidth / slideWidthOrig;
+      const scaleY = targetHeight / slideHeightOrig;
+      slideElement.dataset.scaleX = scaleX;
+      slideElement.dataset.scaleY = scaleY;
+      logDebug(`[WebApp] Adjusted slide size: ${targetWidth.toFixed(1)}x${targetHeight.toFixed(1)}, Scale: ${scaleX.toFixed(4)}x${scaleY.toFixed(4)}`);
+    }
+
+    function updateSlideNavControls() { /* ... unchanged ... */
+        slideIndicator.textContent = `Slide ${currentSlideIndex + 1} of ${totalSlides}`;
+        prevSlideBtn.disabled = currentSlideIndex === 0;
+        nextSlideBtn.disabled = currentSlideIndex >= totalSlides - 1;
+    }
+
+    // ---------- Overlay Rendering (UPDATED) ----------
+
+    // Helper to convert HEX and opacity (0-100) to RGBA CSS string
+    function hexToRgba(hex, opacityPercent) {
+        // Added default hex color if input is invalid
+        if (!hex || typeof hex !== 'string' || !/^#([0-9A-F]{3}){1,2}$/i.test(hex)) {
+            hex = '#000000'; // Default to black if invalid hex
+            console.warn(`[WebApp] Invalid hex color received ('${hex}'), defaulting to black.`);
+        }
+        hex = hex.replace('#', '');
+        let r, g, b;
+
+        try { // Add try-catch for safety during parsing
+            if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+            } else { // Assume 6 length after regex check
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+            }
+        } catch (e) {
+            console.error("Error parsing hex color:", hex, e);
+            r = g = b = 0; // Default to black on error
+        }
+
+        // Clamp opacityPercent between 0 and 100, default to 0 if invalid, then convert to 0-1 alpha
+        const numOpacity = parseFloat(opacityPercent);
+        // Default to 15 if NaN or undefined, otherwise clamp
+        const clampedOpacity = (isNaN(numOpacity) || typeof opacityPercent === 'undefined') ? 15 : Math.max(0, Math.min(100, numOpacity));
+        const alpha = clampedOpacity / 100;
+
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    // Main function to apply styles (custom or global)
+    function applyOverlayStyle(overlay, element) {
+      // Default opacity from global settings
+      let opacityValue = overlayOpacity / 100;
+      
+      try {
+        // Check if the element has custom opacity settings
+        if (element && element.interaction) {
+          if (element.interaction.useCustomOpacity && 
+              typeof element.interaction.customOpacity === 'number') {
+            // Use element-specific opacity
+            opacityValue = element.interaction.customOpacity / 100;
+            logDebug(`[WebApp] Using custom opacity: ${element.interaction.customOpacity}% for element ${element.id}`);
+          }
+          
+          // Check if the element has custom overlay style
+          if (element.interaction.overlayStyle) {
+            const customStyle = element.interaction.overlayStyle;
+            
+            // If custom style includes opacity setting, use that
+            if (typeof customStyle.opacity === 'number') {
+              opacityValue = customStyle.opacity / 100;
+              logDebug(`[WebApp] Using overlayStyle.opacity: ${customStyle.opacity}% for element ${element.id}`);
+            }
+            
+            // Apply custom color if specified
+            if (customStyle.color) {
+              // Get the RGB color components
+              let r = 229, g = 57, b = 53; // Default red
+              
+              try {
+                // Try to parse color from hex
+                if (customStyle.color.startsWith('#')) {
+                  const hex = customStyle.color.substring(1);
+                  if (hex.length === 3) {
+                    r = parseInt(hex[0] + hex[0], 16);
+                    g = parseInt(hex[1] + hex[1], 16);
+                    b = parseInt(hex[2] + hex[2], 16);
+                  } else if (hex.length === 6) {
+                    r = parseInt(hex.substring(0, 2), 16);
+                    g = parseInt(hex.substring(2, 4), 16);
+                    b = parseInt(hex.substring(4, 6), 16);
+                  }
+                }
+              } catch (colorErr) {
+                console.error("[WebApp] Error parsing custom color:", colorErr);
+              }
+              
+              // Apply the color with calculated opacity
+              overlay.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${opacityValue})`;
+              logDebug(`[WebApp] Applied custom color: rgba(${r}, ${g}, ${b}, ${opacityValue})`);
+            } else {
+              // No custom color, use default red with calculated opacity
+              overlay.style.backgroundColor = `rgba(229, 57, 53, ${opacityValue})`;
+            }
+            
+            // Apply other custom style properties if needed
+            if (customStyle.shape === 'roundedRectangle') {
+              overlay.style.borderRadius = '8px';
+            } else if (customStyle.shape === 'oval') {
+              overlay.style.borderRadius = '50%';
+            }
+            
+            // Apply custom outline
+            if (customStyle.outlineEnabled) {
+              const outlineColor = customStyle.outlineColor || '#e53935';
+              const outlineWidth = customStyle.outlineWidth || 1;
+              const outlineStyle = customStyle.outlineStyle || 'dashed';
+              overlay.style.border = `${outlineWidth}px ${outlineStyle} ${outlineColor}`;
+            } else {
+              overlay.style.border = 'none';
+            }
+            
+            return; // Skip default styling
+          }
+        }
+      } catch (err) {
+        console.error("[WebApp] Error applying custom style:", err);
+        // Fall back to default styling below
+      }
+      
+      // Default styling if no custom style or on error
+      // Make sure opacity is within reasonable bounds (0.05 to 0.5)
+      opacityValue = Math.max(0.05, Math.min(0.5, opacityValue));
+      overlay.style.backgroundColor = `rgba(229, 57, 53, ${opacityValue})`;
+      
+      // Apply default border/outline
+      if (overlayShadow) {
+        overlay.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.3)';
+        overlay.style.border = '1px dashed rgba(229, 57, 53, 0.5)';
+      } else {
+        overlay.style.border = '1px dashed rgba(229, 57, 53, 0.5)';
+        overlay.style.boxShadow = 'none';
+      }
+    }
+
+    function addOverlayText(overlay, text) {
+        if (!text || !text.trim()) return;
+
+        const textElement = document.createElement('div');
+        textElement.className = 'overlay-text';
+        textElement.textContent = text;
+        
+        // Find the style settings - either from element's custom style or global defaults
+        let textColor = '#ffffff';
+        let textSize = 14;
+        let useBackground = false; // New setting for background
+        
+        try {
+            // First check for element-specific data
+            const elementId = overlay.dataset.elementId;
+            const elementData = currentSlideElementsData.find(el => el.id === elementId);
+            
+            if (elementData && elementData.interaction && elementData.interaction.overlayStyle) {
+                // Use element's custom style if available
+                textColor = elementData.interaction.overlayStyle.textColor || globalOverlayDefaults.textColor;
+                textSize = elementData.interaction.overlayStyle.textSize || globalOverlayDefaults.textSize;
+                useBackground = elementData.interaction.overlayStyle.textBackground || false;
+            } else {
+                // Fall back to global defaults
+                textColor = globalOverlayDefaults.textColor;
+                textSize = globalOverlayDefaults.textSize;
+                useBackground = globalOverlayDefaults.textBackground || false;
+            }
+        } catch (err) {
+            console.error("[WebApp] Error applying text styles:", err);
+            // Use fallback values already set
+        }
+
+        // Apply the styles directly
+        textElement.style.color = textColor;
+        textElement.style.fontSize = `${textSize}px`;
+        
+        // Only add background if configured
+        if (useBackground) {
+            textElement.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        } else {
+            textElement.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.8)';
+        }
+        
+        overlay.appendChild(textElement);
+        overlay.classList.add('has-overlay-text');
+        logDebug(`[WebApp] Added overlay text "${text}" with color ${textColor}, size ${textSize}px to element ${overlay.dataset.elementId}`);
+    }
+
+    // UPDATED renderOverlays
+    function renderOverlays() {
+        logDebug(`[WebApp] [renderOverlays] Start - Rendering overlays for ${interactiveElements.length} interactive elements on slide ${currentSlideIndex}`); // LOGGING
+
+        // Force-clear any previous overlays
+        const existingOverlays = slideElement.querySelectorAll('.overlay');
+        logDebug(`[WebApp] [renderOverlays] Found ${existingOverlays.length} existing overlays to remove.`); // LOGGING
+        existingOverlays.forEach(overlay => {
+            if (overlay.parentNode) {
+              overlay.parentNode.removeChild(overlay);
+            }
+        });
+        overlayElementsMap.clear();
+        logDebug(`[WebApp] [renderOverlays] Cleared existing overlays and map.`); // LOGGING
+
+        if (!currentSlide || !currentSlideElementsData) {
+            logDebug('[WebApp] [renderOverlays] No current slide data, skipping overlay rendering.');
+            return;
+        }
+
+        // Filter interactive elements *again* here to be safe, though it should be up-to-date from handleSlideData
+        interactiveElements = currentSlideElementsData.filter(el => {
+            const hasInteraction = el.interaction && el.interaction.type && el.interaction.type !== 'none';
+            const hasAnimation = el.animation && el.animation.type && el.animation.type !== 'none';
+            const hasOverlayStyle = el.interaction && el.interaction.overlayStyle && Object.keys(el.interaction.overlayStyle).length > 0;
+            return hasInteraction || hasAnimation || hasOverlayStyle;
+        });
+        logDebug(`[WebApp] [renderOverlays] Re-filtered interactive elements count: ${interactiveElements.length}`); // LOGGING
+
+        if (interactiveElements.length === 0) {
+            logDebug('[WebApp] [renderOverlays] No interactive elements to render.');
+            return;
+        }
+
+        // Get scale factors
+        const scaleX = parseFloat(slideElement.dataset.scaleX || '1');
+        const scaleY = parseFloat(slideElement.dataset.scaleY || '1');
+        logDebug(`[WebApp] [renderOverlays] Using scale factors: X=${scaleX.toFixed(4)}, Y=${scaleY.toFixed(4)}`); // LOGGING
+
+        // Get the set of hidden elements for the CURRENT slide index
+        const currentHiddenSet = permanentlyHiddenElementsPerSlide[currentSlideIndex] || new Set();
+        logDebug(`[WebApp] [renderOverlays] Checking against hidden set for slide ${currentSlideIndex}. Set contains ${currentHiddenSet.size} elements:`, Array.from(currentHiddenSet)); // LOGGING
+
+        let renderedCount = 0; // LOGGING: Count rendered elements
+
+        // Process each interactive element
+        interactiveElements.forEach((element, index) => {
+            logDebug(`[WebApp] [renderOverlays] Processing element ${index + 1}/${interactiveElements.length}: ID=${element.id}, Type=${element.type}`); // LOGGING
+
+            // CHECK: Skip if element is marked as permanently hidden for this slide
+            if (currentHiddenSet.has(element.id)) {
+                logDebug(`[WebApp] [renderOverlays] SKIPPING render (permanently hidden): ${element.id}`); // LOGGING
+                return; // Skip this element entirely
+            }
+
+            // CHECK: Skip elements targeted by 'revealElement' that shouldn't be visible initially
+            if (isTargetOfReveal(element.id)) {
+                logDebug(`[WebApp] [renderOverlays] SKIPPING initial render (reveal target): ${element.id}`); // LOGGING
+                return; // Don't render initially
+            }
+
+            try {
+                const left = element.left * scaleX;
+                const top = element.top * scaleY;
+                const width = Math.max(element.width * scaleX, 10);
+                const height = Math.max(element.height * scaleY, 10);
+                logDebug(`[WebApp] [renderOverlays] Calculated position/size for ${element.id}: L=${left.toFixed(1)}, T=${top.toFixed(1)}, W=${width.toFixed(1)}, H=${height.toFixed(1)}`); // LOGGING
+
+                const overlay = document.createElement('div');
+                overlay.className = 'overlay';
+                overlay.dataset.elementId = element.id;
+                overlay.style.left = `${left}px`;
+                overlay.style.top = `${top}px`;
+                overlay.style.width = `${width}px`;
+                overlay.style.height = `${height}px`;
+
+                applyOverlayStyle(overlay, element);
+
+                if (element.interaction && element.interaction.showOverlayText && element.interaction.overlayText) {
+                    addOverlayText(overlay, element.interaction.overlayText);
+                }
+
+                let tooltipParts = [`ID: ${element.id}`];
+                if(element.interaction?.type && element.interaction.type !== 'none') tooltipParts.push(`I: ${element.interaction.type}`);
+                if(element.interaction?.overlayStyle) tooltipParts.push(`[Style]`);
+                if(element.animation?.type && element.animation.type !== 'none') tooltipParts.push(`A: ${element.animation.type} (${element.animation.trigger || 'auto'})`);
+                overlay.title = tooltipParts.join(' | ');
+
+                overlay.addEventListener('click', () => handleOverlayClick(element, element.id));
+                overlay.addEventListener('mouseenter', () => overlay.classList.add('is-hovering'));
+                overlay.addEventListener('mouseleave', () => overlay.classList.remove('is-hovering'));
+
+                if (element.animation && element.animation.type && element.animation.type !== 'none') {
+                    applyAnimation(overlay, element.animation);
+                }
+
+                slideElement.appendChild(overlay);
+                overlayElementsMap.set(element.id, overlay);
+                renderedCount++; // LOGGING: Increment count
+                logDebug(`[WebApp] [renderOverlays] Successfully added overlay for ${element.id} to DOM and map.`); // LOGGING
+
+            } catch (err) {
+                console.error(`[WebApp] [renderOverlays] Error rendering overlay for element ${element.id || index}:`, err); // LOGGING
+                showError(`Error rendering element ${index+1}. See console for details.`);
+            }
+        });
+
+        logDebug(`[WebApp] [renderOverlays] Finished loop. Rendered ${renderedCount} overlays.`); // LOGGING
+    }
+
+    function isTargetOfReveal(elementId) { /* ... unchanged ... */
+        if (!currentSlide || !currentSlideElementsData) return false;
+        return currentSlideElementsData.some(el =>
+            el.interaction &&
+            el.interaction.type === 'revealElement' &&
+            el.interaction.targetElementId === elementId
+        );
+    }
+
+    function applyAnimation(overlay, animation) {
+        const animationClass = getAnimationClass(animation.type);
+        if (!animationClass) {
+            logDebug(`[WebApp] Unknown animation type: ${animation.type}`);
+            return;
+        }
+        
+        let speedClass = '';
+        // Set speed/intensity classes
+        if (animation.type === 'pulse' && animation.pulseSpeed) {
+            speedClass = animation.pulseSpeed;
+        } else if (animation.type === 'wiggle' && animation.wiggleIntensity) {
+            speedClass = animation.wiggleIntensity;
+        } else if (animation.type === 'float' && animation.floatSpeed) {
+            speedClass = animation.floatSpeed;
+        }
+        
+        const trigger = animation.trigger || 'automatic';
+        logDebug(`[WebApp] Applying animation: ${animation.type} (${trigger}) to ${overlay.dataset.elementId} with speed/intensity: ${speedClass || 'default'}`);
+        
+        // For debugging, add a data attribute to confirm animation is applied
+        overlay.dataset.animationType = animation.type;
+        overlay.dataset.animationTrigger = trigger;
+        
+        switch (trigger) {
+            case 'automatic':
+                overlay.classList.add(animationClass);
+                if (speedClass) overlay.classList.add(speedClass);
+                break;
+            case 'onHover':
+                overlay.addEventListener('mouseenter', () => {
+                    overlay.classList.add(animationClass);
+                    if (speedClass) overlay.classList.add(speedClass);
+                    logDebug(`[WebApp] Hover animation started: ${animationClass}`);
+                });
+                overlay.addEventListener('mouseleave', () => {
+                    overlay.classList.remove(animationClass);
+                    if (speedClass) overlay.classList.remove(speedClass);
+                    logDebug(`[WebApp] Hover animation stopped: ${animationClass}`);
+                });
+                break;
+            case 'onClick':
+                overlay.dataset.animationClass = animationClass;
+                if (speedClass) overlay.dataset.speedClass = speedClass;
+                break;
+        }
+        
+        // Log confirmation that animation was applied
+        if (trigger === 'automatic') {
+            logDebug(`[WebApp] Automatic animation ${animationClass} applied to element ${overlay.dataset.elementId}`);
+        }
+    }
+
+    function clearOverlays() { /* ... unchanged ... */
+      overlayElementsMap.forEach(overlay => {
+        if (overlay.parentNode) {
+          overlay.parentNode.removeChild(overlay);
+        }
+      });
+      overlayElementsMap.clear();
+      logDebug('[WebApp] Cleared overlays');
+    }
+
+    function getAnimationClass(type) {
+        switch (type) {
+            case 'pulse': return 'animate-pulse';
+            case 'wiggle': return 'animate-wiggle';
+            case 'float': return 'animate-float';
+            case 'bounce': return 'animate-bounce';
+            case 'shake': return 'animate-shake';
+            case 'flash': return 'animate-flash';
+            case 'growShrink': return 'animate-growShrink';
+            default: return null;
+        }
+    }
+
+    /**
+     * Handles click events on overlay elements, managing interactions and animations.
+     * @param {Object} element - The element data object.
+     * @param {string} clickedElementId - The ID of the clicked element.
+     */
+    function handleOverlayClick(element, clickedElementId) {
+      // Debug logging to track click handling
+      logDebug(`[WebApp] Click handler triggered for: ${clickedElementId || 'unknown'}`, element);
+      
+      // Use the passed elementId or fall back to the element's id property
+      const elementId = clickedElementId || element?.id;
+      
+      if (!elementId) {
+        console.error("[WebApp] No element ID available in click handler:", {element, clickedElementId});
+        return;
+      }
+      
+      // Find the most up-to-date element data from main array
+      const currentElementData = currentSlideElementsData.find(el => el.id === elementId);
+      
+      if (!currentElementData) {
+        console.error(`[WebApp] Clicked element data not found: ${elementId}`, {
+          availableIds: currentSlideElementsData.map(el => el.id),
+          allElements: currentSlideElementsData,
+          clickedElement: element
+        });
+        return; // Should not happen if overlay exists
+      }
+
+      logDebug(`[WebApp] Processing click for element: ${elementId}`, {
+        interaction: currentElementData.interaction,
+        animation: currentElementData.animation
+      });
+
+      let interactionHandled = false;
+
+      // --- Handle Interactions First ---
+      // Check if interaction block exists and type is not none
+      if (currentElementData.interaction && 
+          currentElementData.interaction.type && 
+          currentElementData.interaction.type !== 'none') {
+          
+        const interaction = currentElementData.interaction;
+        const overlay = overlayElementsMap.get(elementId);
+
+        switch (interaction.type) {
+          case 'showText':
+            if (interaction.text) {
+              showTextModal(interaction.text, elementId);
+              interactionHandled = true;
+            } else {
+              logDebug(`[WebApp] showText interaction has no text content: ${elementId}`);
+            }
+            break;
+            
+          case 'highlight':
+            if (overlay) {
+              logDebug(`[WebApp] Highlight interaction: ${elementId}`);
+              overlay.style.transition = 'background-color 0.1s, box-shadow 0.1s, filter 0.1s';
+              // Temporarily increase brightness/contrast or apply specific style
+              overlay.style.filter = 'brightness(1.2) contrast(1.1)';
+              overlay.classList.add('highlighted-temporary'); // Add class if needed
+              setTimeout(() => {
+                if(overlayElementsMap.has(elementId)) {
+                  overlay.style.transition = ''; // Reset transition
+                  overlay.style.filter = ''; // Reset filter
+                  overlay.classList.remove('highlighted-temporary');
+                  // Re-apply original style to ensure it returns to normal
+                  applyOverlayStyle(overlay, currentElementData);
+                }
+              }, 800); // Duration of highlight
+            } else {
+              logDebug(`[WebApp] Highlight overlay not found: ${elementId}`);
+            }
+            interactionHandled = true;
+            break;
+            
+          case 'openUrl':
+            if (interaction.url) {
+              logDebug(`[WebApp] Open URL interaction: ${interaction.url}`);
+              try {
+                window.open(interaction.url, '_blank');
+                interactionHandled = true;
+              } catch (error) {
+                console.error(`[WebApp] Error opening URL: ${interaction.url}`, error);
+                showError(`Failed to open URL: ${interaction.url}`);
+              }
+            } else {
+              logDebug(`[WebApp] openUrl interaction has no URL: ${elementId}`);
+            }
+            break;
+            
+          case 'spotlight':
+            logDebug(`[WebApp] Spotlight interaction: ${elementId}`);
+            showSpotlight(elementId, interaction);
+            interactionHandled = true;
+            break;
+            
+          case 'goToSlide':
+            if (interaction.targetSlide) {
+              const targetIndex = parseInt(interaction.targetSlide, 10) - 1;
+              logDebug(`[WebApp] Go to Slide interaction: Target ${interaction.targetSlide} (Index ${targetIndex})`);
+              if (targetIndex >= 0 && targetIndex < totalSlides && targetIndex !== currentSlideIndex) {
+                loadSlide(targetIndex);
+              } else if (targetIndex === currentSlideIndex) {
+                logDebug('[WebApp] Already on target slide.');
+              } else {
+                showError(`Invalid target slide number: ${interaction.targetSlide}`);
+              }
+              interactionHandled = true;
+            } else {
+              logDebug(`[WebApp] goToSlide interaction has no target: ${elementId}`);
+            }
+            break;
+            
+          case 'revealElement':
+            if (interaction.targetElementId) {
+              logDebug(`[WebApp] Reveal Element interaction: Target ${interaction.targetElementId}`);
+              revealElement(interaction.targetElementId, elementId);
+              interactionHandled = true;
+            } else {
+              logDebug(`[WebApp] revealElement interaction has no target: ${elementId}`);
+            }
+            break;
+            case 'revealAndSpotlight':
+              if (interaction.targetElementId) {
+                logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${interaction.targetElementId}`);
+                // Step 1: Reveal the element, NOT keeping the trigger visible (pass false)
+                revealElement(interaction.targetElementId, elementId, false); // Changed to false
+
+                // Step 2: Use setTimeout to allow reveal animation/DOM update
+                setTimeout(() => {
+                  // Ensure target is actually in the map after reveal attempt
+                  if (overlayElementsMap.has(interaction.targetElementId)) {
+                    logDebug(`[WebApp] Triggering spotlight for revealed element: ${interaction.targetElementId}`);
+                    // Pass the *entire interaction object* which contains the text/notes settings
+                    showSpotlight(interaction.targetElementId, interaction);
+                  } else {
+                    logDebug(`[WebApp] Target element ${interaction.targetElementId} not found in map after reveal attempt for spotlight.`);
+                    showError(`Could not spotlight revealed element (ID: ${interaction.targetElementId.substring(0,8)}...).`);
+                  }
+                }, 200); // Adjust delay if needed (e.g., 100-300ms)
+
+                interactionHandled = true;
+              } else {
+                logDebug(`[WebApp] revealAndSpotlight interaction has no target: ${elementId}`);
+              }
+              break;
+          default:
+            logDebug(`[WebApp] Unknown interaction type: ${interaction.type}`);
+        }
+      }
+
+      // --- Handle Animation Triggered by Click ---
+      // Only process if the interaction wasn't already handled or if we should chain actions
+      if (!interactionHandled && currentElementData.animation && 
+          currentElementData.animation.trigger === 'onClick') {
+          
+        const animation = currentElementData.animation;
+        const overlay = overlayElementsMap.get(elementId);
+        logDebug(`[WebApp] Click animation triggered: ${animation.type}`);
+
+        if (overlay && animation.type && animation.type !== 'none') {
+          const animationClass = overlay.dataset.animationClass || 
+                                getAnimationClass(animation.type);
+          const speedClass = overlay.dataset.speedClass || '';
+
+          if (animationClass) {
+            overlay.classList.add(animationClass);
+            if (speedClass) overlay.classList.add(speedClass);
+
+            const duration = speedClass.includes('fast') ? 1000 : 
+                            (speedClass.includes('slow') ? 3000 : 2000);
+            logDebug(`[WebApp] Playing click animation ${animationClass} for ${duration}ms`);
+
+            setTimeout(() => {
+              if(overlayElementsMap.has(elementId)) {
+                overlay.classList.remove(animationClass);
+                if (speedClass) overlay.classList.remove(speedClass);
+                logDebug(`[WebApp] Click animation ${animationClass} finished.`);
+              }
+            }, duration);
+          } else {
+            logDebug(`[WebApp] Could not find animation class for type: ${animation.type}`);
+          }
+        } else {
+          logDebug(`[WebApp] Overlay not found or invalid animation for click: ${elementId}`);
+        }
+      }
+    }
+
+
+    function hasSpotlightCapability(element) {
+      return element && 
+             element.interaction && 
+             element.interaction.type === 'spotlight' &&
+             element.interaction.showText &&
+             element.interaction.text;
+    }
+
+    /**
+     * Builds a list of elements that can be navigated through spotlight
+     */
+    function buildSpotlightableElementsList() {
+      // Reset the list
+      spotlightableElements = [];
+      
+      // Get currently visible elements
+      const currentlyVisibleElements = Array.from(overlayElementsMap.keys());
+      
+      // First try to find all interactive elements with spotlight interactions
+      const elementsWithSpotlight = interactiveElements.filter(el => 
+        currentlyVisibleElements.includes(el.id) &&
+        hasSpotlightCapability(el)
+      );
+      
+      // Log what we found
+      logDebug(`[WebApp] Found ${elementsWithSpotlight.length} elements with spotlight capability`);
+      
+      // Check if there are enough elements to enable navigation
+      if (elementsWithSpotlight.length > 1) {
+        spotlightableElements = elementsWithSpotlight;
+      } else {
+        // If only one or no spotlight elements, disable navigation
+        logDebug(`[WebApp] Not enough spotlight elements for navigation`);
+      }
+      
+      // Return the number of elements found
+      return spotlightableElements.length;
+    }
+
+    /**
+     * Shows a spotlight effect with a true cutout that shows the underlying content.
+     */
+    function showSpotlight(elementId, interactionData) {
+        // Always hide any existing spotlight first
+        hideSpotlight();
+        
+        // Get the target element ID (either the specified target or the clicked element)
+        const targetId = interactionData.spotlightTarget || elementId;
+        
+        logDebug(`[WebApp] Spotlight requested for ${elementId}, targeting: ${targetId}`);
+        
+        // Find the target overlay element
+        const targetOverlay = overlayElementsMap.get(targetId);
+        if (!targetOverlay) {
+            logDebug(`[WebApp] Spotlight target not found: ${targetId}`);
+            showError(`Spotlight target not found (ID: ${targetId.substring(0,8)}...)`);
+            return;
+        }
+        
+        // Build the list of spotlightable elements for navigation
+        buildSpotlightableElementsList();
+        
+        // Find the index of this element in the spotlightable elements array
+        currentSpotlightElementIndex = spotlightableElements.findIndex(el => 
+            el.id === elementId || // Either the triggering element
+            (interactionData.spotlightTarget && el.id === interactionData.spotlightTarget) // Or its target
+        );
+        
+        logDebug(`[WebApp] Current spotlight element index: ${currentSpotlightElementIndex} of ${spotlightableElements.length}`);
+        
+        // Get the target's position and dimensions
+        const targetRect = targetOverlay.getBoundingClientRect();
+        const slideRect = slideElement.getBoundingClientRect();
+        
+        // Calculate position relative to the viewport
+        const viewportLeft = targetRect.left;
+        const viewportTop = targetRect.top;
+        const viewportWidth = targetRect.width;
+        const viewportHeight = targetRect.height;
+        
+        // Create SVG with mask for the dimming overlay
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("id", "spotlightSVG");
+        svg.setAttribute("width", "100%");
+        svg.setAttribute("height", "100%");
+        svg.style.position = "fixed";
+        svg.style.top = "0";
+        svg.style.left = "0";
+        svg.style.zIndex = "90";
+        svg.style.pointerEvents = "none"; // Allow clicks to pass through initially
+        
+        // Create the mask
+        const mask = document.createElementNS(svgNS, "mask");
+        mask.setAttribute("id", "spotlightMask");
+        
+        // Background rectangle (white = opaque, black = transparent)
+        const bgRect = document.createElementNS(svgNS, "rect");
+        bgRect.setAttribute("x", "0");
+        bgRect.setAttribute("y", "0");
+        bgRect.setAttribute("width", "100%");
+        bgRect.setAttribute("height", "100%");
+        bgRect.setAttribute("fill", "white"); // White = opaque part of mask
+        
+        // Cutout rectangle (black = transparent hole in the mask)
+        const cutoutRect = document.createElementNS(svgNS, "rect");
+        cutoutRect.setAttribute("x", viewportLeft);
+        cutoutRect.setAttribute("y", viewportTop);
+        cutoutRect.setAttribute("width", viewportWidth);
+        cutoutRect.setAttribute("height", viewportHeight);
+        cutoutRect.setAttribute("fill", "black"); // Black = transparent part of mask
+        cutoutRect.setAttribute("rx", "3"); // Rounded corners
+        cutoutRect.setAttribute("ry", "3"); // Rounded corners
+        
+        // Add the rectangles to the mask
+        mask.appendChild(bgRect);
+        mask.appendChild(cutoutRect);
+        
+        // Add mask to SVG
+        svg.appendChild(mask);
+        
+        // Create the dimming rectangle that uses the mask
+        const dimRect = document.createElementNS(svgNS, "rect");
+        dimRect.setAttribute("x", "0");
+        dimRect.setAttribute("y", "0");
+        dimRect.setAttribute("width", "100%");
+        dimRect.setAttribute("height", "100%");
+        dimRect.setAttribute("fill", "rgba(0, 0, 0, 0.75)"); // Semi-transparent black
+        dimRect.setAttribute("mask", "url(#spotlightMask)");
+        svg.appendChild(dimRect);
+        
+        // Add the SVG to the document
+        document.body.appendChild(svg);
+        
+        // Create a transparent overlay to capture clicks for dismissing the spotlight
+        const clickCatcher = document.createElement('div');
+        clickCatcher.id = 'spotlightClickCatcher';
+        clickCatcher.style.position = 'fixed';
+        clickCatcher.style.top = '0';
+        clickCatcher.style.left = '0';
+        clickCatcher.style.width = '100%';
+        clickCatcher.style.height = '100%';
+        clickCatcher.style.zIndex = '89'; // Below the SVG
+        clickCatcher.style.cursor = 'pointer';
+        
+        // Add click handler to dismiss
+        clickCatcher.addEventListener('click', hideSpotlight);
+        
+        // Add the click catcher to the document
+        document.body.appendChild(clickCatcher);
+        
+        // Highlight the target with a glowing border
+        targetOverlay.classList.add('spotlight-active');
+        
+        // Store references for cleanup
+        window.currentSpotlight = {
+            svg: svg,
+            clickCatcher: clickCatcher,
+            targetId: targetId,
+            elementId: elementId, // Store the original element ID
+            interactionData: interactionData // Store the interaction data
+        };
+        
+        // Set global state
+        isSpotlightActive = true;
+        
+        // Handle text display if configured
+        if (interactionData.showText && interactionData.text) {
+            showSpotlightText(interactionData.text, targetRect);
+        }
+        
+        // Handle notes display if configured
+        if (interactionData.showNotes && currentSlide.slideNotes) {
+            showSpotlightNotes(currentSlide.slideNotes);
+        }
+        
+        logDebug(`[WebApp] Spotlight activated for ${targetId}`);
+    }
+
+    /**
+     * Hides the spotlight effect and cleans up all related elements.
+     */
+    function hideSpotlight() {
+        if (!isSpotlightActive && !window.currentSpotlight) {
+            return;
+        }
+        
+        logDebug('[WebApp] Hiding spotlight');
+        
+        // Remove SVG and click catcher
+        if (window.currentSpotlight) {
+            if (window.currentSpotlight.svg) {
+                document.body.removeChild(window.currentSpotlight.svg);
+            }
+            
+            if (window.currentSpotlight.clickCatcher) {
+                document.body.removeChild(window.currentSpotlight.clickCatcher);
+            }
+            
+            // Remove highlight from target element
+            if (window.currentSpotlight.targetId) {
+                const targetOverlay = overlayElementsMap.get(window.currentSpotlight.targetId);
+                if (targetOverlay) {
+                    targetOverlay.classList.remove('spotlight-active');
+                }
+            }
+            
+            // Clean up text/notes
+            hideSpotlightText();
+            hideSpotlightNotes();
+            
+            // Clean up the reference
+            window.currentSpotlight = null;
+        }
+        
+        // Reset state
+        isSpotlightActive = false;
+        currentSpotlightElementIndex = -1;
+    }
+
+    /**
+     * Shows text next to a spotlighted element
+     */
+    function showSpotlightText(text, targetRect) {
+      // Create text bubble container
+      const textBubble = document.createElement('div');
+      textBubble.id = 'spotlightTextBubble';
+      textBubble.style.position = 'fixed';
+      textBubble.style.maxWidth = '300px';
+      textBubble.style.padding = '15px';
+      textBubble.style.backgroundColor = 'white';
+      textBubble.style.color = '#333';
+      textBubble.style.borderRadius = '8px';
+      textBubble.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+      textBubble.style.zIndex = '95'; // Above the dimming layer
+      textBubble.style.fontSize = '14px';
+      textBubble.style.lineHeight = '1.5';
+      
+      // Content container - format text with simple HTML
+      const contentDiv = document.createElement('div');
+      contentDiv.style.marginBottom = '10px';
+      contentDiv.innerHTML = text.replace(/\n/g, '<br>');
+      textBubble.appendChild(contentDiv);
+      
+      // Only add navigation buttons if we have multiple spotlight elements
+      if (spotlightableElements.length > 1) {
+        // Navigation buttons container
+        const navDiv = document.createElement('div');
+        navDiv.className = 'spotlight-nav-container';
+        
+        // Previous button
+        const prevButton = document.createElement('button');
+        prevButton.id = 'spotlightPrevBtn';
+        prevButton.className = 'spotlight-nav-button';
+        prevButton.innerHTML = '<span>←</span> Previous';
+        prevButton.addEventListener('click', navigateToPrevSpotlight);
+        
+        // Next button
+        const nextButton = document.createElement('button');
+        nextButton.id = 'spotlightNextBtn';
+        nextButton.className = 'spotlight-nav-button';
+        nextButton.innerHTML = 'Next <span>→</span>';
+        nextButton.addEventListener('click', navigateToNextSpotlight);
+        
+        // Add the buttons to the nav container
+        navDiv.appendChild(prevButton);
+        navDiv.appendChild(nextButton);
+        
+        // Add navigation to the bubble
+        textBubble.appendChild(navDiv);
+      } else {
+        // If no navigation, add a small hint about clicking outside to dismiss
+        const hintDiv = document.createElement('div');
+        hintDiv.style.marginTop = '10px';
+        hintDiv.style.borderTop = '1px solid #eee';
+        hintDiv.style.paddingTop = '10px';
+        hintDiv.style.fontSize = '12px';
+        hintDiv.style.color = '#666';
+        hintDiv.style.textAlign = 'center';
+        hintDiv.textContent = 'Click outside to dismiss';
+        textBubble.appendChild(hintDiv);
+      }
+      
+      // Add to body to calculate size
+      document.body.appendChild(textBubble);
+      
+      // Position relative to target
+      const bubbleRect = textBubble.getBoundingClientRect();
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      
+      // Default to positioning below the target
+      let top = targetRect.bottom + 15;
+      let left = targetRect.left + (targetRect.width / 2) - (bubbleRect.width / 2);
+      
+      // Check if it would go off-screen and adjust accordingly
+      if (top + bubbleRect.height > windowHeight) {
+        // Position above if it would go off the bottom
+        top = targetRect.top - bubbleRect.height - 15;
+      }
+      
+      // Adjust horizontal position if needed
+      if (left < 20) {
+        left = 20; // Left margin
+      } else if (left + bubbleRect.width > windowWidth - 20) {
+        left = windowWidth - bubbleRect.width - 20; // Right margin
+      }
+      
+      // Apply position
+      textBubble.style.top = `${top}px`;
+      textBubble.style.left = `${left}px`;
+      
+      // Add to window object for cleanup
+      if (!window.currentSpotlight) {
+        window.currentSpotlight = {};
+      }
+      window.currentSpotlight.textBubble = textBubble;
+      
+      // Update button states if navigation is available
+      if (spotlightableElements.length > 1) {
+        updateSpotlightNavButtons();
+      }
+    }
+
+    /**
+     * Hides any spotlight text bubble.
+     */
+    function hideSpotlightText() {
+        const bubble = document.getElementById('spotlightTextBubble');
+        if (bubble) {
+            document.body.removeChild(bubble);
+        }
+    }
+
+    /**
+     * Shows speaker notes when spotlight is active.
+     */
+    function showSpotlightNotes(notes) {
+        // Create notes panel
+        const notesPanel = document.createElement('div');
+        notesPanel.id = 'spotlightNotesPanel';
+        notesPanel.style.position = 'fixed';
+        notesPanel.style.bottom = '20px';
+        notesPanel.style.left = '50%';
+        notesPanel.style.transform = 'translateX(-50%)';
+        notesPanel.style.maxWidth = '80%';
+        notesPanel.style.width = '600px';
+        notesPanel.style.padding = '15px';
+        notesPanel.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        notesPanel.style.color = 'white';
+        notesPanel.style.borderRadius = '8px';
+        notesPanel.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
+        notesPanel.style.zIndex = '95'; // Above the dimming layer
+        notesPanel.style.fontSize = '14px';
+        notesPanel.style.lineHeight = '1.5';
+        
+        // Add a title and the notes content
+        notesPanel.innerHTML = `<div style="font-weight: bold; margin-bottom: 8px; color: #ccc;">Speaker Notes:</div>${notes.replace(/\n/g, '<br>')}`;
+        
+        // Add to document
+        document.body.appendChild(notesPanel);
+        
+        // Add to window object for cleanup
+        if (!window.currentSpotlight) {
+            window.currentSpotlight = {};
+        }
+        window.currentSpotlight.notesPanel = notesPanel;
+    }
+
+    /**
+     * Hides any spotlight notes panel.
+     */
+    function hideSpotlightNotes() {
+        const panel = document.getElementById('spotlightNotesPanel');
+        if (panel) {
+            document.body.removeChild(panel);
+        }
+    }
+
+    /**
+     * Updates the next/prev button states for spotlight navigation
+     */
+    function updateSpotlightNavButtons() {
+        const prevBtn = document.getElementById('spotlightPrevBtn');
+        const nextBtn = document.getElementById('spotlightNextBtn');
+        
+        if (!prevBtn || !nextBtn) return;
+        
+        // Disable/enable based on current position in spotlightable elements
+        prevBtn.disabled = currentSpotlightElementIndex <= 0;
+        prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
+        prevBtn.style.cursor = prevBtn.disabled ? 'not-allowed' : 'pointer';
+        
+        nextBtn.disabled = currentSpotlightElementIndex >= spotlightableElements.length - 1;
+        nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
+        nextBtn.style.cursor = nextBtn.disabled ? 'not-allowed' : 'pointer';
+    }
+
+    /**
+     * Navigate to the previous element with spotlight capability
+     */
+    function navigateToPrevSpotlight() {
+        if (currentSpotlightElementIndex <= 0 || !window.currentSpotlight) return;
+        
+        // Get the previous element
+        const prevElement = spotlightableElements[currentSpotlightElementIndex - 1];
+        if (!prevElement) return;
+        
+        logDebug(`[WebApp] Navigating to previous spotlight: ${prevElement.id}`);
+        
+        // Hide current spotlight
+        hideSpotlight();
+        
+        // Show spotlight for the previous element
+        if (prevElement.interaction?.type === 'spotlight') {
+            showSpotlight(prevElement.id, prevElement.interaction);
+        }
+    }
+
+    /**
+     * Navigate to the next element with spotlight capability
+     */
+    function navigateToNextSpotlight() {
+        if (currentSpotlightElementIndex >= spotlightableElements.length - 1 || !window.currentSpotlight) return;
+        
+        // Get the next element
+        const nextElement = spotlightableElements[currentSpotlightElementIndex + 1];
+        if (!nextElement) return;
+        
+        logDebug(`[WebApp] Navigating to next spotlight: ${nextElement.id}`);
+        
+        // Hide current spotlight
+        hideSpotlight();
+        
+        // Show spotlight for the next element
+        if (nextElement.interaction?.type === 'spotlight') {
+            showSpotlight(nextElement.id, nextElement.interaction);
+        }
+    }
+
+    // ---------- Modal Functions ----------
+    function showTextModal(text, elementId) {
+      logDebug(`[WebApp] Showing text modal for element: ${elementId}`);
+      // Sanitize text slightly before inserting (basic example)
+      modalTextDiv.innerHTML = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+      textModal.classList.add('visible');
+
+      // Find the index of this element within the *currently rendered* interactive elements
+      // This list might change if elements are revealed
+      const currentlyVisibleElements = Array.from(overlayElementsMap.keys());
+      const modalNavElements = interactiveElements.filter(el =>
+         currentlyVisibleElements.includes(el.id) && // Must be visible
+         ( (el.interaction?.type === 'showText' && el.interaction.text) || // Has interaction text
+           (el.animation?.trigger === 'onClick' && el.animation.showTextOnClick && el.animation.text) // Or animation text
+         )
+      );
+
+      currentModalElementIndex = modalNavElements.findIndex(el => el.id === elementId);
+
+      updateModalNavigation(modalNavElements); // Pass the filtered list
+      highlightActiveModalElement(elementId);
+    }
+
+    function hideTextModal() {
+      // Also ensure spotlight is off when modal closes
+      hideSpotlight();
+      if (textModal.classList.contains('visible')) {
+          logDebug('[WebApp] Hiding text modal');
+          textModal.classList.remove('visible');
+          resetModalElementHighlights();
+          currentModalElementIndex = -1; // Reset index
+      }
+    }
+
+    function highlightActiveModalElement(elementId) {
+      resetModalElementHighlights(); // Reset all first
+      const overlay = overlayElementsMap.get(elementId);
+      if (overlay) {
+        overlay.classList.add('highlighted-for-modal');
+      }
+    }
+
+    function resetModalElementHighlights() {
+      overlayElementsMap.forEach(overlay => {
+        overlay.classList.remove('highlighted-for-modal');
+      });
+    }
+
+    // Update modal Prev/Next buttons based on the list of navigable elements
+    function updateModalNavigation(modalNavElements) {
+      const numNavigable = modalNavElements.length;
+      const hasMultiple = numNavigable > 1;
+
+      // Show/hide buttons based on whether there's more than one item
+      prevElementBtn.style.display = hasMultiple ? 'flex' : 'none';
+      nextElementBtn.style.display = hasMultiple ? 'flex' : 'none';
+
+      if (hasMultiple) {
+        prevElementBtn.disabled = currentModalElementIndex <= 0;
+        nextElementBtn.disabled = currentModalElementIndex >= numNavigable - 1;
+         logDebug(`[WebApp] Modal nav updated: Index ${currentModalElementIndex}, Total ${numNavigable}`);
+      }
+    }
+
+    // Navigate modal to the previous element that can show text
+    function navigateToPrevModalElement() {
+      // Recalculate navigable elements in case state changed (e.g., reveal)
+      const currentlyVisibleElements = Array.from(overlayElementsMap.keys());
+      const modalNavElements = interactiveElements.filter(el =>
+         currentlyVisibleElements.includes(el.id) &&
+         ( (el.interaction?.type === 'showText' && el.interaction.text) ||
+           (el.animation?.trigger === 'onClick' && el.animation.showTextOnClick && el.animation.text)
+         )
+      );
+
+      if (currentModalElementIndex > 0 && currentModalElementIndex < modalNavElements.length) {
+        const prevNavElement = modalNavElements[currentModalElementIndex - 1];
+        // Determine which text to show (interaction takes precedence)
+        let textToShow = prevNavElement.interaction?.text || prevNavElement.animation?.text || 'Error: Text not found.';
+        showTextModal(textToShow, prevNavElement.id); // Will update index and buttons
+      } else {
+         logDebug("[WebApp] Already at first modal element or index invalid.");
+      }
+    }
+
+    // Navigate modal to the next element that can show text
+    function navigateToNextModalElement() {
+      // Recalculate navigable elements
+       const currentlyVisibleElements = Array.from(overlayElementsMap.keys());
+       const modalNavElements = interactiveElements.filter(el =>
+          currentlyVisibleElements.includes(el.id) &&
+          ( (el.interaction?.type === 'showText' && el.interaction.text) ||
+            (el.animation?.trigger === 'onClick' && el.animation.showTextOnClick && el.animation.text)
+          )
+       );
+
+      if (currentModalElementIndex >= 0 && currentModalElementIndex < modalNavElements.length - 1) {
+        const nextNavElement = modalNavElements[currentModalElementIndex + 1];
+        let textToShow = nextNavElement.interaction?.text || nextNavElement.animation?.text || 'Error: Text not found.';
+        showTextModal(textToShow, nextNavElement.id);
+      } else {
+         logDebug("[WebApp] Already at last modal element or index invalid.");
+      }
+    }
+
+    function revealElement(targetElementId, triggerElementId, keepTriggerVisible = false) {
+        logDebug(`[WebApp] [revealElement] Start - Target: ${targetElementId}, Trigger: ${triggerElementId}, KeepTrigger: ${keepTriggerVisible}`); // LOGGING
+
+        if (overlayElementsMap.has(targetElementId)) {
+            logDebug(`[WebApp] [revealElement] Target element ${targetElementId} is already visible in overlayElementsMap.`); // LOGGING
+            const existingOverlay = overlayElementsMap.get(targetElementId);
+            if (existingOverlay) {
+                existingOverlay.style.transition = 'transform 0.2s ease-out, box-shadow 0.2s ease-out';
+                existingOverlay.style.transform = 'scale(1.05)';
+                existingOverlay.style.boxShadow = '0 0 10px rgba(26, 115, 232, 0.7)';
+                setTimeout(() => {
+                    if (overlayElementsMap.has(targetElementId)) {
+                        existingOverlay.style.transform = '';
+                        existingOverlay.style.boxShadow = '';
+                        logDebug(`[WebApp] [revealElement] Removed temporary highlight from already revealed target ${targetElementId}.`); // LOGGING
+                    }
+                }, 800);
+            }
+            return;
+        }
+
+        // Find the element data in the *full* list received from backend
+        const targetElementData = currentSlideElementsData.find(el => el.id === targetElementId);
+
+        if (!targetElementData) {
+            logDebug(`[WebApp] [revealElement] ERROR: Target element data not found in currentSlideElementsData. Target ID: ${targetElementId}`, { // LOGGING
+                availableIds: currentSlideElementsData.map(el => el.id)
+            });
+            showError(`Cannot find element to reveal (ID: ${targetElementId.substring(0,8)}...). Make sure the element is on this slide.`);
+            return;
+        }
+
+        logDebug(`[WebApp] [revealElement] Found target element data for ${targetElementId}. Proceeding to reveal.`); // LOGGING
+        try {
+            const scaleX = parseFloat(slideElement.dataset.scaleX) || 1;
+            const scaleY = parseFloat(slideElement.dataset.scaleY) || 1;
+            const left = targetElementData.left * scaleX;
+            const top = targetElementData.top * scaleY;
+            const width = Math.max(targetElementData.width * scaleX, 5);
+            const height = Math.max(targetElementData.height * scaleY, 5);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay revealed';
+            overlay.dataset.elementId = targetElementData.id;
+            if (triggerElementId) overlay.dataset.revealedBy = triggerElementId;
+
+            overlay.style.left = `${left}px`;
+            overlay.style.top = `${top}px`;
+            overlay.style.width = `${width}px`;
+            overlay.style.height = `${height}px`;
+            overlay.style.opacity = 0;
+
+            applyOverlayStyle(overlay, targetElementData);
+            logDebug(`[WebApp] [revealElement] Applied styles to revealed element ${targetElementId}`); // LOGGING
+
+            if (targetElementData.interaction?.showOverlayText && targetElementData.interaction.overlayText) {
+                addOverlayText(overlay, targetElementData.interaction.overlayText);
+            }
+
+            let tooltipParts = [`ID: ${targetElementData.id} (Revealed)`];
+            if (targetElementData.interaction?.type && targetElementData.interaction.type !== 'none') tooltipParts.push(`I: ${targetElementData.interaction.type}`);
+            if(targetElementData.interaction?.overlayStyle) tooltipParts.push(`[Style]`);
+            if (targetElementData.animation?.type && targetElementData.animation.type !== 'none') tooltipParts.push(`A: ${targetElementData.animation.type} (...)`);
+            overlay.title = tooltipParts.join(' | ');
+
+            if ((targetElementData.interaction && targetElementData.interaction.type !== 'none') || (targetElementData.animation && targetElementData.animation.type !== 'none')) {
+                logDebug(`[WebApp] [revealElement] Adding click listener to revealed element ${targetElementId}`); // LOGGING
+                overlay.addEventListener('click', () => handleOverlayClick(targetElementData, overlay.dataset.elementId));
+            } else {
+              overlay.style.cursor = 'default';
+              overlay.classList.add('no-interaction');
+              logDebug(`[WebApp] [revealElement] Revealed element ${targetElementId} has no interaction/animation, skipping click listener.`); // LOGGING
+            }
+
+            overlay.addEventListener('mouseenter', () => overlay.classList.add('is-hovering'));
+            overlay.addEventListener('mouseleave', () => overlay.classList.remove('is-hovering'));
+
+            if (targetElementData.animation && targetElementData.animation.type && targetElementData.animation.type !== 'none') {
+                applyAnimation(overlay, targetElementData.animation);
+            }
+
+            slideElement.appendChild(overlay);
+            overlayElementsMap.set(targetElementData.id, overlay);
+            logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementId} to DOM and overlayElementsMap.`); // LOGGING
+
+            if (!interactiveElements.some(el => el.id === targetElementData.id)) {
+                interactiveElements.push(targetElementData);
+                logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementData.id} to interactiveElements list.`); // LOGGING
+            }
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    overlay.style.opacity = 1;
+                    logDebug(`[WebApp] [revealElement] Fading in revealed element ${targetElementId}.`); // LOGGING
+                });
+            });
+
+            // --- Modified hiding logic for the trigger ---
+            if (!keepTriggerVisible && triggerElementId && overlayElementsMap.has(triggerElementId)) {
+                logDebug(`[WebApp] [revealElement] Hiding trigger element: ${triggerElementId}`); // LOGGING
+                const triggerOverlay = overlayElementsMap.get(triggerElementId);
+                triggerOverlay.style.transition = 'opacity 0.5s ease-out';
+                triggerOverlay.style.opacity = 0;
+                triggerOverlay.style.pointerEvents = 'none';
+
+                setTimeout(() => {
+                    logDebug(`[WebApp] [revealElement] Timeout for hiding trigger ${triggerElementId} executing...`); // LOGGING
+                    if (overlayElementsMap.has(triggerElementId) && triggerOverlay.parentNode) {
+                      logDebug(`[WebApp] [revealElement] Removing trigger ${triggerElementId} from DOM and map.`); // LOGGING
+                      triggerOverlay.parentNode.removeChild(triggerOverlay);
+                      overlayElementsMap.delete(triggerElementId);
+
+                      const currentHiddenSet = permanentlyHiddenElementsPerSlide[currentSlideIndex];
+                      if (currentHiddenSet) {
+                          currentHiddenSet.add(triggerElementId);
+                          logDebug(`[WebApp] [revealElement] Added ${triggerElementId} to hidden set for slide ${currentSlideIndex}. Set is now:`, Array.from(currentHiddenSet)); // LOGGING
+                          logDebug(`[WebApp] [revealElement] State of all sets after adding:`, permanentlyHiddenElementsPerSlide); // LOGGING
+                      } else {
+                          logDebug(`[WebApp] [revealElement] ERROR: Could not find hidden set for current slide ${currentSlideIndex} when trying to add ${triggerElementId}!`); // LOGGING
+                      }
+                    } else {
+                        logDebug(`[WebApp] [revealElement] Trigger overlay ${triggerElementId} already removed or not found in map during timeout.`); // LOGGING
+                    }
+
+                }, 500);
+            } else if (keepTriggerVisible) {
+                logDebug(`[WebApp] [revealElement] Keeping trigger element visible: ${triggerElementId}`);
+            } else {
+                logDebug(`[WebApp] [revealElement] Trigger element ${triggerElementId} not hidden (keepTrigger: ${keepTriggerVisible}, found in map: ${overlayElementsMap.has(triggerElementId)})`); // LOGGING
+            }
+
+        } catch (err) {
+            console.error(`[WebApp] [revealElement] Error revealing element ${targetElementId}:`, err); // LOGGING
+            showError(`Failed to reveal element ${targetElementId.substring(0,8)}...`);
+        }
+    }
+
+
+    // ---------- Loading and Error Handling ----------
+    function showLoading(message) {
+      loadingOverlay.querySelector('.loading-message').textContent = message || 'Loading...';
+      loadingOverlay.style.display = 'flex';
+      logDebug(`[WebApp] Showing loading: ${message}`);
+    }
+    function hideLoading() {
+      loadingOverlay.style.display = 'none';
+      logDebug(`[WebApp] Hiding loading`);
+    }
+    function showError(message) {
+      const errorMessageText = String(message || "An unknown error occurred.");
+      console.error(`[WebApp] Error: ${errorMessageText}`);
+      errorElement.textContent = errorMessageText;
+      errorElement.style.display = 'block';
+      // Auto-hide after a delay
+      setTimeout(() => { errorElement.style.display = 'none'; }, 5000);
+    }
+    function handleLoadError(error) {
+      hideLoading();
+      const errorMessage = (typeof error === 'object' && error !== null && error.message) ? error.message : String(error);
+      showError(`Failed to load slide data: ${errorMessage}. Please check console logs or presentation access.`);
+      console.error(`[WebApp] Full load error object: `, error); // Log full details
+    }
+    
+    /**
+     * Handles the escape key and closing modals/spotlights properly
+     */
+    function handleEscapeKey() {
+      if (isSpotlightActive) {
+        hideSpotlight();
+        return true; // Handled
+      }
+      if (textModal.classList.contains('visible')) {
+        hideTextModal();
+        return true; // Handled
+      }
+      return false; // Not handled
+    }
+
+    /**
+     * Makes the keyboard navigation more robust by checking state
+     */
+    function tryNavigateWithKeyboard(key) {
+      // Most specific scopes first
+      if (textModal.classList.contains('visible')) {
+        // Text modal is visible
+        if (key === 'ArrowLeft') {
+          navigateToPrevModalElement();
+          return true;
+        } else if (key === 'ArrowRight') {
+          navigateToNextModalElement();
+          return true;
+        }
+      } else if (isSpotlightActive) {
+        // Spotlight is active
+        if (key === 'ArrowLeft') {
+          navigateToPrevSpotlight();
+          return true;
+        } else if (key === 'ArrowRight') {
+          navigateToNextSpotlight();
+          return true;
+        }
+      } else {
+        // Normal slide navigation
+        if (key === 'ArrowLeft' && !prevSlideBtn.disabled) {
+          loadSlide(currentSlideIndex - 1);
+          return true;
+        } else if (key === 'ArrowRight' && !nextSlideBtn.disabled) {
+          loadSlide(currentSlideIndex + 1);
+          return true;
+        }
+      }
+      return false; // Not handled
+    }
+
+    // Keyboard event handler for navigation
+    document.addEventListener('keydown', (e) => {
+      // Handle Escape key for modals/spotlights
+      if (e.key === 'Escape') {
+        if (handleEscapeKey()) {
+          e.preventDefault();
+          return;
+        }
+      }
+      
+      // Handle arrow keys for navigation
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (tryNavigateWithKeyboard(e.key)) {
+          e.preventDefault();
+          return;
+        }
+      }
+      
+      // Handle space bar to dismiss spotlight (optional)
+      if (e.key === ' ' && isSpotlightActive) {
+        hideSpotlight();
+        e.preventDefault();
+        return;
+      }
+    });
+</script>
+</body>
+</html>

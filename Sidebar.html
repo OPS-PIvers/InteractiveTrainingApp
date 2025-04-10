@@ -572,232 +572,315 @@
 
           <!-- --- Interaction Option Groups --- -->
 
-          <!-- Show Text Options -->
-          <div id="showTextOptions" class="option-group hidden">
-            <label for="interactionText">Text to Show (in Modal):</label>
-            <textarea id="interactionText" rows="3" placeholder="Enter the text to display in the popup"></textarea>
-            <!-- Overlay Text Option -->
-            <div class="overlay-text-option">
-              <div class="checkbox-option">
-                <input type="checkbox" id="showText_showOverlayText">
-                <label for="showText_showOverlayText">Show text directly on overlay</label>
-              </div>
-              <div id="showText_overlayTextContainer" class="indented-option hidden">
-                 <label for="showText_overlayText">Overlay Text:</label>
-                 <input type="text" id="showText_overlayText" placeholder="Short text (e.g., 'Details')">
-              </div>
-            </div>
-            <!-- Element-specific Custom Overlay Style controls -->
-            <div class="custom-overlay-controls-section">
-              <div class="checkbox-option">
-                <input type="checkbox" id="showText_useCustomOverlay">
-                <label for="showText_useCustomOverlay">Custom overlay style</label>
-              </div>
-              <div id="showText_customOverlayContainer" class="custom-overlay-style-group hidden">
-                <h6>Custom Overlay Style</h6>
-                <!-- Placeholder for common style controls -->
-              </div>
-            </div>
-          </div>
+<!-- UPDATES TO SIDEBAR.HTML -->
 
-          <!-- Highlight Options -->
-          <div id="highlightOptions" class="option-group hidden">
-            <label for="highlightInfo">Highlight Info (Internal Note):</label>
-            <input type="text" id="highlightInfo" placeholder="Optional note for this highlight"/>
-            <p>Briefly highlights the element when clicked (visual effect only).</p>
-            <!-- Overlay Text Option -->
-            <div class="overlay-text-option">
-              <div class="checkbox-option">
-                <input type="checkbox" id="highlight_showOverlayText">
-                <label for="highlight_showOverlayText">Show text directly on overlay</label>
-              </div>
-              <div id="highlight_overlayTextContainer" class="indented-option hidden">
-                 <label for="highlight_overlayText">Overlay Text:</label>
-                 <input type="text" id="highlight_overlayText" placeholder="Short text (e.g., 'Click')">
-              </div>
-            </div>
-            <!-- Element-specific Custom Overlay Style controls -->
-            <div class="custom-overlay-controls-section">
-              <div class="checkbox-option">
-                <input type="checkbox" id="highlight_useCustomOverlay">
-                <label for="highlight_useCustomOverlay">Custom overlay style</label>
-              </div>
-              <div id="highlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-                 <h6>Custom Overlay Style</h6>
-                 <!-- Placeholder for common style controls -->
-              </div>
-            </div>
-          </div>
+<!-- For each interaction type, we need to add a "disappear-option" div with a checkbox.
+   Place this before the custom overlay controls but after any interaction-specific settings. -->
 
-          <!-- Open URL Options -->
-          <div id="openUrlOptions" class="option-group hidden">
-            <label for="interactionUrl">URL to Open:</label>
-            <input type="text" id="interactionUrl" placeholder="e.g., https://www.example.com"/>
-            <p>Opens the specified URL in a new browser tab when clicked.</p>
-            <!-- Overlay Text Option -->
-            <div class="overlay-text-option">
-              <div class="checkbox-option">
-                <input type="checkbox" id="openUrl_showOverlayText">
-                <label for="openUrl_showOverlayText">Show text directly on overlay</label>
-              </div>
-              <div id="openUrl_overlayTextContainer" class="indented-option hidden">
-                 <label for="openUrl_overlayText">Overlay Text:</label>
-                 <input type="text" id="openUrl_overlayText" placeholder="Short text (e.g., 'Website')">
-              </div>
-            </div>
-            <!-- Element-specific Custom Overlay Style controls -->
-            <div class="custom-overlay-controls-section">
-              <div class="checkbox-option">
-                <input type="checkbox" id="openUrl_useCustomOverlay">
-                <label for="openUrl_useCustomOverlay">Custom overlay style</label>
-              </div>
-              <div id="openUrl_customOverlayContainer" class="custom-overlay-style-group hidden">
-                 <h6>Custom Overlay Style</h6>
-              </div>
-            </div>
-          </div>
+<!-- 1. SHOW TEXT OPTIONS -->
+<!-- Add below overlay text option but before custom overlay controls -->
+<div id="showTextOptions" class="option-group hidden">
+  <label for="interactionText">Text to Show (in Modal):</label>
+  <textarea id="interactionText" rows="3" placeholder="Enter the text to display in the popup"></textarea>
+  <!-- Overlay Text Option -->
+  <div class="overlay-text-option">
+    <div class="checkbox-option">
+      <input type="checkbox" id="showText_showOverlayText">
+      <label for="showText_showOverlayText">Show text directly on overlay</label>
+    </div>
+    <div id="showText_overlayTextContainer" class="indented-option hidden">
+       <label for="showText_overlayText">Overlay Text:</label>
+       <input type="text" id="showText_overlayText" placeholder="Short text (e.g., 'Details')">
+    </div>
+  </div>
+  
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="showText_disappearOnClick">
+      <label for="showText_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  <!-- END OF ADDED CODE -->
+  
+  <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="showText_useCustomOverlay">
+      <label for="showText_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="showText_customOverlayContainer" class="custom-overlay-style-group hidden">
+      <h6>Custom Overlay Style</h6>
+      <!-- Placeholder for common style controls -->
+    </div>
+  </div>
+</div>
 
-          <!-- Spotlight Options -->
-          <div id="spotlightOptions" class="option-group hidden">
-             <p style="margin-bottom: 12px;">Dims the rest of the slide, focusing attention on this element. Click the dimmed background to dismiss.</p>
-             <label for="spotlightTarget">Target Element ID (optional):</label>
-             <input type="text" id="spotlightTarget" placeholder="Enter Object ID to spotlight instead of this element"/>
-             <p>Leave empty to spotlight this element. Specify another element ID to spotlight that area instead.</p>
-             <div class="checkbox-option">
-               <input type="checkbox" id="spotlightShowText">
-               <label for="spotlightShowText">Show Popover Text with Spotlight</label>
-             </div>
-             <div id="spotlightTextContainer" class="indented-option hidden">
-                <label for="spotlightText">Popover Text:</label>
-                <textarea id="spotlightText" rows="3" placeholder="Enter brief text to show near the element"></textarea>
-             </div>
-             <div class="checkbox-option">
-               <input type="checkbox" id="spotlightShowNotes">
-               <label for="spotlightShowNotes">Show Speaker Notes during Spotlight</label>
-             </div>
-             <!-- Overlay Text Option -->
-             <div class="overlay-text-option">
-               <div class="checkbox-option">
-                 <input type="checkbox" id="spotlight_showOverlayText">
-                 <label for="spotlight_showOverlayText">Show text directly on overlay</label>
-               </div>
-               <div id="spotlight_overlayTextContainer" class="indented-option hidden">
-                  <label for="spotlight_overlayText">Overlay Text:</label>
-                  <input type="text" id="spotlight_overlayText" placeholder="Short text (e.g., 'Focus')">
-               </div>
-             </div>
-             <!-- Element-specific Custom Overlay Style controls -->
-            <div class="custom-overlay-controls-section">
-              <div class="checkbox-option">
-                <input type="checkbox" id="spotlight_useCustomOverlay">
-                <label for="spotlight_useCustomOverlay">Custom overlay style</label>
-              </div>
-              <div id="spotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-                 <h6>Custom Overlay Style</h6>
-              </div>
-            </div>
-          </div>
+<!-- 2. HIGHLIGHT OPTIONS -->
+<!-- Add below overlay text option but before custom overlay controls -->
+<div id="highlightOptions" class="option-group hidden">
+  <label for="highlightInfo">Highlight Info (Internal Note):</label>
+  <input type="text" id="highlightInfo" placeholder="Optional note for this highlight"/>
+  <p>Briefly highlights the element when clicked (visual effect only).</p>
+  <!-- Overlay Text Option -->
+  <div class="overlay-text-option">
+    <div class="checkbox-option">
+      <input type="checkbox" id="highlight_showOverlayText">
+      <label for="highlight_showOverlayText">Show text directly on overlay</label>
+    </div>
+    <div id="highlight_overlayTextContainer" class="indented-option hidden">
+       <label for="highlight_overlayText">Overlay Text:</label>
+       <input type="text" id="highlight_overlayText" placeholder="Short text (e.g., 'Click')">
+    </div>
+  </div>
+  
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="highlight_disappearOnClick">
+      <label for="highlight_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  <!-- END OF ADDED CODE -->
+  
+  <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="highlight_useCustomOverlay">
+      <label for="highlight_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="highlight_customOverlayContainer" class="custom-overlay-style-group hidden">
+       <h6>Custom Overlay Style</h6>
+       <!-- Placeholder for common style controls -->
+    </div>
+  </div>
+</div>
 
-          <!-- Go To Slide Options -->
-          <div id="goToSlideOptions" class="option-group hidden">
-            <label for="targetSlideNumber">Target Slide Number:</label>
-            <input type="number" id="targetSlideNumber" min="1" placeholder="e.g., 3"/>
-            <p>Jumps directly to the specified slide number when clicked.</p>
-             <!-- Overlay Text Option -->
-            <div class="overlay-text-option">
-              <div class="checkbox-option">
-                <input type="checkbox" id="goToSlide_showOverlayText">
-                <label for="goToSlide_showOverlayText">Show text directly on overlay</label>
-              </div>
-              <div id="goToSlide_overlayTextContainer" class="indented-option hidden">
-                 <label for="goToSlide_overlayText">Overlay Text:</label>
-                 <input type="text" id="goToSlide_overlayText" placeholder="Short text (e.g., 'Next')">
-              </div>
-            </div>
-             <!-- Element-specific Custom Overlay Style controls -->
-            <div class="custom-overlay-controls-section">
-              <div class="checkbox-option">
-                <input type="checkbox" id="goToSlide_useCustomOverlay">
-                <label for="goToSlide_useCustomOverlay">Custom overlay style</label>
-              </div>
-              <div id="goToSlide_customOverlayContainer" class="custom-overlay-style-group hidden">
-                 <h6>Custom Overlay Style</h6>
-              </div>
-            </div>
-          </div>
+<!-- 3. OPEN URL OPTIONS -->
+<!-- Add below overlay text option but before custom overlay controls -->
+<div id="openUrlOptions" class="option-group hidden">
+  <label for="interactionUrl">URL to Open:</label>
+  <input type="text" id="interactionUrl" placeholder="e.g., https://www.example.com"/>
+  <p>Opens the specified URL in a new browser tab when clicked.</p>
+  <!-- Overlay Text Option -->
+  <div class="overlay-text-option">
+    <div class="checkbox-option">
+      <input type="checkbox" id="openUrl_showOverlayText">
+      <label for="openUrl_showOverlayText">Show text directly on overlay</label>
+    </div>
+    <div id="openUrl_overlayTextContainer" class="indented-option hidden">
+       <label for="openUrl_overlayText">Overlay Text:</label>
+       <input type="text" id="openUrl_overlayText" placeholder="Short text (e.g., 'Website')">
+    </div>
+  </div>
+  
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="openUrl_disappearOnClick">
+      <label for="openUrl_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  <!-- END OF ADDED CODE -->
+  
+  <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="openUrl_useCustomOverlay">
+      <label for="openUrl_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="openUrl_customOverlayContainer" class="custom-overlay-style-group hidden">
+       <h6>Custom Overlay Style</h6>
+    </div>
+  </div>
+</div>
 
-          <!-- Reveal Element Options -->
-           <div id="revealElementOptions" class="option-group hidden">
-             <label for="targetElementId">Target Element Object ID:</label>
-             <input type="text" id="targetElementId" placeholder="Enter the Object ID of the element to reveal"/>
-             <p>Makes another element visible when this element is clicked. Find the target's Object ID by selecting it and checking 'Selected Element' info.</p>
-              <!-- Overlay Text Option -->
-             <div class="overlay-text-option">
-               <div class="checkbox-option">
-                 <input type="checkbox" id="revealElement_showOverlayText">
-                 <label for="revealElement_showOverlayText">Show text directly on overlay</label>
-               </div>
-               <div id="revealElement_overlayTextContainer" class="indented-option hidden">
-                  <label for="revealElement_overlayText">Overlay Text:</label>
-                  <input type="text" id="revealElement_overlayText" placeholder="Short text (e.g., 'Reveal')">
-               </div>
-             </div>
-             <!-- Element-specific Custom Overlay Style controls -->
-            <div class="custom-overlay-controls-section">
-              <div class="checkbox-option">
-                <input type="checkbox" id="revealElement_useCustomOverlay">
-                <label for="revealElement_useCustomOverlay">Custom overlay style</label>
-              </div>
-              <div id="revealElement_customOverlayContainer" class="custom-overlay-style-group hidden">
-                 <h6>Custom Overlay Style</h6>
-              </div>
-            </div>
-           </div>
-          <!-- Reveal and Spotlight Options -->
-           <div id="revealAndSpotlightOptions" class="option-group hidden">
-             <label for="revealAndSpotlight_targetElementId">Target Element Object ID:</label>
-             <input type="text" id="revealAndSpotlight_targetElementId" placeholder="Enter Object ID of element to reveal & spotlight"/>
-             <p>Makes target element visible and then spotlights it. Find the ID by selecting the target and checking 'Selected Element' info.</p>
+<!-- 4. SPOTLIGHT OPTIONS -->
+<!-- Add below overlay text option but before custom overlay controls -->
+<div id="spotlightOptions" class="option-group hidden">
+   <p style="margin-bottom: 12px;">Dims the rest of the slide, focusing attention on this element. Click the dimmed background to dismiss.</p>
+   <label for="spotlightTarget">Target Element ID (optional):</label>
+   <input type="text" id="spotlightTarget" placeholder="Enter Object ID to spotlight instead of this element"/>
+   <p>Leave empty to spotlight this element. Specify another element ID to spotlight that area instead.</p>
+   <div class="checkbox-option">
+     <input type="checkbox" id="spotlightShowText">
+     <label for="spotlightShowText">Show Popover Text with Spotlight</label>
+   </div>
+   <div id="spotlightTextContainer" class="indented-option hidden">
+      <label for="spotlightText">Popover Text:</label>
+      <textarea id="spotlightText" rows="3" placeholder="Enter brief text to show near the element"></textarea>
+   </div>
+   <div class="checkbox-option">
+     <input type="checkbox" id="spotlightShowNotes">
+     <label for="spotlightShowNotes">Show Speaker Notes during Spotlight</label>
+   </div>
+   <!-- Overlay Text Option -->
+   <div class="overlay-text-option">
+     <div class="checkbox-option">
+       <input type="checkbox" id="spotlight_showOverlayText">
+       <label for="spotlight_showOverlayText">Show text directly on overlay</label>
+     </div>
+     <div id="spotlight_overlayTextContainer" class="indented-option hidden">
+        <label for="spotlight_overlayText">Overlay Text:</label>
+        <input type="text" id="spotlight_overlayText" placeholder="Short text (e.g., 'Focus')">
+     </div>
+   </div>
+   
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="spotlight_disappearOnClick">
+      <label for="spotlight_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  <!-- END OF ADDED CODE -->
+  
+   <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="spotlight_useCustomOverlay">
+      <label for="spotlight_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="spotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
+       <h6>Custom Overlay Style</h6>
+    </div>
+  </div>
+</div>
 
-             <div style="margin-top:15px; padding-top:10px; border-top: 1px dashed #ccc;"> <!-- Separator -->
-               <label style="font-weight:bold; color:#1a73e8;">Spotlight Options:</label>
-               <div class="checkbox-option">
-                 <input type="checkbox" id="revealAndSpotlight_showText">
-                 <label for="revealAndSpotlight_showText">Show Popover Text with Spotlight</label>
-               </div>
-               <div id="revealAndSpotlight_textContainer" class="indented-option hidden">
-                 <label for="revealAndSpotlight_text">Popover Text:</label>
-                 <textarea id="revealAndSpotlight_text" rows="3" placeholder="Enter brief text to show near the element"></textarea>
-               </div>
-               <div class="checkbox-option">
-                 <input type="checkbox" id="revealAndSpotlight_showNotes">
-                 <label for="revealAndSpotlight_showNotes">Show Speaker Notes during Spotlight</label>
-               </div>
-             </div>
+<!-- 5. GO TO SLIDE OPTIONS -->
+<!-- Add below overlay text option but before custom overlay controls -->
+<div id="goToSlideOptions" class="option-group hidden">
+  <label for="targetSlideNumber">Target Slide Number:</label>
+  <input type="number" id="targetSlideNumber" min="1" placeholder="e.g., 3"/>
+  <p>Jumps directly to the specified slide number when clicked.</p>
+   <!-- Overlay Text Option -->
+  <div class="overlay-text-option">
+    <div class="checkbox-option">
+      <input type="checkbox" id="goToSlide_showOverlayText">
+      <label for="goToSlide_showOverlayText">Show text directly on overlay</label>
+    </div>
+    <div id="goToSlide_overlayTextContainer" class="indented-option hidden">
+       <label for="goToSlide_overlayText">Overlay Text:</label>
+       <input type="text" id="goToSlide_overlayText" placeholder="Short text (e.g., 'Next')">
+    </div>
+  </div>
+  
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="goToSlide_disappearOnClick">
+      <label for="goToSlide_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  <!-- END OF ADDED CODE -->
+  
+   <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="goToSlide_useCustomOverlay">
+      <label for="goToSlide_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="goToSlide_customOverlayContainer" class="custom-overlay-style-group hidden">
+       <h6>Custom Overlay Style</h6>
+    </div>
+  </div>
+</div>
 
-             <!-- Overlay Text Option -->
-             <div class="overlay-text-option">
-               <div class="checkbox-option">
-                 <input type="checkbox" id="revealAndSpotlight_showOverlayText">
-                 <label for="revealAndSpotlight_showOverlayText">Show text directly on overlay</label>
-               </div>
-               <div id="revealAndSpotlight_overlayTextContainer" class="indented-option hidden">
-                 <label for="revealAndSpotlight_overlayText">Overlay Text:</label>
-                 <input type="text" id="revealAndSpotlight_overlayText" placeholder="Short text (e.g., 'Reveal')">
-               </div>
-             </div>
-             <!-- Element-specific Custom Overlay Style controls -->
-             <div class="custom-overlay-controls-section">
-               <div class="checkbox-option">
-                 <input type="checkbox" id="revealAndSpotlight_useCustomOverlay">
-                 <label for="revealAndSpotlight_useCustomOverlay">Custom overlay style</label>
-               </div>
-               <div id="revealAndSpotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-                 <h6>Custom Overlay Style</h6>
-                 <!-- Placeholder for common style controls -->
-               </div>
-             </div>
-           </div>
+<!-- 6. REVEAL ELEMENT OPTIONS -->
+<!-- Add below overlay text option but before custom overlay controls -->
+<div id="revealElementOptions" class="option-group hidden">
+  <label for="targetElementId">Target Element Object ID:</label>
+  <input type="text" id="targetElementId" placeholder="Enter the Object ID of the element to reveal"/>
+  <p>Makes another element visible when this element is clicked. Find the target's Object ID by selecting it and checking 'Selected Element' info.</p>
+   <!-- Overlay Text Option -->
+  <div class="overlay-text-option">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealElement_showOverlayText">
+      <label for="revealElement_showOverlayText">Show text directly on overlay</label>
+    </div>
+    <div id="revealElement_overlayTextContainer" class="indented-option hidden">
+       <label for="revealElement_overlayText">Overlay Text:</label>
+       <input type="text" id="revealElement_overlayText" placeholder="Short text (e.g., 'Reveal')">
+    </div>
+  </div>
+  
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealElement_disappearOnClick">
+      <label for="revealElement_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  <!-- END OF ADDED CODE -->
+  
+  <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealElement_useCustomOverlay">
+      <label for="revealElement_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="revealElement_customOverlayContainer" class="custom-overlay-style-group hidden">
+       <h6>Custom Overlay Style</h6>
+    </div>
+  </div>
+</div>
+
+<!-- 7. REVEAL AND SPOTLIGHT OPTIONS -->
+<!-- Add below overlay text option but before custom overlay controls -->
+<div id="revealAndSpotlightOptions" class="option-group hidden">
+  <label for="revealAndSpotlight_targetElementId">Target Element Object ID:</label>
+  <input type="text" id="revealAndSpotlight_targetElementId" placeholder="Enter Object ID of element to reveal & spotlight"/>
+  <p>Makes target element visible and then spotlights it. Find the ID by selecting the target and checking 'Selected Element' info.</p>
+
+  <div style="margin-top:15px; padding-top:10px; border-top: 1px dashed #ccc;"> <!-- Separator -->
+    <label style="font-weight:bold; color:#1a73e8;">Spotlight Options:</label>
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealAndSpotlight_showText">
+      <label for="revealAndSpotlight_showText">Show Popover Text with Spotlight</label>
+    </div>
+    <div id="revealAndSpotlight_textContainer" class="indented-option hidden">
+      <label for="revealAndSpotlight_text">Popover Text:</label>
+      <textarea id="revealAndSpotlight_text" rows="3" placeholder="Enter brief text to show near the element"></textarea>
+    </div>
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealAndSpotlight_showNotes">
+      <label for="revealAndSpotlight_showNotes">Show Speaker Notes during Spotlight</label>
+    </div>
+  </div>
+
+  <!-- Overlay Text Option -->
+  <div class="overlay-text-option">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealAndSpotlight_showOverlayText">
+      <label for="revealAndSpotlight_showOverlayText">Show text directly on overlay</label>
+    </div>
+    <div id="revealAndSpotlight_overlayTextContainer" class="indented-option hidden">
+      <label for="revealAndSpotlight_overlayText">Overlay Text:</label>
+      <input type="text" id="revealAndSpotlight_overlayText" placeholder="Short text (e.g., 'Reveal')">
+    </div>
+  </div>
+  
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealAndSpotlight_disappearOnClick">
+      <label for="revealAndSpotlight_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  <!-- END OF ADDED CODE -->
+  
+  <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealAndSpotlight_useCustomOverlay">
+      <label for="revealAndSpotlight_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="revealAndSpotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
+      <h6>Custom Overlay Style</h6>
+      <!-- Placeholder for common style controls -->
+    </div>
+  </div>
+</div>
           <!-- Save Button for Interactions -->
           <button class="blue" onclick="saveInteractionData()">Save Interaction</button>
 
@@ -1734,129 +1817,106 @@
 
     // --- Load Element Data into Forms ---
     function loadElementDataIntoForms() {
-        console.log("Loading data into forms from:", currentElementData);
-        resetForms(); // Start clean
+      console.log("Loading data into forms from:", currentElementData);
+      resetForms(); // Start clean
 
-        if (!currentElementData) {
-            updateElementStatus();
-            updateStatus("Selected element has no configuration.");
-            return;
-         }
+      if (!currentElementData) {
+        updateElementStatus();
+        updateStatus("Selected element has no configuration.");
+        return;
+      }
 
-        // --- Load Interaction Data ---
-        const interactionData = currentElementData.interaction;
-        if (interactionData && typeof interactionData === 'object') { // Check if block exists
-             const interactionType = interactionData.type || 'none'; // Default to 'none' if type missing
-             if (Array.from(dom.interactionType.options).some(opt => opt.value === interactionType)) {
-               dom.interactionType.value = interactionType;
-             } else {
-               console.warn(`Interaction type "${interactionType}" not found. Setting to 'none'.`);
-               dom.interactionType.value = 'none';
-             }
-             const type = dom.interactionType.value; // Use the actual value set
-
-             try {
-                // Populate specific fields based on type
-                // Populate specific fields based on type
-                if (type === 'showText') {
-                    document.getElementById('interactionText').value = interactionData.text || '';
-                } else if (type === 'highlight') {
-                    document.getElementById('highlightInfo').value = interactionData.info || '';
-                } else if (type === 'openUrl') {
-                    document.getElementById('interactionUrl').value = interactionData.url || '';
-                } else if (type === 'spotlight') {
-                    document.getElementById('spotlightTarget').value = interactionData.spotlightTarget || '';
-                    document.getElementById('spotlightShowText').checked = !!interactionData.showText;
-                    document.getElementById('spotlightText').value = interactionData.text || '';
-                    document.getElementById('spotlightShowNotes').checked = !!interactionData.showNotes;
-                } else if (type === 'goToSlide') {
-                    document.getElementById('targetSlideNumber').value = interactionData.targetSlide || '';
-                } else if (type === 'revealElement') {
-                    document.getElementById('targetElementId').value = interactionData.targetElementId || '';
-                } else if (type === 'revealAndSpotlight') {
-                    document.getElementById('revealAndSpotlight_targetElementId').value = interactionData.targetElementId || '';
-                    document.getElementById('revealAndSpotlight_showText').checked = !!interactionData.showText;
-                    document.getElementById('revealAndSpotlight_text').value = interactionData.text || '';
-                    document.getElementById('revealAndSpotlight_showNotes').checked = !!interactionData.showNotes;
-                    toggleRevealAndSpotlightTextContainer(); // Ensure text container visibility is correct
-                }
-
-                 // Load Overlay Text Settings (Common to most interaction types)
-                 if (type !== 'none') {
-                      const showOverlayCheckbox = document.getElementById(`${type}_showOverlayText`);
-                      const overlayTextInput = document.getElementById(`${type}_overlayText`);
-                      if (showOverlayCheckbox && overlayTextInput) {
-                         showOverlayCheckbox.checked = !!interactionData.showOverlayText; // Ensure boolean
-                         overlayTextInput.value = interactionData.overlayText || '';
-                         toggleOverlayTextContainer(showOverlayCheckbox); // Ensure visibility matches state
-                      }
-                 }
-
-                 // Load Custom Overlay Style Settings
-                 const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
-                 if (useCustomOverlayCheckbox) {
-                      if (interactionData.overlayStyle && typeof interactionData.overlayStyle === 'object') {
-                         // If custom style data exists, check the box and populate controls
-                         useCustomOverlayCheckbox.checked = true;
-                         populateOverlayStyleControls(type, interactionData.overlayStyle);
-                      } else {
-                         // If no custom style data, uncheck box and populate with defaults
-                         useCustomOverlayCheckbox.checked = false;
-                         populateOverlayStyleControls(type, globalOverlayDefaults); // Populate with global defaults
-                      }
-                      toggleCustomOverlayContainer(useCustomOverlayCheckbox); // Ensure visibility matches state
-                 }
-
-             } catch (e) { console.error("Error loading interaction form data:", e, interactionData); }
+      // --- Load Interaction Data ---
+      const interactionData = currentElementData.interaction;
+      if (interactionData && typeof interactionData === 'object') { // Check if block exists
+        const interactionType = interactionData.type || 'none'; // Default to 'none' if type missing
+        if (Array.from(dom.interactionType.options).some(opt => opt.value === interactionType)) {
+          dom.interactionType.value = interactionType;
         } else {
-            dom.interactionType.value = 'none';
-             // No interaction block, so ensure all custom style sections are reset and hidden
-            const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement'];
-            interactionTypes.forEach(t => {
-                const cb = document.getElementById(`${t}_useCustomOverlay`);
-                if(cb) {
-                    cb.checked = false;
-                    toggleCustomOverlayContainer(cb);
-                    populateOverlayStyleControls(t, globalOverlayDefaults); // Reset to defaults
-                }
-            });
+          console.warn(`Interaction type "${interactionType}" not found. Setting to 'none'.`);
+          dom.interactionType.value = 'none';
         }
-        handleInteractionTypeChange(); // Update visibility AFTER setting values
+        const type = dom.interactionType.value; // Use the actual value set
 
-        // --- Load Animation Data ---
-        const animationData = currentElementData.animation;
-        if (animationData && typeof animationData === 'object') { // Check if block exists
-            const animationType = animationData.type || 'none';
-            if (Array.from(dom.animationType.options).some(opt => opt.value === animationType)) {
-                dom.animationType.value = animationType;
-             } else {
-                console.warn(`Animation type "${animationType}" not found. Setting to 'none'.`);
-                dom.animationType.value = 'none';
-             }
-             const type = dom.animationType.value; // Use actual value set
+        try {
+          // Populate specific fields based on type
+          if (type === 'showText') {
+            document.getElementById('interactionText').value = interactionData.text || '';
+          } else if (type === 'highlight') {
+            document.getElementById('highlightInfo').value = interactionData.info || '';
+          } else if (type === 'openUrl') {
+            document.getElementById('interactionUrl').value = interactionData.url || '';
+          } else if (type === 'spotlight') {
+            document.getElementById('spotlightTarget').value = interactionData.spotlightTarget || '';
+            document.getElementById('spotlightShowText').checked = !!interactionData.showText;
+            document.getElementById('spotlightText').value = interactionData.text || '';
+            document.getElementById('spotlightShowNotes').checked = !!interactionData.showNotes;
+          } else if (type === 'goToSlide') {
+            document.getElementById('targetSlideNumber').value = interactionData.targetSlide || '';
+          } else if (type === 'revealElement') {
+            document.getElementById('targetElementId').value = interactionData.targetElementId || '';
+          } else if (type === 'revealAndSpotlight') {
+            document.getElementById('revealAndSpotlight_targetElementId').value = interactionData.targetElementId || '';
+            document.getElementById('revealAndSpotlight_showText').checked = !!interactionData.showText;
+            document.getElementById('revealAndSpotlight_text').value = interactionData.text || '';
+            document.getElementById('revealAndSpotlight_showNotes').checked = !!interactionData.showNotes;
+            toggleRevealAndSpotlightTextContainer(); // Ensure text container visibility is correct
+          }
 
-            if (type !== 'none') {
-                 try {
-                    document.getElementById('animationTrigger').value = animationData.trigger || 'automatic';
-                    if (type === 'pulse') {
-                        document.getElementById('pulseColor').value = animationData.pulseColor || '#1a73e8';
-                        document.getElementById('pulseSpeed').value = animationData.pulseSpeed || 'medium';
-                        updatePulseColorPreview();
-                    } else if (type === 'wiggle') {
-                        document.getElementById('wiggleIntensity').value = animationData.wiggleIntensity || 'medium';
-                    } else if (type === 'float') {
-                        document.getElementById('floatDistance').value = animationData.floatDistance || '8';
-                        document.getElementById('floatSpeed').value = animationData.floatSpeed || 'medium';
-                    }
-                 } catch(e) { console.error("Error loading animation form data:", e, animationData); }
+          // Load Overlay Text Settings (Common to most interaction types)
+          if (type !== 'none') {
+            const showOverlayCheckbox = document.getElementById(`${type}_showOverlayText`);
+            const overlayTextInput = document.getElementById(`${type}_overlayText`);
+            if (showOverlayCheckbox && overlayTextInput) {
+              showOverlayCheckbox.checked = !!interactionData.showOverlayText; // Ensure boolean
+              overlayTextInput.value = interactionData.overlayText || '';
+              toggleOverlayTextContainer(showOverlayCheckbox); // Ensure visibility matches state
             }
-        } else {
-            dom.animationType.value = 'none';
-        }
-        handleAnimationTypeChange(); // Update visibility AFTER setting values
+              
+            // ADD THIS NEW CODE: Load disappearOnClick state
+            const disappearCheckbox = document.getElementById(`${type}_disappearOnClick`);
+            if (disappearCheckbox) {
+              disappearCheckbox.checked = !!interactionData.disappearOnClick; // Ensure boolean
+            }
+            // END OF ADDED CODE
+          }
 
-        updateElementStatus(); // Update the status dots/text
-        updateStatus("Element data loaded into forms.");
+          // Load Custom Overlay Style Settings
+          const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
+          if (useCustomOverlayCheckbox) {
+            if (interactionData.overlayStyle && typeof interactionData.overlayStyle === 'object') {
+              // If custom style data exists, check the box and populate controls
+              useCustomOverlayCheckbox.checked = true;
+              populateOverlayStyleControls(type, interactionData.overlayStyle);
+            } else {
+              // If no custom style data, uncheck box and populate with defaults
+              useCustomOverlayCheckbox.checked = false;
+              populateOverlayStyleControls(type, globalOverlayDefaults); // Populate with global defaults
+            }
+            toggleCustomOverlayContainer(useCustomOverlayCheckbox); // Ensure visibility matches state
+          }
+
+        } catch (e) { console.error("Error loading interaction form data:", e, interactionData); }
+      } else {
+        dom.interactionType.value = 'none';
+        // No interaction block, so ensure all custom style sections are reset and hidden
+        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement'];
+        interactionTypes.forEach(t => {
+          const cb = document.getElementById(`${t}_useCustomOverlay`);
+          if(cb) {
+            cb.checked = false;
+            toggleCustomOverlayContainer(cb);
+            populateOverlayStyleControls(t, globalOverlayDefaults); // Reset to defaults
+          }
+        });
+      }
+      handleInteractionTypeChange(); // Update visibility AFTER setting values
+
+      // --- Load Animation Data ---
+      // [Animation data loading code remains unchanged]
+
+      updateElementStatus(); // Update the status dots/text
+      updateStatus("Element data loaded into forms.");
     }
 
     // --- Helper to Populate Overlay Style Controls ---
@@ -1901,49 +1961,48 @@
     }
 
     function resetForms() {
-        // Reset Interaction Form
-        dom.interactionType.value = 'none';
-        document.getElementById('interactionText').value = '';
-        document.getElementById('highlightInfo').value = '';
-        document.getElementById('interactionUrl').value = '';
-        document.getElementById('targetSlideNumber').value = '';
-        document.getElementById('targetElementId').value = '';
-        document.getElementById('spotlightTarget').value = '';
-        document.getElementById('spotlightShowText').checked = false;
-        document.getElementById('spotlightText').value = '';
-        document.getElementById('spotlightShowNotes').checked = false;
-        document.getElementById('revealAndSpotlight_targetElementId').value = '';
-        document.getElementById('revealAndSpotlight_showText').checked = false;
-        document.getElementById('revealAndSpotlight_text').value = '';
-        document.getElementById('revealAndSpotlight_showNotes').checked = false;
-        toggleRevealAndSpotlightTextContainer(); // Hide text container
-        // Reset all overlay text checkboxes and inputs
-         document.querySelectorAll('#interactionSettingsContent input[id$="_showOverlayText"]').forEach(cb => cb.checked = false);
-         document.querySelectorAll('#interactionSettingsContent input[id$="_overlayText"]').forEach(input => input.value = '');
-        // Reset custom overlay style checkboxes and populate with defaults
-        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight'];
-        interactionTypes.forEach(type => {
-            const cb = document.getElementById(`${type}_useCustomOverlay`);
-            if (cb) {
-                cb.checked = false;
-                populateOverlayStyleControls(type, globalOverlayDefaults); // Reset to defaults
-                toggleCustomOverlayContainer(cb); // Hide the container
-            }
-        });
+      // Reset Interaction Form
+      dom.interactionType.value = 'none';
+      document.getElementById('interactionText').value = '';
+      document.getElementById('highlightInfo').value = '';
+      document.getElementById('interactionUrl').value = '';
+      document.getElementById('targetSlideNumber').value = '';
+      document.getElementById('targetElementId').value = '';
+      document.getElementById('spotlightTarget').value = '';
+      document.getElementById('spotlightShowText').checked = false;
+      document.getElementById('spotlightText').value = '';
+      document.getElementById('spotlightShowNotes').checked = false;
+      document.getElementById('revealAndSpotlight_targetElementId').value = '';
+      document.getElementById('revealAndSpotlight_showText').checked = false;
+      document.getElementById('revealAndSpotlight_text').value = '';
+      document.getElementById('revealAndSpotlight_showNotes').checked = false;
+      toggleRevealAndSpotlightTextContainer(); // Hide text container
+      
+      // Reset all overlay text checkboxes and inputs
+      document.querySelectorAll('#interactionSettingsContent input[id$="_showOverlayText"]').forEach(cb => cb.checked = false);
+      document.querySelectorAll('#interactionSettingsContent input[id$="_overlayText"]').forEach(input => input.value = '');
+      
+      // ADD THIS NEW CODE: Reset all disappearOnClick checkboxes
+      document.querySelectorAll('#interactionSettingsContent input[id$="_disappearOnClick"]').forEach(cb => cb.checked = false);
+      // END OF ADDED CODE
+      
+      // Reset custom overlay style checkboxes and populate with defaults
+      const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight'];
+      interactionTypes.forEach(type => {
+        const cb = document.getElementById(`${type}_useCustomOverlay`);
+        if (cb) {
+          cb.checked = false;
+          populateOverlayStyleControls(type, globalOverlayDefaults); // Reset to defaults
+          toggleCustomOverlayContainer(cb); // Hide the container
+        }
+      });
 
-        handleInteractionTypeChange(); // Hide all options
+      handleInteractionTypeChange(); // Hide all options
 
-        // Reset Animation Form
-        dom.animationType.value = 'none';
-        document.getElementById('animationTrigger').value = 'automatic';
-        document.getElementById('pulseColor').value = '#1a73e8'; updatePulseColorPreview();
-        document.getElementById('pulseSpeed').value = 'medium';
-        document.getElementById('wiggleIntensity').value = 'medium';
-        document.getElementById('floatDistance').value = '8';
-        document.getElementById('floatSpeed').value = 'medium';
-        handleAnimationTypeChange(); // Hide options
+      // Reset Animation Form
+      // [Animation reset code remains unchanged]
 
-        // Global overlay style form is NOT reset here, it's loaded on startup/refresh
+      // Global overlay style form is NOT reset here, it's loaded on startup/refresh
     }
 
     // --- Save Functions ---
@@ -1967,95 +2026,103 @@
     }
 
     function saveInteractionData() {
-        if (!currentElementId) { showError("No element selected."); return; }
+      if (!currentElementId) { showError("No element selected."); return; }
 
-        const type = dom.interactionType.value;
-        let interactionData = { type: type }; // Base object
+      const type = dom.interactionType.value;
+      let interactionData = { type: type }; // Base object
 
-        try {
-            // Gather type-specific data
-            if (type === 'showText') {
-                interactionData.text = document.getElementById('interactionText').value;
-            }
-            else if (type === 'highlight') {
-                interactionData.info = document.getElementById('highlightInfo').value;
-            }
-            else if (type === 'openUrl') {
-                const url = document.getElementById('interactionUrl').value.trim();
-                if (!url) { showError("Please enter a URL."); return; }
-                interactionData.url = url;
-            }
-            else if (type === 'spotlight') {
-                interactionData.spotlightTarget = document.getElementById('spotlightTarget').value.trim() || null;
-                interactionData.showText = document.getElementById('spotlightShowText').checked;
-                interactionData.text = interactionData.showText ? document.getElementById('spotlightText').value : undefined;
-                interactionData.showNotes = document.getElementById('spotlightShowNotes').checked;
-             }
-             else if (type === 'goToSlide') {
-                const targetSlideInput = document.getElementById('targetSlideNumber');
-                const targetSlide = parseInt(targetSlideInput.value, 10);
-                if (isNaN(targetSlide) || targetSlide < 1) { showError("Please enter a valid slide number."); targetSlideInput.focus(); return; }
-                interactionData.targetSlide = targetSlide;
-             }
-             else if (type === 'revealElement') {
-                 const targetIdInput = document.getElementById('targetElementId');
-                 const targetId = targetIdInput.value.trim();
-                 if (!targetId) { showError("Please enter the Object ID to reveal."); targetIdInput.focus(); return; }
-                 if (targetId === currentElementId) { showError("Element cannot reveal itself."); targetIdInput.focus(); return; }
-                 interactionData.targetElementId = targetId;
-             }
-             else if (type === 'revealAndSpotlight') {
-                 const targetIdInput = document.getElementById('revealAndSpotlight_targetElementId');
-                 const targetId = targetIdInput.value.trim();
-                 if (!targetId) { showError("Please enter the Target Element Object ID."); targetIdInput.focus(); return; }
-                 if (targetId === currentElementId) { showError("Element cannot reveal/spotlight itself."); targetIdInput.focus(); return; }
-                 interactionData.targetElementId = targetId;
-
-                // Spotlight specific options
-                 interactionData.showText = document.getElementById('revealAndSpotlight_showText').checked;
-                 interactionData.text = interactionData.showText ? document.getElementById('revealAndSpotlight_text').value : undefined;
-                 interactionData.showNotes = document.getElementById('revealAndSpotlight_showNotes').checked;
-             }
-             // Gather common Overlay Text Settings if type is not 'none'
-             if (type !== 'none') {
-                 const showOverlayCheckbox = document.getElementById(`${type}_showOverlayText`);
-                 const overlayTextInput = document.getElementById(`${type}_overlayText`);
-                 if (showOverlayCheckbox && overlayTextInput) {
-                     interactionData.showOverlayText = showOverlayCheckbox.checked;
-                     interactionData.overlayText = interactionData.showOverlayText ? overlayTextInput.value.trim() : undefined;
-                 }
-
-                 // Check for custom overlay style settings
-                 const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
-                 if (useCustomOverlayCheckbox && useCustomOverlayCheckbox.checked) {
-                    interactionData.overlayStyle = collectOverlayStyleSettings(type);
-                    // Add flag for backend cleanup logic (this flag isn't saved, just used during merge)
-                    interactionData.useCustomOverlay = true;
-                 } else {
-                    // Ensure overlayStyle is NOT included if checkbox is unchecked
-                    delete interactionData.overlayStyle;
-                     // Add flag for backend cleanup logic
-                    interactionData.useCustomOverlay = false;
-                 }
-
-             } else {
-                  // Ensure related fields are removed if type is 'none'
-                  delete interactionData.showOverlayText;
-                  delete interactionData.overlayText;
-                  delete interactionData.overlayStyle;
-                  interactionData.useCustomOverlay = false; // Signal potential cleanup
-             }
-
-console.log("Saving Interaction Data:", JSON.stringify(interactionData)); // Log data being sent
-             google.script.run
-                .withSuccessHandler(handleSaveSuccess('interaction', interactionData)) // Pass type and *collected* data
-                .withFailureHandler(showError)
-                .mergeElementData(currentElementId, interactionData, 'interaction'); // Pass collected data
-
-        } catch (e) {
-             showError("Error preparing interaction data: " + e.message);
-             console.error(e);
+      try {
+        // Gather type-specific data
+        if (type === 'showText') {
+          interactionData.text = document.getElementById('interactionText').value;
         }
+        else if (type === 'highlight') {
+          interactionData.info = document.getElementById('highlightInfo').value;
+        }
+        else if (type === 'openUrl') {
+          const url = document.getElementById('interactionUrl').value.trim();
+          if (!url) { showError("Please enter a URL."); return; }
+          interactionData.url = url;
+        }
+        else if (type === 'spotlight') {
+          interactionData.spotlightTarget = document.getElementById('spotlightTarget').value.trim() || null;
+          interactionData.showText = document.getElementById('spotlightShowText').checked;
+          interactionData.text = interactionData.showText ? document.getElementById('spotlightText').value : undefined;
+          interactionData.showNotes = document.getElementById('spotlightShowNotes').checked;
+        }
+        else if (type === 'goToSlide') {
+          const targetSlideInput = document.getElementById('targetSlideNumber');
+          const targetSlide = parseInt(targetSlideInput.value, 10);
+          if (isNaN(targetSlide) || targetSlide < 1) { showError("Please enter a valid slide number."); targetSlideInput.focus(); return; }
+          interactionData.targetSlide = targetSlide;
+        }
+        else if (type === 'revealElement') {
+          const targetIdInput = document.getElementById('targetElementId');
+          const targetId = targetIdInput.value.trim();
+          if (!targetId) { showError("Please enter the Object ID to reveal."); targetIdInput.focus(); return; }
+          if (targetId === currentElementId) { showError("Element cannot reveal itself."); targetIdInput.focus(); return; }
+          interactionData.targetElementId = targetId;
+        }
+        else if (type === 'revealAndSpotlight') {
+          const targetIdInput = document.getElementById('revealAndSpotlight_targetElementId');
+          const targetId = targetIdInput.value.trim();
+          if (!targetId) { showError("Please enter the Target Element Object ID."); targetIdInput.focus(); return; }
+          if (targetId === currentElementId) { showError("Element cannot reveal/spotlight itself."); targetIdInput.focus(); return; }
+          interactionData.targetElementId = targetId;
+
+          // Spotlight specific options
+          interactionData.showText = document.getElementById('revealAndSpotlight_showText').checked;
+          interactionData.text = interactionData.showText ? document.getElementById('revealAndSpotlight_text').value : undefined;
+          interactionData.showNotes = document.getElementById('revealAndSpotlight_showNotes').checked;
+        }
+        
+        // Gather common Overlay Text Settings if type is not 'none'
+        if (type !== 'none') {
+          const showOverlayCheckbox = document.getElementById(`${type}_showOverlayText`);
+          const overlayTextInput = document.getElementById(`${type}_overlayText`);
+          if (showOverlayCheckbox && overlayTextInput) {
+            interactionData.showOverlayText = showOverlayCheckbox.checked;
+            interactionData.overlayText = interactionData.showOverlayText ? overlayTextInput.value.trim() : undefined;
+          }
+
+          // ADD THIS NEW CODE: Get disappearOnClick checkbox state
+          const disappearCheckbox = document.getElementById(`${type}_disappearOnClick`);
+          if (disappearCheckbox) {
+            interactionData.disappearOnClick = disappearCheckbox.checked;
+          }
+          // END OF ADDED CODE
+
+          // Check for custom overlay style settings
+          const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
+          if (useCustomOverlayCheckbox && useCustomOverlayCheckbox.checked) {
+            interactionData.overlayStyle = collectOverlayStyleSettings(type);
+            // Add flag for backend cleanup logic (this flag isn't saved, just used during merge)
+            interactionData.useCustomOverlay = true;
+          } else {
+            // Ensure overlayStyle is NOT included if checkbox is unchecked
+            delete interactionData.overlayStyle;
+            // Add flag for backend cleanup logic
+            interactionData.useCustomOverlay = false;
+          }
+
+        } else {
+          // Ensure related fields are removed if type is 'none'
+          delete interactionData.showOverlayText;
+          delete interactionData.overlayText;
+          delete interactionData.overlayStyle;
+          delete interactionData.disappearOnClick; // ADD THIS LINE
+          interactionData.useCustomOverlay = false; // Signal potential cleanup
+        }
+
+        google.script.run
+          .withSuccessHandler(handleSaveSuccess('interaction', interactionData)) // Pass type and *collected* data
+          .withFailureHandler(showError)
+          .mergeElementData(currentElementId, interactionData, 'interaction'); // Pass collected data
+
+      } catch (e) {
+        showError("Error preparing interaction data: " + e.message);
+        console.error(e);
+      }
     }
 
     function saveAnimationData() {

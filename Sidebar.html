@@ -572,315 +572,416 @@
 
           <!-- --- Interaction Option Groups --- -->
 
-<!-- UPDATES TO SIDEBAR.HTML -->
+    <!-- UPDATES TO SIDEBAR.HTML -->
 
-<!-- For each interaction type, we need to add a "disappear-option" div with a checkbox.
-   Place this before the custom overlay controls but after any interaction-specific settings. -->
 
-<!-- 1. SHOW TEXT OPTIONS -->
-<!-- Add below overlay text option but before custom overlay controls -->
-<div id="showTextOptions" class="option-group hidden">
-  <label for="interactionText">Text to Show (in Modal):</label>
-  <textarea id="interactionText" rows="3" placeholder="Enter the text to display in the popup"></textarea>
-  <!-- Overlay Text Option -->
-  <div class="overlay-text-option">
-    <div class="checkbox-option">
-      <input type="checkbox" id="showText_showOverlayText">
-      <label for="showText_showOverlayText">Show text directly on overlay</label>
+    <!-- 1. Show Text Interaction Type -->
+    <div id="showTextOptions" class="option-group hidden">
+      <!-- Existing options -->
+      <label for="interactionText">Text to Show (in Modal):</label>
+      <textarea id="interactionText" rows="3" placeholder="Enter the text to display in the popup"></textarea>
+      
+      <!-- Overlay Text Option -->
+      <div class="overlay-text-option">
+        <div class="checkbox-option">
+          <input type="checkbox" id="showText_showOverlayText">
+          <label for="showText_showOverlayText">Show text directly on overlay</label>
+        </div>
+        <div id="showText_overlayTextContainer" class="indented-option hidden">
+          <label for="showText_overlayText">Overlay Text:</label>
+          <input type="text" id="showText_overlayText" placeholder="Short text (e.g., 'Details')">
+        </div>
+      </div>
+      
+      <!-- Disappear option -->
+      <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <div class="checkbox-option">
+          <input type="checkbox" id="showText_disappearOnClick">
+          <label for="showText_disappearOnClick">Disappear when clicked</label>
+        </div>
+      </div>
+      
+      <!-- NEW: Sequential Appearance Controls -->
+      <div class="appearance-options" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <label style="font-weight:bold; color:#1a73e8;">Appearance Behavior:</label>
+        <select id="showText_appearanceBehavior">
+          <option value="withPresentation">Show with presentation (default)</option>
+          <option value="afterPrevious">Appear after previous element</option>
+          <option value="withPrevious">Appear with previous element</option>
+        </select>
+        <div id="showText_appearAfterContainer" class="indented-option hidden">
+          <label for="showText_appearAfterElementId">Appear after element ID:</label>
+          <input type="text" id="showText_appearAfterElementId" placeholder="Enter element ID">
+        </div>
+      </div>
+      
+      <!-- Element-specific Custom Overlay Style controls -->
+      <div class="custom-overlay-controls-section">
+        <div class="checkbox-option">
+          <input type="checkbox" id="showText_useCustomOverlay">
+          <label for="showText_useCustomOverlay">Custom overlay style</label>
+        </div>
+        <div id="showText_customOverlayContainer" class="custom-overlay-style-group hidden">
+          <h6>Custom Overlay Style</h6>
+          <!-- Placeholder for common style controls -->
+        </div>
+      </div>
     </div>
-    <div id="showText_overlayTextContainer" class="indented-option hidden">
-       <label for="showText_overlayText">Overlay Text:</label>
-       <input type="text" id="showText_overlayText" placeholder="Short text (e.g., 'Details')">
-    </div>
-  </div>
-  
-  <!-- ADD DISAPPEAR OPTION HERE -->
-  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-    <div class="checkbox-option">
-      <input type="checkbox" id="showText_disappearOnClick">
-      <label for="showText_disappearOnClick">Disappear when clicked</label>
-    </div>
-  </div>
-  <!-- END OF ADDED CODE -->
-  
-  <!-- Element-specific Custom Overlay Style controls -->
-  <div class="custom-overlay-controls-section">
-    <div class="checkbox-option">
-      <input type="checkbox" id="showText_useCustomOverlay">
-      <label for="showText_useCustomOverlay">Custom overlay style</label>
-    </div>
-    <div id="showText_customOverlayContainer" class="custom-overlay-style-group hidden">
-      <h6>Custom Overlay Style</h6>
-      <!-- Placeholder for common style controls -->
-    </div>
-  </div>
-</div>
 
-<!-- 2. HIGHLIGHT OPTIONS -->
-<!-- Add below overlay text option but before custom overlay controls -->
-<div id="highlightOptions" class="option-group hidden">
-  <label for="highlightInfo">Highlight Info (Internal Note):</label>
-  <input type="text" id="highlightInfo" placeholder="Optional note for this highlight"/>
-  <p>Briefly highlights the element when clicked (visual effect only).</p>
-  <!-- Overlay Text Option -->
-  <div class="overlay-text-option">
-    <div class="checkbox-option">
-      <input type="checkbox" id="highlight_showOverlayText">
-      <label for="highlight_showOverlayText">Show text directly on overlay</label>
+    <!-- 2. Highlight Interaction Type -->
+    <div id="highlightOptions" class="option-group hidden">
+      <!-- Existing options -->
+      <label for="highlightInfo">Highlight Info (Internal Note):</label>
+      <input type="text" id="highlightInfo" placeholder="Optional note for this highlight"/>
+      <p>Briefly highlights the element when clicked (visual effect only).</p>
+      
+      <!-- Overlay Text Option -->
+      <div class="overlay-text-option">
+        <div class="checkbox-option">
+          <input type="checkbox" id="highlight_showOverlayText">
+          <label for="highlight_showOverlayText">Show text directly on overlay</label>
+        </div>
+        <div id="highlight_overlayTextContainer" class="indented-option hidden">
+          <label for="highlight_overlayText">Overlay Text:</label>
+          <input type="text" id="highlight_overlayText" placeholder="Short text (e.g., 'Click')">
+        </div>
+      </div>
+      
+      <!-- Disappear option -->
+      <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <div class="checkbox-option">
+          <input type="checkbox" id="highlight_disappearOnClick">
+          <label for="highlight_disappearOnClick">Disappear when clicked</label>
+        </div>
+      </div>
+      
+      <!-- NEW: Sequential Appearance Controls -->
+      <div class="appearance-options" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <label style="font-weight:bold; color:#1a73e8;">Appearance Behavior:</label>
+        <select id="highlight_appearanceBehavior">
+          <option value="withPresentation">Show with presentation (default)</option>
+          <option value="afterPrevious">Appear after previous element</option>
+          <option value="withPrevious">Appear with previous element</option>
+        </select>
+        <div id="highlight_appearAfterContainer" class="indented-option hidden">
+          <label for="highlight_appearAfterElementId">Appear after element ID:</label>
+          <input type="text" id="highlight_appearAfterElementId" placeholder="Enter element ID">
+        </div>
+      </div>
+      
+      <!-- Element-specific Custom Overlay Style controls -->
+      <div class="custom-overlay-controls-section">
+        <div class="checkbox-option">
+          <input type="checkbox" id="highlight_useCustomOverlay">
+          <label for="highlight_useCustomOverlay">Custom overlay style</label>
+        </div>
+        <div id="highlight_customOverlayContainer" class="custom-overlay-style-group hidden">
+          <h6>Custom Overlay Style</h6>
+          <!-- Placeholder for common style controls -->
+        </div>
+      </div>
     </div>
-    <div id="highlight_overlayTextContainer" class="indented-option hidden">
-       <label for="highlight_overlayText">Overlay Text:</label>
-       <input type="text" id="highlight_overlayText" placeholder="Short text (e.g., 'Click')">
-    </div>
-  </div>
-  
-  <!-- ADD DISAPPEAR OPTION HERE -->
-  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-    <div class="checkbox-option">
-      <input type="checkbox" id="highlight_disappearOnClick">
-      <label for="highlight_disappearOnClick">Disappear when clicked</label>
-    </div>
-  </div>
-  <!-- END OF ADDED CODE -->
-  
-  <!-- Element-specific Custom Overlay Style controls -->
-  <div class="custom-overlay-controls-section">
-    <div class="checkbox-option">
-      <input type="checkbox" id="highlight_useCustomOverlay">
-      <label for="highlight_useCustomOverlay">Custom overlay style</label>
-    </div>
-    <div id="highlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
-       <!-- Placeholder for common style controls -->
-    </div>
-  </div>
-</div>
 
-<!-- 3. OPEN URL OPTIONS -->
-<!-- Add below overlay text option but before custom overlay controls -->
-<div id="openUrlOptions" class="option-group hidden">
-  <label for="interactionUrl">URL to Open:</label>
-  <input type="text" id="interactionUrl" placeholder="e.g., https://www.example.com"/>
-  <p>Opens the specified URL in a new browser tab when clicked.</p>
-  <!-- Overlay Text Option -->
-  <div class="overlay-text-option">
-    <div class="checkbox-option">
-      <input type="checkbox" id="openUrl_showOverlayText">
-      <label for="openUrl_showOverlayText">Show text directly on overlay</label>
+    <!-- 3. Open URL Interaction Type -->
+    <div id="openUrlOptions" class="option-group hidden">
+      <!-- Existing options -->
+      <label for="interactionUrl">URL to Open:</label>
+      <input type="text" id="interactionUrl" placeholder="e.g., https://www.example.com"/>
+      <p>Opens the specified URL in a new browser tab when clicked.</p>
+      
+      <!-- Overlay Text Option -->
+      <div class="overlay-text-option">
+        <div class="checkbox-option">
+          <input type="checkbox" id="openUrl_showOverlayText">
+          <label for="openUrl_showOverlayText">Show text directly on overlay</label>
+        </div>
+        <div id="openUrl_overlayTextContainer" class="indented-option hidden">
+          <label for="openUrl_overlayText">Overlay Text:</label>
+          <input type="text" id="openUrl_overlayText" placeholder="Short text (e.g., 'Website')">
+        </div>
+      </div>
+      
+      <!-- Disappear option -->
+      <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <div class="checkbox-option">
+          <input type="checkbox" id="openUrl_disappearOnClick">
+          <label for="openUrl_disappearOnClick">Disappear when clicked</label>
+        </div>
+      </div>
+      
+      <!-- NEW: Sequential Appearance Controls -->
+      <div class="appearance-options" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <label style="font-weight:bold; color:#1a73e8;">Appearance Behavior:</label>
+        <select id="openUrl_appearanceBehavior">
+          <option value="withPresentation">Show with presentation (default)</option>
+          <option value="afterPrevious">Appear after previous element</option>
+          <option value="withPrevious">Appear with previous element</option>
+        </select>
+        <div id="openUrl_appearAfterContainer" class="indented-option hidden">
+          <label for="openUrl_appearAfterElementId">Appear after element ID:</label>
+          <input type="text" id="openUrl_appearAfterElementId" placeholder="Enter element ID">
+        </div>
+      </div>
+      
+      <!-- Element-specific Custom Overlay Style controls -->
+      <div class="custom-overlay-controls-section">
+        <div class="checkbox-option">
+          <input type="checkbox" id="openUrl_useCustomOverlay">
+          <label for="openUrl_useCustomOverlay">Custom overlay style</label>
+        </div>
+        <div id="openUrl_customOverlayContainer" class="custom-overlay-style-group hidden">
+          <h6>Custom Overlay Style</h6>
+          <!-- Placeholder for common style controls -->
+        </div>
+      </div>
     </div>
-    <div id="openUrl_overlayTextContainer" class="indented-option hidden">
-       <label for="openUrl_overlayText">Overlay Text:</label>
-       <input type="text" id="openUrl_overlayText" placeholder="Short text (e.g., 'Website')">
-    </div>
-  </div>
-  
-  <!-- ADD DISAPPEAR OPTION HERE -->
-  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-    <div class="checkbox-option">
-      <input type="checkbox" id="openUrl_disappearOnClick">
-      <label for="openUrl_disappearOnClick">Disappear when clicked</label>
-    </div>
-  </div>
-  <!-- END OF ADDED CODE -->
-  
-  <!-- Element-specific Custom Overlay Style controls -->
-  <div class="custom-overlay-controls-section">
-    <div class="checkbox-option">
-      <input type="checkbox" id="openUrl_useCustomOverlay">
-      <label for="openUrl_useCustomOverlay">Custom overlay style</label>
-    </div>
-    <div id="openUrl_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
-    </div>
-  </div>
-</div>
 
-<!-- 4. SPOTLIGHT OPTIONS -->
-<!-- Add below overlay text option but before custom overlay controls -->
-<div id="spotlightOptions" class="option-group hidden">
-   <p style="margin-bottom: 12px;">Dims the rest of the slide, focusing attention on this element. Click the dimmed background to dismiss.</p>
-   <label for="spotlightTarget">Target Element ID (optional):</label>
-   <input type="text" id="spotlightTarget" placeholder="Enter Object ID to spotlight instead of this element"/>
-   <p>Leave empty to spotlight this element. Specify another element ID to spotlight that area instead.</p>
-   <div class="checkbox-option">
-     <input type="checkbox" id="spotlightShowText">
-     <label for="spotlightShowText">Show Popover Text with Spotlight</label>
-   </div>
-   <div id="spotlightTextContainer" class="indented-option hidden">
-      <label for="spotlightText">Popover Text:</label>
-      <textarea id="spotlightText" rows="3" placeholder="Enter brief text to show near the element"></textarea>
-   </div>
-   <div class="checkbox-option">
-     <input type="checkbox" id="spotlightShowNotes">
-     <label for="spotlightShowNotes">Show Speaker Notes during Spotlight</label>
-   </div>
-   <!-- Overlay Text Option -->
-   <div class="overlay-text-option">
-     <div class="checkbox-option">
-       <input type="checkbox" id="spotlight_showOverlayText">
-       <label for="spotlight_showOverlayText">Show text directly on overlay</label>
-     </div>
-     <div id="spotlight_overlayTextContainer" class="indented-option hidden">
-        <label for="spotlight_overlayText">Overlay Text:</label>
-        <input type="text" id="spotlight_overlayText" placeholder="Short text (e.g., 'Focus')">
-     </div>
-   </div>
-   
-  <!-- ADD DISAPPEAR OPTION HERE -->
-  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-    <div class="checkbox-option">
-      <input type="checkbox" id="spotlight_disappearOnClick">
-      <label for="spotlight_disappearOnClick">Disappear when clicked</label>
+    <!-- 4. Spotlight Interaction Type -->
+    <div id="spotlightOptions" class="option-group hidden">
+      <!-- Existing options -->
+      <p style="margin-bottom: 12px;">Dims the rest of the slide, focusing attention on this element. Click the dimmed background to dismiss.</p>
+      <label for="spotlightTarget">Target Element ID (optional):</label>
+      <input type="text" id="spotlightTarget" placeholder="Enter Object ID to spotlight instead of this element"/>
+      <p>Leave empty to spotlight this element. Specify another element ID to spotlight that area instead.</p>
+      
+      <div class="checkbox-option">
+        <input type="checkbox" id="spotlightShowText">
+        <label for="spotlightShowText">Show Popover Text with Spotlight</label>
+      </div>
+      <div id="spotlightTextContainer" class="indented-option hidden">
+        <label for="spotlightText">Popover Text:</label>
+        <textarea id="spotlightText" rows="3" placeholder="Enter brief text to show near the element"></textarea>
+      </div>
+      
+      <div class="checkbox-option">
+        <input type="checkbox" id="spotlightShowNotes">
+        <label for="spotlightShowNotes">Show Speaker Notes during Spotlight</label>
+      </div>
+      
+      <!-- Overlay Text Option -->
+      <div class="overlay-text-option">
+        <div class="checkbox-option">
+          <input type="checkbox" id="spotlight_showOverlayText">
+          <label for="spotlight_showOverlayText">Show text directly on overlay</label>
+        </div>
+        <div id="spotlight_overlayTextContainer" class="indented-option hidden">
+          <label for="spotlight_overlayText">Overlay Text:</label>
+          <input type="text" id="spotlight_overlayText" placeholder="Short text (e.g., 'Focus')">
+        </div>
+      </div>
+      
+      <!-- Disappear option -->
+      <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <div class="checkbox-option">
+          <input type="checkbox" id="spotlight_disappearOnClick">
+          <label for="spotlight_disappearOnClick">Disappear when clicked</label>
+        </div>
+      </div>
+      
+      <!-- NEW: Sequential Appearance Controls -->
+      <div class="appearance-options" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <label style="font-weight:bold; color:#1a73e8;">Appearance Behavior:</label>
+        <select id="spotlight_appearanceBehavior">
+          <option value="withPresentation">Show with presentation (default)</option>
+          <option value="afterPrevious">Appear after previous element</option>
+          <option value="withPrevious">Appear with previous element</option>
+        </select>
+        <div id="spotlight_appearAfterContainer" class="indented-option hidden">
+          <label for="spotlight_appearAfterElementId">Appear after element ID:</label>
+          <input type="text" id="spotlight_appearAfterElementId" placeholder="Enter element ID">
+        </div>
+      </div>
+      
+      <!-- Element-specific Custom Overlay Style controls -->
+      <div class="custom-overlay-controls-section">
+        <div class="checkbox-option">
+          <input type="checkbox" id="spotlight_useCustomOverlay">
+          <label for="spotlight_useCustomOverlay">Custom overlay style</label>
+        </div>
+        <div id="spotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
+          <h6>Custom Overlay Style</h6>
+          <!-- Placeholder for common style controls -->
+        </div>
+      </div>
     </div>
-  </div>
-  <!-- END OF ADDED CODE -->
-  
-   <!-- Element-specific Custom Overlay Style controls -->
-  <div class="custom-overlay-controls-section">
-    <div class="checkbox-option">
-      <input type="checkbox" id="spotlight_useCustomOverlay">
-      <label for="spotlight_useCustomOverlay">Custom overlay style</label>
-    </div>
-    <div id="spotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
-    </div>
-  </div>
-</div>
 
-<!-- 5. GO TO SLIDE OPTIONS -->
-<!-- Add below overlay text option but before custom overlay controls -->
-<div id="goToSlideOptions" class="option-group hidden">
-  <label for="targetSlideNumber">Target Slide Number:</label>
-  <input type="number" id="targetSlideNumber" min="1" placeholder="e.g., 3"/>
-  <p>Jumps directly to the specified slide number when clicked.</p>
-   <!-- Overlay Text Option -->
-  <div class="overlay-text-option">
-    <div class="checkbox-option">
-      <input type="checkbox" id="goToSlide_showOverlayText">
-      <label for="goToSlide_showOverlayText">Show text directly on overlay</label>
+    <!-- 5. Go To Slide Interaction Type -->
+    <div id="goToSlideOptions" class="option-group hidden">
+      <!-- Existing options -->
+      <label for="targetSlideNumber">Target Slide Number:</label>
+      <input type="number" id="targetSlideNumber" min="1" placeholder="e.g., 3"/>
+      <p>Jumps directly to the specified slide number when clicked.</p>
+      
+      <!-- Overlay Text Option -->
+      <div class="overlay-text-option">
+        <div class="checkbox-option">
+          <input type="checkbox" id="goToSlide_showOverlayText">
+          <label for="goToSlide_showOverlayText">Show text directly on overlay</label>
+        </div>
+        <div id="goToSlide_overlayTextContainer" class="indented-option hidden">
+          <label for="goToSlide_overlayText">Overlay Text:</label>
+          <input type="text" id="goToSlide_overlayText" placeholder="Short text (e.g., 'Next')">
+        </div>
+      </div>
+      
+      <!-- Disappear option -->
+      <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <div class="checkbox-option">
+          <input type="checkbox" id="goToSlide_disappearOnClick">
+          <label for="goToSlide_disappearOnClick">Disappear when clicked</label>
+        </div>
+      </div>
+      
+      <!-- NEW: Sequential Appearance Controls -->
+      <div class="appearance-options" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <label style="font-weight:bold; color:#1a73e8;">Appearance Behavior:</label>
+        <select id="goToSlide_appearanceBehavior">
+          <option value="withPresentation">Show with presentation (default)</option>
+          <option value="afterPrevious">Appear after previous element</option>
+          <option value="withPrevious">Appear with previous element</option>
+        </select>
+        <div id="goToSlide_appearAfterContainer" class="indented-option hidden">
+          <label for="goToSlide_appearAfterElementId">Appear after element ID:</label>
+          <input type="text" id="goToSlide_appearAfterElementId" placeholder="Enter element ID">
+        </div>
+      </div>
+      
+      <!-- Element-specific Custom Overlay Style controls -->
+      <div class="custom-overlay-controls-section">
+        <div class="checkbox-option">
+          <input type="checkbox" id="goToSlide_useCustomOverlay">
+          <label for="goToSlide_useCustomOverlay">Custom overlay style</label>
+        </div>
+        <div id="goToSlide_customOverlayContainer" class="custom-overlay-style-group hidden">
+          <h6>Custom Overlay Style</h6>
+          <!-- Placeholder for common style controls -->
+        </div>
+      </div>
     </div>
-    <div id="goToSlide_overlayTextContainer" class="indented-option hidden">
-       <label for="goToSlide_overlayText">Overlay Text:</label>
-       <input type="text" id="goToSlide_overlayText" placeholder="Short text (e.g., 'Next')">
-    </div>
-  </div>
-  
-  <!-- ADD DISAPPEAR OPTION HERE -->
-  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-    <div class="checkbox-option">
-      <input type="checkbox" id="goToSlide_disappearOnClick">
-      <label for="goToSlide_disappearOnClick">Disappear when clicked</label>
-    </div>
-  </div>
-  <!-- END OF ADDED CODE -->
-  
-   <!-- Element-specific Custom Overlay Style controls -->
-  <div class="custom-overlay-controls-section">
-    <div class="checkbox-option">
-      <input type="checkbox" id="goToSlide_useCustomOverlay">
-      <label for="goToSlide_useCustomOverlay">Custom overlay style</label>
-    </div>
-    <div id="goToSlide_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
-    </div>
-  </div>
-</div>
 
-<!-- 6. REVEAL ELEMENT OPTIONS -->
-<!-- Add below overlay text option but before custom overlay controls -->
-<div id="revealElementOptions" class="option-group hidden">
-  <label for="targetElementId">Target Element Object ID:</label>
-  <input type="text" id="targetElementId" placeholder="Enter the Object ID of the element to reveal"/>
-  <p>Makes another element visible when this element is clicked. Find the target's Object ID by selecting it and checking 'Selected Element' info.</p>
-   <!-- Overlay Text Option -->
-  <div class="overlay-text-option">
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealElement_showOverlayText">
-      <label for="revealElement_showOverlayText">Show text directly on overlay</label>
+    <!-- 6. Reveal Element Interaction Type -->
+    <div id="revealElementOptions" class="option-group hidden">
+      <!-- Existing options -->
+      <label for="targetElementId">Target Element Object ID:</label>
+      <input type="text" id="targetElementId" placeholder="Enter the Object ID of the element to reveal"/>
+      <p>Makes another element visible when this element is clicked. Find the target's Object ID by selecting it and checking 'Selected Element' info.</p>
+      
+      <!-- Overlay Text Option -->
+      <div class="overlay-text-option">
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealElement_showOverlayText">
+          <label for="revealElement_showOverlayText">Show text directly on overlay</label>
+        </div>
+        <div id="revealElement_overlayTextContainer" class="indented-option hidden">
+          <label for="revealElement_overlayText">Overlay Text:</label>
+          <input type="text" id="revealElement_overlayText" placeholder="Short text (e.g., 'Reveal')">
+        </div>
+      </div>
+      
+      <!-- Disappear option -->
+      <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealElement_disappearOnClick">
+          <label for="revealElement_disappearOnClick">Disappear when clicked</label>
+        </div>
+      </div>
+      
+      <!-- NEW: Sequential Appearance Controls -->
+      <div class="appearance-options" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <label style="font-weight:bold; color:#1a73e8;">Appearance Behavior:</label>
+        <select id="revealElement_appearanceBehavior">
+          <option value="withPresentation">Show with presentation (default)</option>
+          <option value="afterPrevious">Appear after previous element</option>
+          <option value="withPrevious">Appear with previous element</option>
+        </select>
+        <div id="revealElement_appearAfterContainer" class="indented-option hidden">
+          <label for="revealElement_appearAfterElementId">Appear after element ID:</label>
+          <input type="text" id="revealElement_appearAfterElementId" placeholder="Enter element ID">
+        </div>
+      </div>
+      
+      <!-- Element-specific Custom Overlay Style controls -->
+      <div class="custom-overlay-controls-section">
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealElement_useCustomOverlay">
+          <label for="revealElement_useCustomOverlay">Custom overlay style</label>
+        </div>
+        <div id="revealElement_customOverlayContainer" class="custom-overlay-style-group hidden">
+          <h6>Custom Overlay Style</h6>
+          <!-- Placeholder for common style controls -->
+        </div>
+      </div>
     </div>
-    <div id="revealElement_overlayTextContainer" class="indented-option hidden">
-       <label for="revealElement_overlayText">Overlay Text:</label>
-       <input type="text" id="revealElement_overlayText" placeholder="Short text (e.g., 'Reveal')">
-    </div>
-  </div>
-  
-  <!-- ADD DISAPPEAR OPTION HERE -->
-  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealElement_disappearOnClick">
-      <label for="revealElement_disappearOnClick">Disappear when clicked</label>
-    </div>
-  </div>
-  <!-- END OF ADDED CODE -->
-  
-  <!-- Element-specific Custom Overlay Style controls -->
-  <div class="custom-overlay-controls-section">
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealElement_useCustomOverlay">
-      <label for="revealElement_useCustomOverlay">Custom overlay style</label>
-    </div>
-    <div id="revealElement_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
-    </div>
-  </div>
-</div>
 
-<!-- 7. REVEAL AND SPOTLIGHT OPTIONS -->
-<!-- Add below overlay text option but before custom overlay controls -->
-<div id="revealAndSpotlightOptions" class="option-group hidden">
-  <label for="revealAndSpotlight_targetElementId">Target Element Object ID:</label>
-  <input type="text" id="revealAndSpotlight_targetElementId" placeholder="Enter Object ID of element to reveal & spotlight"/>
-  <p>Makes target element visible and then spotlights it. Find the ID by selecting the target and checking 'Selected Element' info.</p>
-
-  <div style="margin-top:15px; padding-top:10px; border-top: 1px dashed #ccc;"> <!-- Separator -->
-    <label style="font-weight:bold; color:#1a73e8;">Spotlight Options:</label>
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealAndSpotlight_showText">
-      <label for="revealAndSpotlight_showText">Show Popover Text with Spotlight</label>
+    <!-- 7. Reveal And Spotlight Interaction Type -->
+    <div id="revealAndSpotlightOptions" class="option-group hidden">
+      <!-- Existing options -->
+      <label for="revealAndSpotlight_targetElementId">Target Element Object ID:</label>
+      <input type="text" id="revealAndSpotlight_targetElementId" placeholder="Enter Object ID of element to reveal & spotlight"/>
+      <p>Makes target element visible and then spotlights it. Find the ID by selecting the target and checking 'Selected Element' info.</p>
+      
+      <div style="margin-top:15px; padding-top:10px; border-top: 1px dashed #ccc;"> <!-- Separator -->
+        <label style="font-weight:bold; color:#1a73e8;">Spotlight Options:</label>
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealAndSpotlight_showText">
+          <label for="revealAndSpotlight_showText">Show Popover Text with Spotlight</label>
+        </div>
+        <div id="revealAndSpotlight_textContainer" class="indented-option hidden">
+          <label for="revealAndSpotlight_text">Popover Text:</label>
+          <textarea id="revealAndSpotlight_text" rows="3" placeholder="Enter brief text to show near the element"></textarea>
+        </div>
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealAndSpotlight_showNotes">
+          <label for="revealAndSpotlight_showNotes">Show Speaker Notes during Spotlight</label>
+        </div>
+      </div>
+      
+      <!-- Overlay Text Option -->
+      <div class="overlay-text-option">
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealAndSpotlight_showOverlayText">
+          <label for="revealAndSpotlight_showOverlayText">Show text directly on overlay</label>
+        </div>
+        <div id="revealAndSpotlight_overlayTextContainer" class="indented-option hidden">
+          <label for="revealAndSpotlight_overlayText">Overlay Text:</label>
+          <input type="text" id="revealAndSpotlight_overlayText" placeholder="Short text (e.g., 'Reveal')">
+        </div>
+      </div>
+      
+      <!-- Disappear option -->
+      <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealAndSpotlight_disappearOnClick">
+          <label for="revealAndSpotlight_disappearOnClick">Disappear when clicked</label>
+        </div>
+      </div>
+      
+      <!-- NEW: Sequential Appearance Controls -->
+      <div class="appearance-options" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+        <label style="font-weight:bold; color:#1a73e8;">Appearance Behavior:</label>
+        <select id="revealAndSpotlight_appearanceBehavior">
+          <option value="withPresentation">Show with presentation (default)</option>
+          <option value="afterPrevious">Appear after previous element</option>
+          <option value="withPrevious">Appear with previous element</option>
+        </select>
+        <div id="revealAndSpotlight_appearAfterContainer" class="indented-option hidden">
+          <label for="revealAndSpotlight_appearAfterElementId">Appear after element ID:</label>
+          <input type="text" id="revealAndSpotlight_appearAfterElementId" placeholder="Enter element ID">
+        </div>
+      </div>
+      
+      <!-- Element-specific Custom Overlay Style controls -->
+      <div class="custom-overlay-controls-section">
+        <div class="checkbox-option">
+          <input type="checkbox" id="revealAndSpotlight_useCustomOverlay">
+          <label for="revealAndSpotlight_useCustomOverlay">Custom overlay style</label>
+        </div>
+        <div id="revealAndSpotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
+          <h6>Custom Overlay Style</h6>
+          <!-- Placeholder for common style controls -->
+        </div>
+      </div>
     </div>
-    <div id="revealAndSpotlight_textContainer" class="indented-option hidden">
-      <label for="revealAndSpotlight_text">Popover Text:</label>
-      <textarea id="revealAndSpotlight_text" rows="3" placeholder="Enter brief text to show near the element"></textarea>
-    </div>
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealAndSpotlight_showNotes">
-      <label for="revealAndSpotlight_showNotes">Show Speaker Notes during Spotlight</label>
-    </div>
-  </div>
-
-  <!-- Overlay Text Option -->
-  <div class="overlay-text-option">
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealAndSpotlight_showOverlayText">
-      <label for="revealAndSpotlight_showOverlayText">Show text directly on overlay</label>
-    </div>
-    <div id="revealAndSpotlight_overlayTextContainer" class="indented-option hidden">
-      <label for="revealAndSpotlight_overlayText">Overlay Text:</label>
-      <input type="text" id="revealAndSpotlight_overlayText" placeholder="Short text (e.g., 'Reveal')">
-    </div>
-  </div>
-  
-  <!-- ADD DISAPPEAR OPTION HERE -->
-  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealAndSpotlight_disappearOnClick">
-      <label for="revealAndSpotlight_disappearOnClick">Disappear when clicked</label>
-    </div>
-  </div>
-  <!-- END OF ADDED CODE -->
-  
-  <!-- Element-specific Custom Overlay Style controls -->
-  <div class="custom-overlay-controls-section">
-    <div class="checkbox-option">
-      <input type="checkbox" id="revealAndSpotlight_useCustomOverlay">
-      <label for="revealAndSpotlight_useCustomOverlay">Custom overlay style</label>
-    </div>
-    <div id="revealAndSpotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-      <h6>Custom Overlay Style</h6>
-      <!-- Placeholder for common style controls -->
-    </div>
-  </div>
-</div>
           <!-- Save Button for Interactions -->
           <button class="blue" onclick="saveInteractionData()">Save Interaction</button>
 
@@ -1154,7 +1255,16 @@
       document.querySelectorAll('input[id$="_useCustomOverlay"] + label').forEach(label => {
           label.textContent = "Custom overlay style";
       });
-    });
+      document.querySelectorAll('select[id$="_appearanceBehavior"]').forEach(select => {
+        select.addEventListener('change', function() {
+          const containerId = this.id.replace('_appearanceBehavior', '_appearAfterContainer');
+          const container = document.getElementById(containerId);
+          if (container) {
+            container.classList.toggle('hidden', this.value !== 'afterPrevious');
+            adjustSectionHeight(document.getElementById('interactionSettingsContainer'));
+          }
+        });
+      });
 
     // --- Setup functions ---
     function setupRangeValueDisplays() {

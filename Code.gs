@@ -5,19 +5,97 @@
 
 // --- Add-on Menu & Sidebar ---
 
-
 /**
- * Creates the add-on menu in Google Slides when the presentation is opened.
+ * Store your master web app URL here after you deploy once
+ * Replace with your actual deployed web app URL after deployment
  */
+const MASTER_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwa026a6MEXLrF_4GgrcMcOXv9ifqVjeB83fJVZpVkn8AxhS6UncueZzwY3lCld-TGAwQ/exec";
+
 function onOpen() {
-  SlidesApp.getUi()
-      .createMenu('Onboarding Tools')
+  const ui = SlidesApp.getUi();
+  
+  // Regular menu for all users
+  const menu = ui.createMenu('Onboarding Tools')
       .addItem('Show Builder Panel', 'showSidebar')
-      .addItem('Get Shareable URL', 'showShareableUrl')
-      .addSeparator()
-      // .addItem('Reset Step Counter', 'resetStepCounter') // Removed as Step Numbers section is gone
-      .addItem('Set Web App Deployment ID', 'setDeploymentId') // Exposed via menu
-      .addToUi();
+      .addItem('Get Interactive Viewer Link', 'showViewerLink');
+  
+  // Check if running as owner/admin and add admin options
+  const email = Session.getEffectiveUser().getEmail();
+  const ownerEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+  
+  if (!ownerEmail) {
+    // First run, assume current user is admin
+    PropertiesService.getScriptProperties().setProperty('ADMIN_EMAIL', email);
+    menu.addSeparator()
+        .addItem('[Admin] Set Master Deployment ID', 'setMasterDeploymentId');
+  } else if (email === ownerEmail) {
+    // Admin user, show admin options
+    menu.addSeparator()
+        .addItem('[Admin] Set Master Deployment ID', 'setMasterDeploymentId');
+  }
+  
+  menu.addToUi();
+}
+
+function setMasterDeploymentId() {
+  const ui = SlidesApp.getUi();
+  const response = ui.prompt(
+    'Set Master Deployment ID',
+    'Enter the deployment ID from your web app:',
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response.getSelectedButton() === ui.Button.OK) {
+    const deploymentId = response.getResponseText().trim();
+    if (deploymentId) {
+      PropertiesService.getScriptProperties().setProperty('MASTER_WEBAPP_ID', deploymentId);
+      ui.alert('Success', 'Master deployment ID saved!', ui.ButtonSet.OK);
+    }
+  }
+}
+
+function getMasterWebAppUrl() {
+  const deploymentId = PropertiesService.getScriptProperties().getProperty('MASTER_WEBAPP_ID');
+  if (deploymentId) {
+    return `https://script.google.com/macros/s/${deploymentId}/exec`;
+  }
+  return null;
+}
+
+function showViewerLink() {
+  try {
+    const presentationId = SlidesApp.getActivePresentation().getId();
+    const masterUrl = getMasterWebAppUrl();
+    
+    if (!masterUrl) {
+      // Guide the admin through setup if needed
+      SlidesApp.getUi().alert(
+        'Setup Required',
+        'The master web app URL has not been configured yet. Only the admin needs to set this up once.',
+        SlidesApp.getUi().ButtonSet.OK
+      );
+      return;
+    }
+    
+    // Format the complete URL with this presentation's ID
+    const viewerUrl = `${masterUrl}?presId=${presentationId}`;
+    
+    // Show the dialog with the link
+    const ui = SlidesApp.getUi();
+    const htmlContent = `<div style="font-family: Arial, sans-serif; padding: 10px;">
+                        <p>Share this URL for the interactive presentation:</p>
+                        <textarea rows="3" style="width:98%; margin-top:10px; font-family: monospace; font-size: 12px; border: 1px solid #ccc; border-radius: 4px; padding: 5px;" readonly onclick="this.select();">${viewerUrl}</textarea>
+                        <br/><br/>
+                        <button onclick="google.script.host.close()" style="padding: 8px 15px; background-color: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+                      </div>`;
+    const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+        .setWidth(500)
+        .setHeight(180);
+    ui.showModalDialog(htmlOutput, 'Interactive Viewer Link');
+  } catch (e) {
+    console.error("Error generating viewer link: " + e);
+    SlidesApp.getUi().alert('Error generating link: ' + e.message);
+  }
 }
 
 
@@ -881,53 +959,96 @@ function setOverlayStyleSettings(opacity, shadow) {
 
 // --- Web App Functions ---
 
-
 /**
  * Handles GET requests for the web app. Serves the WebApp.html file.
- * Passes the presentation ID to the template.
  * @param {object} e The event parameter for doGet, contains URL parameters.
  * @returns {HtmlOutput} The HTML page to be rendered.
  */
 function doGet(e) {
-  // Extract presentation ID from URL parameter 'presId', use default if missing.
-  const presentationId = e?.parameter?.presId || "15sEovSiZVqWDdUdtatObclQPmB-LfzMCicjl3Wh9mxs"; // Replace with YOUR default ID if needed
+  // Extract presentation ID from URL parameter 'presId'
+  const presentationId = e?.parameter?.presId || "";
   console.log(`doGet triggered for presentation ID: ${presentationId}`);
 
-
-  // --- Optional: Debug/Loader Pages (Keep or Remove as needed) ---
-  if (e?.parameter?.debug === "true") {
-    console.log("Serving diagnostic page");
-    return serveDiagnosticPage(e); // Use the dedicated function
-  } else if (e?.parameter?.loader === "true") {
-    console.log("Serving step loader page");
-    return HtmlService.createHtmlOutputFromFile('StepLoader') // Ensure this file exists if used
-        .setTitle('Interactive Training - Step Loader')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  // If no presentation ID is provided, show a helpful intro page
+  if (!presentationId) {
+    return HtmlService.createHtmlOutput(`
+      <html>
+      <head>
+        <title>Interactive Training - Welcome</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+          h1, h2 { color: #1a73e8; }
+          .container { max-width: 800px; margin: 0 auto; }
+          .section { margin-bottom: 30px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Interactive Training Viewer</h1>
+          <div class="section">
+            <h2>Welcome</h2>
+            <p>This interactive viewer lets you view Google Slides presentations with interactive elements.</p>
+            <p>To view a presentation, you need a link that includes the presentation ID.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `)
+    .setTitle('Interactive Training - Welcome')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
-  // --- End Optional ---
-
 
   try {
-    // Verify access to the presentation ID. Throws error if inaccessible.
+    // Try to open the presentation - this will throw an error if no access
     SlidesApp.openById(presentationId);
-    console.log(`Successfully verified access to presentation in doGet: ${presentationId}`);
+    console.log(`Successfully verified access to presentation: ${presentationId}`);
 
-
-    // Create an HTML template from WebApp.html.
+    // Create template and pass the presentation ID
     const template = HtmlService.createTemplateFromFile('WebApp');
-    // Pass the presentation ID to the template's JavaScript scope.
     template.presentationId = presentationId;
 
-
-    // Evaluate the template, set title and viewport meta tag.
     return template.evaluate()
         .setTitle('Interactive Training')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } catch (err) {
-      // Log detailed error if presentation access fails.
-      console.error(`Error in doGet: Failed to open Presentation ID '${presentationId}'. Error: ${err.message}\nStack: ${err.stack}`);
-      // Return a user-friendly error message.
-      return HtmlService.createHtmlOutput(`Error: Could not load the presentation (ID: ${presentationId}). Please check the ID and ensure the script has permission to access it. See script logs for more details.`);
+    console.error(`Error accessing presentation: ${err.message}`);
+    
+    // Check if this is a permission error
+    const isPermissionError = err.message && 
+                             (err.message.includes("Access denied") || 
+                              err.message.includes("permission") ||
+                              err.message.includes("Insufficient"));
+    
+    // Return a user-friendly error page
+    return HtmlService.createHtmlOutput(`
+      <html>
+      <head>
+        <title>Interactive Training - Error</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+          h1, h2 { color: #d93025; }
+          .container { max-width: 800px; margin: 0 auto; }
+          .error-section { margin-bottom: 30px; padding: 20px; border: 1px solid #f44336; border-radius: 8px; background-color: #fff0f0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>Error Loading Presentation</h1>
+          <div class="error-section">
+            <h2>${isPermissionError ? 'Access Denied' : 'Error Loading Presentation'}</h2>
+            <p>${isPermissionError ? 
+              `You don't have permission to access this presentation (ID: ${presentationId}).` : 
+              `Could not load the presentation (ID: ${presentationId}).`}</p>
+            <p>${isPermissionError ? 
+              'The presentation owner needs to share it with you or make it accessible to anyone with the link.' : 
+              'The presentation may not exist or there was a problem loading it.'}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `)
+    .setTitle('Interactive Training - Error')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
 }
 

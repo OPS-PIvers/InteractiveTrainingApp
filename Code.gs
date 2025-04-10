@@ -9,7 +9,7 @@
  * Store your master web app URL here after you deploy once
  * Replace with your actual deployed web app URL after deployment
  */
-const MASTER_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwa026a6MEXLrF_4GgrcMcOXv9ifqVjeB83fJVZpVkn8AxhS6UncueZzwY3lCld-TGAwQ/exec";
+const MASTER_WEBAPP_URL = "https://script.google.com/a/macros/orono.k12.mn.us/s/AKfycbwo5eaRK-iyFF_vNmq5KLE8w3GLNoq_SQxsQkdugo8jktnsDymR1h0k2Haw1pd22Zcgog/exec";
 
 function onOpen() {
   const ui = SlidesApp.getUi();
@@ -368,7 +368,8 @@ function saveDescription(element, jsonString) {
 
 /**
  * Merges new interaction or animation data with existing data for a specific element.
- * Handles 'overlayText', 'showOverlayText', 'useCustomOpacity', 'customOpacity', and 'overlayStyle' within the interaction object.
+ * Handles 'overlayText', 'showOverlayText', 'useCustomOpacity', 'customOpacity', 'overlayStyle',
+ * 'disappearOnClick', 'appearanceBehavior', and 'appearAfterElementId' within the interaction object.
  *
  * @param {string} elementId The ID of the element to modify.
  * @param {object} newData The new data to merge (e.g., { type: 'showText', text: '...', overlayStyle: {...} }).
@@ -470,19 +471,40 @@ function mergeElementData(elementId, newData, dataType) {
         if (!interaction.showOverlayText) {
           delete interaction.overlayText;
         }
+        
         // Clean up customOpacity if useCustomOpacity is false/undefined
         if (!interaction.useCustomOpacity) {
           delete interaction.customOpacity;
         }
+        
         // Remove overlayStyle entirely if interaction.useCustomOverlay (new flag) is false/undefined
         if (!interaction.useCustomOverlay) { // Assuming a new flag from sidebar indicates customisation
           delete interaction.overlayStyle;
         }
         // Remove the useCustomOverlay flag itself after cleanup
         delete interaction.useCustomOverlay;
-
+        
+        // --- NEW: Handle appearance behavior properties ---
+        if (interaction.appearanceBehavior) {
+          // If the behavior is not 'afterPrevious', remove the dependency element ID
+          if (interaction.appearanceBehavior !== 'afterPrevious') {
+            delete interaction.appearAfterElementId;
+          }
+          // Otherwise ensure the ID exists if provided
+          else if (interaction.appearAfterElementId === undefined || 
+                  interaction.appearAfterElementId === null || 
+                  interaction.appearAfterElementId === '') {
+            // Provide a warning but don't block the save
+            console.warn(`Element ${elementId} has 'afterPrevious' behavior but no valid target element ID`);
+          }
+        }
+        // If no behavior specified, set to default
+        else {
+          interaction.appearanceBehavior = 'withPresentation';
+          delete interaction.appearAfterElementId;
+        }
       }
-      console.log(`Updated ${dataType} section with new data: ${JSON.stringify(mergedData[dataType])}`);
+
     }
 
 

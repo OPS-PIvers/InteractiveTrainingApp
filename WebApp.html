@@ -1260,30 +1260,32 @@
               logDebug(`[WebApp] revealElement interaction has no target: ${elementId}`);
             }
             break;
-            case 'revealAndSpotlight':
-              if (interaction.targetElementId) {
-                logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${interaction.targetElementId}`);
-                // Step 1: Reveal the element, NOT keeping the trigger visible (pass false)
-                revealElement(interaction.targetElementId, elementId, false); // Changed to false
+            
+          case 'revealAndSpotlight':
+            if (interaction.targetElementId) {
+              logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${interaction.targetElementId}`);
+              // Step 1: Reveal the element, NOT keeping the trigger visible (pass false)
+              revealElement(interaction.targetElementId, elementId, false); // Changed to false
 
-                // Step 2: Use setTimeout to allow reveal animation/DOM update
-                setTimeout(() => {
-                  // Ensure target is actually in the map after reveal attempt
-                  if (overlayElementsMap.has(interaction.targetElementId)) {
-                    logDebug(`[WebApp] Triggering spotlight for revealed element: ${interaction.targetElementId}`);
-                    // Pass the *entire interaction object* which contains the text/notes settings
-                    showSpotlight(interaction.targetElementId, interaction);
-                  } else {
-                    logDebug(`[WebApp] Target element ${interaction.targetElementId} not found in map after reveal attempt for spotlight.`);
-                    showError(`Could not spotlight revealed element (ID: ${interaction.targetElementId.substring(0,8)}...).`);
-                  }
-                }, 200); // Adjust delay if needed (e.g., 100-300ms)
+              // Step 2: Use setTimeout to allow reveal animation/DOM update
+              setTimeout(() => {
+                // Ensure target is actually in the map after reveal attempt
+                if (overlayElementsMap.has(interaction.targetElementId)) {
+                  logDebug(`[WebApp] Triggering spotlight for revealed element: ${interaction.targetElementId}`);
+                  // Pass the *entire interaction object* which contains the text/notes settings
+                  showSpotlight(interaction.targetElementId, interaction);
+                } else {
+                  logDebug(`[WebApp] Target element ${interaction.targetElementId} not found in map after reveal attempt for spotlight.`);
+                  showError(`Could not spotlight revealed element (ID: ${interaction.targetElementId.substring(0,8)}...).`);
+                }
+              }, 200); // Adjust delay if needed (e.g., 100-300ms)
 
-                interactionHandled = true;
-              } else {
-                logDebug(`[WebApp] revealAndSpotlight interaction has no target: ${elementId}`);
-              }
-              break;
+              interactionHandled = true;
+            } else {
+              logDebug(`[WebApp] revealAndSpotlight interaction has no target: ${elementId}`);
+            }
+            break;
+            
           default:
             logDebug(`[WebApp] Unknown interaction type: ${interaction.type}`);
         }
@@ -1325,6 +1327,47 @@
           logDebug(`[WebApp] Overlay not found or invalid animation for click: ${elementId}`);
         }
       }
+      
+      // --- ADDED: Handle disappearOnClick functionality ---
+      // Process after interactions and animations are handled
+      if (currentElementData.interaction && currentElementData.interaction.disappearOnClick) {
+        logDebug(`[WebApp] Element has disappearOnClick enabled: ${elementId}`);
+        
+        // Use setTimeout to ensure other interactions complete first
+        setTimeout(() => {
+          // Get the overlay element from the map
+          const overlay = overlayElementsMap.get(elementId);
+          if (overlay && overlay.parentNode) {
+            logDebug(`[WebApp] Starting disappear animation for: ${elementId}`);
+            
+            // Fade out with transition
+            overlay.style.transition = 'opacity 0.5s ease-out';
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+            
+            // After fade animation completes, remove from DOM and tracking
+            setTimeout(() => {
+              if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+                logDebug(`[WebApp] Removed element from DOM: ${elementId}`);
+              }
+              
+              // Remove from overlay map
+              overlayElementsMap.delete(elementId);
+              
+              // Add to the set of permanently hidden elements for this slide
+              if (!permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
+                permanentlyHiddenElementsPerSlide[currentSlideIndex] = new Set();
+              }
+              permanentlyHiddenElementsPerSlide[currentSlideIndex].add(elementId);
+              
+              logDebug(`[WebApp] Added ${elementId} to hidden set for slide ${currentSlideIndex}. Current hidden elements:`, 
+                      Array.from(permanentlyHiddenElementsPerSlide[currentSlideIndex]));
+            }, 500); // Wait for fade animation to complete
+          }
+        }, 100); // Small delay to ensure interaction/animation processing completes
+      }
+      // --- END OF ADDED CODE ---
     }
 
 

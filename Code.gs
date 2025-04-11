@@ -11,6 +11,16 @@
  */
 const MASTER_WEBAPP_URL = "https://script.google.com/a/macros/orono.k12.mn.us/s/AKfycby-y-aQ8HW3MJ5t9p4DzVgsrSAWY_UUPClpRz-fS6jLRlwtcjJF--pRE32Ywx5CKk-teQ/exec";
 
+/**
+ * Central publishing service configuration
+ * This only needs to be set up ONCE by you as the template creator
+ */
+const MASTER_PUBLISHING_SERVICE = {
+  // Replace with your actual master deployment URL after you deploy once
+  URL: "https://script.google.com/macros/s/YOUR-MASTER-DEPLOYMENT-ID/exec",
+  SECRET_KEY: "change-this-to-a-secure-random-string"
+};
+
 function onOpen() {
   const ui = SlidesApp.getUi();
   

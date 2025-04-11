@@ -9,7 +9,7 @@
  * Store your master web app URL here after you deploy once
  * Replace with your actual deployed web app URL after deployment
  */
-const MASTER_WEBAPP_URL = "https://script.google.com/a/macros/orono.k12.mn.us/s/AKfycbwo5eaRK-iyFF_vNmq5KLE8w3GLNoq_SQxsQkdugo8jktnsDymR1h0k2Haw1pd22Zcgog/exec";
+const MASTER_WEBAPP_URL = "https://script.google.com/a/macros/orono.k12.mn.us/s/AKfycby-y-aQ8HW3MJ5t9p4DzVgsrSAWY_UUPClpRz-fS6jLRlwtcjJF--pRE32Ywx5CKk-teQ/exec";
 
 function onOpen() {
   const ui = SlidesApp.getUi();

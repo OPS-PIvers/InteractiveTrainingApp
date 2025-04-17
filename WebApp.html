@@ -1200,224 +1200,229 @@
         }
     }
 
-/**
- * Handles click events on overlay elements, managing interactions, animations, and sequential appearances.
- * @param {Object} element - The element data object
- * @param {string} clickedElementId - The ID of the clicked element
- */
-function handleOverlayClick(element, clickedElementId) {
-    // Debug logging
-    logDebug(`[WebApp] Click handler triggered for: ${clickedElementId || 'unknown'}`, element);
-    
-    // Use the passed elementId or fall back to the element's id property
-    const elementId = clickedElementId || element?.id;
-    
-    if (!elementId) {
-        console.error("[WebApp] No element ID available in click handler:", {element, clickedElementId});
-        return;
-    }
-    
-    // Find the most up-to-date element data
-    const currentElementData = currentSlideElementsData.find(el => el.id === elementId);
-    
-    if (!currentElementData) {
-        console.error(`[WebApp] Clicked element data not found: ${elementId}`);
-        return;
-    }
-
-    logDebug(`[WebApp] Processing click for element: ${elementId}`);
-
-    let interactionHandled = false;
-
-    // --- Handle Interactions First ---
-    if (currentElementData.interaction && 
-        currentElementData.interaction.type && 
-        currentElementData.interaction.type !== 'none') {
+    /**
+     * Handles click events on overlay elements, managing interactions, animations, and sequential appearances.
+     * @param {Object} element - The element data object
+     * @param {string} clickedElementId - The ID of the clicked element
+     */
+    function handleOverlayClick(element, clickedElementId) {
+        // Debug logging
+        logDebug(`[WebApp] Click handler triggered for: ${clickedElementId || 'unknown'}`, element);
         
-      const interaction = currentElementData.interaction;
-      const overlay = overlayElementsMap.get(elementId);
+        // Use the passed elementId or fall back to the element's id property
+        const elementId = clickedElementId || element?.id;
+        
+        if (!elementId) {
+            console.error("[WebApp] No element ID available in click handler:", {element, clickedElementId});
+            return;
+        }
+        
+        // Find the most up-to-date element data
+        const currentElementData = currentSlideElementsData.find(el => el.id === elementId);
+        
+        if (!currentElementData) {
+            console.error(`[WebApp] Clicked element data not found: ${elementId}`);
+            return;
+        }
 
-      switch (interaction.type) {
-        case 'showText':
-          if (interaction.text) {
-            showTextModal(interaction.text, elementId);
-            interactionHandled = true;
-          }
-          break;
-          
-        case 'highlight':
-          if (overlay) {
-            logDebug(`[WebApp] Highlight interaction: ${elementId}`);
-            overlay.style.transition = 'background-color 0.1s, box-shadow 0.1s, filter 0.1s';
-            overlay.style.filter = 'brightness(1.2) contrast(1.1)';
-            overlay.classList.add('highlighted-temporary');
-            setTimeout(() => {
-              if(overlayElementsMap.has(elementId)) {
-                overlay.style.transition = '';
-                overlay.style.filter = '';
-                overlay.classList.remove('highlighted-temporary');
-                applyOverlayStyle(overlay, currentElementData);
+        logDebug(`[WebApp] Processing click for element: ${elementId}`);
+
+        let interactionHandled = false;
+
+        // --- Handle Interactions First ---
+        if (currentElementData.interaction && 
+            currentElementData.interaction.type && 
+            currentElementData.interaction.type !== 'none') {
+            
+          const interaction = currentElementData.interaction;
+          const overlay = overlayElementsMap.get(elementId);
+
+          switch (interaction.type) {
+            case 'showText':
+              if (interaction.text) {
+                showTextModal(interaction.text, elementId);
+                interactionHandled = true;
               }
-            }, 800);
-          }
-          interactionHandled = true;
-          break;
-          
-        case 'openUrl':
-          if (interaction.url) {
-            logDebug(`[WebApp] Open URL interaction: ${interaction.url}`);
-            try {
-              window.open(interaction.url, '_blank');
+              break;
+              
+            case 'highlight':
+              if (overlay) {
+                logDebug(`[WebApp] Highlight interaction: ${elementId}`);
+                overlay.style.transition = 'background-color 0.1s, box-shadow 0.1s, filter 0.1s';
+                overlay.style.filter = 'brightness(1.2) contrast(1.1)';
+                overlay.classList.add('highlighted-temporary');
+                setTimeout(() => {
+                  if(overlayElementsMap.has(elementId)) {
+                    overlay.style.transition = '';
+                    overlay.style.filter = '';
+                    overlay.classList.remove('highlighted-temporary');
+                    applyOverlayStyle(overlay, currentElementData);
+                  }
+                }, 800);
+              }
               interactionHandled = true;
-            } catch (error) {
-              console.error(`[WebApp] Error opening URL: ${interaction.url}`, error);
-              showError(`Failed to open URL: ${interaction.url}`);
-            }
-          }
-          break;
-          
-        case 'spotlight':
-          logDebug(`[WebApp] Spotlight interaction: ${elementId}`);
-          showSpotlight(elementId, interaction);
-          interactionHandled = true;
-          break;
-          
-        case 'goToSlide':
-          if (interaction.targetSlide) {
-            const targetIndex = parseInt(interaction.targetSlide, 10) - 1;
-            logDebug(`[WebApp] Go to Slide interaction: Target ${interaction.targetSlide} (Index ${targetIndex})`);
-            if (targetIndex >= 0 && targetIndex < totalSlides && targetIndex !== currentSlideIndex) {
-              loadSlide(targetIndex);
-            } else if (targetIndex === currentSlideIndex) {
-              logDebug('[WebApp] Already on target slide.');
-            } else {
-              showError(`Invalid target slide number: ${interaction.targetSlide}`);
-            }
-            interactionHandled = true;
-          }
-          break;
-          
-        case 'revealElement':
-          if (interaction.targetElementId) {
-            logDebug(`[WebApp] Reveal Element interaction: Target ${interaction.targetElementId}`);
-            revealElement(interaction.targetElementId, elementId);
-            interactionHandled = true;
-          }
-          break;
-          
-        case 'revealAndSpotlight':
-          if (interaction.targetElementId) {
-            logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${interaction.targetElementId}`);
-            revealElement(interaction.targetElementId, elementId, false);
-            setTimeout(() => {
-              if (overlayElementsMap.has(interaction.targetElementId)) {
-                logDebug(`[WebApp] Triggering spotlight for revealed element: ${interaction.targetElementId}`);
-                showSpotlight(interaction.targetElementId, interaction);
+              break;
+              
+            case 'openUrl':
+              if (interaction.url) {
+                logDebug(`[WebApp] Open URL interaction: ${interaction.url}`);
+                try {
+                  window.open(interaction.url, '_blank');
+                  interactionHandled = true;
+                } catch (error) {
+                  console.error(`[WebApp] Error opening URL: ${interaction.url}`, error);
+                  showError(`Failed to open URL: ${interaction.url}`);
+                }
               }
-            }, 200);
-            interactionHandled = true;
+              break;
+              
+            case 'spotlight':
+              logDebug(`[WebApp] Spotlight interaction: ${elementId}`);
+              showSpotlight(elementId, interaction);
+              interactionHandled = true;
+              break;
+              
+            case 'goToSlide':
+              if (interaction.targetSlide) {
+                const targetIndex = parseInt(interaction.targetSlide, 10) - 1;
+                logDebug(`[WebApp] Go to Slide interaction: Target ${interaction.targetSlide} (Index ${targetIndex})`);
+                if (targetIndex >= 0 && targetIndex < totalSlides && targetIndex !== currentSlideIndex) {
+                  loadSlide(targetIndex);
+                } else if (targetIndex === currentSlideIndex) {
+                  logDebug('[WebApp] Already on target slide.');
+                } else {
+                  showError(`Invalid target slide number: ${interaction.targetSlide}`);
+                }
+                interactionHandled = true;
+              }
+              break;
+              
+            case 'revealElement':
+              if (interaction.targetElementId) {
+                logDebug(`[WebApp] Reveal Element interaction: Target ${interaction.targetElementId}`);
+                revealElement(interaction.targetElementId, elementId);
+                interactionHandled = true;
+              }
+              break;
+              
+            case 'revealAndSpotlight':
+              if (interaction.targetElementId) {
+                logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${interaction.targetElementId}`);
+                revealElement(interaction.targetElementId, elementId, false);
+                setTimeout(() => {
+                  if (overlayElementsMap.has(interaction.targetElementId)) {
+                    logDebug(`[WebApp] Triggering spotlight for revealed element: ${interaction.targetElementId}`);
+                    showSpotlight(interaction.targetElementId, interaction);
+                  }
+                }, 200);
+                interactionHandled = true;
+              }
+              break;
+              
+            default:
+              logDebug(`[WebApp] Unknown interaction type: ${interaction.type}`);
           }
-          break;
-          
-        default:
-          logDebug(`[WebApp] Unknown interaction type: ${interaction.type}`);
-      }
-    }
+        }
 
-    // --- Handle Animation Triggered by Click ---
-    if (!interactionHandled && currentElementData.animation && 
-        currentElementData.animation.trigger === 'onClick') {
+        // --- Handle Animation Triggered by Click ---
+        if (!interactionHandled && currentElementData.animation && 
+            currentElementData.animation.trigger === 'onClick') {
+            
+          const animation = currentElementData.animation;
+          const overlay = overlayElementsMap.get(elementId);
+          logDebug(`[WebApp] Click animation triggered: ${animation.type}`);
+
+          if (overlay && animation.type && animation.type !== 'none') {
+            const animationClass = overlay.dataset.animationClass || 
+                                  getAnimationClass(animation.type);
+            const speedClass = overlay.dataset.speedClass || '';
+
+            if (animationClass) {
+              overlay.classList.add(animationClass);
+              if (speedClass) overlay.classList.add(speedClass);
+
+              const duration = speedClass.includes('fast') ? 1000 : 
+                              (speedClass.includes('slow') ? 3000 : 2000);
+              logDebug(`[WebApp] Playing click animation ${animationClass} for ${duration}ms`);
+
+              setTimeout(() => {
+                if(overlayElementsMap.has(elementId)) {
+                  overlay.classList.remove(animationClass);
+                  if (speedClass) overlay.classList.remove(speedClass);
+                  logDebug(`[WebApp] Click animation ${animationClass} finished.`);
+                }
+              }, duration);
+            }
+          }
+        }
         
-      const animation = currentElementData.animation;
-      const overlay = overlayElementsMap.get(elementId);
-      logDebug(`[WebApp] Click animation triggered: ${animation.type}`);
-
-      if (overlay && animation.type && animation.type !== 'none') {
-        const animationClass = overlay.dataset.animationClass || 
-                              getAnimationClass(animation.type);
-        const speedClass = overlay.dataset.speedClass || '';
-
-        if (animationClass) {
-          overlay.classList.add(animationClass);
-          if (speedClass) overlay.classList.add(speedClass);
-
-          const duration = speedClass.includes('fast') ? 1000 : 
-                          (speedClass.includes('slow') ? 3000 : 2000);
-          logDebug(`[WebApp] Playing click animation ${animationClass} for ${duration}ms`);
-
+        // --- Handle Disappear On Click Functionality ---
+        if (currentElementData.interaction && currentElementData.interaction.disappearOnClick) {
+          logDebug(`[WebApp] Element has disappearOnClick enabled: ${elementId}`);
+          
           setTimeout(() => {
-            if(overlayElementsMap.has(elementId)) {
-              overlay.classList.remove(animationClass);
-              if (speedClass) overlay.classList.remove(speedClass);
-              logDebug(`[WebApp] Click animation ${animationClass} finished.`);
+            const overlay = overlayElementsMap.get(elementId);
+            if (overlay && overlay.parentNode) {
+              logDebug(`[WebApp] Starting disappear animation for: ${elementId}`);
+              
+              overlay.style.transition = 'opacity 0.5s ease-out';
+              overlay.style.opacity = '0';
+              overlay.style.pointerEvents = 'none';
+              
+              setTimeout(() => {
+                if (overlay.parentNode) {
+                  overlay.parentNode.removeChild(overlay);
+                  logDebug(`[WebApp] Removed element from DOM: ${elementId}`);
+                }
+                
+                overlayElementsMap.delete(elementId);
+                
+                // Add to the set of permanently hidden elements for this slide
+                if (!permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
+                  permanentlyHiddenElementsPerSlide[currentSlideIndex] = new Set();
+                }
+                permanentlyHiddenElementsPerSlide[currentSlideIndex].add(elementId);
+                
+                // Remove from navigation sequence and rebuild it
+                buildNavigationSequence();
+                
+                logDebug(`[WebApp] Added ${elementId} to hidden set for slide ${currentSlideIndex}`);
+              }, 500);
             }
-          }, duration);
+          }, 100);
         }
-      }
-    }
-    
-    // --- Handle Disappear On Click Functionality ---
-    if (currentElementData.interaction && currentElementData.interaction.disappearOnClick) {
-      logDebug(`[WebApp] Element has disappearOnClick enabled: ${elementId}`);
-      
-      setTimeout(() => {
-        const overlay = overlayElementsMap.get(elementId);
-        if (overlay && overlay.parentNode) {
-          logDebug(`[WebApp] Starting disappear animation for: ${elementId}`);
+        
+        // --- Handle Sequential Appearances ---
+        // Check for elements that should appear after this one was clicked
+        setTimeout(() => {
+          let newlyVisible = false;
           
-          overlay.style.transition = 'opacity 0.5s ease-out';
-          overlay.style.opacity = '0';
-          overlay.style.pointerEvents = 'none';
+          pendingAppearanceElements.forEach((info, pendingId) => {
+            if (info.behavior === 'afterPrevious' && info.dependsOn === elementId) {
+              logDebug(`[WebApp] Element ${pendingId} should appear after clicking ${elementId}`);
+              
+              if (renderElement(info.data)) {
+                visibleElementIds.add(pendingId);
+                pendingAppearanceElements.delete(pendingId);
+                newlyVisible = true;
+                logDebug(`[WebApp] Rendered element ${pendingId} after clicking ${elementId}`);
+              }
+            }
+          });
           
-          setTimeout(() => {
-            if (overlay.parentNode) {
-              overlay.parentNode.removeChild(overlay);
-              logDebug(`[WebApp] Removed element from DOM: ${elementId}`);
-            }
-            
-            overlayElementsMap.delete(elementId);
-            
-            // Add to the set of permanently hidden elements for this slide
-            if (!permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
-              permanentlyHiddenElementsPerSlide[currentSlideIndex] = new Set();
-            }
-            permanentlyHiddenElementsPerSlide[currentSlideIndex].add(elementId);
-            
-            // Remove from navigation sequence and rebuild it
+          // If any new elements appeared, trigger another check for cascading appearances
+          if (newlyVisible) {
+            checkPendingAppearances();
+            // Rebuild navigation sequence to include new elements
             buildNavigationSequence();
-            
-            logDebug(`[WebApp] Added ${elementId} to hidden set for slide ${currentSlideIndex}`);
-          }, 500);
-        }
-      }, 100);
-    }
-    
-    // --- Handle Sequential Appearances ---
-    // Check for elements that should appear after this one was clicked
-    setTimeout(() => {
-      let newlyVisible = false;
-      
-      pendingAppearanceElements.forEach((info, pendingId) => {
-        if (info.behavior === 'afterPrevious' && info.dependsOn === elementId) {
-          logDebug(`[WebApp] Element ${pendingId} should appear after clicking ${elementId}`);
-          
-          if (renderElement(info.data)) {
-            visibleElementIds.add(pendingId);
-            pendingAppearanceElements.delete(pendingId);
-            newlyVisible = true;
-            logDebug(`[WebApp] Rendered element ${pendingId} after clicking ${elementId}`);
           }
-        }
-      });
-      
-      // If any new elements appeared, trigger another check for cascading appearances
-      if (newlyVisible) {
-        checkPendingAppearances();
-        // Rebuild navigation sequence to include new elements
+        }, 500);
+      setTimeout(() => {
         buildNavigationSequence();
-      }
-    }, 500);
-}
+        forceEnableNavigationButtons();
+        logDebug(`[WebApp] handleOverlayClick completed for ${elementId}, navigation updated`);
+      }, 600);
+    }
 
 
     function hasSpotlightCapability(element) {
@@ -1618,6 +1623,15 @@ function handleOverlayClick(element, clickedElementId) {
                 }
             });
         }, 800); // Delay to allow spotlight effect to complete
+      // Force rebuild navigation sequence
+      setTimeout(() => {
+          buildNavigationSequence();
+          
+          // Force enable navigation buttons
+          setTimeout(forceEnableNavigationButtons, 100);
+          
+          logDebug(`[WebApp] Spotlight active, navigation sequence rebuilt with ${navSequenceElements.length} elements`);
+      }, 200);
     }
 
     /**
@@ -1662,8 +1676,7 @@ function handleOverlayClick(element, clickedElementId) {
     }
 
     /**
-     * Shows text next to a spotlighted element
-     * Updated version with integrated navigation controls
+     * Modified showSpotlightText function that ensures buttons are never disabled
      */
     function showSpotlightText(text, targetRect) {
         // Create text bubble container
@@ -1686,25 +1699,53 @@ function handleOverlayClick(element, clickedElementId) {
         contentDiv.innerHTML = text.replace(/\n/g, '<br>');
         textBubble.appendChild(contentDiv);
         
-        // Always add navigation buttons using the universal navigation sequence
+        // Navigation container
         const navDiv = document.createElement('div');
         navDiv.className = 'spotlight-nav-container';
         
-        // Previous button
+        // IMPORTANT: Always create enabled navigation buttons
+        // Previous button - never disabled
         const prevButton = document.createElement('button');
         prevButton.id = 'spotlightPrevBtn';
         prevButton.className = 'spotlight-nav-button';
         prevButton.innerHTML = '<span>←</span> Previous';
-        prevButton.addEventListener('click', navigateToPrevElement);
-        prevButton.disabled = currentSpotlightElementIndex <= 0;
+        prevButton.disabled = false; // Never disable
+        prevButton.style.opacity = '1';
+        prevButton.style.cursor = 'pointer';
         
-        // Next button
+        // Next button - never disabled
         const nextButton = document.createElement('button');
         nextButton.id = 'spotlightNextBtn';
         nextButton.className = 'spotlight-nav-button';
         nextButton.innerHTML = 'Next <span>→</span>';
-        nextButton.addEventListener('click', navigateToNextElement);
-        nextButton.disabled = currentSpotlightElementIndex >= navSequenceElements.length - 1;
+        nextButton.disabled = false; // Never disable
+        nextButton.style.opacity = '1';
+        nextButton.style.cursor = 'pointer';
+        
+        // Add click handlers with try/catch for robustness
+        prevButton.addEventListener('click', function(e) {
+            try {
+                e.preventDefault(); // Prevent any default behavior
+                e.stopPropagation(); // Stop event bubbling
+                logDebug('[WebApp] Previous button clicked');
+                navigateToPrevElement();
+            } catch (err) {
+                console.error('[WebApp] Error in prev button handler:', err);
+            }
+            return false; // Prevent default and stop propagation
+        });
+        
+        nextButton.addEventListener('click', function(e) {
+            try {
+                e.preventDefault(); // Prevent any default behavior
+                e.stopPropagation(); // Stop event bubbling
+                logDebug('[WebApp] Next button clicked');
+                navigateToNextElement();
+            } catch (err) {
+                console.error('[WebApp] Error in next button handler:', err);
+            }
+            return false; // Prevent default and stop propagation
+        });
         
         // Add the buttons to the nav container
         navDiv.appendChild(prevButton);
@@ -1748,8 +1789,11 @@ function handleOverlayClick(element, clickedElementId) {
         }
         window.currentSpotlight.textBubble = textBubble;
         
+        // Force enable the buttons again after a brief delay (to overcome any automatic disabling)
+        setTimeout(forceEnableNavigationButtons, 100);
+        
         // Log navigation state
-        logDebug(`[WebApp] Spotlight text shown with navigation. Current index: ${currentSpotlightElementIndex}, Total: ${navSequenceElements.length}`);
+        logDebug(`[WebApp] Spotlight text shown with navigation. Current index: ${currentSpotlightElementIndex}, Total elements: ${navSequenceElements.length}`);
     }
 
     /**
@@ -2118,6 +2162,13 @@ function handleOverlayClick(element, clickedElementId) {
                 logDebug(`[WebApp] [revealElement] Trigger element ${triggerElementId} not hidden (keepTrigger: ${keepTriggerVisible}, found in map: ${overlayElementsMap.has(triggerElementId)})`); // LOGGING
             }
 
+            // NEW CODE: Rebuild navigation sequence after revealing element
+            setTimeout(() => {
+                // Rebuild the navigation sequence to include the newly revealed element
+                buildNavigationSequence();
+                logDebug(`[WebApp] [revealElement] Updated navigation sequence after revealing element ${targetElementId}`);
+            }, 600);
+
         } catch (err) {
             console.error(`[WebApp] [revealElement] Error revealing element ${targetElementId}:`, err); // LOGGING
             showError(`Failed to reveal element ${targetElementId.substring(0,8)}...`);
@@ -2125,10 +2176,8 @@ function handleOverlayClick(element, clickedElementId) {
     }
 
     /**
-     * Builds a comprehensive navigation sequence of all interactive elements
-     * that should be included in navigation (spotlights, text modals, etc.)
-     * 
-     * @returns {number} The number of elements in the navigation sequence
+     * Enhanced function to build the navigation sequence, ensuring all interactive elements
+     * are included and properly ordered
      */
     function buildNavigationSequence() {
         // Reset current sequence
@@ -2136,26 +2185,30 @@ function handleOverlayClick(element, clickedElementId) {
         
         // Get currently visible elements
         const currentlyVisibleElements = Array.from(overlayElementsMap.keys());
+        logDebug(`[WebApp] buildNavigationSequence: Found ${currentlyVisibleElements.length} visible elements`);
         
-        // Get all elements with navigable interactions (spotlights, text modals, etc.)
+        // Include all interactive elements based on their interaction type
         const visibleInteractiveElements = interactiveElements.filter(el => 
             currentlyVisibleElements.includes(el.id) &&
             (
                 // Elements with spotlight capability
-                (el.interaction?.type === 'spotlight' && el.interaction.showText) ||
+                (el.interaction?.type === 'spotlight') ||
                 // Elements with text modals
-                (el.interaction?.type === 'showText' && el.interaction.text) ||
-                // Can add more conditions for other navigable types if needed
+                (el.interaction?.type === 'showText') ||
+                // Explicitly include revealAndSpotlight elements
+                (el.interaction?.type === 'revealAndSpotlight') ||
+                // Other navigable interaction types
                 false
             )
         );
         
-        // Sort elements based on position (top to bottom, left to right)
-        // This creates a natural reading order for navigation
+        logDebug(`[WebApp] buildNavigationSequence: Found ${visibleInteractiveElements.length} interactive elements out of ${currentlyVisibleElements.length} visible elements`);
+        
+        // Sort elements by position (top to bottom, left to right)
         visibleInteractiveElements.sort((a, b) => {
             // Compare vertical position first (with some tolerance)
             const verticalDiff = a.top - b.top;
-            if (Math.abs(verticalDiff) > 50) { // Tolerance of 50px
+            if (Math.abs(verticalDiff) > 30) { // Reduced tolerance for more accurate ordering
                 return verticalDiff;
             }
             // If at similar height, compare horizontal position
@@ -2164,112 +2217,202 @@ function handleOverlayClick(element, clickedElementId) {
         
         navSequenceElements = visibleInteractiveElements;
         
-        logDebug(`[WebApp] Built navigation sequence with ${navSequenceElements.length} elements`);
+        // Update current indices
+        if (isSpotlightActive && window.currentSpotlight) {
+            const elementId = window.currentSpotlight.elementId;
+            const targetId = window.currentSpotlight.targetId;
+            
+            // Try to find by element ID first, then by target ID
+            currentSpotlightElementIndex = navSequenceElements.findIndex(el => el.id === elementId);
+            if (currentSpotlightElementIndex < 0) {
+                currentSpotlightElementIndex = navSequenceElements.findIndex(el => el.id === targetId);
+            }
+            
+            logDebug(`[WebApp] buildNavigationSequence: Updated spotlight index to ${currentSpotlightElementIndex}`);
+        }
+        
+        // Log the sequence for debugging
+        if (navSequenceElements.length > 0) {
+            logDebug(`[WebApp] buildNavigationSequence: Built sequence with ${navSequenceElements.length} elements. First: ${navSequenceElements[0].id}, Last: ${navSequenceElements[navSequenceElements.length-1].id}`);
+        } else {
+            logDebug(`[WebApp] buildNavigationSequence: No navigable elements found`);
+        }
+        
         return navSequenceElements.length;
     }
 
     /**
-     * Navigates to the next element in the sequence
-     * @returns {boolean} True if navigation was successful
+     * Updates to the navigation functions to ensure they work with all interaction types
      */
     function navigateToNextElement() {
-        // Determine current context (modal or spotlight)
-        let currentIndex = -1;
+        logDebug('[WebApp] navigateToNextElement called');
         
-        if (isSpotlightActive) {
-            // In spotlight context
-            currentIndex = currentSpotlightElementIndex;
-        } else if (textModal.classList.contains('visible')) {
-            // In text modal context
-            currentIndex = currentModalElementIndex;
-        } else {
-            // No active context, start from beginning
-            currentIndex = -1;
-        }
+        // Force rebuild navigation sequence to ensure it's current
+        buildNavigationSequence();
         
-        // Ensure we have a navigation sequence
-        if (navSequenceElements.length === 0) {
-            buildNavigationSequence();
-        }
-        
-        if (currentIndex >= -1 && currentIndex < navSequenceElements.length - 1) {
-            const nextElement = navSequenceElements[currentIndex + 1];
-            
-            // Hide current spotlight or modal
-            if (isSpotlightActive) {
-                hideSpotlight();
-            }
-            if (textModal.classList.contains('visible')) {
-                hideTextModal();
-            }
-            
-            // Small delay to allow transitions to complete
-            setTimeout(() => {
-                // Trigger the appropriate interaction based on type
-                if (nextElement.interaction?.type === 'spotlight') {
-                    showSpotlight(nextElement.id, nextElement.interaction);
-                } else if (nextElement.interaction?.type === 'showText') {
-                    showTextModal(nextElement.interaction.text, nextElement.id);
-                }
-                // Handle other interaction types as needed
-            }, 300);
-            
-            return true;
-        }
-        
-        return false; // No next element
-    }
-
-    /**
-     * Navigates to the previous element in the sequence
-     * @returns {boolean} True if navigation was successful
-     */
-    function navigateToPrevElement() {
-        // Determine current context (modal or spotlight)
-        let currentIndex = -1;
-        
-        if (isSpotlightActive) {
-            // In spotlight context
-            currentIndex = currentSpotlightElementIndex;
-        } else if (textModal.classList.contains('visible')) {
-            // In text modal context
-            currentIndex = currentModalElementIndex;
-        } else {
-            // No active context, can't go previous
+        if (navSequenceElements.length <= 0) {
+            logDebug('[WebApp] No elements in navigation sequence');
             return false;
         }
         
-        // Ensure we have a navigation sequence
-        if (navSequenceElements.length === 0) {
-            buildNavigationSequence();
-        }
+        // Determine current index
+        let currentIndex = -1;
         
-        if (currentIndex > 0 && currentIndex < navSequenceElements.length) {
-            const prevElement = navSequenceElements[currentIndex - 1];
+        if (isSpotlightActive && window.currentSpotlight) {
+            // Get the elementId (trigger) and targetId (spotlighted element)
+            const elementId = window.currentSpotlight.elementId;
+            const targetId = window.currentSpotlight.targetId;
             
-            // Hide current spotlight or modal
-            if (isSpotlightActive) {
-                hideSpotlight();
-            }
-            if (textModal.classList.contains('visible')) {
-                hideTextModal();
+            // Try to find index of either in the sequence
+            currentIndex = navSequenceElements.findIndex(el => el.id === elementId);
+            if (currentIndex < 0) {
+                currentIndex = navSequenceElements.findIndex(el => el.id === targetId);
             }
             
-            // Small delay to allow transitions to complete
-            setTimeout(() => {
-                // Trigger the appropriate interaction based on type
-                if (prevElement.interaction?.type === 'spotlight') {
-                    showSpotlight(prevElement.id, prevElement.interaction);
-                } else if (prevElement.interaction?.type === 'showText') {
-                    showTextModal(prevElement.interaction.text, prevElement.id);
-                }
-                // Handle other interaction types as needed
-            }, 300);
-            
-            return true;
+            logDebug(`[WebApp] Current spotlight: elementId=${elementId}, targetId=${targetId}, index=${currentIndex}`);
+        } else if (textModal.classList.contains('visible')) {
+            currentIndex = currentModalElementIndex;
+            logDebug(`[WebApp] Current modal index=${currentIndex}`);
+        } else {
+            // If no active context, start from beginning
+            currentIndex = -1;
+            logDebug('[WebApp] No active context, starting from beginning');
         }
         
-        return false; // No previous element
+        // Get next index (with wrap-around)
+        const nextIndex = (currentIndex >= navSequenceElements.length - 1 || currentIndex < 0) ? 
+            0 : currentIndex + 1;
+        
+        // Get the next element
+        const nextElement = navSequenceElements[nextIndex];
+        logDebug(`[WebApp] Next element: index=${nextIndex}, id=${nextElement.id}, type=${nextElement.interaction?.type}`);
+        
+        // Clean up current state
+        hideSpotlight();
+        hideTextModal();
+        
+        // Short delay to ensure clean state
+        setTimeout(() => {
+            // IMPORTANT: Simulate clicking the element directly
+            if (nextElement.interaction && nextElement.interaction.type) {
+                logDebug(`[WebApp] Handling next element click: ${nextElement.id}`);
+                // Call the click handler directly with element data
+                handleOverlayClick(nextElement, nextElement.id);
+            }
+        }, 300);
+        
+        return true;
+    }
+
+    function navigateToPrevElement() {
+        logDebug('[WebApp] navigateToPrevElement called');
+        
+        // Force rebuild navigation sequence to ensure it's current
+        buildNavigationSequence();
+        
+        if (navSequenceElements.length <= 0) {
+            logDebug('[WebApp] No elements in navigation sequence');
+            return false;
+        }
+        
+        // Determine current index
+        let currentIndex = -1;
+        
+        if (isSpotlightActive && window.currentSpotlight) {
+            // Get the elementId (trigger) and targetId (spotlighted element)
+            const elementId = window.currentSpotlight.elementId;
+            const targetId = window.currentSpotlight.targetId;
+            
+            // Try to find index of either in the sequence
+            currentIndex = navSequenceElements.findIndex(el => el.id === elementId);
+            if (currentIndex < 0) {
+                currentIndex = navSequenceElements.findIndex(el => el.id === targetId);
+            }
+            
+            logDebug(`[WebApp] Current spotlight: elementId=${elementId}, targetId=${targetId}, index=${currentIndex}`);
+        } else if (textModal.classList.contains('visible')) {
+            currentIndex = currentModalElementIndex;
+            logDebug(`[WebApp] Current modal index=${currentIndex}`);
+        } else {
+            // If no active context, can't go previous
+            logDebug('[WebApp] No active context, cannot go previous');
+            return false;
+        }
+        
+        // Get previous index (with wrap-around)
+        const prevIndex = (currentIndex <= 0) ? 
+            navSequenceElements.length - 1 : currentIndex - 1;
+        
+        // Get the previous element
+        const prevElement = navSequenceElements[prevIndex];
+        logDebug(`[WebApp] Previous element: index=${prevIndex}, id=${prevElement.id}, type=${prevElement.interaction?.type}`);
+        
+        // Clean up current state
+        hideSpotlight();
+        hideTextModal();
+        
+        // Short delay to ensure clean state
+        setTimeout(() => {
+            // IMPORTANT: Simulate clicking the element directly
+            if (prevElement.interaction && prevElement.interaction.type) {
+                logDebug(`[WebApp] Handling previous element click: ${prevElement.id}`);
+                // Call the click handler directly with element data
+                handleOverlayClick(prevElement, prevElement.id);
+            }
+        }, 300);
+        
+        return true;
+    }
+
+    /**
+     * IMPORTANT: Function to force enable navigation buttons
+     * Call this after any spotlight or modal is shown
+     */
+    function forceEnableNavigationButtons() {
+        // Get all navigation buttons
+        const spotlightPrevBtn = document.getElementById('spotlightPrevBtn');
+        const spotlightNextBtn = document.getElementById('spotlightNextBtn');
+        const modalPrevBtn = document.getElementById('prevElementBtn');
+        const modalNextBtn = document.getElementById('nextElementBtn');
+        
+        // Log the initial button states for debugging
+        logDebug(`[WebApp] forceEnableNavigationButtons - Initial states:
+            Spotlight Prev: ${spotlightPrevBtn ? (spotlightPrevBtn.disabled ? 'Disabled' : 'Enabled') : 'Not found'}
+            Spotlight Next: ${spotlightNextBtn ? (spotlightNextBtn.disabled ? 'Disabled' : 'Enabled') : 'Not found'}
+            Modal Prev: ${modalPrevBtn ? (modalPrevBtn.disabled ? 'Disabled' : 'Enabled') : 'Not found'}
+            Modal Next: ${modalNextBtn ? (modalNextBtn.disabled ? 'Disabled' : 'Enabled') : 'Not found'}`);
+        
+        // Force enable spotlight buttons if they exist
+        if (spotlightPrevBtn) {
+            spotlightPrevBtn.disabled = false;
+            spotlightPrevBtn.style.opacity = '1';
+            spotlightPrevBtn.style.cursor = 'pointer';
+            // Re-attach event listener
+            spotlightPrevBtn.onclick = navigateToPrevElement;
+        }
+        
+        if (spotlightNextBtn) {
+            spotlightNextBtn.disabled = false;
+            spotlightNextBtn.style.opacity = '1';
+            spotlightNextBtn.style.cursor = 'pointer';
+            // Re-attach event listener
+            spotlightNextBtn.onclick = navigateToNextElement;
+        }
+        
+        // Force enable modal buttons if they exist
+        if (modalPrevBtn) {
+            modalPrevBtn.disabled = false;
+            // Re-attach event listener
+            modalPrevBtn.onclick = navigateToPrevElement;
+        }
+        
+        if (modalNextBtn) {
+            modalNextBtn.disabled = false;
+            // Re-attach event listener
+            modalNextBtn.onclick = navigateToNextElement;
+        }
+        
+        logDebug('[WebApp] Navigation buttons force enabled');
     }
 
     // ---------- Loading and Error Handling ----------

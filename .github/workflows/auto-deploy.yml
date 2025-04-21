@@ -23,11 +23,11 @@ jobs:
       run: npm install -g @google/clasp
 
     - name: Authenticate clasp
-      # Create a temporary .clasprc.json file using the secret
       run: |
-        echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > ~/.clasprc.json
-        # Optional: Verify the file was created (remove for production)
-        # cat ~/.clasprc.json
+        # Use printf to write the JSON secret content to the file
+        printf "%s" "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > ~/.clasprc.json
+        # Optional: Verify the first few characters written (remove for production)
+        # head -c 20 ~/.clasprc.json
 
     - name: Push code to Apps Script
       # Use --force if you encounter issues with minor version bumps

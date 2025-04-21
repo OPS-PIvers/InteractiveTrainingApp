@@ -3,7 +3,7 @@ name: Auto Deploy Apps Script
 on:
   push:
     branches:
-      - main # Change this to your default branch if it's not named 'main'
+      - main # Change this to your main branch if it's not named 'main'
       # Add other branches here if you want pushes to them to trigger deployment
 
 jobs:

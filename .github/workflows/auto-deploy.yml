@@ -24,20 +24,25 @@ jobs:
 
     - name: Authenticate clasp
       run: |
-        # Use printf to write the JSON secret content to the file
-        printf "%s" "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > ~/.clasprc.json
-        # Optional: Verify the first few characters written (remove for production)
-        # head -c 20 ~/.clasprc.json
+        # Create the credentials file from the secret
+        echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > ~/.clasprc.json
+        # Validate JSON format (fails if not valid)
+        jq empty ~/.clasprc.json || { echo "Invalid JSON in credentials"; cat ~/.clasprc.json; exit 1; }
 
     - name: Push code to Apps Script
       # Use --force if you encounter issues with minor version bumps
       run: clasp push --force
 
     - name: Update deployment
-      # Use the deployment ID secret to target the specific deployment
-      run: clasp deploy -i ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}
+      # If you have a specific deployment ID to update, use this format
+      run: |
+        if [ -n "${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }}" ]; then
+          clasp deploy --deploymentId ${{ secrets.APPS_SCRIPT_DEPLOYMENT_ID }} --description "Auto-deployment $(date)"
+        else
+          clasp deploy --description "Auto-deployment $(date)"
+        fi
 
     # Optional: Clean up the credentials file (good practice)
-    # - name: Clean up credentials
-    #   if: always() # Run even if previous steps failed
-    #   run: rm ~/.clasprc.json
+    - name: Clean up credentials
+      if: always() # Run even if previous steps failed
+      run: rm -f ~/.clasprc.json

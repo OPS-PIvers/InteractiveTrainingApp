@@ -2164,7 +2164,7 @@
 
             // Apply animation if configured
             if (targetElementData.animation && targetElementData.animation.type && targetElementData.animation.type !== 'none') {
-                applyAnimation(overlay, targetElementData.animation);
+                applyAnimation(overlay, targetElementData);
             }
 
             slideElement.appendChild(overlay);
@@ -2308,115 +2308,143 @@
         buildNavigationSequence();
         
         if (navSequenceElements.length <= 0) {
-            logDebug('[WebApp] No elements in navigation sequence');
+            logDebug('[WebApp] No navigation sequence available.');
             return false;
         }
         
-        // Determine current index
+        // Determine current index based on active modal or spotlight
         let currentIndex = -1;
-        
-        if (isSpotlightActive && window.currentSpotlight) {
-            // Get the elementId (trigger) and targetId (spotlighted element)
-            const elementId = window.currentSpotlight.elementId;
-            const targetId = window.currentSpotlight.targetId;
-            
-            // Try to find index of either in the sequence
-            currentIndex = navSequenceElements.findIndex(el => el.id === elementId);
-            if (currentIndex < 0) {
-                currentIndex = navSequenceElements.findIndex(el => el.id === targetId);
-            }
-            
-            logDebug(`[WebApp] Current spotlight: elementId=${elementId}, targetId=${targetId}, index=${currentIndex}`);
-        } else if (textModal.classList.contains('visible')) {
+        if (isSpotlightActive && window.currentSpotlight?.targetId) {
+            currentIndex = navSequenceElements.findIndex(el => el.id === window.currentSpotlight.targetId);
+            logDebug(`[WebApp] Current index based on spotlight: ${currentIndex} (Target ID: ${window.currentSpotlight.targetId})`);
+        } else if (textModal.classList.contains('visible') && currentModalElementIndex !== -1) {
             currentIndex = currentModalElementIndex;
-            logDebug(`[WebApp] Current modal index=${currentIndex}`);
+            logDebug(`[WebApp] Current index based on modal: ${currentIndex}`);
         } else {
-            // If no active context, start from beginning
-            currentIndex = -1;
-            logDebug('[WebApp] No active context, starting from beginning');
+            // If nothing is active, assume we start from the beginning or last known position
+            currentIndex = -1; // Start from beginning if no context
+            logDebug('[WebApp] No active modal/spotlight, starting navigation from beginning.');
         }
         
         // Get next index (with wrap-around)
         const nextIndex = (currentIndex >= navSequenceElements.length - 1 || currentIndex < 0) ? 
-            0 : currentIndex + 1;
+                          0 : currentIndex + 1;
         
-        // Get the next element
+        // Get the next element data
         const nextElement = navSequenceElements[nextIndex];
-        logDebug(`[WebApp] Next element: index=${nextIndex}, id=${nextElement.id}, type=${nextElement.interaction?.type}`);
+        if (!nextElement || !nextElement.id) {
+            logDebug('[WebApp] Could not find valid next element data.');
+            return false;
+        }
         
-        // Clean up current state
+        logDebug(`[WebApp] Navigating TO element: index=${nextIndex}, id=${nextElement.id}, type=${nextElement.interaction?.type}`);
+        
+        // Clean up current state BEFORE triggering the next
         hideSpotlight();
         hideTextModal();
         
-        // Short delay to ensure clean state
+        // Short delay to ensure clean state and DOM updates
         setTimeout(() => {
-            // IMPORTANT: Simulate clicking the element directly
-            if (nextElement.interaction && nextElement.interaction.type) {
-                logDebug(`[WebApp] Handling next element click: ${nextElement.id}`);
-                // Call the click handler directly with element data
-                handleOverlayClick(nextElement, nextElement.id);
+            logDebug(`[WebApp] Triggering interaction for next element: ${nextElement.id}`);
+            const interactionType = nextElement.interaction?.type || 'none';
+            
+            // Update indices BEFORE triggering interaction
+            currentModalElementIndex = nextIndex;
+            currentSpotlightElementIndex = nextIndex;
+
+            // Trigger the appropriate interaction for the next element
+            switch (interactionType) {
+                case 'spotlight':
+                    showSpotlight(nextElement.id, nextElement.interaction);
+                    break;
+                case 'showText':
+                    showTextModal(nextElement.interaction.text, nextElement.id);
+                    break;
+                case 'revealElement':
+                case 'revealAndSpotlight':
+                case 'openUrl':
+                case 'none': // Even if 'none', handleOverlayClick might trigger animations or appearance changes
+                default:
+                    // Simulate a click on the element's overlay
+                    handleOverlayClick(nextElement, nextElement.id);
+                    break;
             }
-        }, 300);
+        }, 150); // Delay to allow hide animations/cleanup
         
         return true;
     }
 
+    /**
+     * Navigates to the previous element in the defined sequence and triggers its interaction.
+     */
     function navigateToPrevElement() {
         logDebug('[WebApp] navigateToPrevElement called');
         
-        // Force rebuild navigation sequence to ensure it's current
+        // Force rebuild navigation sequence
         buildNavigationSequence();
         
         if (navSequenceElements.length <= 0) {
-            logDebug('[WebApp] No elements in navigation sequence');
+            logDebug('[WebApp] No navigation sequence available.');
             return false;
         }
         
         // Determine current index
         let currentIndex = -1;
-        
-        if (isSpotlightActive && window.currentSpotlight) {
-            // Get the elementId (trigger) and targetId (spotlighted element)
-            const elementId = window.currentSpotlight.elementId;
-            const targetId = window.currentSpotlight.targetId;
-            
-            // Try to find index of either in the sequence
-            currentIndex = navSequenceElements.findIndex(el => el.id === elementId);
-            if (currentIndex < 0) {
-                currentIndex = navSequenceElements.findIndex(el => el.id === targetId);
-            }
-            
-            logDebug(`[WebApp] Current spotlight: elementId=${elementId}, targetId=${targetId}, index=${currentIndex}`);
-        } else if (textModal.classList.contains('visible')) {
+        if (isSpotlightActive && window.currentSpotlight?.targetId) {
+            currentIndex = navSequenceElements.findIndex(el => el.id === window.currentSpotlight.targetId);
+            logDebug(`[WebApp] Current index based on spotlight: ${currentIndex} (Target ID: ${window.currentSpotlight.targetId})`);
+        } else if (textModal.classList.contains('visible') && currentModalElementIndex !== -1) {
             currentIndex = currentModalElementIndex;
-            logDebug(`[WebApp] Current modal index=${currentIndex}`);
+            logDebug(`[WebApp] Current index based on modal: ${currentIndex}`);
         } else {
-            // If no active context, can't go previous
-            logDebug('[WebApp] No active context, cannot go previous');
-            return false;
+            // If nothing is active, assume we wrap around from the end
+            currentIndex = 0; // Start from beginning if no context, so prev wraps to end
+            logDebug('[WebApp] No active modal/spotlight, starting navigation from end for previous.');
         }
         
         // Get previous index (with wrap-around)
         const prevIndex = (currentIndex <= 0) ? 
-            navSequenceElements.length - 1 : currentIndex - 1;
+                          navSequenceElements.length - 1 : currentIndex - 1;
         
-        // Get the previous element
+        // Get the previous element data
         const prevElement = navSequenceElements[prevIndex];
-        logDebug(`[WebApp] Previous element: index=${prevIndex}, id=${prevElement.id}, type=${prevElement.interaction?.type}`);
+         if (!prevElement || !prevElement.id) {
+            logDebug('[WebApp] Could not find valid previous element data.');
+            return false;
+        }
         
-        // Clean up current state
+        logDebug(`[WebApp] Navigating TO element: index=${prevIndex}, id=${prevElement.id}, type=${prevElement.interaction?.type}`);
+        
+        // Clean up current state BEFORE triggering the previous
         hideSpotlight();
         hideTextModal();
         
-        // Short delay to ensure clean state
+        // Short delay
         setTimeout(() => {
-            // IMPORTANT: Simulate clicking the element directly
-            if (prevElement.interaction && prevElement.interaction.type) {
-                logDebug(`[WebApp] Handling previous element click: ${prevElement.id}`);
-                // Call the click handler directly with element data
-                handleOverlayClick(prevElement, prevElement.id);
+            logDebug(`[WebApp] Triggering interaction for previous element: ${prevElement.id}`);
+            const interactionType = prevElement.interaction?.type || 'none';
+
+            // Update indices BEFORE triggering interaction
+            currentModalElementIndex = prevIndex;
+            currentSpotlightElementIndex = prevIndex;
+
+            // Trigger the appropriate interaction
+            switch (interactionType) {
+                case 'spotlight':
+                    showSpotlight(prevElement.id, prevElement.interaction);
+                    break;
+                case 'showText':
+                    showTextModal(prevElement.interaction.text, prevElement.id);
+                    break;
+                case 'revealElement':
+                case 'revealAndSpotlight':
+                case 'openUrl':
+                case 'none':
+                default:
+                    handleOverlayClick(prevElement, prevElement.id);
+                    break;
             }
-        }, 300);
+        }, 150); // Delay
         
         return true;
     }

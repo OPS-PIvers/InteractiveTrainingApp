@@ -1032,7 +1032,6 @@ function doGet(e) {
 function getSlideDataForWebApp(presentationId, slideIndex) {
   console.log(`Entering getSlideDataForWebApp for ID: ${presentationId}, Index: ${slideIndex}`);
 
-
   // Validate parameters
   if (!presentationId) {
     console.error("getSlideDataForWebApp: Missing presentation ID parameter");
@@ -1044,22 +1043,18 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
     slideIndex = 0; // Default to first slide if invalid
   }
 
-
   try {
     const presentation = SlidesApp.openById(presentationId);
     const slides = presentation.getSlides();
     console.log(`[GS] Found ${slides.length} slides.`);
-
 
     if (slideIndex >= slides.length) {
       console.error(`[GS] Invalid slide index: ${slideIndex}. Total slides: ${slides.length}`);
       return { error: `Invalid slide index (${slideIndex}). Presentation only has ${slides.length} slides.`, totalSlides: slides.length };
     }
 
-
     const slide = slides[slideIndex];
     console.log(`[GS] Processing slide ID: ${slide.getObjectId()}`);
-
 
     // Get global overlay settings
     const globalOverlayResult = getGlobalOverlaySettings();
@@ -1068,7 +1063,6 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       // Use defaults if retrieval failed, but don't stop the process
     }
     const globalOverlayDefaults = globalOverlayResult.settings || OVERLAY_DEFAULTS;
-
 
     // Prepare the data object to return
     const slideData = {
@@ -1082,21 +1076,16 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       slideHeight: presentation.getPageHeight(),
       // Include global overlay settings defaults
       globalOverlayDefaults: globalOverlayDefaults,
-      // Deprecated fields - remove eventually
-      // overlayOpacity: globalOverlayDefaults.opacity,
-      // overlayShadow: globalOverlayDefaults.outlineEnabled
     };
-
 
     // Get background image data URL
     try {
-        slideData.backgroundUrl = getSlideBackgroundAsDataUrl(slide);
-        console.log(`[GS] Background URL fetched: ${slideData.backgroundUrl ? 'Success' : 'null'}`);
+      slideData.backgroundUrl = getSlideBackgroundAsDataUrl(slide);
+      console.log(`[GS] Background URL fetched: ${slideData.backgroundUrl ? 'Success' : 'null'}`);
     } catch (bgError) {
-         console.error(`[GS] Error fetching background: ${bgError}`);
-         // Continue without background if it fails
+      console.error(`[GS] Error fetching background: ${bgError}`);
+      // Continue without background if it fails
     }
-
 
     // Get slide notes
     try {
@@ -1112,22 +1101,28 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       console.warn("[GS] Could not retrieve speaker notes: " + notesError);
     }
 
-
     // Process page elements to find interactive ones
     const pageElements = slide.getPageElements();
     console.log(`[GS] Found ${pageElements.length} elements on slide ${slideIndex}`);
 
-
+    // Create a mapping of IDs for easier lookup and debugging
+    const elementIdMap = new Map();
+    
     pageElements.forEach((element) => {
       const desc = element.getDescription();
       let elementDataJson = null;
-
+      const elementId = element.getObjectId();
+      
+      // Store the ID in our map for easier comparison later
+      elementIdMap.set(elementId, {
+        type: element.getPageElementType().toString(),
+        hasDesc: desc ? 'yes' : 'no'
+      });
 
       // Check if description contains JSON interaction data
       if (desc && desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
         try {
           elementDataJson = JSON.parse(desc); // Keep as parsed JSON object
-
 
           // Get text content if available (best effort)
           let textContent = null;
@@ -1141,16 +1136,32 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
             console.warn(`[GS] Could not get text for ${element.getObjectId()}: ${textError.message}`);
           }
 
-
           // Check if there's any interaction or animation data block defined
-           const hasInteractionData = elementDataJson.interaction && typeof elementDataJson.interaction === 'object';
-           const hasAnimationData = elementDataJson.animation && typeof elementDataJson.animation === 'object';
+          const hasInteractionData = elementDataJson.interaction && typeof elementDataJson.interaction === 'object';
+          const hasAnimationData = elementDataJson.animation && typeof elementDataJson.animation === 'object';
 
-
-           if (hasInteractionData || hasAnimationData) { // Include if it has either data block
+          if (hasInteractionData || hasAnimationData) { // Include if it has either data block
             // Add element data to the results array
             // The interaction and animation properties will contain the parsed objects directly
             // including showOverlayText, overlayText, overlayStyle etc. if present
+            
+            // Check for reveal and spotlight target element IDs
+            if (hasInteractionData && 
+                (elementDataJson.interaction.type === 'revealElement' || 
+                 elementDataJson.interaction.type === 'revealAndSpotlight')) {
+              
+              const targetId = elementDataJson.interaction.targetElementId;
+              if (targetId) {
+                if (elementIdMap.has(targetId)) {
+                  // Target exists on this slide
+                  console.log(`[GS] Found valid target ID reference: ${targetId} for ${element.getObjectId()}`);
+                } else {
+                  // Target doesn't exist on this slide - flag as warning but don't modify
+                  console.warn(`[GS] Warning: Target ID ${targetId} for ${elementDataJson.interaction.type} not found on current slide`);
+                }
+              }
+            }
+            
             slideData.elements.push({
               id: element.getObjectId(),
               type: element.getPageElementType().toString(), // SHAPE, TEXT_BOX etc.
@@ -1163,7 +1174,6 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
               animation: elementDataJson.animation || null // Include full animation object
             });
 
-
             // More detailed logging
             let logMsg = `[GS] Added element: ID=${element.getObjectId()}`;
             if (hasInteractionData) {
@@ -1172,10 +1182,10 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
                 if (elementDataJson.interaction.useCustomOpacity) logMsg += ` [COpacity]`;
                 if (elementDataJson.interaction.overlayStyle) logMsg += ` [OStyle]`;
             }
-             if (hasAnimationData) {
-                 logMsg += `, Animation=${elementDataJson.animation.type ?? 'N/A'}`;
-             }
-             console.log(logMsg);
+            if (hasAnimationData) {
+                logMsg += `, Animation=${elementDataJson.animation.type ?? 'N/A'}`;
+            }
+            console.log(logMsg);
           }
         } catch (e) {
           console.warn(`[GS] Element ${element.getObjectId()} has invalid JSON: ${e.message}`);
@@ -1183,10 +1193,14 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       }
     });
 
+    // Add debug information about all IDs for troubleshooting
+    slideData._debug = { 
+      allSlideElementIds: Array.from(elementIdMap.keys()), 
+      elementTypes: Object.fromEntries(elementIdMap)
+    };
 
     console.log(`[GS] Finished processing slide ${slideIndex}. Found ${slideData.elements.length} elements with data. Global Overlay Defaults included.`);
     return slideData; // Return the compiled slide data
-
 
   } catch (e) {
     // Catch errors during presentation opening or processing
@@ -1194,8 +1208,6 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
     return { error: `An error occurred while loading slide data: ${e.message}. Check script logs.` };
   }
 }
-
-
 
 
 /**

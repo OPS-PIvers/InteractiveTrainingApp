@@ -1325,15 +1325,41 @@
               
             case 'revealAndSpotlight':
               if (interaction.targetElementId) {
-                logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${interaction.targetElementId}`);
-                revealElement(interaction.targetElementId, elementId, false);
+                const targetId = interaction.targetElementId;
+                logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${targetId}`);
+                
+                // Check if target exists in current slide data
+                const targetExists = currentSlideElementsData.some(el => el.id === targetId);
+                if (!targetExists) {
+                  // Log available IDs to help with debugging
+                  const availableIds = currentSlideElementsData.map(el => el.id);
+                  logDebug(`[WebApp] WARNING: Target ID not found in current slide data. Target: ${targetId}`);
+                  logDebug(`[WebApp] Available IDs: ${JSON.stringify(availableIds)}`);
+                  showError(`Target element ID not found: ${targetId.substring(0,8)}... Check your ID and try again.`);
+                  return;
+                }
+                
+                // Proceed with reveal and then spotlight
+                revealElement(targetId, elementId, false);
+                
+                // Use a longer timeout and additional checks
                 setTimeout(() => {
-                  if (overlayElementsMap.has(interaction.targetElementId)) {
-                    logDebug(`[WebApp] Triggering spotlight for revealed element: ${interaction.targetElementId}`);
-                    showSpotlight(interaction.targetElementId, interaction);
+                  if (overlayElementsMap.has(targetId)) {
+                    logDebug(`[WebApp] Triggering spotlight for revealed element: ${targetId}`);
+                    showSpotlight(targetId, interaction);
+                  } else {
+                    logDebug(`[WebApp] Failed to spotlight element ${targetId} - element not in overlay map after reveal`);
+                    // Try to diagnose the issue
+                    if (permanentlyHiddenElementsPerSlide[currentSlideIndex]?.has(targetId)) {
+                      logDebug(`[WebApp] Element ${targetId} is permanently hidden`);
+                    }
+                    showError(`Failed to spotlight target element. Please try again.`);
                   }
-                }, 200);
+                }, 500); // Increased timeout for more reliability
+                
                 interactionHandled = true;
+              } else {
+                showError("Missing target ID for reveal and spotlight");
               }
               break;
               

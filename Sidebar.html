@@ -187,9 +187,7 @@
     }
 
     /* --- Expanded State --- */
-    .section.is-open > h4 {
-      /* No style changes needed for header when open */
-    }
+    /* No style changes needed for header when open */
     .section.is-open .collapse-icon {
       transform: rotate(90deg);
     }
@@ -2153,10 +2151,8 @@
           interactionData.targetElementId = targetId;
         }
         else if (type === 'revealAndSpotlight') {
-          const targetIdInput = document.getElementById('revealAndSpotlight_targetElementId');
-          const targetId = targetIdInput.value.trim();
-          if (!targetId) { showError("Please enter the Target Element Object ID."); targetIdInput.focus(); return; }
-          if (targetId === currentElementId) { showError("Element cannot reveal/spotlight itself."); targetIdInput.focus(); return; }
+          const targetId = validateRevealAndSpotlightTarget();
+          if (!targetId) return; // Validation failed, exit
           interactionData.targetElementId = targetId;
 
           // Spotlight specific options
@@ -2409,6 +2405,34 @@
         })
         .withFailureHandler(showError)
         .debugElementDescription(currentElementId);
+    }
+
+    // New function to validate element IDs for revealAndSpotlight
+    function validateRevealAndSpotlightTarget() {
+        const targetIdInput = document.getElementById('revealAndSpotlight_targetElementId');
+        if (!targetIdInput) return null;
+        
+        const targetId = targetIdInput.value.trim();
+        if (!targetId) {
+            showError("Please enter the Target Element Object ID.");
+            targetIdInput.focus();
+            return null;
+        }
+        
+        // Check if target matches current element ID
+        if (targetId === currentElementId) {
+            showError("Element cannot reveal/spotlight itself. Please select a different target element.");
+            targetIdInput.focus();
+            return null;
+        }
+        
+        // Additional validation: check for obvious issues in ID format
+        if (targetId.length < 4 || targetId.includes(' ')) {
+            showError("The element ID format appears invalid. Element IDs should not contain spaces.");
+            return null;
+        }
+        
+        return targetId;
     }
   </script>
 </body>

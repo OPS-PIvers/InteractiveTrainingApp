@@ -1108,16 +1108,26 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
     // Create a mapping of IDs for easier lookup and debugging
     const elementIdMap = new Map();
     
+    // First pass: collect all elements IDs for complete mapping
+    pageElements.forEach((element) => {
+      const elementId = element.getObjectId();
+      const desc = element.getDescription();
+      
+      elementIdMap.set(elementId, {
+        type: element.getPageElementType().toString(),
+        hasDesc: desc ? 'yes' : 'no',
+        left: element.getLeft(),
+        top: element.getTop(),
+        width: element.getWidth(),
+        height: element.getHeight()
+      });
+    });
+
+    // Second pass: process elements with interactive data
     pageElements.forEach((element) => {
       const desc = element.getDescription();
       let elementDataJson = null;
       const elementId = element.getObjectId();
-      
-      // Store the ID in our map for easier comparison later
-      elementIdMap.set(elementId, {
-        type: element.getPageElementType().toString(),
-        hasDesc: desc ? 'yes' : 'no'
-      });
 
       // Check if description contains JSON interaction data
       if (desc && desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
@@ -1145,7 +1155,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
             // The interaction and animation properties will contain the parsed objects directly
             // including showOverlayText, overlayText, overlayStyle etc. if present
             
-            // Check for reveal and spotlight target element IDs
+            // IMPROVED: Check for reveal and spotlight target element IDs with better diagnostics
             if (hasInteractionData && 
                 (elementDataJson.interaction.type === 'revealElement' || 
                  elementDataJson.interaction.type === 'revealAndSpotlight')) {
@@ -1153,11 +1163,26 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
               const targetId = elementDataJson.interaction.targetElementId;
               if (targetId) {
                 if (elementIdMap.has(targetId)) {
-                  // Target exists on this slide
-                  console.log(`[GS] Found valid target ID reference: ${targetId} for ${element.getObjectId()}`);
+                  // Target exists on this slide - add detailed info 
+                  const targetInfo = elementIdMap.get(targetId);
+                  console.log(`[GS] Found valid target ID ${targetId} for ${elementId} (${elementDataJson.interaction.type}): Type=${targetInfo.type}, Position=${targetInfo.left},${targetInfo.top}`);
                 } else {
-                  // Target doesn't exist on this slide - flag as warning but don't modify
+                  // Target doesn't exist on this slide - flag as warning
                   console.warn(`[GS] Warning: Target ID ${targetId} for ${elementDataJson.interaction.type} not found on current slide`);
+                  
+                  // NEW: Log all available IDs to help troubleshoot
+                  const availableIds = Array.from(elementIdMap.keys());
+                  console.log(`[GS] Available element IDs on slide: ${JSON.stringify(availableIds)}`);
+                  
+                  // NEW: Check for near matches (maybe ID has typos or old version)
+                  const possibleMatches = availableIds.filter(id => 
+                    id.startsWith(targetId.substring(0, 8)) || 
+                    targetId.startsWith(id.substring(0, 8))
+                  );
+                  
+                  if (possibleMatches.length > 0) {
+                    console.log(`[GS] Possible similar IDs: ${JSON.stringify(possibleMatches)}`);
+                  }
                 }
               }
             }
@@ -1190,6 +1215,15 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
         } catch (e) {
           console.warn(`[GS] Element ${element.getObjectId()} has invalid JSON: ${e.message}`);
         }
+      } else {
+        // For elements without interactive data, still include them in the debug map
+        // so we can track them for possible ID matching
+        if (!elementIdMap.has(elementId)) {
+          elementIdMap.set(elementId, {
+            type: element.getPageElementType().toString(),
+            hasDesc: desc ? 'yes' : 'no'
+          });
+        }
       }
     });
 
@@ -1198,6 +1232,33 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       allSlideElementIds: Array.from(elementIdMap.keys()), 
       elementTypes: Object.fromEntries(elementIdMap)
     };
+    
+    // NEW: Add extra verification for any elements with revealAndSpotlight
+    const revealAndSpotlightElements = slideData.elements.filter(
+      el => el.interaction && el.interaction.type === 'revealAndSpotlight'
+    );
+    
+    if (revealAndSpotlightElements.length > 0) {
+      console.log(`[GS] Found ${revealAndSpotlightElements.length} elements with revealAndSpotlight interaction`);
+      
+      revealAndSpotlightElements.forEach(el => {
+        const targetId = el.interaction.targetElementId;
+        if (targetId) {
+          const isAvailable = elementIdMap.has(targetId);
+          console.log(`[GS] revealAndSpotlight element ${el.id} targets ID ${targetId}: ${isAvailable ? 'VALID' : 'NOT FOUND'}`);
+          
+          // If the target isn't found, log details to help diagnose
+          if (!isAvailable) {
+            // Check if there's any ID that contains this target ID as substring (could be a version mismatch)
+            const allIds = Array.from(elementIdMap.keys());
+            const similarIds = allIds.filter(id => id.includes(targetId.substring(0, 8)));
+            if (similarIds.length > 0) {
+              console.log(`[GS] Found similar IDs that might match ${targetId}: ${JSON.stringify(similarIds)}`);
+            }
+          }
+        }
+      });
+    }
 
     console.log(`[GS] Finished processing slide ${slideIndex}. Found ${slideData.elements.length} elements with data. Global Overlay Defaults included.`);
     return slideData; // Return the compiled slide data

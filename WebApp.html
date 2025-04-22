@@ -1328,18 +1328,23 @@
                 const targetId = interaction.targetElementId;
                 logDebug(`[WebApp] Reveal and Spotlight interaction: Target ${targetId}`);
                 
-                // Check if target exists in current slide data
-                const targetExists = currentSlideElementsData.some(el => el.id === targetId);
-                if (!targetExists) {
+                // Check if target exists in current slide data, including in _debug data
+                const targetElementData = currentSlideElementsData.find(el => el.id === targetId);
+                const allSlideElementIds = currentSlide._debug?.allSlideElementIds || [];
+                
+                // First check if the element exists in our data or in the complete list of IDs received from backend
+                if (!targetElementData && !allSlideElementIds.includes(targetId)) {
                   // Log available IDs to help with debugging
                   const availableIds = currentSlideElementsData.map(el => el.id);
                   logDebug(`[WebApp] WARNING: Target ID not found in current slide data. Target: ${targetId}`);
-                  logDebug(`[WebApp] Available IDs: ${JSON.stringify(availableIds)}`);
+                  logDebug(`[WebApp] Available element IDs: ${JSON.stringify(availableIds)}`);
+                  logDebug(`[WebApp] All slide IDs from debug data: ${JSON.stringify(allSlideElementIds)}`);
                   showError(`Target element ID not found: ${targetId.substring(0,8)}... Check your ID and try again.`);
                   return;
                 }
                 
-                // Proceed with reveal and then spotlight
+                // Even if we don't have the full element data, we can still reveal it if we know it exists on the slide
+                logDebug(`[WebApp] Target element ID ${targetId} validation passed. Proceeding with reveal.`);
                 revealElement(targetId, elementId, false);
                 
                 // Use a longer timeout and additional checks
@@ -1441,15 +1446,15 @@
         setTimeout(() => {
           let newlyVisible = false;
           
-          pendingAppearanceElements.forEach((info, pendingId) => {
+          pendingAppearanceElements.forEach((info, elementId) => {
             if (info.behavior === 'afterPrevious' && info.dependsOn === elementId) {
-              logDebug(`[WebApp] Element ${pendingId} should appear after clicking ${elementId}`);
+              logDebug(`[WebApp] Element ${elementId} should appear after clicking ${elementId}`);
               
               if (renderElement(info.data)) {
-                visibleElementIds.add(pendingId);
-                pendingAppearanceElements.delete(pendingId);
+                visibleElementIds.add(elementId);
+                pendingAppearanceElements.delete(elementId);
                 newlyVisible = true;
-                logDebug(`[WebApp] Rendered element ${pendingId} after clicking ${elementId}`);
+                logDebug(`[WebApp] Rendered element ${elementId} after clicking ${elementId}`);
               }
             }
           });
@@ -2550,6 +2555,57 @@
         return;
       }
     });
+
+    // Add this function to create and expose the missing element data when we only have IDs
+    function createElementDataFromId(targetId) {
+        logDebug(`[WebApp] Creating element data from ID: ${targetId}`);
+        
+        // First check if we already have this element in our data
+        const existingData = currentSlideElementsData.find(el => el.id === targetId);
+        if (existingData) return existingData;
+        
+        // Get the debug data that contains all slide elements
+        const allSlideElementIds = currentSlide._debug?.allSlideElementIds || [];
+        const elementTypes = currentSlide._debug?.elementTypes || {};
+        
+        // If this ID isn't in the list of all slide elements, we can't create data for it
+        if (!allSlideElementIds.includes(targetId)) {
+            logDebug(`[WebApp] ID ${targetId} not found in all slide elements list`);
+            return null;
+        }
+        
+        // Get the element type if available
+        const elementType = elementTypes[targetId] || {type: 'unknown', hasDesc: 'no'};
+        
+        // Create a minimal element data object - we don't have position/dimensions
+        // but we'll need to ask the server for these in a future request
+        const elementData = {
+            id: targetId,
+            type: elementType.type,
+            // Assume position in the center of the slide for now
+            left: currentSlide.slideWidth / 2,
+            top: currentSlide.slideHeight / 2,
+            width: 100,
+            height: 100,
+            // Create a minimal default interaction
+            interaction: {
+                type: 'none',
+                overlayStyle: {
+                    opacity: 0,  // Transparent by default
+                    outlineEnabled: true,
+                    outlineColor: '#e53935',
+                    outlineWidth: 1,
+                    outlineStyle: 'solid'
+                }
+            }
+        };
+        
+        // Add this to our currentSlideElementsData array so we have it for future reference
+        currentSlideElementsData.push(elementData);
+        
+        logDebug(`[WebApp] Created minimal element data for ${targetId}`, elementData);
+        return elementData;
+    }
 </script>
 </body>
 </html>

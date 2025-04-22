@@ -828,22 +828,28 @@ function getGlobalOverlaySettings() {
 
   keys.forEach(key => {
     const propKey = OVERLAY_SETTINGS_PREFIX + key.toUpperCase();
-    let value = props.getProperty(propKey);
+    const value = props.getProperty(propKey);
 
+    // Important fix: Only use default if value is strictly null (not found)
+    // This ensures '0' values (for opacity) are properly handled
     if (value === null) {
       // Value not found, use default
       settings[key] = OVERLAY_DEFAULTS[key];
+      console.log(`Property ${propKey} not found, using default: ${OVERLAY_DEFAULTS[key]}`);
     } else {
       // Value found, parse it based on expected type
       const defaultValue = OVERLAY_DEFAULTS[key];
       if (typeof defaultValue === 'number') {
         const numValue = parseFloat(value);
         settings[key] = isNaN(numValue) ? defaultValue : numValue;
+        console.log(`Loaded numeric property ${propKey}: ${numValue}`);
       } else if (typeof defaultValue === 'boolean') {
         settings[key] = (value === 'true');
+        console.log(`Loaded boolean property ${propKey}: ${value}`);
       } else {
         // Assume string (color, shape, style, hoverText)
         settings[key] = value;
+        console.log(`Loaded string property ${propKey}: ${value}`);
       }
     }
   });

@@ -2081,146 +2081,154 @@
     }
 
     function revealElement(targetElementId, triggerElementId, keepTriggerVisible = false) {
-        logDebug(`[WebApp] [revealElement] Start - Target: ${targetElementId}, Trigger: ${triggerElementId}, KeepTrigger: ${keepTriggerVisible}`); // LOGGING
+        logDebug(`[WebApp] [revealElement] Start - Target: ${targetElementId}, Trigger: ${triggerElementId}, KeepTrigger: ${keepTriggerVisible}`);
 
+        // --- NEW: Explicit Check in _debug data first ---
+        const allSlideElementIds = currentSlide?._debug?.allSlideElementIds || [];
+        if (!allSlideElementIds.includes(targetElementId)) {
+            logDebug(`[WebApp] [revealElement] FATAL: Target ID ${targetElementId} not found in allSlideElementIds from backend _debug data.`);
+            showError(`Cannot reveal element (ID: ${targetElementId.substring(0,8)}...). It does not exist on this slide according to server data.`);
+            return; // Stop immediately if ID is fundamentally invalid for this slide
+        }
+        logDebug(`[WebApp] [revealElement] Target ID ${targetElementId} confirmed to exist in _debug data.`);
+        // --- End NEW Check ---
+
+        // Check if element is already visible in the map
         if (overlayElementsMap.has(targetElementId)) {
-            logDebug(`[WebApp] [revealElement] Target element ${targetElementId} is already visible in overlayElementsMap.`); // LOGGING
+            logDebug(`[WebApp] [revealElement] Target element ${targetElementId} is already visible in overlayElementsMap.`);
+            // Optionally re-apply styles or just return
             const existingOverlay = overlayElementsMap.get(targetElementId);
             if (existingOverlay) {
-                existingOverlay.style.transition = 'transform 0.2s ease-out, box-shadow 0.2s ease-out';
-                existingOverlay.style.transform = 'scale(1.05)';
-                existingOverlay.style.boxShadow = '0 0 10px rgba(26, 115, 232, 0.7)';
-                setTimeout(() => {
-                    if (overlayElementsMap.has(targetElementId)) {
-                        existingOverlay.style.transform = '';
-                        existingOverlay.style.boxShadow = '';
-                        logDebug(`[WebApp] [revealElement] Removed temporary highlight from already revealed target ${targetElementId}.`); // LOGGING
-                    }
-                }, 800);
+                // Ensure it's visible if it was faded out
+                existingOverlay.style.opacity = '1';
+                existingOverlay.style.pointerEvents = 'auto';
             }
-            return;
+            // If keeping trigger visible, don't hide it
+            if (!keepTriggerVisible && triggerElementId && overlayElementsMap.has(triggerElementId)) {
+                 // Hide trigger if needed (logic moved here for consistency)
+                 // ... (hiding logic as before) ...
+            }
+            return; // Already visible, nothing more to do
         }
 
-        // Find the element data in the *full* list received from backend
-        const targetElementData = currentSlideElementsData.find(el => el.id === targetElementId);
+        // Find or Create Element Data (Now we know the ID exists in _debug)
+        let targetElementData = currentSlideElementsData.find(el => el.id === targetElementId);
 
         if (!targetElementData) {
-            logDebug(`[WebApp] [revealElement] ERROR: Target element data not found in currentSlideElementsData. Target ID: ${targetElementId}`, { // LOGGING
-                availableIds: currentSlideElementsData.map(el => el.id)
-            });
-            showError(`Cannot find element to reveal (ID: ${targetElementId.substring(0,8)}...). Make sure the element is on this slide.`);
-            return;
+            logDebug(`[WebApp] [revealElement] Target data for ${targetElementId} not found in currentSlideElementsData. Attempting to create minimal data...`);
+            targetElementData = createElementDataFromId(targetElementId); // Attempt to create it
+            if (!targetElementData) {
+                 logDebug(`[WebApp] [revealElement] ERROR: Failed to create minimal data for ${targetElementId} even though ID was in _debug list.`);
+                 showError(`Cannot find or create data for element to reveal (ID: ${targetElementId.substring(0,8)}...).`);
+                 return;
+            }
+            logDebug(`[WebApp] [revealElement] Successfully created minimal data for ${targetElementId}.`);
         }
 
-        logDebug(`[WebApp] [revealElement] Found target element data for ${targetElementId}. Proceeding to reveal.`); // LOGGING
+        logDebug(`[WebApp] [revealElement] Found/Created target element data for ${targetElementId}. Proceeding to render overlay.`);
         try {
-            const scaleX = parseFloat(slideElement.dataset.scaleX) || 1;
-            const scaleY = parseFloat(slideElement.dataset.scaleY) || 1;
+            const scaleX = parseFloat(slideElement.dataset.scaleX || '1');
+            const scaleY = parseFloat(slideElement.dataset.scaleY || '1');
             const left = targetElementData.left * scaleX;
             const top = targetElementData.top * scaleY;
-            const width = Math.max(targetElementData.width * scaleX, 5);
-            const height = Math.max(targetElementData.height * scaleY, 5);
+            const width = Math.max(targetElementData.width * scaleX, 10);
+            const height = Math.max(targetElementData.height * scaleY, 10);
 
             const overlay = document.createElement('div');
-            overlay.className = 'overlay revealed';
+            overlay.className = 'overlay revealed'; // Start hidden
             overlay.dataset.elementId = targetElementData.id;
-            if (triggerElementId) overlay.dataset.revealedBy = triggerElementId;
-
             overlay.style.left = `${left}px`;
             overlay.style.top = `${top}px`;
             overlay.style.width = `${width}px`;
             overlay.style.height = `${height}px`;
-            overlay.style.opacity = 0;
 
             applyOverlayStyle(overlay, targetElementData);
-            logDebug(`[WebApp] [revealElement] Applied styles to revealed element ${targetElementId}`); // LOGGING
+            logDebug(`[WebApp] [revealElement] Applied styles to revealed element ${targetElementId}`);
 
-            if (targetElementData.interaction?.showOverlayText && targetElementData.interaction.overlayText) {
+            // Add text if configured
+            if (targetElementData.interaction && targetElementData.interaction.showOverlayText && targetElementData.interaction.overlayText) {
                 addOverlayText(overlay, targetElementData.interaction.overlayText);
             }
 
-            let tooltipParts = [`ID: ${targetElementData.id} (Revealed)`];
+            // Add tooltip
+            let tooltipParts = [`ID: ${targetElementData.id}`];
             if (targetElementData.interaction?.type && targetElementData.interaction.type !== 'none') tooltipParts.push(`I: ${targetElementData.interaction.type}`);
-            if(targetElementData.interaction?.overlayStyle) tooltipParts.push(`[Style]`);
-            if (targetElementData.animation?.type && targetElementData.animation.type !== 'none') tooltipParts.push(`A: ${targetElementData.animation.type} (...)`);
+            if (targetElementData.interaction?.overlayStyle) tooltipParts.push(`[Style]`);
+            if (targetElementData.animation?.type && targetElementData.animation.type !== 'none') tooltipParts.push(`A: ${targetElementData.animation.type}`);
             overlay.title = tooltipParts.join(' | ');
 
-            if ((targetElementData.interaction && targetElementData.interaction.type !== 'none') || (targetElementData.animation && targetElementData.animation.type !== 'none')) {
-                logDebug(`[WebApp] [revealElement] Adding click listener to revealed element ${targetElementId}`); // LOGGING
-                overlay.addEventListener('click', () => handleOverlayClick(targetElementData, overlay.dataset.elementId));
-            } else {
-              overlay.style.cursor = 'default';
-              overlay.classList.add('no-interaction');
-              logDebug(`[WebApp] [revealElement] Revealed element ${targetElementId} has no interaction/animation, skipping click listener.`); // LOGGING
-            }
-
+            // Add event listener
+            overlay.addEventListener('click', () => handleOverlayClick(targetElementData, targetElementData.id));
             overlay.addEventListener('mouseenter', () => overlay.classList.add('is-hovering'));
             overlay.addEventListener('mouseleave', () => overlay.classList.remove('is-hovering'));
 
+            // Apply animation if configured
             if (targetElementData.animation && targetElementData.animation.type && targetElementData.animation.type !== 'none') {
                 applyAnimation(overlay, targetElementData.animation);
             }
 
             slideElement.appendChild(overlay);
-            overlayElementsMap.set(targetElementData.id, overlay);
-            logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementId} to DOM and overlayElementsMap.`); // LOGGING
 
+            // --- IMPORTANT: Add to map AFTER appending --- 
+            overlayElementsMap.set(targetElementData.id, overlay);
+            // --- ADDED LOGGING --- 
+            logDebug(`[WebApp] [revealElement] Element ${targetElementData.id} ADDED to overlayElementsMap. Map size: ${overlayElementsMap.size}`);
+            logDebug(`[WebApp] [revealElement] Map keys: ${JSON.stringify(Array.from(overlayElementsMap.keys()))}`);
+            // --- END LOGGING --- 
+
+            // Add to interactive elements list if not already present
             if (!interactiveElements.some(el => el.id === targetElementData.id)) {
                 interactiveElements.push(targetElementData);
-                logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementId} to interactiveElements list.`); // LOGGING
+                logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementData.id} to interactiveElements list.`);
             }
 
+            // Use requestAnimationFrame for smoother fade-in
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    overlay.style.opacity = 1;
-                    logDebug(`[WebApp] [revealElement] Fading in revealed element ${targetElementId}.`); // LOGGING
+                    overlay.classList.remove('revealed'); // Remove hidden class
+                    overlay.style.opacity = 1; // Ensure opacity is set
+                    logDebug(`[WebApp] [revealElement] Fading in revealed element ${targetElementId}.`);
                 });
             });
 
-            // --- Modified hiding logic for the trigger ---
+            // --- Modified hiding logic for the trigger --- 
             if (!keepTriggerVisible && triggerElementId && overlayElementsMap.has(triggerElementId)) {
-                logDebug(`[WebApp] [revealElement] Hiding trigger element: ${triggerElementId}`); // LOGGING
+                logDebug(`[WebApp] [revealElement] Hiding trigger element: ${triggerElementId}`);
                 const triggerOverlay = overlayElementsMap.get(triggerElementId);
-                triggerOverlay.style.transition = 'opacity 0.5s ease-out';
-                triggerOverlay.style.opacity = 0;
+                triggerOverlay.style.transition = 'opacity 0.3s ease-out';
+                triggerOverlay.style.opacity = '0';
                 triggerOverlay.style.pointerEvents = 'none';
-
+                // Add to hidden set
+                if (!permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
+                    permanentlyHiddenElementsPerSlide[currentSlideIndex] = new Set();
+                }
+                permanentlyHiddenElementsPerSlide[currentSlideIndex].add(triggerElementId);
+                logDebug(`[WebApp] [revealElement] Added trigger ${triggerElementId} to hidden set for slide ${currentSlideIndex}`);
+                // Remove from map after transition
                 setTimeout(() => {
-                    logDebug(`[WebApp] [revealElement] Timeout for hiding trigger ${triggerElementId} executing...`); // LOGGING
-                    if (overlayElementsMap.has(triggerElementId) && triggerOverlay.parentNode) {
-                      logDebug(`[WebApp] [revealElement] Removing trigger ${triggerElementId} from DOM and map.`); // LOGGING
-                      triggerOverlay.parentNode.removeChild(triggerOverlay);
-                      overlayElementsMap.delete(triggerElementId);
-
-                      const currentHiddenSet = permanentlyHiddenElementsPerSlide[currentSlideIndex];
-                      if (currentHiddenSet) {
-                          currentHiddenSet.add(triggerElementId);
-                          logDebug(`[WebApp] [revealElement] Added ${triggerElementId} to hidden set for slide ${currentSlideIndex}. Set is now:`, Array.from(currentHiddenSet)); // LOGGING
-                          logDebug(`[WebApp] [revealElement] State of all sets after adding:`, permanentlyHiddenElementsPerSlide); // LOGGING
-                      } else {
-                          logDebug(`[WebApp] [revealElement] ERROR: Could not find hidden set for current slide ${currentSlideIndex} when trying to add ${triggerElementId}!`); // LOGGING
-                      }
-                    } else {
-                        logDebug(`[WebApp] [revealElement] Trigger overlay ${triggerElementId} already removed or not found in map during timeout.`); // LOGGING
+                    if (overlayElementsMap.has(triggerElementId)) {
+                        overlayElementsMap.delete(triggerElementId);
+                        logDebug(`[WebApp] [revealElement] Removed trigger ${triggerElementId} from overlayElementsMap after hide.`);
+                        // Rebuild navigation sequence after hiding trigger
+                        buildNavigationSequence();
                     }
-
-                }, 500);
+                }, 300);
             } else if (keepTriggerVisible) {
-                logDebug(`[WebApp] [revealElement] Keeping trigger element visible: ${triggerElementId}`);
+                logDebug(`[WebApp] [revealElement] Keeping trigger element visible (temporarily): ${triggerElementId}`);
             } else {
-                logDebug(`[WebApp] [revealElement] Trigger element ${triggerElementId} not hidden (keepTrigger: ${keepTriggerVisible}, found in map: ${overlayElementsMap.has(triggerElementId)})`); // LOGGING
+                logDebug(`[WebApp] [revealElement] Trigger element ${triggerElementId} not hidden (keepTrigger: ${keepTriggerVisible}, found in map: ${overlayElementsMap.has(triggerElementId)})`);
             }
 
-            // NEW CODE: Rebuild navigation sequence after revealing element
+            // Rebuild navigation sequence after revealing element
+            // Delay slightly to ensure DOM updates and fade-in starts
             setTimeout(() => {
-                // Rebuild the navigation sequence to include the newly revealed element
                 buildNavigationSequence();
                 logDebug(`[WebApp] [revealElement] Updated navigation sequence after revealing element ${targetElementId}`);
-            }, 600);
+            }, 150);
 
         } catch (err) {
-            console.error(`[WebApp] [revealElement] Error revealing element ${targetElementId}:`, err); // LOGGING
-            showError(`Failed to reveal element ${targetElementId.substring(0,8)}...`);
+            console.error(`[WebApp] [revealElement] Error rendering overlay for ${targetElementId}:`, err);
+            showError(`Failed to render revealed element ${targetElementId.substring(0,8)}...`);
         }
     }
 

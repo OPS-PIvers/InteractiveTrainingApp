@@ -1022,6 +1022,12 @@
                 logDebug(`[WebApp] [renderOverlays] SKIPPING initial render (reveal target): ${element.id}`);
                 return;
             }
+            
+            // Skip elements that are set to revealOnClick type (they should be initially hidden)
+            if (element.interaction && element.interaction.type === 'revealOnClick') {
+                logDebug(`[WebApp] [renderOverlays] SKIPPING initial render (revealOnClick type): ${element.id}`);
+                return;
+            }
 
             // Check appearance behavior
             const interaction = element.interaction || {};

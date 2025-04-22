@@ -566,6 +566,7 @@
             <option value="goToSlide">Go to Slide</option>
             <option value="revealElement">Reveal Element</option>
             <option value="revealAndSpotlight">Reveal and Spotlight Element</option>
+            <option value="revealOnClick">Reveal on Click (Initially Hidden)</option>
           </select>
 
           <!-- --- Interaction Option Groups --- -->
@@ -879,6 +880,55 @@
     </div>
   </div>
 </div>
+
+<!-- 8. REVEAL ON CLICK OPTIONS -->
+<div id="revealOnClickOptions" class="option-group hidden">
+  <label for="revealOnClick_targetElementId">Target Element Object ID:</label>
+  <input type="text" id="revealOnClick_targetElementId" placeholder="Enter the Object ID of the element to reveal"/>
+  <p>Makes another element visible ONLY when clicking on this element. The target element remains completely hidden until clicked.</p>
+   <!-- Overlay Text Option -->
+  <div class="overlay-text-option">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealOnClick_showOverlayText">
+      <label for="revealOnClick_showOverlayText">Show text directly on overlay</label>
+    </div>
+    <div id="revealOnClick_overlayTextContainer" class="indented-option hidden">
+       <label for="revealOnClick_overlayText">Overlay Text:</label>
+       <input type="text" id="revealOnClick_overlayText" placeholder="Short text (e.g., 'Click to reveal')">
+    </div>
+  </div>
+  
+  <!-- ADD DISAPPEAR OPTION HERE -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealOnClick_disappearOnClick">
+      <label for="revealOnClick_disappearOnClick">Disappear when clicked</label>
+    </div>
+  </div>
+  
+  <!-- Show Text Modal Option -->
+  <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealOnClick_showTextModal">
+      <label for="revealOnClick_showTextModal">Show text modal when revealed</label>
+    </div>
+    <div id="revealOnClick_textModalContainer" class="indented-option hidden">
+       <label for="revealOnClick_textModal">Modal Text:</label>
+       <textarea id="revealOnClick_textModal" rows="3" placeholder="Text to show in modal after revealing"></textarea>
+    </div>
+  </div>
+  
+  <!-- Element-specific Custom Overlay Style controls -->
+  <div class="custom-overlay-controls-section">
+    <div class="checkbox-option">
+      <input type="checkbox" id="revealOnClick_useCustomOverlay">
+      <label for="revealOnClick_useCustomOverlay">Custom overlay style</label>
+    </div>
+    <div id="revealOnClick_customOverlayContainer" class="custom-overlay-style-group hidden">
+       <h6>Custom Overlay Style</h6>
+    </div>
+  </div>
+</div>
           <!-- Save Button for Interactions -->
           <button class="blue" onclick="saveInteractionData()">Save Interaction</button>
 
@@ -1168,7 +1218,7 @@
         dom.globalOverlayStyleContainer.innerHTML = templateHtml.replaceAll('{prefix}', 'global');
 
         // Inject into each Interaction section placeholder
-        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight'];
+        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight', 'revealOnClick'];
         interactionTypes.forEach(type => {
             const placeholder = document.getElementById(`${type}_customOverlayContainer`);
             if (placeholder) {
@@ -1180,7 +1230,7 @@
     }
 
     function cacheCustomOverlayContainers() {
-        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight'];
+        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight', 'revealOnClick'];
         interactionTypes.forEach(type => {
             dom.customOverlayContainers[type] = document.getElementById(`${type}_customOverlayContainer`);
         });
@@ -1908,7 +1958,7 @@
       } else {
         dom.interactionType.value = 'none';
         // No interaction block, so ensure all custom style sections are reset and hidden
-        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight'];
+        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight', 'revealOnClick'];
         interactionTypes.forEach(t => {
           const cb = document.getElementById(`${t}_useCustomOverlay`);
           if(cb) {
@@ -2035,18 +2085,6 @@
         trySetInputValue(`${prefix}_hoverText`, data.hoverText);
     }
 
-    // Helper to safely set input/select values
-    function trySetInputValue(elementId, value) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            if (value !== undefined && value !== null) {
-                element.value = value;
-            }
-        } else {
-            // console.warn(`Element not found for populating: ${elementId}`);
-        }
-    }
-
     function resetForms() {
       // Reset Interaction Form
       dom.interactionType.value = 'none';
@@ -2074,7 +2112,7 @@
       // END OF ADDED CODE
       
       // Reset custom overlay style checkboxes and populate with defaults
-      const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight'];
+      const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight', 'revealOnClick'];
       interactionTypes.forEach(type => {
         const cb = document.getElementById(`${type}_useCustomOverlay`);
         if (cb) {
@@ -2159,6 +2197,17 @@
           interactionData.showText = document.getElementById('revealAndSpotlight_showText').checked;
           interactionData.text = interactionData.showText ? document.getElementById('revealAndSpotlight_text').value : undefined;
           interactionData.showNotes = document.getElementById('revealAndSpotlight_showNotes').checked;
+        }
+        else if (type === 'revealOnClick') {
+          const targetIdInput = document.getElementById('revealOnClick_targetElementId');
+          const targetId = targetIdInput.value.trim();
+          if (!targetId) { showError("Please enter the Object ID to reveal."); targetIdInput.focus(); return; }
+          if (targetId === currentElementId) { showError("Element cannot reveal itself."); targetIdInput.focus(); return; }
+          interactionData.targetElementId = targetId;
+
+          // Show Text Modal Option
+          interactionData.showTextModal = document.getElementById('revealOnClick_showTextModal').checked;
+          interactionData.textModal = interactionData.showTextModal ? document.getElementById('revealOnClick_textModal').value : undefined;
         }
         
         // Gather common Overlay Text Settings if type is not 'none'

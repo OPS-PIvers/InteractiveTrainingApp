@@ -1873,34 +1873,44 @@
               toggleOverlayTextContainer(showOverlayCheckbox); // Ensure visibility matches state
             }
               
-            // ADD THIS NEW CODE: Load disappearOnClick state
             const disappearCheckbox = document.getElementById(`${type}_disappearOnClick`);
             if (disappearCheckbox) {
               disappearCheckbox.checked = !!interactionData.disappearOnClick; // Ensure boolean
             }
-            // END OF ADDED CODE
-          }
 
-          // Load Custom Overlay Style Settings
-          const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
-          if (useCustomOverlayCheckbox) {
-            if (interactionData.overlayStyle && typeof interactionData.overlayStyle === 'object') {
-              // If custom style data exists, check the box and populate controls
-              useCustomOverlayCheckbox.checked = true;
-              populateOverlayStyleControls(type, interactionData.overlayStyle);
-            } else {
-              // If no custom style data, uncheck box and populate with defaults
-              useCustomOverlayCheckbox.checked = false;
-              populateOverlayStyleControls(type, globalOverlayDefaults); // Populate with global defaults
+            // Load Custom Overlay Style Settings
+            const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
+            if (useCustomOverlayCheckbox) {
+              // IMPROVED: Always start by populating with existing overlay style from the data
+              // or global defaults if no custom style exists
+              if (interactionData.overlayStyle && Object.keys(interactionData.overlayStyle).length > 0) {
+                // If custom style data exists, check the box and populate controls
+                useCustomOverlayCheckbox.checked = true;
+                populateOverlayStyleControls(type, interactionData.overlayStyle);
+                console.log(`Found overlay style for ${type}, populating with:`, interactionData.overlayStyle);
+              } else {
+                // If no custom style data but there's opacity defined directly, create an overlay style from it
+                if (typeof interactionData.customOpacity === 'number') {
+                  const derivedStyle = { ...globalOverlayDefaults, opacity: interactionData.customOpacity };
+                  useCustomOverlayCheckbox.checked = true; 
+                  populateOverlayStyleControls(type, derivedStyle);
+                  console.log(`Using derived style from customOpacity:`, derivedStyle);
+                } else {
+                  // No style data at all, uncheck box and populate with defaults
+                  useCustomOverlayCheckbox.checked = false;
+                  populateOverlayStyleControls(type, globalOverlayDefaults);
+                  console.log(`No custom style found for ${type}, using global defaults`);
+                }
+              }
+              toggleCustomOverlayContainer(useCustomOverlayCheckbox);
             }
-            toggleCustomOverlayContainer(useCustomOverlayCheckbox); // Ensure visibility matches state
           }
 
         } catch (e) { console.error("Error loading interaction form data:", e, interactionData); }
       } else {
         dom.interactionType.value = 'none';
         // No interaction block, so ensure all custom style sections are reset and hidden
-        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement'];
+        const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight'];
         interactionTypes.forEach(t => {
           const cb = document.getElementById(`${t}_useCustomOverlay`);
           if(cb) {
@@ -1913,7 +1923,39 @@
       handleInteractionTypeChange(); // Update visibility AFTER setting values
 
       // --- Load Animation Data ---
-      // [Animation data loading code remains unchanged]
+      const animationData = currentElementData.animation;
+      if (animationData && typeof animationData === 'object') {
+          const animationType = animationData.type || 'none';
+          if (Array.from(dom.animationType.options).some(opt => opt.value === animationType)) {
+              dom.animationType.value = animationType;
+          } else {
+              console.warn(`Animation type "${animationType}" not found. Setting to 'none'.`);
+              dom.animationType.value = 'none';
+          }
+          
+          // Only populate specific fields if animation is not 'none'
+          if (animationType !== 'none') {
+              // Populate common trigger
+              const triggerEl = document.getElementById('animationTrigger');
+              triggerEl.value = animationData.trigger || 'automatic';
+              
+              // Populate type-specific options
+              if (animationType === 'pulse') {
+                  document.getElementById('pulseColor').value = animationData.pulseColor || '#1a73e8';
+                  document.getElementById('pulseSpeed').value = animationData.pulseSpeed || 'medium';
+                  updatePulseColorPreview(); // Update color preview
+              } else if (animationType === 'wiggle') {
+                  document.getElementById('wiggleIntensity').value = animationData.wiggleIntensity || 'medium';
+              } else if (animationType === 'float') {
+                  document.getElementById('floatDistance').value = animationData.floatDistance || 8;
+                  document.getElementById('floatSpeed').value = animationData.floatSpeed || 'medium';
+              }
+          }
+      } else {
+          dom.animationType.value = 'none';
+      }
+      handleAnimationTypeChange(); // Update visibility after setting values
+      handleAnimationTriggerChange(); // Ensure trigger options are shown/hidden correctly
 
       updateElementStatus(); // Update the status dots/text
       updateStatus("Element data loaded into forms.");
@@ -1921,8 +1963,55 @@
 
     // --- Helper to Populate Overlay Style Controls ---
     function populateOverlayStyleControls(prefix, styleData) {
-        // Use global defaults if styleData is missing/incomplete for a field
-        const data = { ...globalOverlayDefaults, ...(styleData || {}) };
+        // Get current values from the form elements to preserve them if needed
+        let currentValues = {};
+        try {
+            // Try to get current values from UI elements to preserve them
+            const opacityEl = document.getElementById(`${prefix}_overlayOpacity`);
+            if (opacityEl) {
+                currentValues.opacity = parseInt(opacityEl.value, 10);
+            }
+            
+            const colorEl = document.getElementById(`${prefix}_overlayColor`);
+            if (colorEl) {
+                currentValues.color = colorEl.value;
+            }
+            
+            const shapeEl = document.getElementById(`${prefix}_overlayShape`);
+            if (shapeEl) {
+                currentValues.shape = shapeEl.value;
+            }
+            
+            const outlineEnabledEl = document.getElementById(`${prefix}_outlineEnabled`);
+            if (outlineEnabledEl) {
+                currentValues.outlineEnabled = outlineEnabledEl.checked;
+            }
+            
+            const outlineColorEl = document.getElementById(`${prefix}_outlineColor`);
+            if (outlineColorEl) {
+                currentValues.outlineColor = outlineColorEl.value;
+            }
+            
+            const outlineWidthEl = document.getElementById(`${prefix}_outlineWidth`);
+            if (outlineWidthEl) {
+                currentValues.outlineWidth = parseInt(outlineWidthEl.value, 10);
+            }
+            
+            const outlineStyleEl = document.getElementById(`${prefix}_outlineStyle`);
+            if (outlineStyleEl) {
+                currentValues.outlineStyle = outlineStyleEl.value;
+            }
+        } catch (e) {
+            console.error("Error getting current form values:", e);
+        }
+
+        // Merge in this order: global defaults < current form values < provided style data
+        // This ensures we keep current UI state unless explicitly overridden
+        const data = { 
+            ...globalOverlayDefaults, 
+            ...currentValues,
+            ...(styleData || {})
+        };
 
         // Fill common controls
         trySetInputValue(`${prefix}_overlayShape`, data.shape);
@@ -1941,7 +2030,7 @@
         updateColorPreview(document.getElementById(`${prefix}_outlineColor`));
         trySetInputValue(`${prefix}_outlineWidth`, data.outlineWidth);
         trySetInputValue(`${prefix}_outlineStyle`, data.outlineStyle);
-
+        
         trySetInputValue(`${prefix}_textColor`, data.textColor);
         updateColorPreview(document.getElementById(`${prefix}_textColor`));
         trySetInputValue(`${prefix}_textSize`, data.textSize);
@@ -2085,23 +2174,49 @@
             interactionData.overlayText = interactionData.showOverlayText ? overlayTextInput.value.trim() : undefined;
           }
 
-          // ADD THIS NEW CODE: Get disappearOnClick checkbox state
+          // Get disappearOnClick checkbox state
           const disappearCheckbox = document.getElementById(`${type}_disappearOnClick`);
           if (disappearCheckbox) {
             interactionData.disappearOnClick = disappearCheckbox.checked;
           }
-          // END OF ADDED CODE
 
-          // Check for custom overlay style settings
+          // IMPROVED CUSTOM OVERLAY STYLE HANDLING
+          // Check for custom overlay style settings or differences from global defaults
           const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
-          if (useCustomOverlayCheckbox && useCustomOverlayCheckbox.checked) {
-            interactionData.overlayStyle = collectOverlayStyleSettings(type);
-            // Add flag for backend cleanup logic (this flag isn't saved, just used during merge)
+          const currentSettings = collectOverlayStyleSettings(type);
+          
+          // Compare with global defaults to see if there are actual differences
+          let hasDifferences = false;
+          for (const [key, value] of Object.entries(currentSettings)) {
+            if (key === 'opacity' && value !== globalOverlayDefaults.opacity) {
+              hasDifferences = true;
+              console.log(`Opacity differs from global: ${value} vs ${globalOverlayDefaults.opacity}`);
+              break;
+            }
+            if (key === 'color' && value !== globalOverlayDefaults.color) {
+              hasDifferences = true;
+              break;
+            }
+            // Only check other properties if they're important
+            if (['shape', 'outlineEnabled', 'outlineColor', 'textColor'].includes(key) && 
+                value !== globalOverlayDefaults[key]) {
+              hasDifferences = true;
+              break;
+            }
+          }
+          
+          // Auto-check the custom style checkbox if differences are found
+          if (hasDifferences && useCustomOverlayCheckbox) {
+            useCustomOverlayCheckbox.checked = true;
+            console.log("Auto-checked custom overlay style due to differences from global defaults");
+          }
+
+          if (useCustomOverlayCheckbox && (useCustomOverlayCheckbox.checked || hasDifferences)) {
+            interactionData.overlayStyle = currentSettings;
             interactionData.useCustomOverlay = true;
           } else {
-            // Ensure overlayStyle is NOT included if checkbox is unchecked
+            // Ensure overlayStyle is NOT included if checkbox is unchecked and no differences
             delete interactionData.overlayStyle;
-            // Add flag for backend cleanup logic
             interactionData.useCustomOverlay = false;
           }
 
@@ -2110,14 +2225,14 @@
           delete interactionData.showOverlayText;
           delete interactionData.overlayText;
           delete interactionData.overlayStyle;
-          delete interactionData.disappearOnClick; // ADD THIS LINE
-          interactionData.useCustomOverlay = false; // Signal potential cleanup
+          delete interactionData.disappearOnClick;
+          interactionData.useCustomOverlay = false;
         }
 
         google.script.run
-          .withSuccessHandler(handleSaveSuccess('interaction', interactionData)) // Pass type and *collected* data
+          .withSuccessHandler(handleSaveSuccess('interaction', interactionData))
           .withFailureHandler(showError)
-          .mergeElementData(currentElementId, interactionData, 'interaction'); // Pass collected data
+          .mergeElementData(currentElementId, interactionData, 'interaction');
 
       } catch (e) {
         showError("Error preparing interaction data: " + e.message);

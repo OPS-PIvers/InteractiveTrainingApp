@@ -2406,13 +2406,32 @@
                     break;
                 case 'revealAndSpotlight':
                     if (nextElement.interaction.targetElementId) {
-                        revealElement(nextElement.interaction.targetElementId, nextElement.id, false);
+                        const targetElementId = nextElement.interaction.targetElementId;
+                        logDebug(`[WebApp] Navigating to revealAndSpotlight interaction with target: ${targetElementId}`);
                         
+                        revealElement(targetElementId, nextElement.id, false);
+                        
+                        // We need to update lastActiveElementId to the target element that was revealed
+                        // This is crucial for proper navigation sequence tracking
                         setTimeout(() => {
-                            if (overlayElementsMap.has(nextElement.interaction.targetElementId)) {
-                                showSpotlight(nextElement.interaction.targetElementId, nextElement.interaction);
+                            if (overlayElementsMap.has(targetElementId)) {
+                                // This is key - we need to update the lastActiveElementId to the REVEALED element, not the trigger
+                                lastActiveElementId = targetElementId;
+                                logDebug(`[WebApp] Updated lastActiveElementId to revealed target: ${targetElementId}`);
+                                
+                                // Then show the spotlight on the revealed element
+                                showSpotlight(targetElementId, {
+                                    ...nextElement.interaction,
+                                    // Override any spotlight target to ensure we're spotlighting the revealed element
+                                    spotlightTarget: targetElementId
+                                });
+                            } else {
+                                logDebug(`[WebApp] Failed to find revealed element ${targetElementId} in overlayElementsMap after reveal`);
                             }
                         }, 500);
+                    } else {
+                        logDebug(`[WebApp] revealAndSpotlight missing targetElementId`);
+                        showError("Missing target element ID for reveal and spotlight");
                     }
                     break;
                 case 'openUrl':
@@ -2511,12 +2530,32 @@
                     break;
                 case 'revealAndSpotlight':
                     if (prevElement.interaction.targetElementId) {
-                        revealElement(prevElement.interaction.targetElementId, prevElement.id, false);
+                        const targetElementId = prevElement.interaction.targetElementId;
+                        logDebug(`[WebApp] Navigating to revealAndSpotlight interaction with target: ${targetElementId}`);
+                        
+                        revealElement(targetElementId, prevElement.id, false);
+                        
+                        // We need to update lastActiveElementId to the target element that was revealed
+                        // This is crucial for proper navigation sequence tracking
                         setTimeout(() => {
-                            if (overlayElementsMap.has(prevElement.interaction.targetElementId)) {
-                                showSpotlight(prevElement.interaction.targetElementId, prevElement.interaction);
+                            if (overlayElementsMap.has(targetElementId)) {
+                                // This is key - we need to update the lastActiveElementId to the REVEALED element, not the trigger
+                                lastActiveElementId = targetElementId;
+                                logDebug(`[WebApp] Updated lastActiveElementId to revealed target: ${targetElementId}`);
+                                
+                                // Then show the spotlight on the revealed element
+                                showSpotlight(targetElementId, {
+                                    ...prevElement.interaction,
+                                    // Override any spotlight target to ensure we're spotlighting the revealed element
+                                    spotlightTarget: targetElementId
+                                });
+                            } else {
+                                logDebug(`[WebApp] Failed to find revealed element ${targetElementId} in overlayElementsMap after reveal`);
                             }
                         }, 500);
+                    } else {
+                        logDebug(`[WebApp] revealAndSpotlight missing targetElementId`);
+                        showError("Missing target element ID for reveal and spotlight");
                     }
                     break;
                 case 'openUrl':

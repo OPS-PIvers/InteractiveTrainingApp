@@ -2405,41 +2405,49 @@
                 case 'revealAndSpotlight':
                     if (nextElement.interaction.targetElementId) {
                         const targetElementId = nextElement.interaction.targetElementId;
-                        logDebug(`[WebApp] Navigating to revealAndSpotlight interaction with target: ${targetElementId}`);
-                        
-                        revealElement(targetElementId, nextElement.id, false);
-                        
-                        // Critical fix: Find the next element in the sequence AFTER the reveal operation
+                        logDebug(`[WebApp][NextNav] Handling revealAndSpotlight. Trigger: ${nextElement.id}, Target: ${targetElementId}`);
+
+                        // Reveal the element first, but don't hide the trigger yet
+                        revealElement(targetElementId, nextElement.id, true); // Keep trigger visible for now
+
+                        // Delay spotlight and sequence rebuild until after reveal animation
                         setTimeout(() => {
+                            logDebug(`[WebApp][NextNav] Post-reveal for ${targetElementId}. Checking visibility...`);
                             if (overlayElementsMap.has(targetElementId)) {
-                                // Find the target element's data in the currentSlideElementsData
+                                logDebug(`[WebApp][NextNav] Target ${targetElementId} is visible in map.`);
+                                // Find the target element's data
                                 const targetElementData = currentSlideElementsData.find(el => el.id === targetElementId);
-                                logDebug(`[WebApp] Found target element data: ${targetElementId}`, targetElementData);
-                                
                                 if (targetElementData) {
-                                    // Update the lastActiveElementId to the REVEALED element, not the trigger
+                                    // *** CRITICAL: Update lastActiveElementId to the REVEALED target ***
                                     lastActiveElementId = targetElementId;
-                                    logDebug(`[WebApp] Updated lastActiveElementId to revealed target: ${targetElementId}`);
-                                    
-                                    // Rebuild navigation sequence with the newly revealed element
+                                    logDebug(`[WebApp][NextNav] Updated lastActiveElementId to revealed target: ${targetElementId}`);
+
+                                    // *** CRITICAL: Rebuild sequence AFTER updating lastActiveElementId ***
                                     buildNavigationSequence();
-                                    
-                                    // Then show the spotlight on the revealed element
+                                    logDebug(`[WebApp][NextNav] Navigation sequence rebuilt. Length: ${navSequenceElements.length}`);
+
+                                    // Now show the spotlight on the revealed element
                                     showSpotlight(targetElementId, {
                                         ...nextElement.interaction,
-                                        // Override any spotlight target to ensure we're spotlighting the revealed element
-                                        spotlightTarget: targetElementId
+                                        spotlightTarget: targetElementId // Ensure spotlight targets the revealed element
                                     });
+                                    logDebug(`[WebApp][NextNav] Spotlight shown for ${targetElementId}`);
+
+                                    // Force enable buttons again after spotlight
+                                    setTimeout(forceEnableNavigationButtons, 150);
+
                                 } else {
-                                    logDebug(`[WebApp] Warning: Could not find element data for ${targetElementId} after reveal`);
+                                    logDebug(`[WebApp][NextNav] Warning: Could not find element data for ${targetElementId} after reveal`);
+                                    // Fallback: Try to show spotlight anyway
                                     showSpotlight(targetElementId, nextElement.interaction);
                                 }
                             } else {
-                                logDebug(`[WebApp] Failed to find revealed element ${targetElementId} in overlayElementsMap after reveal`);
+                                logDebug(`[WebApp][NextNav] ERROR: Failed to find revealed element ${targetElementId} in overlayElementsMap after reveal timeout.`);
+                                showError(`Navigation Error: Revealed element ${targetElementId.substring(0,8)}... not found.`);
                             }
-                        }, 500);
+                        }, 600); // Increased delay to ensure reveal animation completes
                     } else {
-                        logDebug(`[WebApp] revealAndSpotlight missing targetElementId`);
+                        logDebug(`[WebApp][NextNav] revealAndSpotlight missing targetElementId`);
                         showError("Missing target element ID for reveal and spotlight");
                     }
                     break;

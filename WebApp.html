@@ -225,13 +225,13 @@
     .modal-navigation {
       display: flex; justify-content: space-between; margin-top: 20px;
       padding-top: 15px; border-top: 1px solid #eee;
+      gap: 15px; /* Add gap between buttons */
     }
     .modal-navigation button {
       padding: 8px 16px; background-color: #1a73e8; color: white; border: none;
       border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px;
+      min-width: 100px; /* Set minimum width */
     }
-    .modal-navigation button:hover { background-color: #1558b7; }
-    .modal-navigation button:disabled { background-color: #b0bec5; cursor: not-allowed; }
 
     /* Animations, Loading, Error, Spotlight, Debug etc. - UNCHANGED from previous version */
     /* --- Animation Keyframes & Classes --- */
@@ -2400,8 +2400,6 @@
                 case 'revealElement':
                     if (nextElement.interaction.targetElementId) {
                         revealElement(nextElement.interaction.targetElementId, nextElement.id);
-                        // Update the lastActiveElementId again - to the element that was revealed
-                        lastActiveElementId = nextElement.id;
                     }
                     break;
                 case 'revealAndSpotlight':
@@ -2411,20 +2409,31 @@
                         
                         revealElement(targetElementId, nextElement.id, false);
                         
-                        // We need to update lastActiveElementId to the target element that was revealed
-                        // This is crucial for proper navigation sequence tracking
+                        // Critical fix: Find the next element in the sequence AFTER the reveal operation
                         setTimeout(() => {
                             if (overlayElementsMap.has(targetElementId)) {
-                                // This is key - we need to update the lastActiveElementId to the REVEALED element, not the trigger
-                                lastActiveElementId = targetElementId;
-                                logDebug(`[WebApp] Updated lastActiveElementId to revealed target: ${targetElementId}`);
+                                // Find the target element's data in the currentSlideElementsData
+                                const targetElementData = currentSlideElementsData.find(el => el.id === targetElementId);
+                                logDebug(`[WebApp] Found target element data: ${targetElementId}`, targetElementData);
                                 
-                                // Then show the spotlight on the revealed element
-                                showSpotlight(targetElementId, {
-                                    ...nextElement.interaction,
-                                    // Override any spotlight target to ensure we're spotlighting the revealed element
-                                    spotlightTarget: targetElementId
-                                });
+                                if (targetElementData) {
+                                    // Update the lastActiveElementId to the REVEALED element, not the trigger
+                                    lastActiveElementId = targetElementId;
+                                    logDebug(`[WebApp] Updated lastActiveElementId to revealed target: ${targetElementId}`);
+                                    
+                                    // Rebuild navigation sequence with the newly revealed element
+                                    buildNavigationSequence();
+                                    
+                                    // Then show the spotlight on the revealed element
+                                    showSpotlight(targetElementId, {
+                                        ...nextElement.interaction,
+                                        // Override any spotlight target to ensure we're spotlighting the revealed element
+                                        spotlightTarget: targetElementId
+                                    });
+                                } else {
+                                    logDebug(`[WebApp] Warning: Could not find element data for ${targetElementId} after reveal`);
+                                    showSpotlight(targetElementId, nextElement.interaction);
+                                }
                             } else {
                                 logDebug(`[WebApp] Failed to find revealed element ${targetElementId} in overlayElementsMap after reveal`);
                             }
@@ -2524,38 +2533,32 @@
                 case 'revealElement':
                     if (prevElement.interaction.targetElementId) {
                         revealElement(prevElement.interaction.targetElementId, prevElement.id);
-                        // Update the lastActiveElementId again
-                        lastActiveElementId = prevElement.id;
                     }
                     break;
                 case 'revealAndSpotlight':
                     if (prevElement.interaction.targetElementId) {
-                        const targetElementId = prevElement.interaction.targetElementId;
-                        logDebug(`[WebApp] Navigating to revealAndSpotlight interaction with target: ${targetElementId}`);
+                        const targetId = prevElement.interaction.targetElementId;
+                        logDebug(`[WebApp] Navigating to previous revealAndSpotlight: Target ${targetId}`);
                         
-                        revealElement(targetElementId, prevElement.id, false);
+                        revealElement(targetId, prevElement.id, false);
                         
-                        // We need to update lastActiveElementId to the target element that was revealed
-                        // This is crucial for proper navigation sequence tracking
                         setTimeout(() => {
-                            if (overlayElementsMap.has(targetElementId)) {
-                                // This is key - we need to update the lastActiveElementId to the REVEALED element, not the trigger
-                                lastActiveElementId = targetElementId;
-                                logDebug(`[WebApp] Updated lastActiveElementId to revealed target: ${targetElementId}`);
+                            if (overlayElementsMap.has(targetId)) {
+                                const targetData = currentSlideElementsData.find(el => el.id === targetId);
                                 
-                                // Then show the spotlight on the revealed element
-                                showSpotlight(targetElementId, {
-                                    ...prevElement.interaction,
-                                    // Override any spotlight target to ensure we're spotlighting the revealed element
-                                    spotlightTarget: targetElementId
-                                });
-                            } else {
-                                logDebug(`[WebApp] Failed to find revealed element ${targetElementId} in overlayElementsMap after reveal`);
+                                if (targetData) {
+                                    lastActiveElementId = targetId;
+                                    buildNavigationSequence();
+                                    
+                                    showSpotlight(targetId, {
+                                        ...prevElement.interaction,
+                                        spotlightTarget: targetId
+                                    });
+                                } else {
+                                    showSpotlight(targetId, prevElement.interaction);
+                                }
                             }
                         }, 500);
-                    } else {
-                        logDebug(`[WebApp] revealAndSpotlight missing targetElementId`);
-                        showError("Missing target element ID for reveal and spotlight");
                     }
                     break;
                 case 'openUrl':
@@ -2563,7 +2566,7 @@
                 case 'goToSlide':
                 case 'none':
                 default:
-                    // Simulate a click on the element's overlay for other interaction types
+                    // Simulate a click on the element's overlay
                     handleOverlayClick(prevElement, prevElement.id);
                     break;
             }

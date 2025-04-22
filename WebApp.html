@@ -799,7 +799,7 @@
 
     // Main function to apply styles (custom or global)
     function applyOverlayStyle(overlay, element) {
-      // Default opacity from global settings
+      // Default opacity from global settings (which is now 0%)
       let opacityValue = overlayOpacity / 100;
       
       try {
@@ -899,8 +899,6 @@
       }
       
       // Default styling if no custom style or on error
-      // Make sure opacity is within reasonable bounds (0.05 to 0.5)
-      opacityValue = Math.max(0.05, Math.min(0.5, opacityValue));
       overlay.style.backgroundColor = `rgba(229, 57, 53, ${opacityValue})`;
       
       // Apply default border/outline

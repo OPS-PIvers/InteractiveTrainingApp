@@ -805,7 +805,7 @@ const OVERLAY_SETTINGS_PREFIX = 'WEBAPP_OVERLAY_';
 const OVERLAY_DEFAULTS = {
   shape: 'rectangle',
   color: '#e53935', // Default Red
-  opacity: 15, // Default 15%
+  opacity: 0, // Default 0% (changed from 15%)
   outlineEnabled: true, // Default: Outline ON
   outlineColor: '#e53935', // Default Red
   outlineWidth: 1, // Default 1px

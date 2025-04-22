@@ -2276,32 +2276,25 @@
         // Reset current sequence
         navSequenceElements = [];
         
-        // Get currently visible elements
-        const currentlyVisibleElements = Array.from(overlayElementsMap.keys());
-        logDebug(`[WebApp] buildNavigationSequence: Found ${currentlyVisibleElements.length} visible elements`);
+        // Get currently visible elements from the map
+        const currentlyVisibleElementIds = new Set(overlayElementsMap.keys());
+        logDebug(`[WebApp] buildNavigationSequence: Found ${currentlyVisibleElementIds.size} visible elements in overlayElementsMap`);
         
-        // Include all interactive elements based on their interaction type
-        const visibleInteractiveElements = interactiveElements.filter(el => 
-            currentlyVisibleElements.includes(el.id) &&
-            (
-                // Elements with spotlight capability
-                (el.interaction?.type === 'spotlight') ||
-                // Elements with text modals
-                (el.interaction?.type === 'showText') ||
-                // Explicitly include revealAndSpotlight elements
-                (el.interaction?.type === 'revealAndSpotlight') ||
-                // Other navigable interaction types
-                false
-            )
+        // Filter interactiveElements to include only those currently visible AND having any interaction
+        const visibleInteractiveElements = interactiveElements.filter(el =>
+            currentlyVisibleElementIds.has(el.id) && // Must be visible
+            el.interaction &&                       // Must have an interaction block
+            el.interaction.type &&                  // Must have an interaction type
+            el.interaction.type !== 'none'          // Type must not be 'none'
         );
         
-        logDebug(`[WebApp] buildNavigationSequence: Found ${visibleInteractiveElements.length} interactive elements out of ${currentlyVisibleElements.length} visible elements`);
+        logDebug(`[WebApp] buildNavigationSequence: Found ${visibleInteractiveElements.length} visible elements with interactions`);
         
         // Sort elements by position (top to bottom, left to right)
         visibleInteractiveElements.sort((a, b) => {
             // Compare vertical position first (with some tolerance)
             const verticalDiff = a.top - b.top;
-            if (Math.abs(verticalDiff) > 30) { // Reduced tolerance for more accurate ordering
+            if (Math.abs(verticalDiff) > 15) { // Adjust tolerance as needed
                 return verticalDiff;
             }
             // If at similar height, compare horizontal position
@@ -2310,23 +2303,23 @@
         
         navSequenceElements = visibleInteractiveElements;
         
-        // Update current indices
-        if (isSpotlightActive && window.currentSpotlight) {
-            const elementId = window.currentSpotlight.elementId;
-            const targetId = window.currentSpotlight.targetId;
-            
-            // Try to find by element ID first, then by target ID
-            currentSpotlightElementIndex = navSequenceElements.findIndex(el => el.id === elementId);
-            if (currentSpotlightElementIndex < 0) {
-                currentSpotlightElementIndex = navSequenceElements.findIndex(el => el.id === targetId);
+        // Update current indices based on lastActiveElementId primarily
+        if (lastActiveElementId) {
+            const currentIndex = navSequenceElements.findIndex(el => el.id === lastActiveElementId);
+            if (currentIndex >= 0) {
+                currentModalElementIndex = currentIndex;
+                currentSpotlightElementIndex = currentIndex; // Keep them synced for consistency
+                logDebug(`[WebApp] buildNavigationSequence: Updated indices based on lastActiveElementId (${lastActiveElementId}) to ${currentIndex}`);
+            } else {
+                // If lastActiveElementId is not in sequence but is valid, leave the indices as they are
+                logDebug(`[WebApp] buildNavigationSequence: lastActiveElementId (${lastActiveElementId}) not in current sequence.`);
             }
-            
-            logDebug(`[WebApp] buildNavigationSequence: Updated spotlight index to ${currentSpotlightElementIndex}`);
         }
         
         // Log the sequence for debugging
         if (navSequenceElements.length > 0) {
-            logDebug(`[WebApp] buildNavigationSequence: Built sequence with ${navSequenceElements.length} elements. First: ${navSequenceElements[0].id}, Last: ${navSequenceElements[navSequenceElements.length-1].id}`);
+            const sequenceIds = navSequenceElements.map(el => `${el.id} (${el.interaction?.type})`).join(', ');
+            logDebug(`[WebApp] buildNavigationSequence: Built sequence: [${sequenceIds}]`);
         } else {
             logDebug(`[WebApp] buildNavigationSequence: No navigable elements found`);
         }
@@ -2348,18 +2341,25 @@
             return false;
         }
         
-        // Determine current index based on active modal or spotlight
+        // Determine current index based on active modal or spotlight or lastActiveElementId
         let currentIndex = -1;
+        
         if (isSpotlightActive && window.currentSpotlight?.targetId) {
+            // If spotlight is active, use its target as reference
             currentIndex = navSequenceElements.findIndex(el => el.id === window.currentSpotlight.targetId);
             logDebug(`[WebApp] Current index based on spotlight: ${currentIndex} (Target ID: ${window.currentSpotlight.targetId})`);
         } else if (textModal.classList.contains('visible') && currentModalElementIndex !== -1) {
+            // If modal is active, use the modal index
             currentIndex = currentModalElementIndex;
             logDebug(`[WebApp] Current index based on modal: ${currentIndex}`);
+        } else if (lastActiveElementId) {
+            // Try to use the last active element if it's in the sequence
+            currentIndex = navSequenceElements.findIndex(el => el.id === lastActiveElementId);
+            logDebug(`[WebApp] Current index based on lastActiveElementId: ${currentIndex} (ID: ${lastActiveElementId})`);
         } else {
-            // If nothing is active, assume we start from the beginning or last known position
-            currentIndex = -1; // Start from beginning if no context
-            logDebug('[WebApp] No active modal/spotlight, starting navigation from beginning.');
+            // If nothing is active, assume we start from the beginning
+            currentIndex = -1;
+            logDebug('[WebApp] No active context found, starting navigation from beginning.');
         }
         
         // Get next index (with wrap-around)
@@ -2384,11 +2384,12 @@
             logDebug(`[WebApp] Triggering interaction for next element: ${nextElement.id}`);
             const interactionType = nextElement.interaction?.type || 'none';
             
-            // Update indices BEFORE triggering interaction
+            // Update lastActiveElementId and indices
+            lastActiveElementId = nextElement.id;
             currentModalElementIndex = nextIndex;
             currentSpotlightElementIndex = nextIndex;
 
-            // Trigger the appropriate interaction for the next element
+            // Trigger the appropriate interaction for the next element based on its type
             switch (interactionType) {
                 case 'spotlight':
                     showSpotlight(nextElement.id, nextElement.interaction);
@@ -2397,13 +2398,37 @@
                     showTextModal(nextElement.interaction.text, nextElement.id);
                     break;
                 case 'revealElement':
+                    if (nextElement.interaction.targetElementId) {
+                        revealElement(nextElement.interaction.targetElementId, nextElement.id);
+                        // Update the lastActiveElementId again - to the element that was revealed
+                        lastActiveElementId = nextElement.id;
+                    }
+                    break;
                 case 'revealAndSpotlight':
+                    if (nextElement.interaction.targetElementId) {
+                        revealElement(nextElement.interaction.targetElementId, nextElement.id, false);
+                        
+                        setTimeout(() => {
+                            if (overlayElementsMap.has(nextElement.interaction.targetElementId)) {
+                                showSpotlight(nextElement.interaction.targetElementId, nextElement.interaction);
+                            }
+                        }, 500);
+                    }
+                    break;
                 case 'openUrl':
-                case 'none': // Even if 'none', handleOverlayClick might trigger animations or appearance changes
+                case 'highlight':
+                case 'goToSlide': 
+                case 'none':
                 default:
-                    // Simulate a click on the element's overlay
+                    // Simulate a click on the element's overlay for other interaction types
                     handleOverlayClick(nextElement, nextElement.id);
                     break;
+            }
+            
+            // Force enable buttons if needed for modal or spotlight navigation
+            if (interactionType === 'showText' || interactionType === 'spotlight' || 
+                interactionType === 'revealAndSpotlight') {
+                setTimeout(forceEnableNavigationButtons, 150);
             }
         }, 150); // Delay to allow hide animations/cleanup
         
@@ -2432,10 +2457,14 @@
         } else if (textModal.classList.contains('visible') && currentModalElementIndex !== -1) {
             currentIndex = currentModalElementIndex;
             logDebug(`[WebApp] Current index based on modal: ${currentIndex}`);
+        } else if (lastActiveElementId) {
+            // Try to use the last active element if it's in the sequence
+            currentIndex = navSequenceElements.findIndex(el => el.id === lastActiveElementId);
+            logDebug(`[WebApp] Current index based on lastActiveElementId: ${currentIndex} (ID: ${lastActiveElementId})`);
         } else {
             // If nothing is active, assume we wrap around from the end
-            currentIndex = 0; // Start from beginning if no context, so prev wraps to end
-            logDebug('[WebApp] No active modal/spotlight, starting navigation from end for previous.');
+            currentIndex = navSequenceElements.length; // Will become length-1 after we subtract 1
+            logDebug('[WebApp] No active context, starting navigation from end for previous.');
         }
         
         // Get previous index (with wrap-around)
@@ -2444,12 +2473,12 @@
         
         // Get the previous element data
         const prevElement = navSequenceElements[prevIndex];
-         if (!prevElement || !prevElement.id) {
+        if (!prevElement || !prevElement.id) {
             logDebug('[WebApp] Could not find valid previous element data.');
             return false;
         }
         
-        logDebug(`[WebApp] Navigating TO element: index=${prevIndex}, id=${prevElement.id}, type=${prevElement.interaction?.type}`);
+        logDebug(`[WebApp] Navigating TO previous element: index=${prevIndex}, id=${prevElement.id}, type=${prevElement.interaction?.type}`);
         
         // Clean up current state BEFORE triggering the previous
         hideSpotlight();
@@ -2460,7 +2489,8 @@
             logDebug(`[WebApp] Triggering interaction for previous element: ${prevElement.id}`);
             const interactionType = prevElement.interaction?.type || 'none';
 
-            // Update indices BEFORE triggering interaction
+            // Update lastActiveElementId and indices
+            lastActiveElementId = prevElement.id;
             currentModalElementIndex = prevIndex;
             currentSpotlightElementIndex = prevIndex;
 
@@ -2473,12 +2503,36 @@
                     showTextModal(prevElement.interaction.text, prevElement.id);
                     break;
                 case 'revealElement':
+                    if (prevElement.interaction.targetElementId) {
+                        revealElement(prevElement.interaction.targetElementId, prevElement.id);
+                        // Update the lastActiveElementId again
+                        lastActiveElementId = prevElement.id;
+                    }
+                    break;
                 case 'revealAndSpotlight':
+                    if (prevElement.interaction.targetElementId) {
+                        revealElement(prevElement.interaction.targetElementId, prevElement.id, false);
+                        setTimeout(() => {
+                            if (overlayElementsMap.has(prevElement.interaction.targetElementId)) {
+                                showSpotlight(prevElement.interaction.targetElementId, prevElement.interaction);
+                            }
+                        }, 500);
+                    }
+                    break;
                 case 'openUrl':
+                case 'highlight':
+                case 'goToSlide':
                 case 'none':
                 default:
+                    // Simulate a click on the element's overlay for other interaction types
                     handleOverlayClick(prevElement, prevElement.id);
                     break;
+            }
+            
+            // Force enable buttons if needed
+            if (interactionType === 'showText' || interactionType === 'spotlight' || 
+                interactionType === 'revealAndSpotlight') {
+                setTimeout(forceEnableNavigationButtons, 150);
             }
         }, 150); // Delay
         

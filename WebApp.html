@@ -2296,7 +2296,18 @@
         
         logDebug(`[WebApp] buildNavigationSequence: Found ${visibleInteractiveElements.length} visible elements with interactions`);
         
-        // Sort elements by position (top to bottom, left to right)
+        // CHANGED: Sort elements by their original order in the currentSlideElementsData array
+        // This preserves the order in which elements appear in the Google Slides presentation
+        visibleInteractiveElements.sort((a, b) => {
+            // Find the index of each element in the original data array
+            const indexA = currentSlideElementsData.findIndex(el => el.id === a.id);
+            const indexB = currentSlideElementsData.findIndex(el => el.id === b.id);
+            
+            // Sort by original index (lower index = earlier in the sequence)
+            return indexA - indexB;
+        });
+        
+        /* REMOVED: Old spatial sorting logic
         visibleInteractiveElements.sort((a, b) => {
             // Compare vertical position first (with some tolerance)
             const verticalDiff = a.top - b.top;
@@ -2306,6 +2317,7 @@
             // If at similar height, compare horizontal position
             return a.left - b.left;
         });
+        */
         
         navSequenceElements = visibleInteractiveElements;
         

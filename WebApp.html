@@ -822,6 +822,16 @@
               logDebug(`[WebApp] Using overlayStyle.opacity: ${customStyle.opacity}% for element ${element.id}`);
             }
             
+            // Special handling for zero opacity
+            if (opacityValue <= 0.01) {
+              // Make completely invisible but keep interactive
+              overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+              overlay.style.border = 'none';
+              overlay.style.boxShadow = 'none';
+              logDebug(`[WebApp] Applied zero opacity (invisible but interactive) for element ${element.id}`);
+              return; // Skip further styling
+            }
+            
             // Apply custom color if specified
             if (customStyle.color) {
               // Get the RGB color components
@@ -876,6 +886,16 @@
       } catch (err) {
         console.error("[WebApp] Error applying custom style:", err);
         // Fall back to default styling below
+      }
+      
+      // Special handling for zero opacity in default styling
+      if (opacityValue <= 0.01) {
+        // Make completely invisible but keep interactive
+        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+        overlay.style.border = 'none';
+        overlay.style.boxShadow = 'none';
+        logDebug(`[WebApp] Applied zero opacity (invisible but interactive) with default styling`);
+        return; // Skip further styling
       }
       
       // Default styling if no custom style or on error
@@ -2118,7 +2138,7 @@
 
             if (!interactiveElements.some(el => el.id === targetElementData.id)) {
                 interactiveElements.push(targetElementData);
-                logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementData.id} to interactiveElements list.`); // LOGGING
+                logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementId} to interactiveElements list.`); // LOGGING
             }
 
             requestAnimationFrame(() => {

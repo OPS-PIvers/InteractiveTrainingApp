@@ -506,6 +506,7 @@
     let interactiveElements = []; // Subset of currentSlideElementsData with interactions/animations
     let currentModalElementIndex = -1;
     let currentSpotlightElementIndex = -1;
+    let lastActiveElementId = null; // NEW: Track the last element interacted with
     let spotlightableElements = [];
     let isSpotlightActive = false;
     let debugMode = false; // Set true for local debugging
@@ -622,6 +623,9 @@
         currentSlideElementsData = []; // Clear previous element data
         interactiveElements = [];
         currentModalElementIndex = -1;
+        currentSpotlightElementIndex = -1;
+        lastActiveElementId = null; // Reset last active element on slide change
+        navSequenceElements = []; // Reset nav sequence
 
         google.script.run
             .withSuccessHandler(handleSlideData)
@@ -1246,6 +1250,7 @@
         logDebug(`[WebApp] Processing click for element: ${elementId}`);
 
         let interactionHandled = false;
+        let interactionType = 'none'; // Keep track of the type handled
 
         // --- Handle Interactions First ---
         if (currentElementData.interaction && 
@@ -1254,12 +1259,15 @@
             
           const interaction = currentElementData.interaction;
           const overlay = overlayElementsMap.get(elementId);
+          interactionType = interaction.type; // Store the type
 
           switch (interaction.type) {
             case 'showText':
               if (interaction.text) {
                 showTextModal(interaction.text, elementId);
                 interactionHandled = true;
+              } else {
+                showError("Missing text for showText interaction");
               }
               break;
               
@@ -1291,6 +1299,8 @@
                   console.error(`[WebApp] Error opening URL: ${interaction.url}`, error);
                   showError(`Failed to open URL: ${interaction.url}`);
                 }
+              } else {
+                showError("Missing URL for openUrl interaction");
               }
               break;
               
@@ -1312,6 +1322,8 @@
                   showError(`Invalid target slide number: ${interaction.targetSlide}`);
                 }
                 interactionHandled = true;
+              } else {
+                showError("Missing target slide for goToSlide interaction");
               }
               break;
               
@@ -1320,6 +1332,8 @@
                 logDebug(`[WebApp] Reveal Element interaction: Target ${interaction.targetElementId}`);
                 revealElement(interaction.targetElementId, elementId);
                 interactionHandled = true;
+              } else {
+                showError("Missing target ID for revealElement");
               }
               break;
               
@@ -1466,11 +1480,21 @@
             buildNavigationSequence();
           }
         }, 500);
-      setTimeout(() => {
-        buildNavigationSequence();
-        forceEnableNavigationButtons();
-        logDebug(`[WebApp] handleOverlayClick completed for ${elementId}, navigation updated`);
-      }, 600);
+        
+        // --- NEW: Update lastActiveElementId AFTER handling interaction ---
+        lastActiveElementId = elementId;
+        logDebug(`[WebApp] Updated lastActiveElementId to: ${lastActiveElementId}`);
+        // --- End NEW ---
+
+        // Update navigation sequence and buttons slightly later
+        setTimeout(() => {
+          buildNavigationSequence(); // Rebuild sequence after potential reveals/hides
+          // If a modal or spotlight was opened by this click, force enable its buttons
+          if (interactionType === 'showText' || interactionType === 'spotlight' || interactionType === 'revealAndSpotlight') {
+            forceEnableNavigationButtons();
+          }
+          logDebug(`[WebApp] handleOverlayClick completed for ${elementId}, navigation updated`);
+        }, 600); // Keep delay
     }
 
 
@@ -1976,26 +2000,41 @@
         modalTextDiv.innerHTML = text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
         textModal.classList.add('visible');
 
-        // Ensure we have a navigation sequence
-        if (navSequenceElements.length === 0) {
-            buildNavigationSequence();
-        }
-        
-        // Find this element in the navigation sequence
-        currentModalElementIndex = navSequenceElements.findIndex(el => el.id === elementId);
-        logDebug(`[WebApp] Modal index in navigation sequence: ${currentModalElementIndex}`);
+        // Ensure navigation buttons exist and have correct listeners
+        const modalPrevBtn = document.getElementById('prevElementBtn'); // Assuming this ID is used in the modal
+        const modalNextBtn = document.getElementById('nextElementBtn'); // Assuming this ID is used in the modal
 
-        // Update navigation buttons
-        prevElementBtn.disabled = currentModalElementIndex <= 0;
-        nextElementBtn.disabled = currentModalElementIndex >= navSequenceElements.length - 1;
-        
-        // Update the modal navigation buttons visibility
-        const modalNavigation = document.querySelector('.modal-navigation');
-        if (modalNavigation) {
-            modalNavigation.style.display = navSequenceElements.length > 1 ? 'flex' : 'none';
+        if (modalPrevBtn && modalNextBtn) {
+            // Remove existing listeners to prevent duplicates
+            modalPrevBtn.replaceWith(modalPrevBtn.cloneNode(true));
+            modalNextBtn.replaceWith(modalNextBtn.cloneNode(true));
+            // Get fresh references after cloning
+            const freshPrevBtn = document.getElementById('prevElementBtn');
+            const freshNextBtn = document.getElementById('nextElementBtn');
+
+            freshPrevBtn.addEventListener('click', navigateToPrevElement);
+            freshNextBtn.addEventListener('click', navigateToNextElement);
+
+            // Update button states based on the sequence (using elementId passed to this function)
+            buildNavigationSequence(); // Ensure sequence is up-to-date
+            const currentIndex = navSequenceElements.findIndex(el => el.id === elementId);
+            freshPrevBtn.disabled = currentIndex <= 0;
+            freshNextBtn.disabled = currentIndex >= navSequenceElements.length - 1;
+
+            // Show/hide based on sequence length
+            const modalNavigation = document.querySelector('.modal-navigation');
+            if (modalNavigation) {
+                modalNavigation.style.display = navSequenceElements.length > 1 ? 'flex' : 'none';
+            }
+             // Force enable after a moment
+             setTimeout(forceEnableNavigationButtons, 100);
+        } else {
+             logDebug("[WebApp] Modal navigation buttons not found in showTextModal");
         }
-        
+
         highlightActiveModalElement(elementId);
+        lastActiveElementId = elementId; // Update last active ID when modal is shown
+        logDebug(`[WebApp] showTextModal set lastActiveElementId to: ${lastActiveElementId}`);
     }
 
     function hideTextModal() {
@@ -2096,17 +2135,29 @@
         // Check if element is already visible in the map
         if (overlayElementsMap.has(targetElementId)) {
             logDebug(`[WebApp] [revealElement] Target element ${targetElementId} is already visible in overlayElementsMap.`);
-            // Optionally re-apply styles or just return
             const existingOverlay = overlayElementsMap.get(targetElementId);
             if (existingOverlay) {
-                // Ensure it's visible if it was faded out
                 existingOverlay.style.opacity = '1';
                 existingOverlay.style.pointerEvents = 'auto';
             }
             // If keeping trigger visible, don't hide it
             if (!keepTriggerVisible && triggerElementId && overlayElementsMap.has(triggerElementId)) {
-                 // Hide trigger if needed (logic moved here for consistency)
-                 // ... (hiding logic as before) ...
+                 // Hide trigger if needed
+                 logDebug(`[WebApp] [revealElement] Hiding trigger element (already visible target): ${triggerElementId}`);
+                 const triggerOverlay = overlayElementsMap.get(triggerElementId);
+                 triggerOverlay.style.transition = 'opacity 0.3s ease-out';
+                 triggerOverlay.style.opacity = '0';
+                 triggerOverlay.style.pointerEvents = 'none';
+                 if (!permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
+                     permanentlyHiddenElementsPerSlide[currentSlideIndex] = new Set();
+                 }
+                 permanentlyHiddenElementsPerSlide[currentSlideIndex].add(triggerElementId);
+                 setTimeout(() => {
+                     if (overlayElementsMap.has(triggerElementId)) {
+                         overlayElementsMap.delete(triggerElementId);
+                         buildNavigationSequence(); // Rebuild after hiding
+                     }
+                 }, 300);
             }
             return; // Already visible, nothing more to do
         }
@@ -2145,71 +2196,58 @@
             applyOverlayStyle(overlay, targetElementData);
             logDebug(`[WebApp] [revealElement] Applied styles to revealed element ${targetElementId}`);
 
-            // Add text if configured
             if (targetElementData.interaction && targetElementData.interaction.showOverlayText && targetElementData.interaction.overlayText) {
                 addOverlayText(overlay, targetElementData.interaction.overlayText);
             }
 
-            // Add tooltip
             let tooltipParts = [`ID: ${targetElementData.id}`];
             if (targetElementData.interaction?.type && targetElementData.interaction.type !== 'none') tooltipParts.push(`I: ${targetElementData.interaction.type}`);
             if (targetElementData.interaction?.overlayStyle) tooltipParts.push(`[Style]`);
             if (targetElementData.animation?.type && targetElementData.animation.type !== 'none') tooltipParts.push(`A: ${targetElementData.animation.type}`);
             overlay.title = tooltipParts.join(' | ');
 
-            // Add event listener
             overlay.addEventListener('click', () => handleOverlayClick(targetElementData, targetElementData.id));
             overlay.addEventListener('mouseenter', () => overlay.classList.add('is-hovering'));
             overlay.addEventListener('mouseleave', () => overlay.classList.remove('is-hovering'));
 
-            // Apply animation if configured
             if (targetElementData.animation && targetElementData.animation.type && targetElementData.animation.type !== 'none') {
-                applyAnimation(overlay, targetElementData);
+                applyAnimation(overlay, targetElementData.animation);
             }
 
             slideElement.appendChild(overlay);
 
-            // --- IMPORTANT: Add to map AFTER appending --- 
             overlayElementsMap.set(targetElementData.id, overlay);
-            // --- ADDED LOGGING --- 
             logDebug(`[WebApp] [revealElement] Element ${targetElementData.id} ADDED to overlayElementsMap. Map size: ${overlayElementsMap.size}`);
             logDebug(`[WebApp] [revealElement] Map keys: ${JSON.stringify(Array.from(overlayElementsMap.keys()))}`);
-            // --- END LOGGING --- 
 
-            // Add to interactive elements list if not already present
             if (!interactiveElements.some(el => el.id === targetElementData.id)) {
                 interactiveElements.push(targetElementData);
                 logDebug(`[WebApp] [revealElement] Added revealed element ${targetElementData.id} to interactiveElements list.`);
             }
 
-            // Use requestAnimationFrame for smoother fade-in
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    overlay.classList.remove('revealed'); // Remove hidden class
-                    overlay.style.opacity = 1; // Ensure opacity is set
+                    overlay.classList.remove('revealed');
+                    overlay.style.opacity = 1;
                     logDebug(`[WebApp] [revealElement] Fading in revealed element ${targetElementId}.`);
                 });
             });
 
-            // --- Modified hiding logic for the trigger --- 
             if (!keepTriggerVisible && triggerElementId && overlayElementsMap.has(triggerElementId)) {
                 logDebug(`[WebApp] [revealElement] Hiding trigger element: ${triggerElementId}`);
                 const triggerOverlay = overlayElementsMap.get(triggerElementId);
                 triggerOverlay.style.transition = 'opacity 0.3s ease-out';
                 triggerOverlay.style.opacity = '0';
                 triggerOverlay.style.pointerEvents = 'none';
-                // Add to hidden set
                 if (!permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
                     permanentlyHiddenElementsPerSlide[currentSlideIndex] = new Set();
                 }
                 permanentlyHiddenElementsPerSlide[currentSlideIndex].add(triggerElementId);
                 logDebug(`[WebApp] [revealElement] Added trigger ${triggerElementId} to hidden set for slide ${currentSlideIndex}`);
-                // Remove from map after transition
                 setTimeout(() => {
                     if (overlayElementsMap.has(triggerElementId)) {
                         overlayElementsMap.delete(triggerElementId);
                         logDebug(`[WebApp] [revealElement] Removed trigger ${triggerElementId} from overlayElementsMap after hide.`);
-                        // Rebuild navigation sequence after hiding trigger
                         buildNavigationSequence();
                     }
                 }, 300);
@@ -2219,8 +2257,6 @@
                 logDebug(`[WebApp] [revealElement] Trigger element ${triggerElementId} not hidden (keepTrigger: ${keepTriggerVisible}, found in map: ${overlayElementsMap.has(triggerElementId)})`);
             }
 
-            // Rebuild navigation sequence after revealing element
-            // Delay slightly to ensure DOM updates and fade-in starts
             setTimeout(() => {
                 buildNavigationSequence();
                 logDebug(`[WebApp] [revealElement] Updated navigation sequence after revealing element ${targetElementId}`);

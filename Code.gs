@@ -31,6 +31,124 @@ function onOpen() {
   menu.addToUi();
 }
 
+// --- Navigation Sequence Functions ---
+
+/**
+ * Property key constants for storing navigation sequences
+ */
+const NAV_SEQUENCE_PREFIX = 'SLIDE_NAV_SEQUENCE_';
+
+/**
+ * Saves a custom navigation sequence order for a specific slide
+ * @param {string} slideId The ID of the slide
+ * @param {string[]} elementIds Array of element IDs in the desired sequence order
+ * @returns {object} Success/error result
+ */
+function saveNavigationSequence(slideId, elementIds) {
+  try {
+    if (!slideId) {
+      return { success: false, error: "Missing slide ID" };
+    }
+    
+    if (!Array.isArray(elementIds)) {
+      return { success: false, error: "Element IDs must be provided as an array" };
+    }
+    
+    // Check if elements exist
+    if (elementIds.length === 0) {
+      // User is clearing the sequence
+      PropertiesService.getDocumentProperties().deleteProperty(NAV_SEQUENCE_PREFIX + slideId);
+      console.log(`Cleared navigation sequence for slide: ${slideId}`);
+      return { 
+        success: true, 
+        message: "Navigation sequence cleared" 
+      };
+    }
+
+    // Store the sequence as a JSON string in document properties
+    const sequenceData = JSON.stringify(elementIds);
+    PropertiesService.getDocumentProperties().setProperty(NAV_SEQUENCE_PREFIX + slideId, sequenceData);
+    
+    console.log(`Saved navigation sequence for slide ${slideId}: ${sequenceData}`);
+    return { 
+      success: true, 
+      message: "Navigation sequence saved successfully" 
+    };
+  } catch (e) {
+    console.error(`Error saving navigation sequence: ${e.message}`);
+    return { 
+      success: false, 
+      error: `Failed to save navigation sequence: ${e.message}` 
+    };
+  }
+}
+
+/**
+ * Gets the saved navigation sequence for a specific slide
+ * @param {string} slideId The ID of the slide
+ * @returns {object} Object with success flag and either ordered element IDs or error
+ */
+function getNavigationSequence(slideId) {
+  try {
+    if (!slideId) {
+      return { success: false, error: "Missing slide ID" };
+    }
+    
+    const sequenceData = PropertiesService.getDocumentProperties().getProperty(NAV_SEQUENCE_PREFIX + slideId);
+    
+    if (!sequenceData) {
+      // No custom sequence found - this is normal, not an error
+      return { 
+        success: true, 
+        hasCustomSequence: false,
+        elementIds: [] 
+      };
+    }
+    
+    // Parse the stored JSON string
+    const elementIds = JSON.parse(sequenceData);
+    
+    return { 
+      success: true,
+      hasCustomSequence: true,
+      elementIds: elementIds
+    };
+  } catch (e) {
+    console.error(`Error getting navigation sequence: ${e.message}`);
+    return { 
+      success: false, 
+      error: `Failed to get navigation sequence: ${e.message}`
+    };
+  }
+}
+
+/**
+ * Clears the saved navigation sequence for a specific slide
+ * @param {string} slideId The ID of the slide
+ * @returns {object} Success/error result
+ */
+function clearNavigationSequence(slideId) {
+  try {
+    if (!slideId) {
+      return { success: false, error: "Missing slide ID" };
+    }
+    
+    PropertiesService.getDocumentProperties().deleteProperty(NAV_SEQUENCE_PREFIX + slideId);
+    console.log(`Cleared navigation sequence for slide: ${slideId}`);
+    
+    return { 
+      success: true, 
+      message: "Navigation sequence cleared successfully" 
+    };
+  } catch (e) {
+    console.error(`Error clearing navigation sequence: ${e.message}`);
+    return { 
+      success: false, 
+      error: `Failed to clear navigation sequence: ${e.message}` 
+    };
+  }
+}
+
 function setMasterDeploymentId() {
   const ui = SlidesApp.getUi();
   const response = ui.prompt(
@@ -164,6 +282,7 @@ function getSelectedElementInfo() {
         return { error: "Could not determine the element's slide. Please try selecting the element again." };
       }
 
+      const slideId = slide.getObjectId();
       const allSlideElements = slide.getPageElements();
       let currentIndex = -1;
       for (let i = 0; i < allSlideElements.length; i++) {
@@ -185,7 +304,8 @@ function getSelectedElementInfo() {
         height: element.getHeight(),
         description: element.getDescription(), // The description holds the JSON interaction data.
         canGoPrev: canGoPrev, // Flag for previous element navigation
-        canGoNext: canGoNext  // Flag for next element navigation
+        canGoNext: canGoNext,  // Flag for next element navigation
+        slideId: slideId  // Add the slide ID for context/saving
       };
     } else if (pageElements.length > 1) {
       // Error if multiple elements are selected.
@@ -556,10 +676,19 @@ function getAllInteractiveElements() {
       }; 
     }
 
+    const slideId = slide.getObjectId();
     const elements = slide.getPageElements();
     const interactiveElements = [];
 
-    console.log(`Checking ${elements.length} elements on slide ${slide.getObjectId()} for interactive data`);
+    console.log(`Checking ${elements.length} elements on slide ${slideId} for interactive data`);
+
+    // Get saved navigation sequence if it exists
+    const sequenceResult = getNavigationSequence(slideId);
+    const savedSequence = sequenceResult.success && sequenceResult.hasCustomSequence ? 
+                          sequenceResult.elementIds : null;
+    
+    // Create index mapping for sequential display IDs
+    const displayIdMap = new Map();
 
     for (let i = 0; i < elements.length; i++) {
       const element = elements[i];
@@ -571,7 +700,6 @@ function getAllInteractiveElements() {
           data = JSON.parse(desc);
 
           // Check if data is an object and has *any* interaction or animation keys
-          // (even if type is none, it might have overlayStyle)
           const hasInteractionData = data.interaction && typeof data.interaction === 'object';
           const hasAnimationData = data.animation && typeof data.animation === 'object';
 
@@ -601,6 +729,12 @@ function getAllInteractiveElements() {
               elementName = `${element.getPageElementType().toString()} (${element.getObjectId().substring(0, 5)}...)`;
             }
 
+            // Store the element ID to assign display IDs later
+            displayIdMap.set(element.getObjectId(), {
+              index: interactiveElements.length,
+              name: elementName
+            });
+            
             // Add element to list, including the raw description for client-side parsing
             interactiveElements.push({
               id: element.getObjectId(),
@@ -615,9 +749,39 @@ function getAllInteractiveElements() {
         }
       }
     }
-
-    console.log(`Found ${interactiveElements.length} interactive elements on slide ${slide.getObjectId()}`);
-    return { elements: interactiveElements };
+    
+    // Assign sequential display IDs
+    // First, reorder according to saved sequence if present
+    let orderedElements = [...interactiveElements];
+    if (savedSequence && savedSequence.length > 0) {
+      // Reorder according to saved sequence
+      const orderedTemp = [];
+      const unorderedElements = [...interactiveElements]; // Copy to preserve original
+      
+      // First add elements in the saved sequence order
+      savedSequence.forEach(id => {
+        const elementIndex = unorderedElements.findIndex(el => el.id === id);
+        if (elementIndex !== -1) {
+          orderedTemp.push(unorderedElements[elementIndex]);
+          unorderedElements.splice(elementIndex, 1); // Remove from unordered list
+        }
+      });
+      
+      // Then append any remaining elements (not in saved sequence)
+      orderedElements = [...orderedTemp, ...unorderedElements];
+    }
+    
+    // Assign display IDs to the final ordered list
+    orderedElements.forEach((element, index) => {
+      element.displayId = index + 1; // Assign sequential numbers starting from 1
+    });
+    
+    console.log(`Found ${interactiveElements.length} interactive elements on slide ${slideId}`);
+    return { 
+      elements: orderedElements,
+      slideId: slideId,
+      hasCustomSequence: savedSequence !== null
+    };
   } catch (error) {
     console.error("Error in getAllInteractiveElements:", error);
     return { 
@@ -1049,56 +1213,56 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
     console.log(`[GS] Found ${slides.length} slides.`);
 
     if (slideIndex >= slides.length) {
-      console.error(`[GS] Invalid slide index: ${slideIndex}. Total slides: ${slides.length}`);
-      return { error: `Invalid slide index (${slideIndex}). Presentation only has ${slides.length} slides.`, totalSlides: slides.length };
+      console.error(`Slide index ${slideIndex} is out of range (max: ${slides.length - 1})`);
+      return { error: `Invalid slide index. The presentation only has ${slides.length} slides.` };
     }
 
     const slide = slides[slideIndex];
-    console.log(`[GS] Processing slide ID: ${slide.getObjectId()}`);
+    const slideId = slide.getObjectId();
+    console.log(`[GS] Processing slide ID: ${slideId}`);
 
     // Get global overlay settings
     const globalOverlayResult = getGlobalOverlaySettings();
     if (!globalOverlayResult.success) {
-      console.warn("Could not retrieve global overlay settings, using defaults.");
-      // Use defaults if retrieval failed, but don't stop the process
+      console.warn(`Failed to get global overlay settings: ${globalOverlayResult.error}`);
     }
     const globalOverlayDefaults = globalOverlayResult.settings || OVERLAY_DEFAULTS;
 
     // Prepare the data object to return
     const slideData = {
-      slideId: slide.getObjectId(),
-      currentSlideIndex: slideIndex,
-      totalSlides: slides.length,
-      slideNotes: "", // Initialize notes
-      elements: [], // Initialize elements array
-      backgroundUrl: null, // Initialize background URL
-      slideWidth: presentation.getPageWidth(),
-      slideHeight: presentation.getPageHeight(),
-      // Include global overlay settings defaults
+      id: slideId,
+      index: slideIndex,
+      total: slides.length,
+      elements: [],
       globalOverlayDefaults: globalOverlayDefaults,
+      dimensions: { 
+        width: presentation.getPageWidth(),
+        height: presentation.getPageHeight()
+      }
     };
+
+    // Get saved navigation sequence if it exists
+    const sequenceResult = getNavigationSequence(slideId);
+    const savedSequence = sequenceResult.success && sequenceResult.hasCustomSequence ? 
+                          sequenceResult.elementIds : null;
+    
+    slideData.hasCustomSequence = savedSequence !== null;
+    slideData.customSequence = savedSequence || [];
 
     // Get background image data URL
     try {
       slideData.backgroundUrl = getSlideBackgroundAsDataUrl(slide);
       console.log(`[GS] Background URL fetched: ${slideData.backgroundUrl ? 'Success' : 'null'}`);
     } catch (bgError) {
-      console.error(`[GS] Error fetching background: ${bgError}`);
-      // Continue without background if it fails
+      console.error(`Error getting background: ${bgError.message}`);
     }
 
     // Get slide notes
     try {
-      const notesPage = slide.getNotesPage();
-      if (notesPage) {
-        const speakerNotesShape = notesPage.getSpeakerNotesShape();
-        if (speakerNotesShape) {
-          slideData.slideNotes = speakerNotesShape.getText().asString();
-          console.log("[GS] Notes fetched successfully.");
-        }
-      }
+      slideData.notes = slide.getNotesPage().getSpeakerNotesShape().getText().asString();
     } catch(notesError) {
-      console.warn("[GS] Could not retrieve speaker notes: " + notesError);
+      console.warn(`No speaker notes found: ${notesError}`);
+      slideData.notes = "";
     }
 
     // Process page elements to find interactive ones
@@ -1110,157 +1274,98 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
     
     // First pass: collect all elements IDs for complete mapping
     pageElements.forEach((element) => {
-      const elementId = element.getObjectId();
-      const desc = element.getDescription();
-      
-      elementIdMap.set(elementId, {
+      elementIdMap.set(element.getObjectId(), {
         type: element.getPageElementType().toString(),
-        hasDesc: desc ? 'yes' : 'no',
         left: element.getLeft(),
         top: element.getTop(),
-        width: element.getWidth(),
+        width: element.getWidth(), 
         height: element.getHeight()
       });
     });
 
+    // Array to store all elements with interactive data
+    const elementsWithData = [];
+
     // Second pass: process elements with interactive data
     pageElements.forEach((element) => {
-      const desc = element.getDescription();
-      let elementDataJson = null;
-      const elementId = element.getObjectId();
-
-      // Check if description contains JSON interaction data
-      if (desc && desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
-        try {
-          elementDataJson = JSON.parse(desc); // Keep as parsed JSON object
-
-          // Get text content if available (best effort)
-          let textContent = null;
+      try {
+        const desc = element.getDescription();
+        if (!desc || !desc.trim()) return; // Skip if no description
+        
+        if (desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
           try {
-            if (element.getPageElementType() === SlidesApp.PageElementType.SHAPE && element.asShape().getText) {
-              textContent = element.asShape().getText().asString();
-            } else if (element.getPageElementType() === SlidesApp.PageElementType.TEXT_BOX && element.asTextBox().getText) {
-              textContent = element.asTextBox().getText().asString();
-            }
-          } catch(textError){
-            console.warn(`[GS] Could not get text for ${element.getObjectId()}: ${textError.message}`);
-          }
-
-          // Check if there's any interaction or animation data block defined
-          const hasInteractionData = elementDataJson.interaction && typeof elementDataJson.interaction === 'object';
-          const hasAnimationData = elementDataJson.animation && typeof elementDataJson.animation === 'object';
-
-          if (hasInteractionData || hasAnimationData) { // Include if it has either data block
-            // Add element data to the results array
-            // The interaction and animation properties will contain the parsed objects directly
-            // including showOverlayText, overlayText, overlayStyle etc. if present
+            const data = JSON.parse(desc);
+            const hasInteractionData = data.interaction && typeof data.interaction === 'object';
+            const hasAnimationData = data.animation && typeof data.animation === 'object';
             
-            // IMPROVED: Check for reveal and spotlight target element IDs with better diagnostics
-            if (hasInteractionData && 
-                (elementDataJson.interaction.type === 'revealElement' || 
-                 elementDataJson.interaction.type === 'revealAndSpotlight')) {
+            if (hasInteractionData || hasAnimationData) {
+              // Element has valid interactive data, add it to our list
+              const elementId = element.getObjectId();
+              const elementData = {
+                id: elementId,
+                type: element.getPageElementType().toString(),
+                left: element.getLeft(),
+                top: element.getTop(),
+                width: element.getWidth(),
+                height: element.getHeight(),
+                interaction: data.interaction || null,
+                animation: data.animation || null
+              };
               
-              const targetId = elementDataJson.interaction.targetElementId;
-              if (targetId) {
-                if (elementIdMap.has(targetId)) {
-                  // Target exists on this slide - add detailed info 
-                  const targetInfo = elementIdMap.get(targetId);
-                  console.log(`[GS] Found valid target ID ${targetId} for ${elementId} (${elementDataJson.interaction.type}): Type=${targetInfo.type}, Position=${targetInfo.left},${targetInfo.top}`);
-                } else {
-                  // Target doesn't exist on this slide - flag as warning
-                  console.warn(`[GS] Warning: Target ID ${targetId} for ${elementDataJson.interaction.type} not found on current slide`);
-                  
-                  // NEW: Log all available IDs to help troubleshoot
-                  const availableIds = Array.from(elementIdMap.keys());
-                  console.log(`[GS] Available element IDs on slide: ${JSON.stringify(availableIds)}`);
-                  
-                  // NEW: Check for near matches (maybe ID has typos or old version)
-                  const possibleMatches = availableIds.filter(id => 
-                    id.startsWith(targetId.substring(0, 8)) || 
-                    targetId.startsWith(id.substring(0, 8))
-                  );
-                  
-                  if (possibleMatches.length > 0) {
-                    console.log(`[GS] Possible similar IDs: ${JSON.stringify(possibleMatches)}`);
-                  }
+              // Try to extract element text for identification (but don't fail if we can't)
+              try {
+                if (element.getPageElementType() === SlidesApp.PageElementType.SHAPE) {
+                  elementData.text = element.asShape().getText().asString();
+                } else if (element.getPageElementType() === SlidesApp.PageElementType.TEXT_BOX) {
+                  elementData.text = element.asTextBox().getText().asString();
                 }
+              } catch (e) {
+                console.warn(`Couldn't get text for element ${elementId}: ${e.message}`);
               }
+              
+              elementsWithData.push(elementData);
             }
-            
-            slideData.elements.push({
-              id: element.getObjectId(),
-              type: element.getPageElementType().toString(), // SHAPE, TEXT_BOX etc.
-              left: element.getLeft(),
-              top: element.getTop(),
-              width: element.getWidth(),
-              height: element.getHeight(),
-              text: textContent, // Include element's own text content if found
-              interaction: elementDataJson.interaction || null, // Include full interaction object
-              animation: elementDataJson.animation || null // Include full animation object
-            });
-
-            // More detailed logging
-            let logMsg = `[GS] Added element: ID=${element.getObjectId()}`;
-            if (hasInteractionData) {
-                logMsg += `, Interaction=${elementDataJson.interaction.type ?? 'N/A'}`;
-                if (elementDataJson.interaction.showOverlayText) logMsg += ` [OText]`;
-                if (elementDataJson.interaction.useCustomOpacity) logMsg += ` [COpacity]`;
-                if (elementDataJson.interaction.overlayStyle) logMsg += ` [OStyle]`;
-            }
-            if (hasAnimationData) {
-                logMsg += `, Animation=${elementDataJson.animation.type ?? 'N/A'}`;
-            }
-            console.log(logMsg);
+          } catch (e) {
+            console.warn(`Invalid JSON in element ${element.getObjectId()}: ${e.message}`);
           }
-        } catch (e) {
-          console.warn(`[GS] Element ${element.getObjectId()} has invalid JSON: ${e.message}`);
         }
-      } else {
-        // For elements without interactive data, still include them in the debug map
-        // so we can track them for possible ID matching
-        if (!elementIdMap.has(elementId)) {
-          elementIdMap.set(elementId, {
-            type: element.getPageElementType().toString(),
-            hasDesc: desc ? 'yes' : 'no'
-          });
-        }
+      } catch (e) {
+        console.warn(`Error processing element: ${e.message}`);
       }
     });
 
-    // Add debug information about all IDs for troubleshooting
-    slideData._debug = { 
-      allSlideElementIds: Array.from(elementIdMap.keys()), 
-      elementTypes: Object.fromEntries(elementIdMap)
-    };
-    
-    // NEW: Add extra verification for any elements with revealAndSpotlight
-    const revealAndSpotlightElements = slideData.elements.filter(
-      el => el.interaction && el.interaction.type === 'revealAndSpotlight'
-    );
-    
-    if (revealAndSpotlightElements.length > 0) {
-      console.log(`[GS] Found ${revealAndSpotlightElements.length} elements with revealAndSpotlight interaction`);
+    // Apply ordering based on saved sequence (if exists)
+    if (savedSequence && savedSequence.length > 0) {
+      // First add elements in the saved sequence
+      const orderedElements = [];
+      const remainingElements = [...elementsWithData]; // Make a copy to track what's left
       
-      revealAndSpotlightElements.forEach(el => {
-        const targetId = el.interaction.targetElementId;
-        if (targetId) {
-          const isAvailable = elementIdMap.has(targetId);
-          console.log(`[GS] revealAndSpotlight element ${el.id} targets ID ${targetId}: ${isAvailable ? 'VALID' : 'NOT FOUND'}`);
-          
-          // If the target isn't found, log details to help diagnose
-          if (!isAvailable) {
-            // Check if there's any ID that contains this target ID as substring (could be a version mismatch)
-            const allIds = Array.from(elementIdMap.keys());
-            const similarIds = allIds.filter(id => id.includes(targetId.substring(0, 8)));
-            if (similarIds.length > 0) {
-              console.log(`[GS] Found similar IDs that might match ${targetId}: ${JSON.stringify(similarIds)}`);
-            }
-          }
+      savedSequence.forEach(id => {
+        const elementIndex = remainingElements.findIndex(el => el.id === id);
+        if (elementIndex !== -1) {
+          orderedElements.push(remainingElements[elementIndex]);
+          remainingElements.splice(elementIndex, 1); // Remove from remaining
         }
       });
+      
+      // Add any elements not in the sequence at the end
+      slideData.elements = [...orderedElements, ...remainingElements];
+    } else {
+      slideData.elements = elementsWithData;
     }
+    
+    // Assign sequential display IDs for easier reference
+    slideData.elements.forEach((element, index) => {
+      element.displayId = index + 1;
+    });
 
-    console.log(`[GS] Finished processing slide ${slideIndex}. Found ${slideData.elements.length} elements with data. Global Overlay Defaults included.`);
+    // Add debug information about all IDs for troubleshooting
+    slideData._debug = {
+      allElementIds: Array.from(elementIdMap.keys()),
+      interactiveElementIds: slideData.elements.map(el => el.id)
+    };
+    
+    console.log(`[GS] Finished processing slide ${slideIndex}. Found ${slideData.elements.length} elements with data.`);
     return slideData; // Return the compiled slide data
 
   } catch (e) {

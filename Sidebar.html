@@ -512,6 +512,30 @@
     }
 
     .hidden { display: none !important; }
+
+    /* --- Style for Sequencing List --- */
+    #sequenceList {
+      list-style-type: none; padding: 0; margin: 8px 0 0 0;
+      border: 1px solid #e0e0e0; border-radius: 4px;
+      max-height: 200px; overflow-y: auto; background-color: #fff;
+    }
+    .sequence-item {
+      padding: 8px 10px; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between;
+      align-items: center; cursor: grab; gap: 8px; font-size: 12px; background-color: #fff;
+      user-select: none; /* Prevent text selection during drag */
+    }
+    .sequence-item:last-child { border-bottom: none; }
+    .sequence-item:hover { background-color: #f5f5f5; }
+    .sequence-item.dragging { opacity: 0.5; background-color: #e8f0fe; } /* Style for the item being dragged */
+    .sequence-item .item-id { font-weight: bold; color: #1a73e8; margin-right: 8px; flex-shrink: 0; }
+    .sequence-item .item-name { flex-grow: 1; overflow-wrap: break-word; word-break: break-word; white-space: normal; color: #3c4043; }
+    .sequence-item .item-type { color: #5f6368; font-size: 11px; flex-shrink: 0; }
+    .drag-handle { /* Optional: if you want a specific handle */
+        cursor: grab;
+        margin-right: 8px;
+        color: #9aa0a6;
+    }
+    .drag-handle:active { cursor: grabbing; }
   </style>
 </head>
 <body>
@@ -1026,6 +1050,36 @@
         </div>
       </div>
 
+      <!-- ==================== NAVIGATION SEQUENCE SECTION ==================== -->
+      <div class="section collapsible" id="sequenceSettingsContainer">
+        <h4 role="button" tabindex="0" aria-expanded="false" aria-controls="sequenceSettingsContent">
+          Navigation Sequence
+          <span class="collapse-icon" aria-hidden="true">►</span>
+        </h4>
+        <div class="section-content" id="sequenceSettingsContent">
+          <p style="font-size: 11px; color: #5f6368; margin-top: 0; margin-bottom: 10px;">
+            Drag and drop the interactive elements below to define the order for the 'Previous' and 'Next' buttons in the viewer. Elements not included here won't be part of the main sequence.
+          </p>
+          <div id="noSequenceItemsMessage" class="info-message hidden"> No interactive elements found on this slide to sequence.</div>
+          <ul id="sequenceList" class="elements-list">
+            <!-- Sequence items will be populated here by JavaScript -->
+            <!-- Example: 
+            <li class="sequence-item" draggable="true" data-element-id="g123_abc">
+                <span class="drag-handle">&#x2630;</span> 
+                <span class="item-id">1</span> 
+                <span class="item-name">Introduction Text</span> 
+                <span class="item-type">Show Text</span>
+            </li> 
+            -->
+          </ul>
+          <button id="saveSequenceBtn" class="blue" onclick="saveNavigationSequence()" style="margin-top: 15px;">Save Sequence Order</button>
+           <button id="refreshSequenceBtn" class="action-button secondary" style="margin-top: 8px; font-size: 11px; height: 28px;">
+             <span class="icon">↻</span> Refresh List
+          </button>
+        </div>
+      </div>
+      <!-- ==================== END NAVIGATION SEQUENCE SECTION ==================== -->
+
       <!-- ==================== GLOBAL OVERLAY APPEARANCE SECTION ==================== -->
       <div class="section collapsible" id="globalOverlayStyleContainer">
          <h4 role="button" tabindex="0" aria-expanded="false" aria-controls="globalOverlayStyleContent">
@@ -1163,7 +1217,13 @@
         nextObjectBtn: document.getElementById('nextObjectBtn'),
         // Custom overlay containers (filled by template)
         customOverlayContainers: {}, // e.g., { showText: element, highlight: element, ... }
-        overlayStyleControlsTemplate: document.getElementById('overlayStyleControlsTemplate')
+        overlayStyleControlsTemplate: document.getElementById('overlayStyleControlsTemplate'),
+        sequenceSettingsContainer: document.getElementById('sequenceSettingsContainer'),
+        sequenceSettingsContent: document.getElementById('sequenceSettingsContent'),
+        sequenceList: document.getElementById('sequenceList'),
+        noSequenceItemsMessage: document.getElementById('noSequenceItemsMessage'),
+        saveSequenceBtn: document.getElementById('saveSequenceBtn'),
+        refreshSequenceBtn: document.getElementById('refreshSequenceBtn')
     };
 
 
@@ -1365,6 +1425,12 @@
       document.getElementById('animationTrigger').addEventListener('change', handleAnimationTriggerChange);
       document.getElementById('pulseColor').addEventListener('input', updatePulseColorPreview);
       document.getElementById('refreshAnimationsBtn').addEventListener('click', loadAnimatedElements);
+
+      // Add event listeners for the new sequence section
+      dom.refreshSequenceBtn.addEventListener('click', loadCurrentListData); // Reuse list loading
+      
+      // Setup Drag and Drop for Sequence List
+      setupSequenceDragDrop();
     }
 
     // --- Main functionality for selection, data loading, saving, etc. ---
@@ -1525,10 +1591,27 @@
 
     // --- Data Loading & Display ---
     function loadCurrentListData() {
-        loadInteractiveElements();
-        loadAnimatedElements();
+        updateStatus("Loading lists...");
+        google.script.run
+            .withSuccessHandler(handleListData)
+            .withFailureHandler(showError)
+            .getAllInteractiveElements(); // Fetch elements for all lists
     }
-    
+
+    function handleListData(result) {
+        updateStatus("Lists updated.");
+        if (result.error) {
+            showError("Error loading lists: " + result.error);
+            currentInteractiveElements = []; // Clear on error
+        } else {
+            currentInteractiveElements = result.elements || []; // Store for sequencing
+            currentSlideId = result.slideId; // Store current slide ID
+            populateInteractionList(result.elements);
+            populateAnimationList(result.elements);
+            populateSequenceList(result.elements); // Populate the new list
+        }
+    }
+
     function loadInteractiveElements() {
         updateStatus("Loading interactions...");
         google.script.run
@@ -2483,6 +2566,181 @@
         
         return targetId;
     }
+
+    // --- List Population ---
+    function populateInteractionList(elements) {
+      // ... existing logic ...
+    }
+
+    function populateAnimationList(elements) {
+      // ... existing logic ...
+    }
+
+    // NEW: Populate the Navigation Sequence List
+    function populateSequenceList(elements) {
+        dom.sequenceList.innerHTML = ''; // Clear existing items
+        const sequenceItems = elements || currentInteractiveElements; // Use passed data or stored data
+
+        if (!sequenceItems || sequenceItems.length === 0) {
+            dom.noSequenceItemsMessage.classList.remove('hidden');
+            dom.sequenceList.classList.add('hidden');
+            dom.saveSequenceBtn.disabled = true; // Disable save if no items
+            return;
+        }
+
+        dom.noSequenceItemsMessage.classList.add('hidden');
+        dom.sequenceList.classList.remove('hidden');
+        dom.saveSequenceBtn.disabled = false;
+
+        // TODO: Later, fetch the *saved* sequence order here and sort `sequenceItems` accordingly.
+        // For now, populate in the default order received.
+
+        sequenceItems.forEach((element, index) => {
+            const listItem = document.createElement('li');
+            listItem.className = 'sequence-item';
+            listItem.setAttribute('draggable', 'true');
+            listItem.setAttribute('data-element-id', element.id); // Store the REAL ID
+
+            // Use displayId if available, otherwise index+1 as fallback
+            const displayId = element.displayId !== undefined ? element.displayId : (index + 1); 
+            const interactionType = element.interaction?.type !== 'none' ? element.interaction?.type : '';
+            const animationType = element.animation?.type !== 'none' ? element.animation?.type : '';
+            let typeLabel = [interactionType, animationType].filter(Boolean).join(' / ') || 'No Action';
+
+            listItem.innerHTML = `
+                <span class="drag-handle" title="Drag to reorder">&#x2630;</span> 
+                <span class="item-id" title="Sequence ID">${displayId}</span> 
+                <span class="item-name" title="Element Name: ${element.name || 'Unnamed'}\nObject ID: ${element.id}">${element.name || 'Unnamed Element'}</span> 
+                <span class="item-type" title="Type">${typeLabel}</span>
+            `;
+            dom.sequenceList.appendChild(listItem);
+        });
+        
+        // Re-attach drag/drop listeners after repopulating
+        setupSequenceDragDrop(); 
+    }
+
+    // --- Drag and Drop Logic for Sequence List ---
+    function setupSequenceDragDrop() {
+        const list = dom.sequenceList;
+        const items = list.querySelectorAll('.sequence-item');
+
+        items.forEach(item => {
+            item.removeEventListener('dragstart', handleDragStart); // Remove previous listeners
+            item.removeEventListener('dragover', handleDragOver);
+            item.removeEventListener('dragenter', handleDragEnter);
+            item.removeEventListener('dragleave', handleDragLeave);
+            item.removeEventListener('drop', handleDrop);
+            item.removeEventListener('dragend', handleDragEnd);
+
+            item.addEventListener('dragstart', handleDragStart, false);
+            item.addEventListener('dragover', handleDragOver, false);
+            item.addEventListener('dragenter', handleDragEnter, false);
+            item.addEventListener('dragleave', handleDragLeave, false);
+            item.addEventListener('drop', handleDrop, false);
+            item.addEventListener('dragend', handleDragEnd, false);
+        });
+    }
+
+    function handleDragStart(e) {
+        dragSrcElement = this;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', this.innerHTML); // Optional: for visual feedback
+        this.classList.add('dragging');
+    }
+
+    function handleDragOver(e) {
+        if (e.preventDefault) {
+            e.preventDefault(); // Necessary. Allows us to drop.
+        }
+        e.dataTransfer.dropEffect = 'move'; 
+        return false;
+    }
+
+    function handleDragEnter(e) {
+        // Optional: Add visual feedback when entering a drop target
+         if (this !== dragSrcElement) {
+           this.style.borderTop = '2px dashed #1a73e8'; // Highlight drop zone
+         }
+    }
+
+    function handleDragLeave(e) {
+        // Optional: Remove visual feedback when leaving a drop target
+        this.style.borderTop = ''; // Clear highlight
+    }
+
+    function handleDrop(e) {
+        if (e.stopPropagation) {
+            e.stopPropagation(); // stops the browser from redirecting.
+        }
+
+        // Don't do anything if dropping the same column we're dragging.
+        if (dragSrcElement !== this) {
+            // Swap the HTML content
+            // dragSrcElement.innerHTML = this.innerHTML;
+            // this.innerHTML = e.dataTransfer.getData('text/html');
+
+            // More robust: Move the element itself
+            const list = dom.sequenceList;
+            const dropIndex = Array.from(list.children).indexOf(this);
+            const dragIndex = Array.from(list.children).indexOf(dragSrcElement);
+
+            if (dragIndex < dropIndex) {
+                 list.insertBefore(dragSrcElement, this.nextSibling);
+            } else {
+                 list.insertBefore(dragSrcElement, this);
+            }
+        }
+         this.style.borderTop = ''; // Clear highlight on drop
+        return false;
+    }
+
+    function handleDragEnd(e) {
+        // Clean up styles applied during drag
+        this.classList.remove('dragging');
+        dom.sequenceList.querySelectorAll('.sequence-item').forEach(item => {
+             item.style.borderTop = ''; // Ensure all highlights are cleared
+        });
+        dragSrcElement = null; // Reset dragged item
+    }
+
+    // NEW: Save the Navigation Sequence
+    function saveNavigationSequence() {
+        if (!currentSlideId) {
+            showError("Cannot save sequence: Current slide ID is unknown. Please refresh.");
+            return;
+        }
+        
+        const orderedItems = dom.sequenceList.querySelectorAll('.sequence-item');
+        const orderedElementIds = Array.from(orderedItems).map(item => item.getAttribute('data-element-id'));
+
+        if (orderedElementIds.length === 0 && currentInteractiveElements.length > 0) {
+             if (!confirm("The sequence list is empty. This will clear any previously saved sequence for this slide. Continue?")) {
+                 return;
+             }
+        } else if (orderedElementIds.length === 0) {
+             // No items and no interactive elements, nothing to save/clear
+             updateStatus("No elements to sequence.");
+             return;
+        }
+
+
+        updateStatus("Saving navigation sequence...");
+        google.script.run
+            .withSuccessHandler(handleSequenceSaveSuccess)
+            .withFailureHandler(showError)
+            .saveNavigationSequence(currentSlideId, orderedElementIds);
+    }
+
+    function handleSequenceSaveSuccess(result) {
+        if (result.success) {
+            updateStatus("Navigation sequence saved successfully!");
+            // Optional: Maybe briefly highlight the save button or section
+        } else {
+            showError(result.error || "Failed to save sequence.");
+        }
+    }
+
   </script>
 </body>
 </html>

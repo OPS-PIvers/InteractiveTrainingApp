@@ -548,6 +548,16 @@
     <div class="selected-element-section">
       <h4>Selected Element</h4>
       <div id="selectedInfo">Select an element on the slide...</div>
+      
+      <!-- New nickname input field -->
+      <div id="nicknameContainer" class="nickname-container hidden">
+        <label for="elementNickname">Nickname:</label>
+        <div class="nickname-input-container">
+          <input type="text" id="elementNickname" placeholder="Set a friendly name for this element" maxlength="50">
+          <button id="saveNicknameBtn" class="small-action-button" title="Save nickname">Save</button>
+        </div>
+      </div>
+      
       <div id="elementStatus" class="element-status hidden">
         <div style="display: inline-flex; align-items: center;" title="Interaction Status">
           <div class="status-dot inactive" id="interactionStatusDot"></div>
@@ -1087,7 +1097,7 @@
            Global Overlay Appearance
            <span class="collapse-icon" aria-hidden="true">►</span>
          </h4>
-         <div class="section-content" id="globalOverlayStyleContent">
+         <div class="section-content" id="globalOverlayStyleContent"></div>
            <p style="font-size: 11px; color: #5f6368; margin-bottom: 12px;">These settings apply by default to all interactive overlays in the web app, unless overridden by element-specific styles.</p>
            <!-- Placeholder for global style controls -->
            <div id="globalOverlayStyleControls">
@@ -1185,7 +1195,7 @@
     </div>
   </div>
 
-  <script>
+  <script></script>
     // --- Global Variables ---
     let currentElementId = null;
     let currentElementDescription = null; // Keep raw description
@@ -1404,16 +1414,6 @@
            // Track when user explicitly unchecks the box to prevent auto-checking later
            if (!event.target.checked) {
              event.target.hasBeenExplicitlyUnchecked = true;
-             console.log(`Checkbox ${event.target.id} explicitly unchecked by user`);
-           }
-         }
-         // Outline Enabled Checkboxes (Global & Custom)
-         if (event.target.type === 'checkbox' && event.target.id.endsWith('_outlineEnabled')) {
-           toggleOutlineOptionsVisibility(event.target);
-         }
-       });
-
-      // Opacity Sliders (Global & Custom)
       contentArea.addEventListener('input', (event) => {
           if (event.target.type === 'range' && event.target.id.endsWith('_overlayOpacity')) {
               updateOpacityDisplay(event.target);
@@ -1706,9 +1706,32 @@
 
         const nameDiv = document.createElement('div');
         nameDiv.className = 'element-name';
-        nameDiv.textContent = element.name || `${element.elementType || 'Element'} (ID: ${element.id.substring(0, 8)}...)`;
+        
+        // Check if we have a nickname stored for this element
+        const nickname = parsedData?.nickname || '';
+        
+        // Display nickname if available, otherwise show default name
+        if (nickname) {
+            nameDiv.textContent = nickname;
+            nameDiv.title = `Element ID: ${element.id}`;
+        } else {
+            nameDiv.textContent = element.name || `${element.elementType || 'Element'} (ID: ${element.id.substring(0, 8)}...)`;
+            nameDiv.title = `Element ID: ${element.id} - Click to set a nickname`;
+        }
+        
+        // Make the name editable with double-click
+        nameDiv.addEventListener('dblclick', function(e) {
+            e.stopPropagation();
+            const newName = prompt('Enter a nickname for this element:', nickname || element.name);
+            if (newName !== null) {
+                // Save the nickname to the element's data
+                saveElementNickname(element.id, newName);
+            }
+        });
+        
         infoDiv.appendChild(nameDiv);
 
+        // Rest of the function remains the same
         const typeDiv = document.createElement('div');
         typeDiv.className = 'element-type'; // Container for badges
 
@@ -2780,6 +2803,53 @@
                 .withFailureHandler(showError)
                 .clearElementDescription(currentElementId);
         }
+    }
+
+    function saveElementNickname(elementId, nickname) {
+        if (!elementId) {
+            showError("Cannot save nickname: No element ID provided.");
+            return;
+        }
+        
+        updateStatus(`Saving nickname "${nickname}" for element...`);
+        
+        // Check if we have current data for this element
+        let currentData = currentElementId === elementId ? currentElementData : null;
+        
+        // If we don't have the current data and it's not the currently selected element,
+        // we need to fetch it first
+        if (!currentData) {
+            // Create a basic structure with just the nickname
+            currentData = { nickname: nickname };
+        } else {
+            // Add nickname to existing data
+            currentData.nickname = nickname;
+        }
+        
+        // Convert to JSON for storage
+        const dataToSave = JSON.stringify(currentData);
+        
+        google.script.run
+            .withSuccessHandler(function(result) {
+                if (result.success) {
+                    updateStatus(`Nickname saved successfully!`);
+                    
+                    // Update lists to show the new nickname
+                    loadInteractiveElements();
+                    loadAnimatedElements();
+                    
+                    // Update current element data if this is the selected element
+                    if (elementId === currentElementId) {
+                        currentElementDescription = result.verifiedFull ? 
+                            JSON.stringify(result.verifiedFull) : dataToSave;
+                        currentElementData = result.verifiedFull || currentData;
+                    }
+                } else {
+                    showError(result.error || "Failed to save nickname.");
+                }
+            })
+            .withFailureHandler(showError)
+            .mergeElementNickname(elementId, nickname);
     }
 
   </script>

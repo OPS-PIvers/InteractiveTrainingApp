@@ -1481,6 +1481,81 @@ function getSlideBackgroundAsDataUrl(slide) {
 }
 
 
+/**
+ * Updates just the nickname of an element, preserving other data
+ * @param {string} elementId The ID of the element to update
+ * @param {string} nickname The new nickname to assign to this element
+ * @returns {object} Result object with success/error information
+ */
+function mergeElementNickname(elementId, nickname) {
+  try {
+    // Get the current element description to check for existing data
+    const presentation = SlidesApp.getActivePresentation();
+    const selection = presentation.getSelection();
+
+    // Ensure there's a selection context to find the slide
+    if (!selection || selection.getSelectionType() === SlidesApp.SelectionType.NONE) {
+      return { success: false, error: "No slide or element selected. Please select the slide containing your element." };
+    }
+
+    // Get the current slide from the selection
+    const slide = selection.getCurrentPage();
+    if (!slide) {
+      return { success: false, error: "Could not determine the active slide. Please select a slide." };
+    }
+
+    // Find the element on the current slide using its ID
+    const element = slide.getPageElementById(elementId);
+    if (!element) {
+      return { success: false, error: "Element not found on the current slide. Please ensure the correct slide is active." };
+    }
+
+    // Get current description and parse as JSON if exists
+    let currentData = {};
+    const description = element.getDescription();
+
+    if (description && description.trim() !== "") {
+      try {
+        currentData = JSON.parse(description);
+      } catch (e) {
+        console.warn(`Invalid JSON in element description, treating as empty: ${e.message}`);
+        // Continue with empty object if parsing fails
+      }
+    }
+
+    // Add or update the nickname property
+    currentData.nickname = nickname;
+    
+    // Save merged data
+    const mergedJson = JSON.stringify(currentData);
+    element.setDescription(mergedJson);
+
+    // Verify the save worked by reading it back
+    const verifyDesc = element.getDescription();
+    let verifiedParsedData = null;
+    try {
+      verifiedParsedData = JSON.parse(verifyDesc);
+    } catch(e) {
+       console.error("Verification failed: Could not parse saved description back.");
+    }
+
+    return {
+      success: true,
+      message: `Nickname saved successfully.`,
+      elementId: elementId,
+      verifiedFull: verifiedParsedData
+    };
+  } catch (e) {
+    console.error(`Error in mergeElementNickname: ${e.message}`);
+    return {
+      success: false,
+      error: `Failed to save nickname: ${e.message}`,
+      elementId: elementId
+    };
+  }
+}
+
+
 // --- Utility & Debug Functions ---
 
 

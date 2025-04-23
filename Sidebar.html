@@ -1414,6 +1414,9 @@
            // Track when user explicitly unchecks the box to prevent auto-checking later
            if (!event.target.checked) {
              event.target.hasBeenExplicitlyUnchecked = true;
+           }
+         }
+      });
       contentArea.addEventListener('input', (event) => {
           if (event.target.type === 'range' && event.target.id.endsWith('_overlayOpacity')) {
               updateOpacityDisplay(event.target);

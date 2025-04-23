@@ -1059,8 +1059,23 @@
      */
     function renderElement(element) {
         try {
-            const scaleX = parseFloat(slideElement.dataset.scaleX || '1');
-            const scaleY = parseFloat(slideElement.dataset.scaleY || '1');
+            const scaleX = parseFloat(slideElement.dataset.scaleX) || 1;
+            const scaleY = parseFloat(slideElement.dataset.scaleY) || 1;
+
+            // Calculate scaled position and dimensions
+            const scaledTop = (element.position.top * scaleY);
+            const scaledLeft = (element.position.left * scaleX);
+            const scaledWidth = (element.position.width * scaleX);
+            const scaledHeight = (element.position.height * scaleY);
+
+            // *** ADDED DEBUG LOGGING START ***
+            logDebug(`[WebApp] [renderElement ${element.id}] Scales: x=${scaleX.toFixed(4)}, y=${scaleY.toFixed(4)}`);
+            logDebug(`[WebApp] [renderElement ${element.id}] Original Pos: T=${element.position.top}, L=${element.position.left}, W=${element.position.width}, H=${element.position.height}`);
+            logDebug(`[WebApp] [renderElement ${element.id}] Scaled Style: T=${scaledTop.toFixed(2)}px, L=${scaledLeft.toFixed(2)}px, W=${scaledWidth.toFixed(2)}px, H=${scaledHeight.toFixed(2)}px`);
+            // *** ADDED DEBUG LOGGING END ***
+
+            // Apply scaled position and dimensions
+            overlay.style.top = `${scaledTop}px`;
             
             // Verify element has required position data
             if (typeof element.left !== 'number' || typeof element.top !== 'number' || 

@@ -567,6 +567,7 @@
         <button id="prevObjectBtn" class="icon-button disabled" data-tooltip="Previous Object">←</button>
         <button id="manualRefreshBtn" class="icon-button" data-tooltip="Refresh Selection">↻</button>
         <button id="nextObjectBtn" class="icon-button disabled" data-tooltip="Next Object">→</button>
+        <button id="clearAllBtn" class="icon-button" data-tooltip="Clear All Settings" style="background-color: #fce8b2; color: #b6542c;">✕</button>
       </div>
     </div>
 
@@ -1381,7 +1382,8 @@
       document.getElementById('manualRefreshBtn').addEventListener('click', manualRefresh);
       dom.prevObjectBtn.addEventListener('click', selectPreviousObject);
       dom.nextObjectBtn.addEventListener('click', selectNextObject);
-
+      document.getElementById('clearAllBtn').addEventListener('click', clearAllSettings); // Add event listener for clear all button
+      
       // Interaction listeners
       dom.interactionType.addEventListener('change', handleInteractionTypeChange);
       document.getElementById('refreshInteractionsBtn').addEventListener('click', loadInteractiveElements);
@@ -1399,6 +1401,11 @@
          // Custom Overlay Style Checkboxes
          if (event.target.type === 'checkbox' && event.target.id.endsWith('_useCustomOverlay')) {
            toggleCustomOverlayContainer(event.target);
+           // Track when user explicitly unchecks the box to prevent auto-checking later
+           if (!event.target.checked) {
+             event.target.hasBeenExplicitlyUnchecked = true;
+             console.log(`Checkbox ${event.target.id} explicitly unchecked by user`);
+           }
          }
          // Outline Enabled Checkboxes (Global & Custom)
          if (event.target.type === 'checkbox' && event.target.id.endsWith('_outlineEnabled')) {
@@ -2333,17 +2340,19 @@
             }
           }
           
-          // Auto-check the custom style checkbox if differences are found
-          if (hasDifferences && useCustomOverlayCheckbox) {
+          // Only auto-check if user hasn't explicitly unchecked the box
+          // This prevents auto-checking when the user specifically wants to use global styles
+          if (hasDifferences && useCustomOverlayCheckbox && !useCustomOverlayCheckbox.hasBeenExplicitlyUnchecked) {
             useCustomOverlayCheckbox.checked = true;
             console.log("Auto-checked custom overlay style due to differences from global defaults");
           }
 
-          if (useCustomOverlayCheckbox && (useCustomOverlayCheckbox.checked || hasDifferences)) {
+          // Use custom overlay style only if checkbox is checked
+          if (useCustomOverlayCheckbox && useCustomOverlayCheckbox.checked) {
             interactionData.overlayStyle = currentSettings;
             interactionData.useCustomOverlay = true;
           } else {
-            // Ensure overlayStyle is NOT included if checkbox is unchecked and no differences
+            // Ensure overlayStyle is NOT included if checkbox is unchecked
             delete interactionData.overlayStyle;
             interactionData.useCustomOverlay = false;
           }
@@ -2738,6 +2747,38 @@
             // Optional: Maybe briefly highlight the save button or section
         } else {
             showError(result.error || "Failed to save sequence.");
+        }
+    }
+
+    // New function to clear all settings
+    function clearAllSettings() {
+        if (!currentElementId) {
+            showError("No element selected.");
+            return;
+        }
+        if (confirm("Are you sure you want to clear all settings (interactions, animations, and styles) for the selected element?")) {
+            updateStatus("Clearing all settings...");
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    if (result.success) {
+                        updateStatus(result.message || "All settings cleared successfully.");
+                        // Reset the forms and our local data cache
+                        resetForms();
+                        currentElementDescription = null;
+                        currentElementData = { interaction: null, animation: null };
+                        
+                        // Update the status indicators
+                        updateElementStatus();
+                        
+                        // Refresh the lists to show the element is no longer interactive
+                        loadInteractiveElements();
+                        loadAnimatedElements();
+                    } else {
+                        showError(result.error || "Failed to clear settings.");
+                    }
+                })
+                .withFailureHandler(showError)
+                .clearElementDescription(currentElementId);
         }
     }
 

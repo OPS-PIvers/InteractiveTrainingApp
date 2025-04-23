@@ -1059,38 +1059,29 @@
      */
     function renderElement(element) {
         try {
+            // *** Check for DIRECT position properties ***
+            if (!element || typeof element.top !== 'number' || typeof element.left !== 'number' ||
+                typeof element.width !== 'number' || typeof element.height !== 'number') {
+                logError(`[WebApp] [renderElement] Invalid element data received, missing direct position properties: ${JSON.stringify(element)}`);
+                return null; // Skip rendering this element
+            }
+            // *** END CHECK ***
+
             const scaleX = parseFloat(slideElement.dataset.scaleX) || 1;
             const scaleY = parseFloat(slideElement.dataset.scaleY) || 1;
 
-            // Calculate scaled position and dimensions
-            const scaledTop = (element.position.top * scaleY);
-            const scaledLeft = (element.position.left * scaleX);
-            const scaledWidth = (element.position.width * scaleX);
-            const scaledHeight = (element.position.height * scaleY);
+            // Calculate position/size using direct properties
+            const left = Math.round(element.left * scaleX * 100) / 100;
+            const top = Math.round(element.top * scaleY * 100) / 100;
+            // Ensure minimum dimensions after scaling
+            const width = Math.round(Math.max(element.width * scaleX, 10) * 100) / 100;
+            const height = Math.round(Math.max(element.height * scaleY, 10) * 100) / 100;
 
             // *** ADDED DEBUG LOGGING START ***
             logDebug(`[WebApp] [renderElement ${element.id}] Scales: x=${scaleX.toFixed(4)}, y=${scaleY.toFixed(4)}`);
-            logDebug(`[WebApp] [renderElement ${element.id}] Original Pos: T=${element.position.top}, L=${element.position.left}, W=${element.position.width}, H=${element.position.height}`);
-            logDebug(`[WebApp] [renderElement ${element.id}] Scaled Style: T=${scaledTop.toFixed(2)}px, L=${scaledLeft.toFixed(2)}px, W=${scaledWidth.toFixed(2)}px, H=${scaledHeight.toFixed(2)}px`);
+            logDebug(`[WebApp] [renderElement ${element.id}] Original Pos: T=${element.top}, L=${element.left}, W=${element.width}, H=${element.height}`); // Use direct properties
+            logDebug(`[WebApp] [renderElement ${element.id}] Calculated Style: T=${top.toFixed(2)}px, L=${left.toFixed(2)}px, W=${width.toFixed(2)}px, H=${height.toFixed(2)}px`); // Use calculated values
             // *** ADDED DEBUG LOGGING END ***
-
-            // Apply scaled position and dimensions
-            overlay.style.top = `${scaledTop}px`;
-            
-            // Verify element has required position data
-            if (typeof element.left !== 'number' || typeof element.top !== 'number' || 
-                typeof element.width !== 'number' || typeof element.height !== 'number') {
-                console.error(`[WebApp] [renderElement] Element ${element.id} is missing position data:`, element);
-                return null;
-            }
-            
-            // Apply precise positioning with proper rounding
-            const left = Math.round(element.left * scaleX * 100) / 100;
-            const top = Math.round(element.top * scaleY * 100) / 100;
-            const width = Math.round(Math.max(element.width * scaleX, 10) * 100) / 100;
-            const height = Math.round(Math.max(element.height * scaleY, 10) * 100) / 100;
-            
-            logDebug(`[WebApp] [renderElement] Calculated position/size for ${element.id}: L=${left.toFixed(2)}, T=${top.toFixed(2)}, W=${width.toFixed(2)}, H=${height.toFixed(2)}`);
 
             const overlay = document.createElement('div');
             overlay.className = 'overlay';
@@ -1100,6 +1091,7 @@
             overlay.style.width = `${width}px`;
             overlay.style.height = `${height}px`;
 
+            // ... existing code to apply styles, text, tooltips, listeners ...
             applyOverlayStyle(overlay, element);
 
             if (element.interaction && element.interaction.showOverlayText && element.interaction.overlayText) {
@@ -1119,14 +1111,16 @@
             if (element.animation && element.animation.type && element.animation.type !== 'none') {
                 applyAnimation(overlay, element.animation);
             }
+            // ... end existing code ...
 
             slideElement.appendChild(overlay);
             overlayElementsMap.set(element.id, overlay);
             logDebug(`[WebApp] [renderElement] Successfully rendered overlay for ${element.id}`);
-            
+
             return overlay;
         } catch (err) {
-            console.error(`[WebApp] [renderElement] Error rendering element ${element.id}:`, err);
+            // Use logError which includes console.error
+            logError(`[WebApp] [renderElement] Error rendering element ${element?.id || 'unknown'}: ${err.message}`, err);
             return null;
         }
     }

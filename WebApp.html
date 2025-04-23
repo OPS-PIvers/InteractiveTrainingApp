@@ -734,28 +734,47 @@
       }
     }
 
-    function adjustSlideSize() { /* ... unchanged ... */
+    function adjustSlideSize() {
       if (!currentSlide || !slideContainer) return;
+      
+      // Get container dimensions (subtract padding)
       const containerWidth = slideContainer.clientWidth - 20;
       const containerHeight = slideContainer.clientHeight - 20;
-      const slideWidthOrig = currentSlide.slideWidth || 960;
-      const slideHeightOrig = currentSlide.slideHeight || 540;
+      
+      // Get original slide dimensions from data
+      const slideWidthOrig = currentSlide.dimensions?.width || 960;
+      const slideHeightOrig = currentSlide.dimensions?.height || 540;
       const slideAspectRatio = slideWidthOrig / slideHeightOrig;
+      
       logDebug(`[WebApp] Calculating size: Container ${containerWidth}x${containerHeight}, Original ${slideWidthOrig}x${slideHeightOrig} (Ratio: ${slideAspectRatio.toFixed(3)})`);
+      
       let targetWidth, targetHeight;
+      
+      // Calculate dimensions that preserve aspect ratio and fit in container
       if (containerWidth / slideAspectRatio <= containerHeight) {
+        // Width is the limiting factor
         targetWidth = containerWidth;
         targetHeight = targetWidth / slideAspectRatio;
       } else {
+        // Height is the limiting factor
         targetHeight = containerHeight;
         targetWidth = targetHeight * slideAspectRatio;
       }
+      
+      // Apply calculated dimensions to slide
       slideElement.style.width = `${targetWidth}px`;
       slideElement.style.height = `${targetHeight}px`;
+      
+      // Store scale factors for element positioning
       const scaleX = targetWidth / slideWidthOrig;
       const scaleY = targetHeight / slideHeightOrig;
+      
+      // Store scale factors as data attributes
       slideElement.dataset.scaleX = scaleX;
       slideElement.dataset.scaleY = scaleY;
+      slideElement.dataset.origWidth = slideWidthOrig;
+      slideElement.dataset.origHeight = slideHeightOrig;
+      
       logDebug(`[WebApp] Adjusted slide size: ${targetWidth.toFixed(1)}x${targetHeight.toFixed(1)}, Scale: ${scaleX.toFixed(4)}x${scaleY.toFixed(4)}`);
     }
 
@@ -1067,10 +1086,16 @@
             }
             // *** END CHECK ***
 
+            // Get the precise scaling factors
             const scaleX = parseFloat(slideElement.dataset.scaleX) || 1;
             const scaleY = parseFloat(slideElement.dataset.scaleY) || 1;
+            
+            // Get original slide dimensions for reference
+            const slideWidthOrig = parseFloat(slideElement.dataset.origWidth) || 960;
+            const slideHeightOrig = parseFloat(slideElement.dataset.origHeight) || 540;
 
-            // Calculate position/size using direct properties
+            // Calculate position/size with precise scaling
+            // Position is relative to slide origin (0,0)
             const left = Math.round(element.left * scaleX * 100) / 100;
             const top = Math.round(element.top * scaleY * 100) / 100;
             // Ensure minimum dimensions after scaling
@@ -1079,40 +1104,53 @@
 
             // *** ADDED DEBUG LOGGING START ***
             logDebug(`[WebApp] [renderElement ${element.id}] Scales: x=${scaleX.toFixed(4)}, y=${scaleY.toFixed(4)}`);
-            logDebug(`[WebApp] [renderElement ${element.id}] Original Pos: T=${element.top}, L=${element.left}, W=${element.width}, H=${element.height}`); // Use direct properties
-            logDebug(`[WebApp] [renderElement ${element.id}] Calculated Style: T=${top.toFixed(2)}px, L=${left.toFixed(2)}px, W=${width.toFixed(2)}px, H=${height.toFixed(2)}px`); // Use calculated values
+            logDebug(`[WebApp] [renderElement ${element.id}] Original Slide Size: ${slideWidthOrig}x${slideHeightOrig}`);
+            logDebug(`[WebApp] [renderElement ${element.id}] Original Element Pos: T=${element.top}, L=${element.left}, W=${element.width}, H=${element.height}`);
+            logDebug(`[WebApp] [renderElement ${element.id}] Calculated Style: T=${top.toFixed(2)}px, L=${left.toFixed(2)}px, W=${width.toFixed(2)}px, H=${height.toFixed(2)}px`);
             // *** ADDED DEBUG LOGGING END ***
 
             const overlay = document.createElement('div');
             overlay.className = 'overlay';
             overlay.dataset.elementId = element.id;
+            
+            // Apply the calculated position and size
             overlay.style.left = `${left}px`;
             overlay.style.top = `${top}px`;
             overlay.style.width = `${width}px`;
             overlay.style.height = `${height}px`;
 
-            // ... existing code to apply styles, text, tooltips, listeners ...
+            // Apply overlay styles based on element configuration
             applyOverlayStyle(overlay, element);
 
+            // Add text to overlay if configured
             if (element.interaction && element.interaction.showOverlayText && element.interaction.overlayText) {
                 addOverlayText(overlay, element.interaction.overlayText);
             }
 
+            // Add hover text (displayed as tooltip)
+            if (element.interaction?.overlayStyle?.hoverText || globalOverlayDefaults.hoverText) {
+                const hoverText = element.interaction?.overlayStyle?.hoverText || globalOverlayDefaults.hoverText;
+                overlay.dataset.hoverText = hoverText;
+            }
+
+            // Set tooltip for debugging
             let tooltipParts = [`ID: ${element.id}`];
             if (element.interaction?.type && element.interaction.type !== 'none') tooltipParts.push(`I: ${element.interaction.type}`);
             if (element.interaction?.overlayStyle) tooltipParts.push(`[Style]`);
             if (element.animation?.type && element.animation.type !== 'none') tooltipParts.push(`A: ${element.animation.type}`);
             overlay.title = tooltipParts.join(' | ');
 
+            // Add event listeners
             overlay.addEventListener('click', () => handleOverlayClick(element, element.id));
             overlay.addEventListener('mouseenter', () => overlay.classList.add('is-hovering'));
             overlay.addEventListener('mouseleave', () => overlay.classList.remove('is-hovering'));
 
+            // Apply animation if configured
             if (element.animation && element.animation.type && element.animation.type !== 'none') {
                 applyAnimation(overlay, element.animation);
             }
-            // ... end existing code ...
 
+            // Add overlay to the slide and tracking Map
             slideElement.appendChild(overlay);
             overlayElementsMap.set(element.id, overlay);
             logDebug(`[WebApp] [renderElement] Successfully rendered overlay for ${element.id}`);

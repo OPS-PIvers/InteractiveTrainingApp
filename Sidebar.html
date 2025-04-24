@@ -1399,6 +1399,7 @@
       document.getElementById('refreshInteractionsBtn').addEventListener('click', loadInteractiveElements);
       document.getElementById('spotlightShowText').addEventListener('change', toggleSpotlightTextContainer);
       document.getElementById('revealAndSpotlight_showText').addEventListener('change', toggleRevealAndSpotlightTextContainer);
+      document.getElementById('revealOnClick_showTextModal').addEventListener('change', toggleRevealOnClickTextModalContainer); // Added event listener
 
       // --- Event Delegation for Dynamic Controls ---
       const contentArea = document.querySelector('.content-area');
@@ -1493,12 +1494,14 @@
         if (type === 'spotlight') {
             toggleSpotlightTextContainer(); // Existing spotlight logic
         }
-        // --- ADDED CASE for revealAndSpotlight ---
+        // Special case for revealAndSpotlight sub-options
         else if (type === 'revealAndSpotlight') {
-            toggleRevealAndSpotlightTextContainer(); // New function for this type's text box
+            toggleRevealAndSpotlightTextContainer(); // Function for this type's text box
         }
-        // --- END ADDED CASE ---
-
+        // Special case for revealOnClick sub-options
+        else if (type === 'revealOnClick') {
+            toggleRevealOnClickTextModalContainer(); // Added for revealOnClick text modal
+        }
 
         adjustSectionHeight(document.getElementById('interactionSettingsContainer'));
     }
@@ -1537,6 +1540,18 @@
         }
     }
     
+    // --- ADDED FUNCTION ---
+    // Toggle visibility of the text modal container within revealOnClick options
+    function toggleRevealOnClickTextModalContainer() {
+        const checkbox = document.getElementById('revealOnClick_showTextModal');
+        const container = document.getElementById('revealOnClick_textModalContainer');
+        if (checkbox && container) {
+            const optionsVisible = !document.getElementById('revealOnClickOptions').classList.contains('hidden');
+            container.classList.toggle('hidden', !checkbox.checked || !optionsVisible);
+            adjustSectionHeight(document.getElementById('interactionSettingsContainer'));
+        }
+    }
+
     // --- ADDED FUNCTION ---
     // Toggle visibility of the text area within revealAndSpotlight options
     function toggleRevealAndSpotlightTextContainer() {
@@ -2218,14 +2233,17 @@
       document.getElementById('revealAndSpotlight_text').value = '';
       document.getElementById('revealAndSpotlight_showNotes').checked = false;
       toggleRevealAndSpotlightTextContainer(); // Hide text container
+      document.getElementById('revealOnClick_targetElementId').value = '';
+      document.getElementById('revealOnClick_showTextModal').checked = false;
+      document.getElementById('revealOnClick_textModal').value = '';
+      toggleRevealOnClickTextModalContainer(); // Hide modal text container
       
       // Reset all overlay text checkboxes and inputs
       document.querySelectorAll('#interactionSettingsContent input[id$="_showOverlayText"]').forEach(cb => cb.checked = false);
       document.querySelectorAll('#interactionSettingsContent input[id$="_overlayText"]').forEach(input => input.value = '');
       
-      // ADD THIS NEW CODE: Reset all disappearOnClick checkboxes
+      // Reset all disappearOnClick checkboxes
       document.querySelectorAll('#interactionSettingsContent input[id$="_disappearOnClick"]').forEach(cb => cb.checked = false);
-      // END OF ADDED CODE
       
       // Reset custom overlay style checkboxes and populate with defaults
       const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight', 'revealOnClick'];
@@ -2241,7 +2259,16 @@
       handleInteractionTypeChange(); // Hide all options
 
       // Reset Animation Form
-      // [Animation reset code remains unchanged]
+      dom.animationType.value = 'none';
+      document.getElementById('animationTrigger').value = 'automatic';
+      document.getElementById('pulseColor').value = '#1a73e8';
+      document.getElementById('pulseSpeed').value = 'medium';
+      document.getElementById('wiggleIntensity').value = 'medium';
+      document.getElementById('floatDistance').value = 8;
+      document.getElementById('floatSpeed').value = 'medium';
+      document.getElementById('animationCommonOptions').classList.add('hidden');
+      updatePulseColorPreview();
+      handleAnimationTypeChange(); // Hide all options
 
       // Global overlay style form is NOT reset here, it's loaded on startup/refresh
     }

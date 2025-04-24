@@ -333,27 +333,22 @@ function selectPreviousObjectOnSlide() {
   const selection = SlidesApp.getActivePresentation().getSelection();
   const selectionType = selection.getSelectionType();
 
-
   if (selectionType !== SlidesApp.SelectionType.PAGE_ELEMENT) {
     return { error: "Select an element first.", canGoPrev: false, canGoNext: false };
   }
-
 
   const pageElements = selection.getPageElementRange().getPageElements();
   if (pageElements.length !== 1) {
     return { error: "Select only one element.", canGoPrev: false, canGoNext: false };
   }
 
-
   const currentElement = pageElements[0];
   const elementId = currentElement.getObjectId();
   const slide = currentElement.getParentPage();
 
-
   if (!slide) {
     return { error: "Could not determine the element's slide.", canGoPrev: false, canGoNext: false };
   }
-
 
   const allSlideElements = slide.getPageElements();
   let currentIndex = -1;
@@ -364,15 +359,14 @@ function selectPreviousObjectOnSlide() {
     }
   }
 
-
   if (currentIndex > 0) {
     const prevElement = allSlideElements[currentIndex - 1];
     prevElement.select();
-    Utilities.sleep(30); // Reduced sleep time to improve performance
-    return getSelectedElementInfo(); // Return info for the newly selected element
+    // Remove sleep and immediately return element info
+    return getSelectedElementInfo();
   } else {
     // Already at the first element, cannot go previous
-    return getSelectedElementInfo(); // Return current info, canGoPrev will be false
+    return getSelectedElementInfo();
   }
 }
 
@@ -385,27 +379,22 @@ function selectNextObjectOnSlide() {
   const selection = SlidesApp.getActivePresentation().getSelection();
   const selectionType = selection.getSelectionType();
 
-
   if (selectionType !== SlidesApp.SelectionType.PAGE_ELEMENT) {
     return { error: "Select an element first.", canGoPrev: false, canGoNext: false };
   }
-
 
   const pageElements = selection.getPageElementRange().getPageElements();
   if (pageElements.length !== 1) {
     return { error: "Select only one element.", canGoPrev: false, canGoNext: false };
   }
 
-
   const currentElement = pageElements[0];
   const elementId = currentElement.getObjectId();
   const slide = currentElement.getParentPage();
 
-
   if (!slide) {
     return { error: "Could not determine the element's slide.", canGoPrev: false, canGoNext: false };
   }
-
 
   const allSlideElements = slide.getPageElements();
   let currentIndex = -1;
@@ -416,15 +405,14 @@ function selectNextObjectOnSlide() {
     }
   }
 
-
   if (currentIndex >= 0 && currentIndex < allSlideElements.length - 1) {
     const nextElement = allSlideElements[currentIndex + 1];
     nextElement.select();
-    Utilities.sleep(30); // Reduced sleep time to improve performance
-    return getSelectedElementInfo(); // Return info for the newly selected element
+    // Remove sleep and immediately return element info
+    return getSelectedElementInfo();
   } else {
     // Already at the last element, cannot go next
-    return getSelectedElementInfo(); // Return current info, canGoNext will be false
+    return getSelectedElementInfo();
   }
 }
 
@@ -862,9 +850,9 @@ function selectElementById(elementId) {
       
       if (element) {
         targetSlide = currentSlide;
-        console.warn(`Element ${elementId} found on the current slide.`);
+        console.log(`Element ${elementId} found on the current slide.`);
       } else {
-        console.warn(`Element ${elementId} not found on current slide, searching all slides...`);
+        console.log(`Element ${elementId} not found on current slide, searching all slides...`);
       }
     }
 
@@ -891,10 +879,9 @@ function selectElementById(elementId) {
     }
 
     // Switch to the target slide if it's not the current one
-    if (targetSlide.getObjectId() !== presentation.getSelection()?.getCurrentPage()?.getObjectId()) {
+    if (selection && selection.getCurrentPage() && 
+        targetSlide.getObjectId() !== selection.getCurrentPage().getObjectId()) {
       targetSlide.selectAsCurrentPage();
-      // Brief pause to allow UI to update
-      Utilities.sleep(50);
     }
 
     // Select the specific element
@@ -1384,7 +1371,21 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
  */
 function getSlideBackgroundAsDataUrl(slide) {
     try {
+        // Check cache first
+        const cache = CacheService.getScriptCache();
+        const slideId = slide.getObjectId();
+        const cacheKey = 'bg_' + slideId;
+        
+        // Try to get cached background
+        const cachedData = cache.get(cacheKey);
+        if (cachedData) {
+            console.log(`Retrieved slide background from cache for slide ${slideId}`);
+            return cachedData;
+        }
+
+        // Not in cache, get via normal methods
         const background = slide.getBackground();
+        let dataUrl = null;
 
         // Method 1: Try to get image using getPictureFill()
         try {
@@ -1392,7 +1393,7 @@ function getSlideBackgroundAsDataUrl(slide) {
             if (fill) {
                 const blob = fill.getBlob();
                 if (blob) {
-                    return `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
+                    dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
                 }
             }
         } catch (e) {
@@ -1400,28 +1401,30 @@ function getSlideBackgroundAsDataUrl(slide) {
         }
 
         // Method 2: Check if it's a solid fill color (will return null)
-        try {
-            const solidFill = background.getSolidFill();
-            if (solidFill) {
-                return null; // Indicate no image background
+        if (!dataUrl) {
+            try {
+                const solidFill = background.getSolidFill();
+                if (solidFill) {
+                    // No image background, don't need to continue
+                    // Still cache the null result to avoid repeated checks
+                    cache.put(cacheKey, "null", 300); // Cache for 5 minutes
+                    return null;
+                }
+            } catch(e) {
+                // Silent fail and continue to next method
             }
-        } catch(e) {
-            // Silent fail and continue to next method
         }
 
         // Method 3: Use Slides API to get thumbnail as fallback (Requires Advanced Slides Service enabled)
-        try {
-            // Explicit check if the Slides advanced service is available
-            if (typeof Slides !== 'undefined' && Slides.Presentations && Slides.Presentations.Pages) {
+        if (!dataUrl && typeof Slides !== 'undefined' && Slides.Presentations && Slides.Presentations.Pages) {
+            try {
                 // Get presentation and slide IDs
                 const presentationId = slide.getParent().getId();
-                const slideId = slide.getObjectId();
 
                 // Request thumbnail from Slides API with a timeout wrapper
                 let thumbnailResponse;
                 try {
                     // Set a timeout to prevent long-running execution
-                    const timeout = 3000; // 3 seconds timeout
                     const start = new Date().getTime();
                     
                     thumbnailResponse = Slides.Presentations.Pages.getThumbnail(
@@ -1436,7 +1439,6 @@ function getSlideBackgroundAsDataUrl(slide) {
                     }
                 } catch (timeoutError) {
                     console.warn(`Thumbnail fetch took too long or failed: ${timeoutError.message}`);
-                    return null;
                 }
 
                 if (thumbnailResponse && thumbnailResponse.contentUrl) {
@@ -1453,27 +1455,28 @@ function getSlideBackgroundAsDataUrl(slide) {
                         if (response.getResponseCode() === 200) {
                             const blob = response.getBlob();
                             if (blob) {
-                                return `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
+                                dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
                             }
-                        } else {
-                            console.warn(`Failed to fetch thumbnail URL: HTTP ${response.getResponseCode()}`);
                         }
                     } catch (fetchError) {
                         console.warn(`URL fetch for thumbnail failed: ${fetchError.message}`);
                     }
                 }
-            } else {
-                console.warn("Slides Advanced Service not enabled or available.");
-            }
-        } catch (e) {
-            console.error("Method 3 (Slides API) failed: " + e.message);
-            if (e.message && e.message.includes("requires authentication")) {
-                console.error("Hint: Ensure 'Slides API' advanced service is enabled in Apps Script editor and permissions granted.");
+            } catch (e) {
+                console.error("Method 3 (Slides API) failed: " + e.message);
             }
         }
 
-        // No method worked
-        return null;
+        // Cache the result for future use (5 minutes)
+        if (dataUrl) {
+            console.log(`Caching slide background for slide ${slideId}`);
+            cache.put(cacheKey, dataUrl, 300); // 5 minutes TTL
+        } else {
+            // Cache null result to avoid repeated lookups
+            cache.put(cacheKey, "null", 300); 
+        }
+
+        return dataUrl;
     } catch (e) {
         console.error(`General error getting background for slide ${slide.getObjectId()}: ${e}`);
         return null;

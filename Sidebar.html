@@ -2559,6 +2559,23 @@
         console.error("Sidebar Error:", error); // Log raw error
     }
 
+    // Helper function to set input values with error handling
+    function trySetInputValue(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            if (element.type === 'checkbox') {
+                element.checked = !!value; // Convert to boolean
+            } else if (element.type === 'number') {
+                element.value = Number(value) || 0; // Ensure number for number inputs
+            } else {
+                element.value = value !== undefined && value !== null ? value : '';
+            }
+            return true;
+        }
+        console.warn(`Element not found: ${elementId}`);
+        return false;
+    }
+
     // --- Debug Function ---
     function debugCurrentElement() {
       if (!currentElementId) { updateStatus("No element selected."); return; }

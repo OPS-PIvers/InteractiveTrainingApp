@@ -627,6 +627,28 @@
         lastActiveElementId = null; // Reset last active element on slide change
         navSequenceElements = []; // Reset nav sequence
 
+        // If changing slides, save current state of hidden elements for the slide we're leaving
+        if (currentSlideIndex !== index && currentSlideElementsData.length > 0) {
+            // Create map of currently visible elements
+            const visibleElements = new Set(overlayElementsMap.keys());
+            const allInteractiveIds = interactiveElements.map(el => el.id);
+            
+            // Track which elements are hidden on the current slide before switching
+            if (!permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
+                permanentlyHiddenElementsPerSlide[currentSlideIndex] = new Set();
+            }
+            
+            // Any interactive element that's not visible should be marked as hidden
+            allInteractiveIds.forEach(id => {
+                if (!visibleElements.has(id)) {
+                    permanentlyHiddenElementsPerSlide[currentSlideIndex].add(id);
+                    logDebug(`[WebApp] Marked element ${id} as hidden for slide ${currentSlideIndex}`);
+                }
+            });
+            
+            logDebug(`[WebApp] Saved hidden state for slide ${currentSlideIndex}: ${Array.from(permanentlyHiddenElementsPerSlide[currentSlideIndex]).join(', ')}`);
+        }
+
         google.script.run
             .withSuccessHandler(handleSlideData)
             .withFailureHandler(handleLoadError)
@@ -657,8 +679,8 @@
       }
 
       currentSlide = data;
-      currentSlideIndex = data.currentSlideIndex;
-      totalSlides = data.totalSlides;
+      currentSlideIndex = data.index; // Use the correct property (index instead of currentSlideIndex)
+      totalSlides = data.total; // Use the correct property (total instead of totalSlides)
       
       // IMPORTANT: Store all element data, including non-interactive elements
       currentSlideElementsData = data.elements || [];
@@ -700,7 +722,7 @@
       currentModalElementIndex = -1; // Reset modal index
 
       updateSlideNavControls(); // Update buttons and indicator
-      slideTitleElement.textContent = data.slideNotes || ''; // Display speaker notes as title
+      slideTitleElement.textContent = data.notes || ''; // Display speaker notes as title
 
       // Simplified background handling - don't rely on events that might not fire
       if (data.backgroundUrl) {
@@ -725,30 +747,30 @@
         logDebug("[WebApp] Preparing slide content...");
         adjustSlideSize(); // Calculate and apply slide dimensions
         renderOverlays(); // Render interactive overlays based on new size
+        
+        // Now restore visibility states based on our tracked hidden elements
+        if (permanentlyHiddenElementsPerSlide[currentSlideIndex]) {
+          const hiddenElements = permanentlyHiddenElementsPerSlide[currentSlideIndex];
+          logDebug(`[WebApp] Found ${hiddenElements.size} elements to keep hidden on slide ${currentSlideIndex}`);
+          
+          hiddenElements.forEach(id => {
+            if (overlayElementsMap.has(id)) {
+              const overlay = overlayElementsMap.get(id);
+              overlay.style.opacity = '0';
+              overlay.style.pointerEvents = 'none';
+              logDebug(`[WebApp] Restored hidden state for element ${id}`);
+            }
+          });
+        } else {
+          logDebug(`[WebApp] No hidden elements to restore for slide ${currentSlideIndex}`);
+        }
+        
+        // Update navigation sequence to reflect visible elements
+        buildNavigationSequence();
+        
         hideLoading(); // Hide loading indicator
         logDebug("[WebApp] Slide ready!");
       } catch (err) {
-        console.error("[WebApp] Error in onSlideContentReady:", err);
-        hideLoading(); // Make sure we still hide the loading overlay
-        showError("Error preparing slide: " + (err.message || err));
-      }
-    }
-
-    function adjustSlideSize() {
-      if (!currentSlide || !slideContainer) return;
-      
-      // Get container dimensions (subtract padding)
-      const containerWidth = slideContainer.clientWidth - 20;
-      const containerHeight = slideContainer.clientHeight - 20;
-      
-      // Get original slide dimensions from data
-      const slideWidthOrig = currentSlide.dimensions?.width || 960;
-      const slideHeightOrig = currentSlide.dimensions?.height || 540;
-      const slideAspectRatio = slideWidthOrig / slideHeightOrig;
-      
-      logDebug(`[WebApp] Calculating size: Container ${containerWidth}x${containerHeight}, Original ${slideWidthOrig}x${slideHeightOrig} (Ratio: ${slideAspectRatio.toFixed(3)})`);
-      
-      let targetWidth, targetHeight;
       
       // Calculate dimensions that preserve aspect ratio and fit in container
       if (containerWidth / slideAspectRatio <= containerHeight) {
@@ -1805,7 +1827,8 @@
     }
 
     /**
-     * Modified showSpotlightText function that ensures buttons are never disabled
+     * Shows text in a bubble next to the spotlight target.
+     * Fixed version that ensures navigation buttons are always available.
      */
     function showSpotlightText(text, targetRect) {
         // Create text bubble container
@@ -1828,60 +1851,68 @@
         contentDiv.innerHTML = text.replace(/\n/g, '<br>');
         textBubble.appendChild(contentDiv);
         
-        // Navigation container
-        const navDiv = document.createElement('div');
-        navDiv.className = 'spotlight-nav-container';
-        
-        // IMPORTANT: Always create enabled navigation buttons
-        // Previous button - never disabled
-        const prevButton = document.createElement('button');
-        prevButton.id = 'spotlightPrevBtn';
-        prevButton.className = 'spotlight-nav-button';
-        prevButton.innerHTML = '<span>←</span> Previous';
-        prevButton.disabled = false; // Never disable
-        prevButton.style.opacity = '1';
-        prevButton.style.cursor = 'pointer';
-        
-        // Next button - never disabled
-        const nextButton = document.createElement('button');
-        nextButton.id = 'spotlightNextBtn';
-        nextButton.className = 'spotlight-nav-button';
-        nextButton.innerHTML = 'Next <span>→</span>';
-        nextButton.disabled = false; // Never disable
-        nextButton.style.opacity = '1';
-        nextButton.style.cursor = 'pointer';
-        
-        // Add click handlers with try/catch for robustness
-        prevButton.addEventListener('click', function(e) {
-            try {
-                e.preventDefault(); // Prevent any default behavior
-                e.stopPropagation(); // Stop event bubbling
-                logDebug('[WebApp] Previous button clicked');
-                navigateToPrevElement();
-            } catch (err) {
-                console.error('[WebApp] Error in prev button handler:', err);
-            }
-            return false; // Prevent default and stop propagation
-        });
-        
-        nextButton.addEventListener('click', function(e) {
-            try {
-                e.preventDefault(); // Prevent any default behavior
-                e.stopPropagation(); // Stop event bubbling
-                logDebug('[WebApp] Next button clicked');
-                navigateToNextElement();
-            } catch (err) {
-                console.error('[WebApp] Error in next button handler:', err);
-            }
-            return false; // Prevent default and stop propagation
-        });
-        
-        // Add the buttons to the nav container
-        navDiv.appendChild(prevButton);
-        navDiv.appendChild(nextButton);
-        
-        // Add navigation to the bubble
-        textBubble.appendChild(navDiv);
+        // If we have a navigation sequence, add navigation buttons
+        if (navSequenceElements.length > 1) {
+            const navDiv = document.createElement('div');
+            navDiv.className = 'spotlight-nav-container';
+            navDiv.style.display = 'flex';
+            navDiv.style.justifyContent = 'space-between';
+            navDiv.style.marginTop = '10px';
+            
+            // Previous button - always create regardless of position
+            const prevButton = document.createElement('button');
+            prevButton.id = 'spotlightPrevBtn';
+            prevButton.className = 'spotlight-nav-button';
+            prevButton.style.padding = '5px 10px';
+            prevButton.style.border = '1px solid #ccc';
+            prevButton.style.borderRadius = '4px';
+            prevButton.style.backgroundColor = '#f8f8f8';
+            prevButton.style.cursor = 'pointer';
+            prevButton.style.fontSize = '13px';
+            prevButton.innerHTML = '<span>←</span> Previous';
+            
+            // Next button - always create regardless of position
+            const nextButton = document.createElement('button');
+            nextButton.id = 'spotlightNextBtn';
+            nextButton.className = 'spotlight-nav-button';
+            nextButton.style.padding = '5px 10px';
+            nextButton.style.border = '1px solid #ccc';
+            nextButton.style.borderRadius = '4px';
+            nextButton.style.backgroundColor = '#f8f8f8';
+            nextButton.style.cursor = 'pointer';
+            nextButton.style.fontSize = '13px';
+            nextButton.innerHTML = 'Next <span>→</span>';
+            
+            // Add click handlers with try/catch and proper event prevention
+            prevButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    hideSpotlight();
+                    navigateToPrevElement();
+                } catch (err) {
+                    console.error('[WebApp] Error in prev button handler:', err);
+                    showError("Navigation error: " + (err.message || "Unknown error"));
+                }
+            });
+            
+            nextButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                    hideSpotlight();
+                    navigateToNextElement();
+                } catch (err) {
+                    console.error('[WebApp] Error in next button handler:', err);
+                    showError("Navigation error: " + (err.message || "Unknown error"));
+                }
+            });
+            
+            // Add buttons to the container
+            navDiv.appendChild(prevButton);
+            navDiv.appendChild(nextButton);
+            textBubble.appendChild(navDiv);
+        }
         
         // Add to body to calculate size
         document.body.appendChild(textBubble);
@@ -1918,10 +1949,6 @@
         }
         window.currentSpotlight.textBubble = textBubble;
         
-        // Force enable the buttons again after a brief delay (to overcome any automatic disabling)
-        setTimeout(forceEnableNavigationButtons, 100);
-        
-        // Log navigation state
         logDebug(`[WebApp] Spotlight text shown with navigation. Current index: ${currentSpotlightElementIndex}, Total elements: ${navSequenceElements.length}`);
     }
 

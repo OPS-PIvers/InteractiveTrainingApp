@@ -839,58 +839,56 @@ function removeElementInteraction(elementId) {
 function selectElementById(elementId) {
   try {
     const presentation = SlidesApp.getActivePresentation();
-    let element = null;
+    let targetElement = null;
     let targetSlide = null;
     
-    // First try to find the element on the current slide
+    // First check current slide
     const selection = presentation.getSelection();
-    if (selection && selection.getCurrentPage()) {
-      const currentSlide = selection.getCurrentPage();
-      element = currentSlide.getPageElementById(elementId);
-      
-      if (element) {
+    const currentSlide = selection?.getCurrentPage();
+    
+    if (currentSlide) {
+      targetElement = currentSlide.getPageElementById(elementId);
+      if (targetElement) {
         targetSlide = currentSlide;
-        console.log(`Element ${elementId} found on the current slide.`);
-      } else {
-        console.log(`Element ${elementId} not found on current slide, searching all slides...`);
       }
     }
-
-    // If not found on current slide, search all slides
-    if (!element) {
-      const allSlides = presentation.getSlides();
-      for (let i = 0; i < allSlides.length; i++) {
-        const s = allSlides[i];
-        const el = s.getPageElementById(elementId);
-        if (el) {
-          element = el;
-          targetSlide = s;
-          console.log(`Element ${elementId} found on slide index ${i}`);
-          break;
+    
+    // If not found, search all slides (with progress indicator in UI)
+    if (!targetElement) {
+      const slides = presentation.getSlides();
+      for (let i = 0; i < slides.length; i++) {
+        try {
+          const element = slides[i].getPageElementById(elementId);
+          if (element) {
+            targetElement = element;
+            targetSlide = slides[i];
+            break;
+          }
+        } catch (e) {
+          // Skip invalid elements
         }
       }
     }
-
-    if (!element) {
-      return { success: false, error: "Element not found in the presentation. It may have been deleted." };
+    
+    if (!targetElement || !targetSlide) {
+      return { 
+        success: false, 
+        error: "Element not found in presentation. It may have been deleted." 
+      };
     }
-    if (!targetSlide) {
-      return { success: false, error: "Could not determine the slide for the element." };
-    }
-
-    // Switch to the target slide if it's not the current one
-    if (selection && selection.getCurrentPage() && 
-        targetSlide.getObjectId() !== selection.getCurrentPage().getObjectId()) {
+    
+    // Switch to target slide if needed
+    if (currentSlide?.getObjectId() !== targetSlide.getObjectId()) {
       targetSlide.selectAsCurrentPage();
     }
-
-    // Select the specific element
-    element.select();
-
+    
+    // Actually select the element
+    targetElement.select();
+    
     return { success: true, message: "Element selected successfully." };
   } catch (e) {
-    console.error("Error selecting element:", e);
-    return { success: false, error: `Failed to select element: ${e.message}` };
+    console.error("Error in selectElementById:", e);
+    return { success: false, error: e.message };
   }
 }
 
@@ -975,15 +973,14 @@ const OVERLAY_DEFAULTS = {
 function getGlobalOverlaySettings() {
   const props = PropertiesService.getScriptProperties();
   const settings = {};
-  const keys = Object.keys(OVERLAY_DEFAULTS);
-
-  keys.forEach(key => {
+  
+  Object.keys(OVERLAY_DEFAULTS).forEach(key => {
     const propKey = OVERLAY_SETTINGS_PREFIX + key.toUpperCase();
-    const value = props.getProperty(propKey);
-
-    // Important fix: Only use default if value is strictly null (not found)
+    const rawValue = props.getProperty(propKey);
+    
+    // Important: Only use default if value is strictly null (not found)
     // This ensures '0' values (for opacity) are properly handled
-    if (value === null) {
+    if (rawValue === null) {
       // Value not found, use default
       settings[key] = OVERLAY_DEFAULTS[key];
       console.log(`Property ${propKey} not found, using default: ${OVERLAY_DEFAULTS[key]}`);
@@ -991,16 +988,16 @@ function getGlobalOverlaySettings() {
       // Value found, parse it based on expected type
       const defaultValue = OVERLAY_DEFAULTS[key];
       if (typeof defaultValue === 'number') {
-        const numValue = parseFloat(value);
+        const numValue = parseFloat(rawValue);
         settings[key] = isNaN(numValue) ? defaultValue : numValue;
         console.log(`Loaded numeric property ${propKey}: ${numValue}`);
       } else if (typeof defaultValue === 'boolean') {
-        settings[key] = (value === 'true');
-        console.log(`Loaded boolean property ${propKey}: ${value}`);
+        settings[key] = (rawValue === 'true');
+        console.log(`Loaded boolean property ${propKey}: ${rawValue}`);
       } else {
         // Assume string (color, shape, style, hoverText)
-        settings[key] = value;
-        console.log(`Loaded string property ${propKey}: ${value}`);
+        settings[key] = rawValue;
+        console.log(`Loaded string property ${propKey}: ${rawValue}`);
       }
     }
   });
@@ -1025,7 +1022,7 @@ function setGlobalOverlaySettings(settings) {
         const propKey = OVERLAY_SETTINGS_PREFIX + key.toUpperCase();
         let valueToSave = settings[key];
 
-        // Basic validation/type consistency (optional but recommended)
+        // Basic validation/type consistency
         const defaultValue = OVERLAY_DEFAULTS[key];
         if (typeof defaultValue === 'number') {
           valueToSave = parseFloat(valueToSave);
@@ -1034,7 +1031,6 @@ function setGlobalOverlaySettings(settings) {
           valueToSave = !!valueToSave; // Ensure boolean
         } else if (typeof defaultValue === 'string') {
            valueToSave = String(valueToSave).trim(); // Ensure string, trim whitespace
-           // Add specific validation e.g. for colors if needed
         }
 
         props.setProperty(propKey, String(valueToSave)); // Store all as strings
@@ -1119,24 +1115,17 @@ function doGet(e) {
     let errorDescription = `Could not load the presentation (ID: ${presentationId}).`;
     let errorSuggestion = 'The presentation may not exist or there was a problem loading it.';
     
-    // Check if this is a permission error
-    const isPermissionError = err.message && 
-                             (err.message.includes("Access denied") || 
-                              err.message.includes("permission") ||
-                              err.message.includes("Insufficient"));
+    // Check if this is a permission error - fixed syntax
+    const isPermissionError = err.message && (
+      err.message.includes("Access denied") || 
+      err.message.includes("permission") ||
+      err.message.includes("Insufficient")
+    );
     
     if (isPermissionError) {
       errorHeading = 'Access Denied';
       errorDescription = `You don't have permission to access this presentation (ID: ${presentationId}).`;
       errorSuggestion = 'The presentation owner needs to share it with you or make it accessible to anyone with the link.';
-    } else if (err.message && err.message.includes("not found")) {
-      errorHeading = 'Presentation Not Found';
-      errorDescription = `The presentation with ID: ${presentationId} could not be found.`;
-      errorSuggestion = 'Check that the presentation ID in the URL is correct and that the presentation hasn\'t been deleted.';
-    } else if (err.message && err.message.includes("quota")) {
-      errorHeading = 'Service Quota Exceeded';
-      errorDescription = 'The application has reached its usage limits.';
-      errorSuggestion = 'Please try again later or contact the presentation owner.';
     }
     
     // Return a user-friendly error page
@@ -1171,7 +1160,6 @@ function doGet(e) {
   }
 }
 
-
 /**
  * Fetches data for a specific slide to be displayed in the web app.
  * Includes global overlay style settings.
@@ -1182,7 +1170,7 @@ function doGet(e) {
  */
 function getSlideDataForWebApp(presentationId, slideIndex) {
   console.log(`Entering getSlideDataForWebApp for ID: ${presentationId}, Index: ${slideIndex}`);
-
+  
   // Validate parameters
   if (!presentationId) {
     console.error("getSlideDataForWebApp: Missing presentation ID parameter");
@@ -1214,7 +1202,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       console.warn(`Failed to get global overlay settings: ${globalOverlayResult.error}`);
     }
     const globalOverlayDefaults = globalOverlayResult.settings || OVERLAY_DEFAULTS;
-
+    
     // Prepare the data object to return
     const slideData = {
       id: slideId,
@@ -1222,7 +1210,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       total: slides.length,
       elements: [],
       globalOverlayDefaults: globalOverlayDefaults,
-      dimensions: { 
+      dimensions: {
         width: presentation.getPageWidth(),
         height: presentation.getPageHeight()
       }
@@ -1232,7 +1220,6 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
     const sequenceResult = getNavigationSequence(slideId);
     const savedSequence = sequenceResult.success && sequenceResult.hasCustomSequence ? 
                           sequenceResult.elementIds : null;
-    
     slideData.hasCustomSequence = savedSequence !== null;
     slideData.customSequence = savedSequence || [];
 
@@ -1258,7 +1245,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
 
     // Create a mapping of IDs for easier lookup and debugging
     const elementIdMap = new Map();
-    
+
     // First pass: collect all elements IDs for complete mapping
     pageElements.forEach((element) => {
       elementIdMap.set(element.getObjectId(), {
@@ -1278,13 +1265,13 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       try {
         const desc = element.getDescription();
         if (!desc || !desc.trim()) return; // Skip if no description
-        
+
         if (desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
           try {
             const data = JSON.parse(desc);
             const hasInteractionData = data.interaction && typeof data.interaction === 'object';
             const hasAnimationData = data.animation && typeof data.animation === 'object';
-            
+
             if (hasInteractionData || hasAnimationData) {
               // Element has valid interactive data, add it to our list
               const elementId = element.getObjectId();
@@ -1298,7 +1285,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
                 interaction: data.interaction || null,
                 animation: data.animation || null
               };
-              
+
               // Try to extract element text for identification (but don't fail if we can't)
               try {
                 if (element.getPageElementType() === SlidesApp.PageElementType.SHAPE) {
@@ -1309,7 +1296,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
               } catch (e) {
                 console.warn(`Couldn't get text for element ${elementId}: ${e.message}`);
               }
-              
+
               elementsWithData.push(elementData);
             }
           } catch (e) {
@@ -1326,7 +1313,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       // First add elements in the saved sequence
       const orderedElements = [];
       const remainingElements = [...elementsWithData]; // Make a copy to track what's left
-      
+
       savedSequence.forEach(id => {
         const elementIndex = remainingElements.findIndex(el => el.id === id);
         if (elementIndex !== -1) {
@@ -1334,13 +1321,13 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
           remainingElements.splice(elementIndex, 1); // Remove from remaining
         }
       });
-      
+
       // Add any elements not in the sequence at the end
       slideData.elements = [...orderedElements, ...remainingElements];
     } else {
       slideData.elements = elementsWithData;
     }
-    
+
     // Assign sequential display IDs for easier reference
     slideData.elements.forEach((element, index) => {
       element.displayId = index + 1;
@@ -1351,17 +1338,14 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       allElementIds: Array.from(elementIdMap.keys()),
       interactiveElementIds: slideData.elements.map(el => el.id)
     };
-    
-    console.log(`[GS] Finished processing slide ${slideIndex}. Found ${slideData.elements.length} elements with data.`);
-    return slideData; // Return the compiled slide data
 
+    console.log(`[GS] Finished processing slide ${slideIndex}. Found ${slideData.elements.length} elements with data.`);
+    return slideData;
   } catch (e) {
-    // Catch errors during presentation opening or processing
     console.error(`Error in getSlideDataForWebApp (ID: ${presentationId}, Index: ${slideIndex}): ${e.toString()}\nStack: ${e.stack}`);
     return { error: `An error occurred while loading slide data: ${e.message}. Check script logs.` };
   }
 }
-
 
 /**
  * Attempts to get the background of a slide as a Base64 Data URL.
@@ -1370,121 +1354,84 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
  * @returns {string|null} Base64 Data URL of the background or null if not found/error.
  */
 function getSlideBackgroundAsDataUrl(slide) {
-    try {
-        // Check cache first
-        const cache = CacheService.getScriptCache();
-        const slideId = slide.getObjectId();
-        const cacheKey = 'bg_' + slideId;
-        
-        // Try to get cached background
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-            console.log(`Retrieved slide background from cache for slide ${slideId}`);
-            return cachedData;
-        }
-
-        // Not in cache, get via normal methods
-        const background = slide.getBackground();
-        let dataUrl = null;
-
-        // Method 1: Try to get image using getPictureFill()
-        try {
-            const fill = background.getPictureFill();
-            if (fill) {
-                const blob = fill.getBlob();
-                if (blob) {
-                    dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
-                }
-            }
-        } catch (e) {
-            // Silent fail and continue to next method
-        }
-
-        // Method 2: Check if it's a solid fill color (will return null)
-        if (!dataUrl) {
-            try {
-                const solidFill = background.getSolidFill();
-                if (solidFill) {
-                    // No image background, don't need to continue
-                    // Still cache the null result to avoid repeated checks
-                    cache.put(cacheKey, "null", 300); // Cache for 5 minutes
-                    return null;
-                }
-            } catch(e) {
-                // Silent fail and continue to next method
-            }
-        }
-
-        // Method 3: Use Slides API to get thumbnail as fallback (Requires Advanced Slides Service enabled)
-        if (!dataUrl && typeof Slides !== 'undefined' && Slides.Presentations && Slides.Presentations.Pages) {
-            try {
-                // Get presentation and slide IDs
-                const presentationId = slide.getParent().getId();
-
-                // Request thumbnail from Slides API with a timeout wrapper
-                let thumbnailResponse;
-                try {
-                    // Set a timeout to prevent long-running execution
-                    const start = new Date().getTime();
-                    
-                    thumbnailResponse = Slides.Presentations.Pages.getThumbnail(
-                        presentationId,
-                        slideId,
-                        { 'thumbnailProperties.thumbnailSize': 'LARGE' }
-                    );
-                    
-                    const elapsed = new Date().getTime() - start;
-                    if (elapsed > 1000) {
-                        console.warn(`Slides API thumbnail fetch took ${elapsed}ms, consider optimizing`);
-                    }
-                } catch (timeoutError) {
-                    console.warn(`Thumbnail fetch took too long or failed: ${timeoutError.message}`);
-                }
-
-                if (thumbnailResponse && thumbnailResponse.contentUrl) {
-                    // Add a timeout to the URL fetch to prevent excessive delays
-                    const urlFetchOptions = {
-                        'muteHttpExceptions': true,
-                        'followRedirects': true,
-                        'validateHttpsCertificates': true,
-                        'timeout': 5000 // 5 second timeout
-                    };
-                    
-                    try {
-                        const response = UrlFetchApp.fetch(thumbnailResponse.contentUrl, urlFetchOptions);
-                        if (response.getResponseCode() === 200) {
-                            const blob = response.getBlob();
-                            if (blob) {
-                                dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
-                            }
-                        }
-                    } catch (fetchError) {
-                        console.warn(`URL fetch for thumbnail failed: ${fetchError.message}`);
-                    }
-                }
-            } catch (e) {
-                console.error("Method 3 (Slides API) failed: " + e.message);
-            }
-        }
-
-        // Cache the result for future use (5 minutes)
-        if (dataUrl) {
-            console.log(`Caching slide background for slide ${slideId}`);
-            cache.put(cacheKey, dataUrl, 300); // 5 minutes TTL
-        } else {
-            // Cache null result to avoid repeated lookups
-            cache.put(cacheKey, "null", 300); 
-        }
-
-        return dataUrl;
-    } catch (e) {
-        console.error(`General error getting background for slide ${slide.getObjectId()}: ${e}`);
-        return null;
+  try {
+    const cache = CacheService.getScriptCache();
+    const slideId = slide.getObjectId();
+    const cacheKey = 'bg_' + slideId;
+    
+    // Check cache first
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      // Don't return "null" string as a value
+      return cachedData === "null" ? null : cachedData;
     }
+    
+    // Check for solid fill first (fastest)
+    let dataUrl = null;
+    try {
+      const background = slide.getBackground();
+      const solidFill = background.getSolidFill();
+      if (solidFill) {
+        // For solid backgrounds, just cache null to avoid repeated checks
+        cache.put(cacheKey, "null", 600); // 10 minute cache
+        return null;
+      }
+    } catch (e) {
+      // Continue to other methods
+    }
+    
+    // Try picture fill next
+    try {
+      const background = slide.getBackground();
+      const fill = background.getPictureFill();
+      if (fill) {
+        const blob = fill.getBlob();
+        if (blob) {
+          dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
+        }
+      }
+    } catch (e) {
+      // Continue to API method
+    }
+    
+    // Last resort: Slides API
+    if (!dataUrl && typeof Slides !== 'undefined') {
+      try {
+        const presentationId = slide.getParent().getId();
+        const thumbnailResponse = Slides.Presentations.Pages.getThumbnail(
+          presentationId, 
+          slideId,
+          { 'thumbnailProperties.thumbnailSize': 'LARGE' }
+        );
+        
+        if (thumbnailResponse && thumbnailResponse.contentUrl) {
+          const response = UrlFetchApp.fetch(thumbnailResponse.contentUrl, {
+            muteHttpExceptions: true,
+            followRedirects: true,
+            validateHttpsCertificates: true,
+            timeout: 5000 // 5 second timeout
+          });
+          
+          if (response.getResponseCode() === 200) {
+            const blob = response.getBlob();
+            dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
+          }
+        }
+      } catch (e) {
+        console.error(`API method failed: ${e.message}`);
+      }
+    }
+    
+    // Cache result (including null) for 10 minutes
+    cache.put(cacheKey, dataUrl || "null", 600);
+    return dataUrl;
+  } catch (e) {
+    console.error(`Background error for ${slide.getObjectId()}: ${e.message}`);
+    return null;
+  }
 }
 
-
-/**
+/** 
  * Updates just the nickname of an element, preserving other data
  * @param {string} elementId The ID of the element to update
  * @param {string} nickname The new nickname to assign to this element
@@ -1495,7 +1442,7 @@ function mergeElementNickname(elementId, nickname) {
     // Get the current element description to check for existing data
     const presentation = SlidesApp.getActivePresentation();
     const selection = presentation.getSelection();
-
+    
     // Ensure there's a selection context to find the slide
     if (!selection || selection.getSelectionType() === SlidesApp.SelectionType.NONE) {
       return { success: false, error: "No slide or element selected. Please select the slide containing your element." };
@@ -1528,7 +1475,7 @@ function mergeElementNickname(elementId, nickname) {
 
     // Add or update the nickname property
     currentData.nickname = nickname;
-    
+
     // Save merged data
     const mergedJson = JSON.stringify(currentData);
     element.setDescription(mergedJson);
@@ -1558,11 +1505,9 @@ function mergeElementNickname(elementId, nickname) {
   }
 }
 
-
 // --- Utility & Debug Functions ---
 
-
-/**
+/** 
  * Converts a hex color string (#RRGGBB or #RGB) to an RGB object for the Slides API.
  * @param {string} hex Hex color string.
  * @returns {object} {red, green, blue} object with values 0-1.
@@ -1583,9 +1528,7 @@ function hexToRgb(hex) {
      return { red: r, green: g, blue: b };
 }
 
-
 // --- Diagnostic Functions (Unchanged) ---
-
 
 /**
  * Creates a simple diagnostic page useful for debugging presentation rendering.
@@ -1595,8 +1538,6 @@ function hexToRgb(hex) {
  */
 function serveDiagnosticPage(e) {
   const presentationId = e?.parameter?.presId || "";
-
-
   let htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -1625,8 +1566,6 @@ function serveDiagnosticPage(e) {
     </head>
     <body>
       <h1>Interactive Training Diagnostic Page</h1>
-
-
       <div class="section">
         <h2>Presentation Information</h2>
         <div class="info-item">
@@ -1635,7 +1574,6 @@ function serveDiagnosticPage(e) {
         <div id="presentationDetails">Loading presentation details...</div>
         <button id="loadDetailsBtn" ${!presentationId ? 'disabled' : ''}>Load Presentation Details</button>
       </div>
-
 
       <div class="section">
         <h2>Slide Information</h2>
@@ -1648,7 +1586,6 @@ function serveDiagnosticPage(e) {
         </div>
         <div id="slideDetails">(No slide loaded)</div>
       </div>
-
 
       <div class="section">
         <h2>Environment Information</h2>
@@ -1663,22 +1600,18 @@ function serveDiagnosticPage(e) {
         </div>
       </div>
 
-
       <script>
         const currentPresentationId = "${presentationId}";
-
 
         // Display environment info immediately
         document.getElementById('userAgent').textContent = navigator.userAgent;
         document.getElementById('windowSize').textContent = window.innerWidth + 'x' + window.innerHeight;
-
 
         const loadDetailsBtn = document.getElementById('loadDetailsBtn');
         const loadSlideBtn = document.getElementById('loadSlideBtn');
         const slideSelect = document.getElementById('slideIndex');
         const presentationDetailsDiv = document.getElementById('presentationDetails');
         const slideDetailsDiv = document.getElementById('slideDetails');
-
 
         // Load presentation details
         loadDetailsBtn.addEventListener('click', function() {
@@ -1690,9 +1623,6 @@ function serveDiagnosticPage(e) {
           loadSlideBtn.disabled = true;
           slideDetailsDiv.innerHTML = '(No slide loaded)';
 
-
-
-
           google.script.run
             .withSuccessHandler(function(result) {
               if (result.error) {
@@ -1702,12 +1632,10 @@ function serveDiagnosticPage(e) {
                 return;
               }
 
-
               let html = '<div class="info-item"><span class="label">Title:</span> ' + (result.title || 'Untitled') + '</div>';
               html += '<div class="info-item"><span class="label">Total Slides:</span> ' + result.totalSlides + '</div>';
               html += '<div class="info-item"><span class="label">Dimensions:</span> ' + result.width + 'x' + result.height + '</div>';
               presentationDetailsDiv.innerHTML = html;
-
 
               // Populate slide dropdown
               slideSelect.innerHTML = ''; // Clear previous options
@@ -1724,7 +1652,6 @@ function serveDiagnosticPage(e) {
                  slideSelect.innerHTML = '<option value="">No Slides Found</option>';
               }
 
-
               loadDetailsBtn.textContent = 'Reload Presentation Details';
               loadDetailsBtn.disabled = false;
             })
@@ -1737,17 +1664,14 @@ function serveDiagnosticPage(e) {
             .getDiagnosticPresentationInfo(currentPresentationId);
         });
 
-
         // Load slide details
         loadSlideBtn.addEventListener('click', function() {
           const selectedIndex = slideSelect.value;
           if (selectedIndex === "") return; // No slide selected
 
-
           this.disabled = true;
           this.textContent = 'Loading Slide...';
           slideDetailsDiv.innerHTML = 'Loading slide details...';
-
 
           google.script.run
             .withSuccessHandler(function(result) {
@@ -1757,7 +1681,6 @@ function serveDiagnosticPage(e) {
                 loadSlideBtn.disabled = false;
                 return;
               }
-
 
               let html = '<div class="info-item"><span class="label">Slide ID:</span> ' + result.slideId + '</div>';
               html += '<div class="info-item"><span class="label">Slide Index:</span> ' + result.currentSlideIndex + '</div>';
@@ -1771,8 +1694,8 @@ function serveDiagnosticPage(e) {
               }
               // html += '<div class="info-item"><span class="label">Overlay Opacity:</span> ' + result.overlayOpacity + '%</div>'; // Deprecated
               // html += '<div class="info-item"><span class="label">Overlay Shadow:</span> ' + result.overlayShadow + '</div>'; // Deprecated
-
-
+              loadSlideBtn.textContent = 'Reload Slide Details';
+              loadSlideBtn.disabled = false;
               html += '<div class="info-item"><span class="label">Background:</span><br>';
               if (result.backgroundUrl) {
                 html += '<img src="' + result.backgroundUrl + '" class="slide-thumbnail" alt="Slide Background Preview"></div>';
@@ -1780,13 +1703,10 @@ function serveDiagnosticPage(e) {
                 html += '<span>Solid color or no background image</span></div>';
               }
 
-
               html += '<h3>Interactive Elements (' + (result.elements?.length || 0) + ')</h3>';
-
 
               if (result.elements && result.elements.length > 0) {
                 html += '<table><thead><tr><th>ID</th><th>Type</th><Pos (L,T)</th><th>Size (W,H)</th><th>Interaction</th><th>Animation</th></tr></thead><tbody>';
-
 
                 result.elements.forEach(element => {
                   html += '<tr>';
@@ -1795,24 +1715,19 @@ function serveDiagnosticPage(e) {
                   html += '<td>' + Math.round(element.left) + ', ' + Math.round(element.top) + '</td>';
                   html += '<td>' + Math.round(element.width) + ', ' + Math.round(element.height) + '</td>';
 
-
                   const interactionDetails = element.interaction ? JSON.stringify(element.interaction, null, 2) : 'None';
                   html += '<td><pre>' + interactionDetails + '</pre></td>';
-
 
                   const animationDetails = element.animation ? JSON.stringify(element.animation, null, 2) : 'None';
                   html += '<td><pre>' + animationDetails + '</pre></td>';
 
-
                   html += '</tr>';
                 });
-
 
                 html += '</tbody></table>';
               } else {
                 html += '<p>No interactive elements found on this slide.</p>';
               }
-
 
               slideDetailsDiv.innerHTML = html;
               loadSlideBtn.textContent = 'Reload Slide Details';
@@ -1822,29 +1737,23 @@ function serveDiagnosticPage(e) {
               slideDetailsDiv.innerHTML =
                 '<p style="color: red;">Failed to load slide details: ' + error + '</p>';
               loadSlideBtn.textContent = 'Load Slide Details';
-               loadSlideBtn.disabled = false; // Re-enable button on failure
+              loadSlideBtn.disabled = false; // Re-enable button on failure
             })
             .getSlideDataForWebApp(currentPresentationId, selectedIndex); // Use the main function here
         });
-
 
          // Trigger loading presentation details automatically if ID is present
          if(currentPresentationId) {
            loadDetailsBtn.click();
          }
-
-
       </script>
     </body>
     </html>
   `;
-
-
   return HtmlService.createHtmlOutput(htmlContent)
     .setTitle('Interactive Training - Diagnostic')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
-
 
 /**
  * Gets presentation information for diagnostic purposes.
@@ -1876,7 +1785,6 @@ function getDiagnosticPresentationInfo(presentationId) {
   }
 }
 
-
 /**
  * Debugging function to inspect element description directly.
  * Called from Sidebar.html for troubleshooting.
@@ -1886,18 +1794,22 @@ function getDiagnosticPresentationInfo(presentationId) {
 function debugElementDescription(elementId) {
   try {
     if (!elementId) return { success: false, error: "No element ID provided." };
-
     const presentation = SlidesApp.getActivePresentation();
     const selection = presentation.getSelection();
     let element = null;
     let slideId = null;
     let slideIndex = -1;
-    
+    let parsedSuccessfully = false;
+    let hasInteractionField = false;
+    let interactionType = 'N/A';
+    let hasAnimationField = false;
+    let animationType = 'N/A';
+    let hasOverlayStyleField = false; // New check
+
     // First, check the current slide from selection
     if (selection && selection.getCurrentPage()) {
       const currentSlide = selection.getCurrentPage();
       element = currentSlide.getPageElementById(elementId);
-      
       if (element) {
         slideId = currentSlide.getObjectId();
         // Find the slide index
@@ -1957,7 +1869,6 @@ function debugElementDescription(elementId) {
                  } else {
                     interactionType = 'Not present';
                  }
-
                  hasAnimationField = parsedData.hasOwnProperty('animation');
                  if (hasAnimationField && parsedData.animation && typeof parsedData.animation === 'object') {
                     animationType = parsedData.animation.type || 'Type missing';
@@ -1989,7 +1900,6 @@ function debugElementDescription(elementId) {
         hasOverlayStyleField: hasOverlayStyleField, // Include overlay style check
         parsedData: parsedData // Include parsed data if successful
     };
-
   } catch (e) {
       console.error(`Error in debugElementDescription for ${elementId}: ${e}`);
       return { success: false, error: `Debug failed: ${e.message}` };

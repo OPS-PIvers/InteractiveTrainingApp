@@ -1328,8 +1328,14 @@
     }
     
     function toggleSection(header) {
+        if (!header) return;
+        
         const section = header.closest('.section.collapsible');
+        if (!section) return;
+        
         const content = section.querySelector('.section-content');
+        if (!content) return;
+        
         const isCurrentlyOpen = section.classList.contains('is-open');
         const contentArea = document.querySelector('.content-area');
 
@@ -1339,9 +1345,11 @@
                 if (openSection !== section) {
                     const openContent = openSection.querySelector('.section-content');
                     const openHeader = openSection.querySelector('h4');
-                    openSection.classList.remove('is-open');
-                    openHeader.setAttribute('aria-expanded', 'false');
-                    openContent.style.maxHeight = '0';
+                    if (openContent && openHeader) {
+                        openSection.classList.remove('is-open');
+                        openHeader.setAttribute('aria-expanded', 'false');
+                        openContent.style.maxHeight = '0';
+                    }
                 }
             });
         }
@@ -1361,12 +1369,14 @@
                 const contentHeight = content.scrollHeight;
                 content.style.maxHeight = contentHeight + 'px';
                 
-                // Scroll the section into view
-                const headerOffset = section.getBoundingClientRect().top + contentArea.scrollTop - contentArea.getBoundingClientRect().top;
-                contentArea.scrollTo({
-                    top: headerOffset - 5,
-                    behavior: 'smooth'
-                });
+                // Scroll the section into view if contentArea exists
+                if (contentArea) {
+                    const headerOffset = section.getBoundingClientRect().top + contentArea.scrollTop - contentArea.getBoundingClientRect().top;
+                    contentArea.scrollTo({
+                        top: headerOffset - 5,
+                        behavior: 'smooth'
+                    });
+                }
             }, 10);
         } else {
             // Set height to 0 when closing
@@ -1389,59 +1399,111 @@
 
     // --- Event Listeners ---
     function setupEventListeners() {
-      document.getElementById('manualRefreshBtn').addEventListener('click', manualRefresh);
-      dom.prevObjectBtn.addEventListener('click', selectPreviousObject);
-      dom.nextObjectBtn.addEventListener('click', selectNextObject);
-      document.getElementById('clearAllBtn').addEventListener('click', clearAllSettings); // Add event listener for clear all button
+      // Selection listeners
+      const manualRefreshBtn = document.getElementById('manualRefreshBtn');
+      if (manualRefreshBtn) manualRefreshBtn.addEventListener('click', manualRefresh);
+      
+      if (dom.prevObjectBtn) dom.prevObjectBtn.addEventListener('click', selectPreviousObject);
+      if (dom.nextObjectBtn) dom.nextObjectBtn.addEventListener('click', selectNextObject);
+      
+      const clearAllBtn = document.getElementById('clearAllBtn');
+      if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllSettings);
       
       // Interaction listeners
-      dom.interactionType.addEventListener('change', handleInteractionTypeChange);
-      document.getElementById('refreshInteractionsBtn').addEventListener('click', loadInteractiveElements);
-      document.getElementById('spotlightShowText').addEventListener('change', toggleSpotlightTextContainer);
-      document.getElementById('revealAndSpotlight_showText').addEventListener('change', toggleRevealAndSpotlightTextContainer);
-      document.getElementById('revealOnClick_showTextModal').addEventListener('change', toggleRevealOnClickTextModalContainer); // Added event listener
+      if (dom.interactionType) dom.interactionType.addEventListener('change', handleInteractionTypeChange);
+      
+      const refreshInteractionsBtn = document.getElementById('refreshInteractionsBtn');
+      if (refreshInteractionsBtn) refreshInteractionsBtn.addEventListener('click', loadInteractiveElements);
+      
+      const spotlightShowText = document.getElementById('spotlightShowText');
+      if (spotlightShowText) spotlightShowText.addEventListener('change', toggleSpotlightTextContainer);
+      
+      const revealAndSpotlightShowText = document.getElementById('revealAndSpotlight_showText');
+      if (revealAndSpotlightShowText) revealAndSpotlightShowText.addEventListener('change', toggleRevealAndSpotlightTextContainer);
+      
+      const revealOnClickShowTextModal = document.getElementById('revealOnClick_showTextModal');
+      if (revealOnClickShowTextModal) revealOnClickShowTextModal.addEventListener('change', toggleRevealOnClickTextModalContainer);
 
       // --- Event Delegation for Dynamic Controls ---
       const contentArea = document.querySelector('.content-area');
 
       // Overlay Text Checkboxes
-      contentArea.addEventListener('change', (event) => {
-         if (event.target.type === 'checkbox' && event.target.id.endsWith('_showOverlayText')) {
-           toggleOverlayTextContainer(event.target);
-         }
-         // Custom Overlay Style Checkboxes
-         if (event.target.type === 'checkbox' && event.target.id.endsWith('_useCustomOverlay')) {
-           toggleCustomOverlayContainer(event.target);
-           // Track when user explicitly unchecks the box to prevent auto-checking later
-           if (!event.target.checked) {
-             event.target.hasBeenExplicitlyUnchecked = true;
-           }
-         }
-      });
-      contentArea.addEventListener('input', (event) => {
-          if (event.target.type === 'range' && event.target.id.endsWith('_overlayOpacity')) {
-              updateOpacityDisplay(event.target);
+      if (contentArea) {
+        contentArea.addEventListener('change', (event) => {
+          if (event.target.type === 'checkbox' && event.target.id.endsWith('_showOverlayText')) {
+            toggleOverlayTextContainer(event.target);
           }
-      });
+          // Custom Overlay Style Checkboxes
+          if (event.target.type === 'checkbox' && event.target.id.endsWith('_useCustomOverlay')) {
+            toggleCustomOverlayContainer(event.target);
+            // Track when user explicitly unchecks the box to prevent auto-checking later
+            if (!event.target.checked) {
+              event.target.hasBeenExplicitlyUnchecked = true;
+            } else {
+              delete event.target.hasBeenExplicitlyUnchecked; // Clear flag if checked
+            }
+          }
+          // Outline Enabled Checkboxes (within custom or global styles)
+          if (event.target.type === 'checkbox' && event.target.id.endsWith('_outlineEnabled')) {
+            toggleOutlineOptionsVisibility(event.target);
+          }
+        });
 
-      // Color Pickers (Global & Custom)
-      contentArea.addEventListener('input', (event) => {
-          if (event.target.type === 'color') {
-              updateColorPreview(event.target);
+        // Opacity Sliders (Global & Custom)
+        contentArea.addEventListener('input', (event) => {
+          if (event.target.type === 'range' && event.target.id.endsWith('_overlayOpacity')) {
+            updateOpacityDisplay(event.target);
           }
-       });
+        });
+
+        // Color Pickers (Global & Custom)
+        contentArea.addEventListener('input', (event) => {
+          if (event.target.type === 'color') {
+            updateColorPreview(event.target);
+          }
+        });
+      }
 
       // Animation listeners
-      dom.animationType.addEventListener('change', handleAnimationTypeChange);
-      document.getElementById('animationTrigger').addEventListener('change', handleAnimationTriggerChange);
-      document.getElementById('pulseColor').addEventListener('input', updatePulseColorPreview);
-      document.getElementById('refreshAnimationsBtn').addEventListener('click', loadAnimatedElements);
+      if (dom.animationType) dom.animationType.addEventListener('change', handleAnimationTypeChange);
+      
+      const animationTrigger = document.getElementById('animationTrigger');
+      if (animationTrigger) animationTrigger.addEventListener('change', handleAnimationTriggerChange);
+      
+      const pulseColor = document.getElementById('pulseColor');
+      if (pulseColor) pulseColor.addEventListener('input', updatePulseColorPreview);
+      
+      const refreshAnimationsBtn = document.getElementById('refreshAnimationsBtn');
+      if (refreshAnimationsBtn) refreshAnimationsBtn.addEventListener('click', loadAnimatedElements);
 
       // Add event listeners for the new sequence section
-      dom.refreshSequenceBtn.addEventListener('click', loadCurrentListData); // Reuse list loading
+      if (dom.saveSequenceBtn) dom.saveSequenceBtn.addEventListener('click', saveNavigationSequence);
+      if (dom.refreshSequenceBtn) dom.refreshSequenceBtn.addEventListener('click', loadCurrentListData); // Reuse list loading
       
       // Setup Drag and Drop for Sequence List
       setupSequenceDragDrop();
+      
+      // Add listener for nickname save button
+      const saveNicknameBtn = document.getElementById('saveNicknameBtn');
+      const nicknameInput = document.getElementById('elementNickname');
+      if (saveNicknameBtn && nicknameInput) {
+          saveNicknameBtn.addEventListener('click', () => {
+              if (currentElementId) {
+                  saveElementNickname(currentElementId, nicknameInput.value.trim());
+              } else {
+                  showError("No element selected to save nickname for.");
+              }
+          });
+          // Also save on Enter key press
+          nicknameInput.addEventListener('keypress', (event) => {
+              if (event.key === 'Enter') {
+                  event.preventDefault(); // Prevent form submission if any
+                  if (currentElementId) {
+                      saveElementNickname(currentElementId, nicknameInput.value.trim());
+                  }
+              }
+          });
+      }
     }
 
     // --- Main functionality for selection, data loading, saving, etc. ---
@@ -2028,7 +2090,7 @@
           } else if (type === 'spotlight') {
             document.getElementById('spotlightTarget').value = interactionData.spotlightTarget || '';
             document.getElementById('spotlightShowText').checked = !!interactionData.showText;
-            document.getElementById('spotlightText').value = interactionData.text || '';
+            document.getElementById('spotlightText').value = interactionData.showText ? interactionData.text : '';
             document.getElementById('spotlightShowNotes').checked = !!interactionData.showNotes;
           } else if (type === 'goToSlide') {
             document.getElementById('targetSlideNumber').value = interactionData.targetSlide || '';
@@ -2037,7 +2099,7 @@
           } else if (type === 'revealAndSpotlight') {
             document.getElementById('revealAndSpotlight_targetElementId').value = interactionData.targetElementId || '';
             document.getElementById('revealAndSpotlight_showText').checked = !!interactionData.showText;
-            document.getElementById('revealAndSpotlight_text').value = interactionData.text || '';
+            document.getElementById('revealAndSpotlight_text').value = interactionData.showText ? interactionData.text : '';
             document.getElementById('revealAndSpotlight_showNotes').checked = !!interactionData.showNotes;
             toggleRevealAndSpotlightTextContainer(); // Ensure text container visibility is correct
           }
@@ -2048,7 +2110,7 @@
             const overlayTextInput = document.getElementById(`${type}_overlayText`);
             if (showOverlayCheckbox && overlayTextInput) {
               showOverlayCheckbox.checked = !!interactionData.showOverlayText; // Ensure boolean
-              overlayTextInput.value = interactionData.overlayText || '';
+              overlayTextInput.value = interactionData.showOverlayText ? interactionData.overlayText : '';
               toggleOverlayTextContainer(showOverlayCheckbox); // Ensure visibility matches state
             }
               

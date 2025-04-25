@@ -1097,14 +1097,16 @@
            Global Overlay Appearance
            <span class="collapse-icon" aria-hidden="true">►</span>
          </h4>
-         <div class="section-content" id="globalOverlayStyleContent"></div>
+         <div class="section-content" id="globalOverlayStyleContent">
+           <p style="font-size: 11px; color: #5f6368; margin: 12px 0;">These settings apply by default to all interactive overlays in the web app, unless overridden by element-specific styles.</p>
+         </div>
            <p style="font-size: 11px; color: #5f6368; margin-bottom: 12px;">These settings apply by default to all interactive overlays in the web app, unless overridden by element-specific styles.</p>
-           <!-- Placeholder for global style controls -->
+           <!-- Global style controls will be dynamically injected by JavaScript -->
            <div id="globalOverlayStyleControls">
               <!-- Content injected by JS -->
            </div>
            <!-- Save Button -->
-           <button class="blue" onclick="saveGlobalOverlaySettings()">Save Global Styles</button>
+           <button class="blue" onclick="saveGlobalOverlaySettings()" title="Save the global overlay styles">Save Global Styles</button>
          </div>
        </div>
 

@@ -1300,7 +1300,7 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
               elementsWithData.push(elementData);
             }
           } catch (e) {
-            console.warn(`Invalid JSON in element ${element.getObjectId()}: ${e.message}`);
+            console.warn(`Element ${element.getObjectId()} has invalid JSON in description: ${e.message}`);
           }
         }
       } catch (e) {
@@ -1826,6 +1826,7 @@ function debugElementDescription(elementId) {
       }
     }
     
+    // If not found on current slide,```plaintext
     // If not found on current slide, search all slides
     if (!element) {
       const allSlides = presentation.getSlides();
@@ -1848,7 +1849,6 @@ function debugElementDescription(elementId) {
     const description = element.getDescription();
     let parsedData = null;
     let parseError = null;
-    let parsedSuccessfully = false;
     let hasInteractionField = false;
     let interactionType = 'N/A';
     let hasAnimationField = false;
@@ -1858,7 +1858,6 @@ function debugElementDescription(elementId) {
     if (description && description.trim() !== "") {
         try {
             parsedData = JSON.parse(description);
-            parsedSuccessfully = true;
             if (parsedData && typeof parsedData === 'object') {
                  hasInteractionField = parsedData.hasOwnProperty('interaction');
                  if (hasInteractionField && parsedData.interaction && typeof parsedData.interaction === 'object') {
@@ -1878,6 +1877,7 @@ function debugElementDescription(elementId) {
                      animationType = 'Not present';
                  }
             }
+            parsedSuccessfully = true;
         } catch (e) {
             parseError = e.message;
         }
@@ -1905,3 +1905,4 @@ function debugElementDescription(elementId) {
       return { success: false, error: `Debug failed: ${e.message}` };
   }
 }
+```

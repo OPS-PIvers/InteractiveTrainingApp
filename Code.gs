@@ -1800,6 +1800,7 @@ function debugElementDescription(elementId) {
     let slideId = null;
     let slideIndex = -1;
     let parsedSuccessfully = false;
+    
     // First, check the current slide from selection
     if (selection && selection.getCurrentPage()) {
       const currentSlide = selection.getCurrentPage();
@@ -1820,13 +1821,12 @@ function debugElementDescription(elementId) {
       }
     }
     
-    // If not found on current slide,```plaintext
     // If not found on current slide, search all slides
     if (!element) {
       const allSlides = presentation.getSlides();
       for (let i = 0; i < allSlides.length; i++) {
           const s = allSlides[i];
-          const el = s.getPageElementById(elementId);
+                   const el = s.getPageElementById(elementId);
           if (el) {
               element = el;
               slideId = s.getObjectId();
@@ -1847,7 +1847,7 @@ function debugElementDescription(elementId) {
     let interactionType = 'N/A';
     let hasAnimationField = false;
     let animationType = 'N/A';
-    let hasOverlayStyleField = false; // New check
+    let hasOverlayStyleField = false; // Include overlay style check
 
     if (description && description.trim() !== "") {
         try {
@@ -1899,4 +1899,3 @@ function debugElementDescription(elementId) {
       return { success: false, error: `Debug failed: ${e.message}` };
   }
 }
-```

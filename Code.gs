@@ -1800,10 +1800,6 @@ function debugElementDescription(elementId) {
     let slideId = null;
     let slideIndex = -1;
     let parsedSuccessfully = false;
-    // Duplicate declaration removed
-    hasInteractionField = false;
-    let animationType = 'N/A';
-    let hasOverlayStyleField = false; // New check
     // First, check the current slide from selection
     if (selection && selection.getCurrentPage()) {
       const currentSlide = selection.getCurrentPage();

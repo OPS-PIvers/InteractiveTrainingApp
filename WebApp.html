@@ -1676,7 +1676,7 @@
 
         // Re-enable main nav buttons after a delay
         setTimeout(() => {
-            forceEnableNavigationButtons();
+            forceEnableNavigation            forceEnableNavigationButtons();
         }, 100);
 
         logDebug("[WebApp] Spotlight hidden.");
@@ -1907,242 +1907,130 @@
     }
 
 
-    // ---------- Modal Functions ----------
     /**
-     * Shows the text modal with the given content and updates navigation.
-     * This function is now simpler, focusing only on display and basic setup.
-     * Navigation logic is handled by buildNavigationSequence and updateModalNavigationButtons.
-     * @param {string} text - The text to display in the modal.
-     * @param {string} elementId - The ID of the element that triggered the modal.
+     * Builds the navigation sequence of interactive elements for the current slide.
+     * This creates an ordered list of elements that can be navigated through.
      */
-    function showTextModal(text, elementId) {
-        logDebug(`[WebApp] Showing text modal for element: ${elementId}`);
-        modalTextDiv.innerHTML = text.replace(/\\n/g, '<br>');
-        textModal.classList.add('visible');
-
-        // Ensure navigation buttons exist and have correct listeners
-        // Remove old listeners and add new ones to prevent duplicates
-        const modalPrevBtn = document.getElementById('prevElementBtn');
-        const modalNextBtn = document.getElementById('nextElementBtn');
-
-        if (modalPrevBtn && modalNextBtn) {
-            // Clone and replace to remove all old listeners reliably
-            const freshPrevBtn = modalPrevBtn.cloneNode(true);
-            const freshNextBtn = modalNextBtn.cloneNode(true);
-            modalPrevBtn.parentNode.replaceChild(freshPrevBtn, modalPrevBtn);
-            modalNextBtn.parentNode.replaceChild(freshNextBtn, modalNextBtn);
-
-            // Add new listeners
-            freshPrevBtn.addEventListener('click', navigateToPrevElement);
-            freshNextBtn.addEventListener('click', navigateToNextElement);
-
-            // Update button states based on the sequence
-            buildNavigationSequence(); // Ensure sequence is up-to-date
-            updateModalNavigationButtons(elementId); // Update based on current element
-
-            // Show/hide based on sequence length
-            const modalNavigation = document.querySelector('.modal-navigation');
-            if (modalNavigation) {
-                modalNavigation.style.display = navSequenceElements.length > 1 ? 'flex' : 'none';
+    function buildNavigationSequence() {
+        // Reset the sequence
+        navSequenceElements = [];
+        
+        // Only consider elements that are currently visible in the overlays map
+        const visibleElementIds = new Set(overlayElementsMap.keys());
+        logDebug(`[WebApp] Building navigation sequence with ${visibleElementIds.size} visible elements`);
+        
+        if (visibleElementIds.size === 0) {
+            logDebug('[WebApp] No visible elements for navigation sequence');
+            return 0; // Return count for convenience
+        }
+        
+        // First, collect all elements that can be part of the navigation sequence
+        const eligibleElements = interactiveElements.filter(el => {
+            // Must be currently visible
+            if (!visibleElementIds.has(el.id)) return false;
+            
+            // Check if it has a meaningful interaction
+            const hasNavInteraction = el.interaction && (
+                el.interaction.type === 'showText' ||
+                el.interaction.type === 'spotlight' ||
+                el.interaction.type === 'revealElement' ||
+                el.interaction.type === 'revealAndSpotlight'
+            );
+            
+            // Also include elements with special text animations
+            const hasTextAnimation = el.animation && 
+                el.animation.type && 
+                el.animation.type !== 'none' && 
+                el.animation.showTextOnClick;
+            
+            return hasNavInteraction || hasTextAnimation;
+        });
+        
+        // Sort elements by position (top to bottom, left to right)
+        // This provides a natural reading order for navigation
+        const sortedElements = [...eligibleElements].sort((a, b) => {
+            // Group elements into rows (elements within ~50px vertical distance)
+            const rowThreshold = 50;
+            if (Math.abs(a.top - b.top) < rowThreshold) {
+                // Same row, sort left to right
+                return a.left - b.left;
             }
-             // Force enable after a moment
-             setTimeout(forceEnableNavigationButtons, 100);
-        } else {
-             logDebug("[WebApp] Modal navigation buttons not found in showTextModal");
+            // Different rows, sort top to bottom
+            return a.top - b.top;
+        });
+        
+        // Set the navigation sequence
+        navSequenceElements = sortedElements;
+        
+        logDebug(`[WebApp] Built navigation sequence with ${navSequenceElements.length} elements`);
+        
+        // Update modal navigation buttons if modal is currently shown
+        if (textModal.classList.contains('visible') && lastActiveElementId) {
+            updateModalNavigationButtons(lastActiveElementId);
         }
-
-        highlightActiveModalElement(elementId);
-        lastActiveElementId = elementId; // Update last active ID when modal is shown
-        logDebug(`[WebApp] showTextModal set lastActiveElementId to: ${lastActiveElementId}`); // Log the element that triggered the modal
+        
+        return navSequenceElements.length;
     }
-
-
+    
     /**
-     * Hides the text modal and resets related states.
+     * Updates the modal navigation buttons based on the current element's position in sequence
+     * @param {string} currentElementId - The ID of the current element
      */
-    function hideTextModal() {
-        if (!textModal.classList.contains('visible')) return; // Already hidden
-
-        logDebug('[WebApp] Hiding text modal');
-        textModal.classList.remove('visible');
+    function updateModalNavigationButtons(currentElementId) {
+        const prevBtn = document.getElementById('prevElementBtn');
+        const nextBtn = document.getElementById('nextElementBtn');
+        
+        if (!prevBtn || !nextBtn) {
+            logDebug('[WebApp] Modal navigation buttons not found');
+            return;
+        }
+        
+        // Find current element's index in the navigation sequence
+        const currentIndex = navSequenceElements.findIndex(el => el.id === currentElementId);
+        
+        if (currentIndex === -1) {
+            logDebug(`[WebApp] Element ${currentElementId} not found in navigation sequence`);
+            // If element not in sequence, disable both buttons
+            prevBtn.disabled = true;
+            nextBtn.disabled = true;
+            return;
+        }
+        
+        logDebug(`[WebApp] Updating modal navigation buttons. Current index: ${currentIndex}, Total: ${navSequenceElements.length}`);
+        
+        // Enable/disable buttons based on position in sequence
+        prevBtn.disabled = navSequenceElements.length <= 1 || currentIndex === 0;
+        nextBtn.disabled = navSequenceElements.length <= 1 || currentIndex === navSequenceElements.length - 1;
+        
+        // Update visual state to match disabled property
+        prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
+        nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
+    }
+    
+    /**
+     * Highlights the active element in the modal
+     * @param {string} elementId - The ID of the element to highlight
+     */
+    function highlightActiveModalElement(elementId) {
+        // Reset any previous highlights
         resetModalElementHighlights();
-        // Don't reset lastActiveElementId here, keep it for main navigation context
-
-        // Re-enable main nav buttons after a delay
-        setTimeout(forceEnableNavigationButtons, 100);
+        
+        // Find the overlay for this element
+        const overlay = overlayElementsMap.get(elementId);
+        if (overlay) {
+            // Add a highlight class or temporarily change style
+            overlay.classList.add('modal-active-element');
+            logDebug(`[WebApp] Highlighted modal active element: ${elementId}`);
+        }
     }
-
-
+    
     /**
-     * Updates to the navigation functions to ensure they work with all interaction types
+     * Removes highlighting from all elements
      */
-    function navigateToNextElement() {
-        logDebug("[WebApp] navigateToNextElement called");
-        if (navSequenceElements.length === 0) {
-            logDebug("[WebApp] Navigation sequence is empty.");
-            return;
-        }
-
-        // Determine current index
-        let currentIndex = -1;
-        if (isSpotlightActive && window.currentSpotlight?.targetId) {
-            currentIndex = navSequenceElements.findIndex(el => el.id === window.currentSpotlight.targetId);
-            logDebug(`[WebApp] Current index based on spotlight: ${currentIndex} (Target ID: ${window.currentSpotlight.targetId})`);
-        } else if (textModal.classList.contains('visible') && lastActiveElementId) {
-            // If modal is open, use the element associated with the modal
-            currentIndex = navSequenceElements.findIndex(el => el.id === lastActiveElementId);
-             logDebug(`[WebApp] Current index based on modal: ${currentIndex}`);
-        } else if (lastActiveElementId) {
-            // Use the last interacted element if it's in the sequence
-            currentIndex = navSequenceElements.findIndex(el => el.id === lastActiveElementId);
-            logDebug(`[WebApp] Current index based on lastActiveElementId: ${currentIndex} (ID: ${lastActiveElementId})`);
-        } else {
-            // If nothing is active, assume we start from the beginning
-            currentIndex = 0;
-            logDebug('[WebApp] No active context found, starting navigation from beginning.');
-        }
-
-        // Get next index (with wrap-around)
-        const nextIndex = (currentIndex >= navSequenceElements.length - 1) ? 0 : currentIndex + 1;
-
-        // Get the next element data
-        const nextElement = navSequenceElements[nextIndex];
-        if (!nextElement || !nextElement.id) {
-            logDebug('[WebApp] Could not find valid next element data.');
-            return false;
-        }
-
-        logDebug(`[WebApp] Navigating TO element: index=${nextIndex}, id=${nextElement.id}, type=${nextElement.interaction?.type}`);
-
-        // Clean up current state BEFORE triggering the next
-        hideSpotlight();
-        hideTextModal();
-
-        // Short delay to ensure clean state and DOM updates
-        setTimeout(() => {
-            logDebug(`[WebApp] Triggering interaction for next element: ${nextElement.id}`);
-            // Simulate a click or directly call the interaction handler
-            // Using handleOverlayClick ensures all logic (reveal, spotlight, text) is processed
-            handleOverlayClick(nextElement, nextElement.id);
-        }, 150); // Delay to allow hide animations/cleanup
-
-        return true;
-    }
-
-
-    /**
-     * Navigates to the previous element in the sequence, triggering its interaction.
-     */
-    function navigateToPrevElement() {
-        logDebug("[WebApp] navigateToPrevElement called");
-        if (navSequenceElements.length === 0) {
-            logDebug("[WebApp] Navigation sequence is empty.");
-            return;
-        }
-
-        // Determine current index
-        let currentIndex = -1;
-        if (isSpotlightActive && window.currentSpotlight?.targetId) {
-            currentIndex = navSequenceElements.findIndex(el => el.id === window.currentSpotlight.targetId);
-            logDebug(`[WebApp] Current index based on spotlight: ${currentIndex} (Target ID: ${window.currentSpotlight.targetId})`);
-        } else if (textModal.classList.contains('visible') && lastActiveElementId) {
-            // If modal is open, use the element associated with the modal
-            currentIndex = navSequenceElements.findIndex(el => el.id === lastActiveElementId);
-             logDebug(`[WebApp] Current index based on modal: ${currentIndex}`);
-        } else if (lastActiveElementId) {
-            // Use the last interacted element if it's in the sequence
-            currentIndex = navSequenceElements.findIndex(el => el.id === lastActiveElementId);
-            logDebug(`[WebApp] Current index based on lastActiveElementId: ${currentIndex} (ID: ${lastActiveElementId})`);
-        } else {
-            // If nothing is active, assume we wrap around from the end
-            currentIndex = navSequenceElements.length; // Will become length-1 after we subtract 1
-            logDebug('[WebApp] No active context, starting navigation from end for previous.');
-        }
-
-        // Get previous index (with wrap-around)
-        const prevIndex = (currentIndex <= 0) ? navSequenceElements.length - 1 : currentIndex - 1;
-
-        // Get the previous element data
-        const prevElement = navSequenceElements[prevIndex];
-        if (!prevElement || !prevElement.id) {
-            logDebug('[WebApp] Could not find valid previous element data.');
-            return false;
-        }
-
-        logDebug(`[WebApp] Navigating TO previous element: index=${prevIndex}, id=${prevElement.id}, type=${prevElement.interaction?.type}`);
-
-        // Clean up current state BEFORE triggering the previous
-        hideSpotlight();
-        hideTextModal();
-
-        // Short delay to ensure clean state and DOM updates
-        setTimeout(() => {
-            logDebug(`[WebApp] Triggering interaction for previous element: ${prevElement.id}`);
-            // Simulate a click or directly call the interaction handler
-            // Using handleOverlayClick ensures all logic (reveal, spotlight, text) is processed
-            handleOverlayClick(prevElement, prevElement.id);
-        }, 150); // Delay to allow hide animations/cleanup
-
-        return true;
-    }
-
-
-    /**
-     * IMPORTANT: Function to force enable navigation buttons
-     * Call this after any spotlight or modal is shown
-     */
-    function forceEnableNavigationButtons() {
-        try {
-            const navButtons = [
-                document.getElementById('spotlightPrevBtn'),
-                document.getElementById('spotlightNextBtn'),
-                document.getElementById('prevElementBtn'),
-                document.getElementById('nextElementBtn')
-            ];
-            
-            navButtons.forEach(button => {
-                if (button) {
-                    // Enable all buttons and restore styling
-                    button.disabled = false;
-                    button.style.opacity = '1';
-                    button.style.cursor = 'pointer';
-                    
-                    // Remove and re-attach event listeners based on button ID
-                    if (button.id === 'spotlightPrevBtn' || button.id === 'prevElementBtn') {
-                        // Clone to remove old listeners and create fresh button
-                        const newButton = button.cloneNode(true);
-                        button.parentNode.replaceChild(newButton, button);
-                        newButton.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            if (textModal.classList.contains('visible')) {
-                                hideTextModal();
-                            }
-                            if (isSpotlightActive) {
-                                hideSpotlight();
-                            }
-                            setTimeout(() => navigateToPrevElement(), 50);
-                        });
-                    } else if (button.id === 'spotlightNextBtn' || button.id === 'nextElementBtn') {
-                        const newButton = button.cloneNode(true);
-                        button.parentNode.replaceChild(newButton, button);
-                        newButton.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            if (textModal.classList.contains('visible')) {
-                                hideTextModal();
-                            }
-                            if (isSpotlightActive) {
-                                hideSpotlight();
-                            }
-                            setTimeout(() => navigateToNextElement(), 50);
-                        });
-                    }
-                }
-            });
-            
-            logDebug('[WebApp] Navigation buttons force enabled with fresh event listeners');
-        } catch (err) {
-            console.error('[WebApp] Error in forceEnableNavigationButtons:', err);
-        }
+    function resetModalElementHighlights() {
+        document.querySelectorAll('.modal-active-element').forEach(el => {
+            el.classList.remove('modal-active-element');
+        });
     }
 
 

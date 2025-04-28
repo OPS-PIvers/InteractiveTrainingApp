@@ -20,9 +20,9 @@
       background-color: #f1f3f4;
       border-bottom: 1px solid #dadce0;
       flex-shrink: 0;
-      display: none; /* Hide completely */
+      display: none; /* Hide completely - Keeping CSS rule, removed inline style */
     }
-    
+
     /* --- Selected Element Section --- */
     .selected-element-section {
       padding: 8px;
@@ -51,7 +51,48 @@
       color: #174ea6;
       font-size: 11px;
     }
-    
+
+    /* --- Nickname Input (FIX #3 Applied) --- */
+    .nickname-container {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #eee;
+    }
+    .nickname-container label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 11px;
+        color: #5f6368;
+        font-weight: 500;
+    }
+    .nickname-input-container {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .nickname-input-container input[type="text"] {
+      flex-grow: 1;
+      margin-bottom: 0; /* Override default margin */
+      height: 28px; /* Smaller height */
+      font-size: 11px;
+    }
+    .small-action-button { /* Example styling */
+      padding: 4px 8px;
+      font-size: 11px;
+      height: 28px;
+      line-height: 1;
+      background-color: #e8f0fe;
+      color: #1967d2;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      cursor: pointer;
+      flex-shrink: 0; /* Prevent shrinking */
+    }
+    .small-action-button:hover {
+       background-color: #d2e3fc;
+    }
+    /* --- End Nickname CSS --- */
+
     /* Single-line status indicators */
     .element-status {
       display: flex;
@@ -127,18 +168,18 @@
     }
 
     /* --- Content Area --- */
-    .content-area { 
-      flex-grow: 1; 
-      overflow-y: auto; 
-      padding: 10px 15px 15px 15px; 
+    .content-area {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 10px 15px 15px 15px;
       background-color: #ffffff;
     }
-  
+
     /* --- Sections (Base) --- */
     .section {
-      background-color: #ffffff; 
+      background-color: #ffffff;
       border: 1px solid #dadce0;
-      border-radius: 8px; 
+      border-radius: 8px;
       margin-bottom: 10px;
     }
     .section:last-child { margin-bottom: 0; }
@@ -147,8 +188,8 @@
     .section.collapsible > h4 {
       margin: 0;
       padding: 10px 12px;
-      color: #1a73e8; 
-      font-size: 13px; 
+      color: #1a73e8;
+      font-size: 13px;
       font-weight: 500;
       border-bottom: 1px solid #eee;
       cursor: pointer;
@@ -200,43 +241,43 @@
     }
 
     /* --- Form Elements --- */
-    label { 
-      display: block; 
-      margin-bottom: 5px; 
-      font-size: 12px; 
-      color: #5f6368; 
-      font-weight: 500; 
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 12px;
+      color: #5f6368;
+      font-weight: 500;
     }
     select, input[type='text'], input[type="number"], textarea {
-      display: block; 
-      width: 100%; 
-      padding: 7px 8px; 
-      margin-bottom: 10px; 
+      display: block;
+      width: 100%;
+      padding: 7px 8px;
+      margin-bottom: 10px;
       border: 1px solid #dadce0;
-      border-radius: 4px; 
-      background-color: #fff; 
-      font-size: 12px; 
+      border-radius: 4px;
+      background-color: #fff;
+      font-size: 12px;
       box-sizing: border-box;
-      transition: border-color 0.2s; 
-      height: 32px; 
+      transition: border-color 0.2s;
+      height: 32px;
       line-height: 1.4;
     }
-    select { 
-      padding-top: 6px; 
-      padding-bottom: 6px; 
-      text-overflow: ellipsis; 
-      overflow: hidden; 
-      white-space: nowrap; 
+    select {
+      padding-top: 6px;
+      padding-bottom: 6px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
     }
-    textarea { 
-      min-height: 60px; 
-      height: auto; 
-      resize: vertical; 
-      line-height: 1.4; 
+    textarea {
+      min-height: 60px;
+      height: auto;
+      resize: vertical;
+      line-height: 1.4;
     }
     select:focus, input[type='text']:focus, input[type='number']:focus, textarea:focus {
-      border-color: #1a73e8; 
-      outline: none; 
+      border-color: #1a73e8;
+      outline: none;
       box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
     }
     input[type="number"] { padding-right: 5px; }
@@ -258,21 +299,21 @@
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px; 
+      width: 16px;
       height: 16px;
       background: #1a73e8;
       border-radius: 50%;
       cursor: pointer;
     }
     input[type="range"]::-moz-range-thumb {
-      width: 16px; 
+      width: 16px;
       height: 16px;
       background: #1a73e8;
       border-radius: 50%;
       cursor: pointer;
       border: none;
     }
-    
+
     /* Range container with inline value */
     .range-container label {
       display: flex;
@@ -293,129 +334,129 @@
       margin-right: 0;
       margin-bottom: 0;
     }
-    
+
     /* Button styles */
     button {
-      font-family: 'Roboto', Arial, sans-serif; 
-      font-size: 12px; 
-      border-radius: 4px; 
+      font-family: 'Roboto', Arial, sans-serif;
+      font-size: 12px;
+      border-radius: 4px;
       cursor: pointer;
-      padding: 7px 12px; 
-      border: 1px solid transparent; 
+      padding: 7px 12px;
+      border: 1px solid transparent;
       transition: background-color 0.2s, border-color 0.2s;
-      box-sizing: border-box; 
-      height: 32px; 
-      display: inline-flex; 
-      align-items: center; 
+      box-sizing: border-box;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
       justify-content: center;
-      line-height: normal; 
+      line-height: normal;
       vertical-align: middle;
     }
     button.blue {
-      background-color: #1a73e8; 
-      color: white; 
-      font-weight: 500; 
-      border-color: #1a73e8; 
+      background-color: #1a73e8;
+      color: white;
+      font-weight: 500;
+      border-color: #1a73e8;
       width: 100%;
-      margin-top: 8px; 
+      margin-top: 8px;
       margin-bottom: 15px;
     }
     button.blue:hover { background-color: #1558b7; border-color: #1558b7; }
     button.action-button {
-      background-color: #e8f0fe; 
-      color: #1967d2; 
-      border: 1px solid #dadce0; 
+      background-color: #e8f0fe;
+      color: #1967d2;
+      border: 1px solid #dadce0;
       font-weight: 500;
-      padding: 7px 10px; 
-      width: auto; 
+      padding: 7px 10px;
+      width: auto;
       gap: 5px;
     }
     button.action-button:hover { background-color: #d2e3fc; border-color: #c6dafc; }
     button.action-button.secondary {
-      background-color: #f1f3f4; 
-      color: #5f6368; 
+      background-color: #f1f3f4;
+      color: #5f6368;
       border-color: #dadce0;
     }
     button.action-button.secondary:hover { background-color: #e8eaed; border-color: #cdd1d5; }
     button.action-button .icon { margin-right: 5px; }
-    
+
     /* Option groups */
     .option-group {
-      font-size: 12px; 
-      margin-bottom: 12px; 
-      padding: 10px; 
+      font-size: 12px;
+      margin-bottom: 12px;
+      padding: 10px;
       background-color: #f8f9fa;
-      border: 1px solid #e8eaed; 
-      border-radius: 4px; 
+      border: 1px solid #e8eaed;
+      border-radius: 4px;
       margin-top: 8px;
     }
     select + .option-group, input + .option-group { margin-top: 8px; }
-    .option-group p { 
-      font-size: 11px; 
-      color: #5f6368; 
-      margin: 5px 0 0 0; 
-      line-height: 1.3; 
+    .option-group p {
+      font-size: 11px;
+      color: #5f6368;
+      margin: 5px 0 0 0;
+      line-height: 1.3;
     }
-    
+
     /* Color inputs */
-    .color-option { 
-      display: flex; 
-      align-items: center; 
-      margin-bottom: 8px; 
-      min-height: 32px; 
+    .color-option {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      min-height: 32px;
     }
     input[type="color"] {
-      width: 28px; 
-      height: 28px; 
-      padding: 0; 
-      border: 1px solid #ccc; 
-      border-radius: 4px; 
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
       margin-left: auto;
-      min-height: auto; 
-      margin-bottom: 0; 
-      flex-shrink: 0; 
+      min-height: auto;
+      margin-bottom: 0;
+      flex-shrink: 0;
       cursor: pointer;
     }
-    .color-option label { 
-      flex-grow: 1; 
-      margin-right: 5px; 
-      margin-bottom: 0; 
+    .color-option label {
+      flex-grow: 1;
+      margin-right: 5px;
+      margin-bottom: 0;
     }
     .color-preview {
-      display: none; 
-      width: 24px; 
-      height: 24px; 
-      border: 1px solid #ccc; 
+      display: inline-block; /* Changed from none */
+      width: 24px;
+      height: 24px;
+      border: 1px solid #ccc;
       border-radius: 4px;
-      vertical-align: middle; 
-      margin-left: 8px; 
+      vertical-align: middle;
+      margin-left: 8px;
       flex-shrink: 0;
     }
-    
+
     /* Checkbox styling */
-    .checkbox-option { 
-      display: flex; 
-      align-items: center; 
-      margin-bottom: 8px; 
+    .checkbox-option {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
     }
     .checkbox-option + .checkbox-option { margin-top: 8px; }
-    .checkbox-option input[type="checkbox"] { 
-      width: auto; 
-      margin-right: 8px; 
-      margin-bottom: 0; 
-      display: inline-block; 
-      height: auto; 
-      flex-shrink: 0; 
+    .checkbox-option input[type="checkbox"] {
+      width: auto;
+      margin-right: 8px;
+      margin-bottom: 0;
+      display: inline-block;
+      height: auto;
+      flex-shrink: 0;
     }
-    .checkbox-option label { 
-      display: inline; 
-      width: auto; 
-      margin-bottom: 0; 
-      font-weight: normal; 
-      cursor: pointer; 
+    .checkbox-option label {
+      display: inline;
+      width: auto;
+      margin-bottom: 0;
+      font-weight: normal;
+      cursor: pointer;
       font-size: 12px;
     }
-    
+
     /* Style for list items */
     .list-subheading {
       font-size: 12px; font-weight: 500; color: #5f6368; margin-top: 0; margin-bottom: 8px;
@@ -447,13 +488,13 @@
       color: #5f6368; font-style: italic; padding: 12px; text-align: center; background-color: #f8f9fa;
       border-radius: 4px; margin: 10px 0; font-size: 12px; border: 1px dashed #dadce0;
     }
-    
+
     /* Style for overlay text option within interaction groups */
     .overlay-text-option {
       margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;
     }
     .overlay-text-option .indented-option { margin-top: 8px; padding-top: 8px; border-top: none; }
-    
+
     /* Style for element-specific CUSTOM OVERLAY controls */
     .custom-overlay-controls-section {
       margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;
@@ -466,13 +507,14 @@
         border: 1px solid #adc6ff;
         border-radius: 6px;
         max-width: 100%;
-        overflow: hidden; /* Ensure content stays within */
+        /* FIX #11: overflow: hidden; might clip content. Change to visible or auto if testing shows issues */
+        overflow: hidden;
         box-sizing: border-box; /* Include padding in width calculation */
     }
     .custom-overlay-style-group h6 {
       margin: 0 0 12px 0; font-size: 12px; color: #174ea6; font-weight: 500; padding-bottom: 8px; border-bottom: 1px solid #adc6ff;
     }
-    
+
     /* Style for Overlay Style Controls */
     .overlay-style-controls {
         display: flex;
@@ -493,17 +535,17 @@
     .overlay-style-controls .range-container div { display: flex; align-items: center; }
     .overlay-style-controls .range-container input[type="range"] { margin-bottom: 0; }
     .overlay-style-controls .checkbox-option { margin-bottom: 0; min-height: 0; }
-    .overlay-style-controls .outline-options {
+    .overlay-style-controls .outline-options { /* Combined with prefix class */
       grid-column: 1 / -1;
       margin-top: 5px; padding-top: 8px; border-top: 1px solid #eee;
       display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 15px;
     }
-    
+
     /* Style for indented options */
     .indented-option {
       margin-left: 25px; margin-top: 5px; padding-top: 5px; border-top: 1px solid #eee;
     }
-    
+
     /* Status Bar */
     #statusBar {
       padding: 8px 12px; font-size: 11px; min-height: 18px; background-color: #f1f3f4;
@@ -540,24 +582,29 @@
 </head>
 <body>
   <div class="container">
-    <!-- Header hidden for space efficiency -->
-    <div class="sidebar-header" style="display:none;">
+    <!-- FIX #10: Removed inline style="display:none;" -->
+    <div class="sidebar-header">
       <h3 class="sidebar-title">Training Builder</h3>
+    </div>
+    <div style="margin: 10px 0;">
+      <button id="debugRefreshBtn" class="action-button secondary" style="width: 100%;">
+        Debug Elements & Force Refresh
+      </button>
     </div>
     <!-- Selected Element Section (Compact) -->
     <div class="selected-element-section">
       <h4>Selected Element</h4>
       <div id="selectedInfo">Select an element on the slide...</div>
-      
+
       <!-- New nickname input field -->
-      <div id="nicknameContainer" class="nickname-container hidden">
+      <div id="nicknameContainer" class="nickname-container hidden"> <!-- Initially hidden -->
         <label for="elementNickname">Nickname:</label>
         <div class="nickname-input-container">
           <input type="text" id="elementNickname" placeholder="Set a friendly name for this element" maxlength="50">
           <button id="saveNicknameBtn" class="small-action-button" title="Save nickname">Save</button>
         </div>
       </div>
-      
+
       <div id="elementStatus" class="element-status hidden">
         <div style="display: inline-flex; align-items: center;" title="Interaction Status">
           <div class="status-dot inactive" id="interactionStatusDot"></div>
@@ -627,7 +674,7 @@
        <input type="text" id="showText_overlayText" placeholder="Short text (e.g., 'Details')">
     </div>
   </div>
-  
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -636,7 +683,7 @@
     </div>
   </div>
   <!-- END OF ADDED CODE -->
-  
+
   <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -644,8 +691,7 @@
       <label for="showText_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="showText_customOverlayContainer" class="custom-overlay-style-group hidden">
-      <h6>Custom Overlay Style</h6>
-      <!-- Placeholder for common style controls -->
+      <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -667,7 +713,7 @@
        <input type="text" id="highlight_overlayText" placeholder="Short text (e.g., 'Click')">
     </div>
   </div>
-  
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -676,7 +722,7 @@
     </div>
   </div>
   <!-- END OF ADDED CODE -->
-  
+
   <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -684,8 +730,7 @@
       <label for="highlight_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="highlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
-       <!-- Placeholder for common style controls -->
+       <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -707,7 +752,7 @@
        <input type="text" id="openUrl_overlayText" placeholder="Short text (e.g., 'Website')">
     </div>
   </div>
-  
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -716,7 +761,7 @@
     </div>
   </div>
   <!-- END OF ADDED CODE -->
-  
+
   <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -724,7 +769,7 @@
       <label for="openUrl_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="openUrl_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
+       <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -759,7 +804,7 @@
         <input type="text" id="spotlight_overlayText" placeholder="Short text (e.g., 'Focus')">
      </div>
    </div>
-   
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -768,7 +813,7 @@
     </div>
   </div>
   <!-- END OF ADDED CODE -->
-  
+
    <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -776,7 +821,7 @@
       <label for="spotlight_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="spotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
+       <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -798,7 +843,7 @@
        <input type="text" id="goToSlide_overlayText" placeholder="Short text (e.g., 'Next')">
     </div>
   </div>
-  
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -807,7 +852,7 @@
     </div>
   </div>
   <!-- END OF ADDED CODE -->
-  
+
    <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -815,7 +860,7 @@
       <label for="goToSlide_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="goToSlide_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
+       <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -837,7 +882,7 @@
        <input type="text" id="revealElement_overlayText" placeholder="Short text (e.g., 'Reveal')">
     </div>
   </div>
-  
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -846,7 +891,7 @@
     </div>
   </div>
   <!-- END OF ADDED CODE -->
-  
+
   <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -854,7 +899,7 @@
       <label for="revealElement_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="revealElement_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
+       <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -893,7 +938,7 @@
       <input type="text" id="revealAndSpotlight_overlayText" placeholder="Short text (e.g., 'Reveal')">
     </div>
   </div>
-  
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -902,7 +947,7 @@
     </div>
   </div>
   <!-- END OF ADDED CODE -->
-  
+
   <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -910,8 +955,7 @@
       <label for="revealAndSpotlight_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="revealAndSpotlight_customOverlayContainer" class="custom-overlay-style-group hidden">
-      <h6>Custom Overlay Style</h6>
-      <!-- Placeholder for common style controls -->
+      <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -932,7 +976,7 @@
        <input type="text" id="revealOnClick_overlayText" placeholder="Short text (e.g., 'Click to reveal')">
     </div>
   </div>
-  
+
   <!-- ADD DISAPPEAR OPTION HERE -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -940,7 +984,7 @@
       <label for="revealOnClick_disappearOnClick">Disappear when clicked</label>
     </div>
   </div>
-  
+
   <!-- Show Text Modal Option -->
   <div class="disappear-option" style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
     <div class="checkbox-option">
@@ -952,7 +996,7 @@
        <textarea id="revealOnClick_textModal" rows="3" placeholder="Text to show in modal after revealing"></textarea>
     </div>
   </div>
-  
+
   <!-- Element-specific Custom Overlay Style controls -->
   <div class="custom-overlay-controls-section">
     <div class="checkbox-option">
@@ -960,7 +1004,7 @@
       <label for="revealOnClick_useCustomOverlay">Custom overlay style</label>
     </div>
     <div id="revealOnClick_customOverlayContainer" class="custom-overlay-style-group hidden">
-       <h6>Custom Overlay Style</h6>
+       <!-- Content Injected by JS -->
     </div>
   </div>
 </div>
@@ -1074,13 +1118,13 @@
           <div id="noSequenceItemsMessage" class="info-message hidden"> No interactive elements found on this slide to sequence.</div>
           <ul id="sequenceList" class="elements-list">
             <!-- Sequence items will be populated here by JavaScript -->
-            <!-- Example: 
+            <!-- Example:
             <li class="sequence-item" draggable="true" data-element-id="g123_abc">
-                <span class="drag-handle">&#x2630;</span> 
-                <span class="item-id">1</span> 
-                <span class="item-name">Introduction Text</span> 
+                <span class="drag-handle">&#x2630;</span>
+                <span class="item-id">1</span>
+                <span class="item-name">Introduction Text</span>
                 <span class="item-type">Show Text</span>
-            </li> 
+            </li>
             -->
           </ul>
           <button id="saveSequenceBtn" class="blue" onclick="saveNavigationSequence()" style="margin-top: 15px;">Save Sequence Order</button>
@@ -1098,8 +1142,7 @@
            <span class="collapse-icon" aria-hidden="true">►</span>
          </h4>
          <div class="section-content" id="globalOverlayStyleContent">
-           <p style="font-size: 11px; color: #5f6368; margin: 12px 0;">These settings apply by default to all interactive overlays in the web app, unless overridden by element-specific styles.</p>
-         </div>
+           <!-- FIX #8: Removed duplicate <p> tag from outside this div -->
            <p style="font-size: 11px; color: #5f6368; margin-bottom: 12px;">These settings apply by default to all interactive overlays in the web app, unless overridden by element-specific styles.</p>
            <!-- Global style controls will be dynamically injected by JavaScript -->
            <div id="globalOverlayStyleControls">
@@ -1153,6 +1196,7 @@
             </div>
         </div>
 
+        <!-- FIX #5: Added {prefix}-outline-options class -->
         <div class="{prefix}-outline-options outline-options">
             <div class="control-group">
                 <div class="color-option">
@@ -1198,10 +1242,15 @@
   </div>
 
   <script>
+    // FIX #2: Declare intended global variables explicitly
+    let dragSrcElement = null;
+    let currentInteractiveElements = [];
+    let currentSlideId = null;
+
     // --- Global Variables ---
     let currentElementId = null;
     let currentElementDescription = null; // Keep raw description
-    let currentElementData = null; // Parsed { interaction: {...}, animation: {...} }
+    let currentElementData = null; // Parsed { interaction: {...}, animation: {...}, nickname: "..." }
     let globalOverlayDefaults = { // Initial defaults, loaded from backend
         shape: 'rectangle', color: '#e53935', opacity: 15, outlineEnabled: true,
         outlineColor: '#e53935', outlineWidth: 1, outlineStyle: 'dashed',
@@ -1214,6 +1263,8 @@
         animationType: document.getElementById('animationType'),
         statusBar: document.getElementById('statusBar'),
         selectedInfo: document.getElementById('selectedInfo'),
+        nicknameContainer: document.getElementById('nicknameContainer'), // Cache nickname container
+        elementNicknameInput: document.getElementById('elementNickname'), // Cache nickname input
         elementStatusDiv: document.getElementById('elementStatus'),
         interactionStatusDot: document.getElementById('interactionStatusDot'),
         interactionStatusText: document.getElementById('interactionStatusText'),
@@ -1244,7 +1295,7 @@
     window.addEventListener('load', () => {
       populateCustomOverlayPlaceholders(); // Inject controls template
       cacheCustomOverlayContainers(); // Cache the injected container divs
-      setupEventListeners();
+      setupEventListeners(); // Setup event listeners
       setupCollapseListeners(); // Add listener setup for collapse
       loadGlobalOverlaySettings(); // Load global overlay styles FIRST
       refreshSelectedElement(); // Load selection info
@@ -1254,7 +1305,7 @@
       updatePulseColorPreview();
       updateNavigationButtons(false, false); // Start nav buttons disabled
       setupRangeValueDisplays(); // Initialize range value displays
-      
+
       // Set initial collapsed state based on HTML classes
       document.querySelectorAll('.section.collapsible').forEach(section => {
           const content = section.querySelector('.section-content');
@@ -1270,7 +1321,7 @@
              });
           }
       });
-      
+
       // Make sure checkboxes have concise labels
       document.querySelectorAll('input[id$="_useCustomOverlay"] + label').forEach(label => {
           label.textContent = "Custom overlay style";
@@ -1295,6 +1346,7 @@
         interactionTypes.forEach(type => {
             const placeholder = document.getElementById(`${type}_customOverlayContainer`);
             if (placeholder) {
+                // Inject the heading *before* the controls template
                 placeholder.innerHTML = `<h6>Custom Overlay Style</h6>` + templateHtml.replaceAll('{prefix}', type);
             } else {
                 console.warn(`Placeholder container not found for interaction type: ${type}_customOverlayContainer`);
@@ -1328,16 +1380,16 @@
             });
         }
     }
-    
+
     function toggleSection(header) {
         if (!header) return;
-        
+
         const section = header.closest('.section.collapsible');
         if (!section) return;
-        
+
         const content = section.querySelector('.section-content');
         if (!content) return;
-        
+
         const isCurrentlyOpen = section.classList.contains('is-open');
         const contentArea = document.querySelector('.content-area');
 
@@ -1362,39 +1414,44 @@
         header.setAttribute('aria-expanded', isOpen);
 
         if (isOpen) {
-            // First set a large enough max-height to measure content
-            content.style.maxHeight = '2000px';
-
-            // Use setTimeout to get accurate scrollHeight after browser renders
-            setTimeout(() => {
-                // Get the actual height and set it
+            // Use requestAnimationFrame to ensure styles are applied before calculating scrollHeight
+            requestAnimationFrame(() => {
                 const contentHeight = content.scrollHeight;
                 content.style.maxHeight = contentHeight + 'px';
-                
-                // Scroll the section into view if contentArea exists
+
+                 // Scroll the section into view if contentArea exists
                 if (contentArea) {
                     const headerOffset = section.getBoundingClientRect().top + contentArea.scrollTop - contentArea.getBoundingClientRect().top;
-                    contentArea.scrollTo({
-                        top: headerOffset - 5,
-                        behavior: 'smooth'
-                    });
+                    // Use setTimeout to allow smooth scroll after height adjustment starts
+                    setTimeout(() => {
+                        contentArea.scrollTo({
+                            top: headerOffset - 5,
+                            behavior: 'smooth'
+                        });
+                    }, 50); // Small delay
                 }
-            }, 10);
+            });
         } else {
             // Set height to 0 when closing
             content.style.maxHeight = '0';
         }
     }
-    
+
     function adjustSectionHeight(sectionElement) {
         if (sectionElement && sectionElement.classList.contains('is-open')) {
             const content = sectionElement.querySelector('.section-content');
             if (content) {
-                content.style.maxHeight = '2000px'; // Temporary large value
-                setTimeout(() => {
-                    const contentHeight = content.scrollHeight;
-                    content.style.maxHeight = contentHeight + 'px';
-                }, 10);
+                 requestAnimationFrame(() => {
+                     // Temporarily set max-height to allow content measurement
+                     const currentMaxHeight = content.style.maxHeight;
+                     content.style.maxHeight = 'none';
+                     const scrollHeight = content.scrollHeight;
+                     // Re-apply max-height for animation (use measured height)
+                     content.style.maxHeight = currentMaxHeight; // Put back briefly to ensure transition starts
+                     requestAnimationFrame(() => { // Allow recalc before setting target height
+                         content.style.maxHeight = scrollHeight + 'px';
+                     });
+                 });
             }
         }
     }
@@ -1404,25 +1461,25 @@
       // Selection listeners
       const manualRefreshBtn = document.getElementById('manualRefreshBtn');
       if (manualRefreshBtn) manualRefreshBtn.addEventListener('click', manualRefresh);
-      
+
       if (dom.prevObjectBtn) dom.prevObjectBtn.addEventListener('click', selectPreviousObject);
       if (dom.nextObjectBtn) dom.nextObjectBtn.addEventListener('click', selectNextObject);
-      
+
       const clearAllBtn = document.getElementById('clearAllBtn');
       if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllSettings);
-      
+
       // Interaction listeners
       if (dom.interactionType) dom.interactionType.addEventListener('change', handleInteractionTypeChange);
-      
+
       const refreshInteractionsBtn = document.getElementById('refreshInteractionsBtn');
       if (refreshInteractionsBtn) refreshInteractionsBtn.addEventListener('click', loadInteractiveElements);
-      
+
       const spotlightShowText = document.getElementById('spotlightShowText');
       if (spotlightShowText) spotlightShowText.addEventListener('change', toggleSpotlightTextContainer);
-      
+
       const revealAndSpotlightShowText = document.getElementById('revealAndSpotlight_showText');
       if (revealAndSpotlightShowText) revealAndSpotlightShowText.addEventListener('change', toggleRevealAndSpotlightTextContainer);
-      
+
       const revealOnClickShowTextModal = document.getElementById('revealOnClick_showTextModal');
       if (revealOnClickShowTextModal) revealOnClickShowTextModal.addEventListener('change', toggleRevealOnClickTextModalContainer);
 
@@ -1438,12 +1495,6 @@
           // Custom Overlay Style Checkboxes
           if (event.target.type === 'checkbox' && event.target.id.endsWith('_useCustomOverlay')) {
             toggleCustomOverlayContainer(event.target);
-            // Track when user explicitly unchecks the box to prevent auto-checking later
-            if (!event.target.checked) {
-              event.target.hasBeenExplicitlyUnchecked = true;
-            } else {
-              delete event.target.hasBeenExplicitlyUnchecked; // Clear flag if checked
-            }
           }
           // Outline Enabled Checkboxes (within custom or global styles)
           if (event.target.type === 'checkbox' && event.target.id.endsWith('_outlineEnabled')) {
@@ -1468,26 +1519,26 @@
 
       // Animation listeners
       if (dom.animationType) dom.animationType.addEventListener('change', handleAnimationTypeChange);
-      
+
       const animationTrigger = document.getElementById('animationTrigger');
       if (animationTrigger) animationTrigger.addEventListener('change', handleAnimationTriggerChange);
-      
+
       const pulseColor = document.getElementById('pulseColor');
       if (pulseColor) pulseColor.addEventListener('input', updatePulseColorPreview);
-      
+
       const refreshAnimationsBtn = document.getElementById('refreshAnimationsBtn');
       if (refreshAnimationsBtn) refreshAnimationsBtn.addEventListener('click', loadAnimatedElements);
 
       // Add event listeners for the new sequence section
       if (dom.saveSequenceBtn) dom.saveSequenceBtn.addEventListener('click', saveNavigationSequence);
       if (dom.refreshSequenceBtn) dom.refreshSequenceBtn.addEventListener('click', loadCurrentListData); // Reuse list loading
-      
+
       // Setup Drag and Drop for Sequence List
-      setupSequenceDragDrop();
-      
+      setupSequenceDragDrop(); // Initial setup
+
       // Add listener for nickname save button
       const saveNicknameBtn = document.getElementById('saveNicknameBtn');
-      const nicknameInput = document.getElementById('elementNickname');
+      const nicknameInput = dom.elementNicknameInput; // Use cached element
       if (saveNicknameBtn && nicknameInput) {
           saveNicknameBtn.addEventListener('click', () => {
               if (currentElementId) {
@@ -1509,14 +1560,14 @@
     }
 
     // --- Main functionality for selection, data loading, saving, etc. ---
-    
+
     // --- Preview Updaters ---
     function updatePulseColorPreview() {
         const colorInput = document.getElementById('pulseColor');
         const preview = document.getElementById('pulseColorPreview');
         if (colorInput && preview) preview.style.backgroundColor = colorInput.value;
     }
-    
+
     function updateOpacityDisplay(slider) {
         const inlineValueId = slider.id + 'Inline';
         const inlineValue = document.getElementById(inlineValueId);
@@ -1524,8 +1575,9 @@
             inlineValue.textContent = `${slider.value}%`;
         }
     }
-    
+
     function updateColorPreview(colorInput) {
+        if (!colorInput) return; // Guard against null input
         const previewId = colorInput.id + 'Preview';
         const preview = document.getElementById(previewId);
         if (preview) {
@@ -1552,19 +1604,19 @@
 
             const useCustomOverlayCheckbox = optionsDiv.querySelector(`input[type="checkbox"][id^="${type}_useCustomOverlay"]`);
             if (useCustomOverlayCheckbox) toggleCustomOverlayContainer(useCustomOverlayCheckbox);
-        }
 
-        // Special case for spotlight sub-options
-        if (type === 'spotlight') {
-            toggleSpotlightTextContainer(); // Existing spotlight logic
-        }
-        // Special case for revealAndSpotlight sub-options
-        else if (type === 'revealAndSpotlight') {
-            toggleRevealAndSpotlightTextContainer(); // Function for this type's text box
-        }
-        // Special case for revealOnClick sub-options
-        else if (type === 'revealOnClick') {
-            toggleRevealOnClickTextModalContainer(); // Added for revealOnClick text modal
+            const disappearCheckbox = optionsDiv.querySelector(`input[type="checkbox"][id^="${type}_disappearOnClick"]`);
+            // No toggle needed for disappear, just ensure it's visible
+
+            // Special cases requiring specific toggles if the main group is shown
+            if (type === 'spotlight') {
+                toggleSpotlightTextContainer();
+            } else if (type === 'revealAndSpotlight') {
+                toggleRevealAndSpotlightTextContainer();
+            } else if (type === 'revealOnClick') {
+                 toggleRevealOnClickTextModalContainer();
+            }
+
         }
 
         adjustSectionHeight(document.getElementById('interactionSettingsContainer'));
@@ -1579,7 +1631,7 @@
             adjustSectionHeight(document.getElementById('interactionSettingsContainer')); // Adjust height as content changes
         }
     }
-    
+
     // Toggle custom overlay STYLE group
     function toggleCustomOverlayContainer(checkbox) {
         const containerId = checkbox.id.replace('_useCustomOverlay', '_customOverlayContainer');
@@ -1603,8 +1655,7 @@
             adjustSectionHeight(document.getElementById('interactionSettingsContainer'));
         }
     }
-    
-    // --- ADDED FUNCTION ---
+
     // Toggle visibility of the text modal container within revealOnClick options
     function toggleRevealOnClickTextModalContainer() {
         const checkbox = document.getElementById('revealOnClick_showTextModal');
@@ -1616,7 +1667,6 @@
         }
     }
 
-    // --- ADDED FUNCTION ---
     // Toggle visibility of the text area within revealAndSpotlight options
     function toggleRevealAndSpotlightTextContainer() {
         const checkbox = document.getElementById('revealAndSpotlight_showText');
@@ -1653,7 +1703,7 @@
         handleAnimationTriggerChange(); // Update trigger options visibility too
         adjustSectionHeight(document.getElementById('animationSettingsContainer'));
     }
-    
+
     function handleAnimationTriggerChange() {
         const trigger = document.getElementById('animationTrigger').value;
         const animationType = dom.animationType.value;
@@ -1661,20 +1711,23 @@
         document.getElementById('animationClickOptions').classList.toggle('hidden', !showClickOptions);
         adjustSectionHeight(document.getElementById('animationSettingsContainer'));
     }
-    
+
     // Toggle visibility of outline color/width/style based on outlineEnabled checkbox
     function toggleOutlineOptionsVisibility(checkbox) {
         const prefix = checkbox.id.split('_')[0]; // 'global' or interaction type like 'showText'
-        const optionsContainer = document.querySelector(`.${prefix}-outline-options`);
+        // FIX #5: Use the correct selector based on updated template
+        const optionsContainer = checkbox.closest('.overlay-style-controls')?.querySelector(`.${prefix}-outline-options`);
         if (optionsContainer) {
             optionsContainer.classList.toggle('hidden', !checkbox.checked);
 
             // Adjust height of the parent section
             if(prefix === 'global') {
-                adjustSectionHeight(document.getElementById('globalOverlayStyleContainer'));
+                adjustSectionHeight(document.getElementById('globalOverlayStyleContainer').closest('.section'));
             } else {
                 adjustSectionHeight(document.getElementById('interactionSettingsContainer'));
             }
+        } else {
+             console.warn(`Could not find outline options container for prefix: ${prefix}`);
         }
     }
 
@@ -1708,7 +1761,7 @@
             .withFailureHandler(showError)
             .getAllInteractiveElements();
     }
-    
+
     function loadAnimatedElements() {
         updateStatus("Loading animations...");
         google.script.run
@@ -1729,13 +1782,16 @@
             return;
         }
 
-        // Filter elements that have an interaction block (even if type is none, could have style)
+        // Filter elements that have an interaction block OR a nickname (can be edited from list)
         const elementsWithInteractions = result.elements ? result.elements.filter(el => {
              const data = parseElementData(el.description); // Parse raw description
-             return data.interaction !== null && typeof data.interaction === 'object';
+             // Consider an element relevant if it has interaction settings (even 'none' with style) OR animation OR nickname
+             return (data.interaction !== null && typeof data.interaction === 'object') ||
+                    (data.animation !== null && typeof data.animation === 'object') ||
+                    data.nickname;
         }) : [];
 
-        noMsg.classList.toggle('hidden', elementsWithInteractions.length > 0);
+        noMsg.classList.toggle('hidden', elementsWithInteractions.length === 0);
         listContainer.classList.toggle('hidden', elementsWithInteractions.length === 0);
 
         elementsWithInteractions.forEach(element => {
@@ -1743,7 +1799,7 @@
              listContainer.appendChild(createListElement(element, 'interaction', data));
         });
 
-        updateStatus(`Found ${elementsWithInteractions.length} element(s) with interaction settings on this slide.`);
+        updateStatus(`Found ${elementsWithInteractions.length} element(s) with settings or nicknames on this slide.`);
         adjustSectionHeight(document.getElementById('interactionSettingsContainer'));
     }
 
@@ -1759,13 +1815,16 @@
             return;
         }
 
-        // Filter elements that have an animation block (even if type is none)
+        // Filter elements that have an animation block OR interaction OR a nickname (can be edited from list)
         const elementsWithAnimations = result.elements ? result.elements.filter(el => {
             const data = parseElementData(el.description);
-            return data.animation !== null && typeof data.animation === 'object';
+            // Consider an element relevant if it has animation settings OR interaction OR nickname
+            return (data.animation !== null && typeof data.animation === 'object') ||
+                   (data.interaction !== null && typeof data.interaction === 'object') ||
+                   data.nickname;
         }) : [];
 
-        noMsg.classList.toggle('hidden', elementsWithAnimations.length > 0);
+        noMsg.classList.toggle('hidden', elementsWithAnimations.length === 0);
         listContainer.classList.toggle('hidden', elementsWithAnimations.length === 0);
 
         elementsWithAnimations.forEach(element => {
@@ -1773,7 +1832,7 @@
              listContainer.appendChild(createListElement(element, 'animation', data));
         });
 
-        updateStatus(`Found ${elementsWithAnimations.length} element(s) with animation settings on this slide.`);
+        updateStatus(`Found ${elementsWithAnimations.length} element(s) with settings or nicknames on this slide.`);
         adjustSectionHeight(document.getElementById('animationSettingsContainer'));
     }
 
@@ -1788,38 +1847,48 @@
 
         const nameDiv = document.createElement('div');
         nameDiv.className = 'element-name';
-        
+
         // Check if we have a nickname stored for this element
         const nickname = parsedData?.nickname || '';
-        
+
         // Display nickname if available, otherwise show default name
         if (nickname) {
             nameDiv.textContent = nickname;
-            nameDiv.title = `Element ID: ${element.id}`;
+            nameDiv.title = `Element ID: ${element.id}`; // Tooltip shows ID
         } else {
             nameDiv.textContent = element.name || `${element.elementType || 'Element'} (ID: ${element.id.substring(0, 8)}...)`;
-            nameDiv.title = `Element ID: ${element.id} - Click to set a nickname`;
+            nameDiv.title = `Element ID: ${element.id} - Double-click to set a nickname`;
         }
-        
+
         // Make the name editable with double-click
         nameDiv.addEventListener('dblclick', function(e) {
             e.stopPropagation();
-            const newName = prompt('Enter a nickname for this element:', nickname || element.name);
-            if (newName !== null) {
-                // Save the nickname to the element's data
-                saveElementNickname(element.id, newName);
+            const currentDisplayedName = nameDiv.textContent;
+            const promptText = nickname ? `Enter a new nickname (current: "${nickname}"):` : 'Enter a nickname for this element:';
+            const newName = prompt(promptText, nickname || ''); // Pre-fill with existing nickname or empty string
+
+            if (newName !== null) { // User didn't press Cancel
+                const trimmedName = newName.trim();
+                if (trimmedName !== nickname) { // Only save if changed
+                    saveElementNickname(element.id, trimmedName);
+                    // Optimistically update UI immediately
+                    nameDiv.textContent = trimmedName || (element.name || `${element.elementType || 'Element'} (ID: ${element.id.substring(0, 8)}...)`);
+                     nameDiv.title = trimmedName ? `Element ID: ${element.id}` : `Element ID: ${element.id} - Double-click to set a nickname`;
+                }
             }
         });
-        
+
         infoDiv.appendChild(nameDiv);
 
-        // Rest of the function remains the same
         const typeDiv = document.createElement('div');
         typeDiv.className = 'element-type'; // Container for badges
 
         // Populate badges based on interaction or animation data from parsedData
-        if (displayType === 'interaction' && parsedData?.interaction) {
-            const interaction = parsedData.interaction;
+        const interaction = parsedData?.interaction;
+        const animation = parsedData?.animation;
+        let badgesAdded = false;
+
+        if (interaction && typeof interaction === 'object') {
             const interactionType = interaction.type || 'none';
 
             if(interactionType !== 'none') {
@@ -1828,9 +1897,10 @@
                 let badgeText = (interactionType.charAt(0).toUpperCase() + interactionType.slice(1)).replace(/([A-Z])/g, ' $1').trim();
                 if (interactionType === 'goToSlide') badgeText += ` (${interaction.targetSlide || '?'})`;
                 else if (interactionType === 'openUrl') badgeText += ` (...)`;
-                else if (interactionType === 'revealElement') badgeText += ` (${interaction.targetElementId?.substring(0,5) ?? '??'}...)`;
+                else if (interactionType === 'revealElement' || interactionType === 'revealAndSpotlight' || interactionType === 'revealOnClick') badgeText += ` (${interaction.targetElementId?.substring(0,5) ?? '??'}...)`;
                 interactionBadge.textContent = badgeText;
                 typeDiv.appendChild(interactionBadge);
+                badgesAdded = true;
             }
 
             // Indicate if overlay text is enabled
@@ -1840,6 +1910,7 @@
                  textBadge.textContent = 'OText';
                  textBadge.title = `Overlay Text: "${interaction.overlayText}"`; // Tooltip
                  typeDiv.appendChild(textBadge);
+                 badgesAdded = true;
             }
             // Indicate if custom style is enabled
             if (interaction.overlayStyle) { // Check if the style object exists
@@ -1848,10 +1919,11 @@
                  styleBadge.textContent = 'Style';
                  styleBadge.title = `Custom overlay style applied`;
                  typeDiv.appendChild(styleBadge);
+                 badgesAdded = true;
             }
+        }
 
-        } else if (displayType === 'animation' && parsedData?.animation) {
-            const animation = parsedData.animation;
+        if (animation && typeof animation === 'object') {
             const animationType = animation.type || 'none';
 
             if (animationType !== 'none') {
@@ -1861,14 +1933,19 @@
                 const trigger = animation.trigger || 'auto';
                 animationBadge.textContent = `${typeText} (${trigger})`;
                 typeDiv.appendChild(animationBadge);
+                badgesAdded = true;
             }
         }
 
-        // If no badges were added (e.g., interaction type 'none' with no custom style/text), show placeholder
-        if (typeDiv.children.length === 0) {
-            typeDiv.textContent = 'No active settings';
-            typeDiv.style.fontStyle = 'italic';
+        // If no badges were added, maybe indicate it's just a nickname or has base settings
+        if (!badgesAdded && !nickname ) {
+             // Show nothing or a placeholder if needed
+             // typeDiv.textContent = 'No active settings';
+             // typeDiv.style.fontStyle = 'italic';
+        } else if (!badgesAdded && nickname) {
+             typeDiv.textContent = ''; // Or 'Nickname Only' if desired
         }
+
 
         infoDiv.appendChild(typeDiv);
         listItem.appendChild(infoDiv);
@@ -1877,10 +1954,11 @@
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-btn';
         deleteBtn.innerHTML = '🗑️';
-        deleteBtn.title = `Remove ALL settings from this element`; // Updated title
+        deleteBtn.title = `Remove ALL settings (interaction, animation, nickname) from this element`; // Updated title
         deleteBtn.onclick = function(e) {
             e.stopPropagation();
-            if (confirm(`Are you sure you want to remove ALL interaction and animation settings from element "${nameDiv.textContent}"?`)) {
+            const displayedName = nameDiv.textContent; // Get current name/nickname for confirm message
+            if (confirm(`Are you sure you want to remove ALL interaction, animation, and nickname settings from element "${displayedName}"?`)) {
                 // Call the function that removes everything (clears description)
                 removeElementSettings(element.id);
             }
@@ -1897,6 +1975,7 @@
         return listItem;
     }
 
+
     // Updated function to remove ALL settings by clearing description
     function removeElementSettings(elementId) {
        updateStatus(`Removing all settings for ${elementId}...`);
@@ -1904,9 +1983,8 @@
          .withSuccessHandler(function(result) {
              if (result.success) {
                  updateStatus(result.message || `All settings removed for element ${elementId}.`);
-                 // Refresh both lists
-                 loadInteractiveElements();
-                 loadAnimatedElements();
+                 // Refresh lists
+                 loadCurrentListData(); // Refresh all lists at once
                  // Refresh selection if it was the current element
                  if (elementId === currentElementId) {
                     refreshSelectedElement(); // This updates forms and status based on new (empty) data
@@ -1914,7 +1992,7 @@
              } else { showError(result.error || `Failed to remove settings.`); }
          })
          .withFailureHandler(showError)
-         .clearElementDescription(); // Use the dedicated function
+         .clearElementDescription(elementId); // Pass elementId
     }
 
     function selectElementById(elementId) {
@@ -1923,6 +2001,7 @@
             if (result.success) {
                 updateStatus("Element selected by ID.");
                 // Selection change should trigger refreshSelectedElement automatically via focus/selection event.
+                // If not reliable, manually call refreshSelectedElement() here.
             } else { showError(result.error || "Could not select the element via ID."); }
         }).withFailureHandler(showError).selectElementById(elementId);
     }
@@ -1945,9 +2024,12 @@
     }
 
     function handleSelectedElementInfo(info) {
+        const nicknameContainer = dom.nicknameContainer; // Use cached element
+
         if (info.error) {
             dom.selectedInfo.textContent = info.error;
             dom.elementStatusDiv.classList.add('hidden');
+            if (nicknameContainer) nicknameContainer.classList.add('hidden'); // FIX #4: Hide nickname container on error
             updateNavigationButtons(false, false); // Disable nav buttons on error
             if (currentElementId !== null) {
                 resetForms();
@@ -1955,12 +2037,13 @@
                 currentElementDescription = null;
                 currentElementData = null;
             }
-             updateStatus("Ready. " + info.error);
+            updateStatus("Ready. " + info.error);
             return;
         }
 
         dom.selectedInfo.innerHTML = `<strong>Selected:</strong> ${info.type || 'Unknown'} <br><span style="font-size: 11px; color: #5f6368;">(ID: ${info.id})</span>`;
         updateStatus("Element selected. Loading data...");
+        if (nicknameContainer) nicknameContainer.classList.remove('hidden'); // FIX #4: Show nickname container on success
 
         // Update navigation buttons based on backend info
         updateNavigationButtons(info.canGoPrev, info.canGoNext);
@@ -1973,11 +2056,16 @@
             console.log("Parsed data on selection change:", currentElementData);
             loadElementDataIntoForms(); // Populate forms with parsed data
         } else {
-            // If selection is the same, still update status indicators
+            // If selection is the same, still update status indicators and nickname field
             updateElementStatus(); // Update based on existing currentElementData
+            // FIX #4: Ensure nickname input is still populated even if data didn't change overall
+            if (dom.elementNicknameInput) {
+                 dom.elementNicknameInput.value = currentElementData?.nickname || '';
+            }
             updateStatus("Selected element data already loaded.");
         }
     }
+
 
     // --- Navigation Functions ---
     function selectPreviousObject() {
@@ -1987,11 +2075,12 @@
             .withSuccessHandler(handleSelectedElementInfo) // Re-use handler
             .withFailureHandler(err => {
                 showError("Failed to select previous object.");
-                updateNavigationButtons(false, true); // Assume we can still go next? Or refresh?
+                // Optionally try to refresh to get accurate state
+                refreshSelectedElement();
             })
             .selectPreviousObjectOnSlide();
     }
-    
+
     function selectNextObject() {
         if (dom.nextObjectBtn.classList.contains('disabled')) return;
         updateStatus("Selecting next object...");
@@ -1999,11 +2088,12 @@
             .withSuccessHandler(handleSelectedElementInfo) // Re-use handler
             .withFailureHandler(err => {
                 showError("Failed to select next object.");
-                updateNavigationButtons(true, false); // Assume we can still go prev? Or refresh?
+                 // Optionally try to refresh to get accurate state
+                refreshSelectedElement();
             })
             .selectNextObjectOnSlide();
     }
-    
+
     function updateNavigationButtons(canGoPrev, canGoNext) {
         dom.prevObjectBtn.classList.toggle('disabled', !canGoPrev);
         dom.nextObjectBtn.classList.toggle('disabled', !canGoNext);
@@ -2014,22 +2104,23 @@
     // --- Parse and Load Data ---
     function parseElementData(description) {
         if (!description || typeof description !== 'string' || description.trim() === "") {
-            return { interaction: null, animation: null };
+            return { interaction: null, animation: null, nickname: null }; // Ensure all keys are present
         }
         try {
             const data = JSON.parse(description);
             if (typeof data !== 'object' || data === null) {
                 console.warn("Parsed data is not an object:", data);
-                return { interaction: null, animation: null };
+                return { interaction: null, animation: null, nickname: null };
             }
             // Return structure, ensuring keys exist
             return {
                 interaction: data.interaction || null,
-                animation: data.animation || null
+                animation: data.animation || null,
+                nickname: data.nickname || null // Ensure nickname key exists
             };
         } catch (e) {
             console.error("Error parsing element JSON:", e, "Description:", `"${description}"`);
-            return { interaction: null, animation: null }; // Return default on error
+            return { interaction: null, animation: null, nickname: null }; // Return default on error
         }
     }
 
@@ -2069,6 +2160,11 @@
         return;
       }
 
+      // --- FIX #4: Load Nickname ---
+      if (dom.elementNicknameInput) {
+          dom.elementNicknameInput.value = currentElementData.nickname || '';
+      }
+
       // --- Load Interaction Data ---
       const interactionData = currentElementData.interaction;
       if (interactionData && typeof interactionData === 'object') { // Check if block exists
@@ -2092,7 +2188,7 @@
           } else if (type === 'spotlight') {
             document.getElementById('spotlightTarget').value = interactionData.spotlightTarget || '';
             document.getElementById('spotlightShowText').checked = !!interactionData.showText;
-            document.getElementById('spotlightText').value = interactionData.showText ? interactionData.text : '';
+            document.getElementById('spotlightText').value = interactionData.showText ? (interactionData.text || '') : ''; // Handle undefined text
             document.getElementById('spotlightShowNotes').checked = !!interactionData.showNotes;
           } else if (type === 'goToSlide') {
             document.getElementById('targetSlideNumber').value = interactionData.targetSlide || '';
@@ -2101,9 +2197,14 @@
           } else if (type === 'revealAndSpotlight') {
             document.getElementById('revealAndSpotlight_targetElementId').value = interactionData.targetElementId || '';
             document.getElementById('revealAndSpotlight_showText').checked = !!interactionData.showText;
-            document.getElementById('revealAndSpotlight_text').value = interactionData.showText ? interactionData.text : '';
+            document.getElementById('revealAndSpotlight_text').value = interactionData.showText ? (interactionData.text || '') : ''; // Handle undefined text
             document.getElementById('revealAndSpotlight_showNotes').checked = !!interactionData.showNotes;
             toggleRevealAndSpotlightTextContainer(); // Ensure text container visibility is correct
+          } else if (type === 'revealOnClick') {
+            document.getElementById('revealOnClick_targetElementId').value = interactionData.targetElementId || '';
+            document.getElementById('revealOnClick_showTextModal').checked = !!interactionData.showTextModal;
+            document.getElementById('revealOnClick_textModal').value = interactionData.showTextModal ? (interactionData.textModal || '') : ''; // Handle undefined text
+            toggleRevealOnClickTextModalContainer(); // Ensure modal container visibility
           }
 
           // Load Overlay Text Settings (Common to most interaction types)
@@ -2112,10 +2213,10 @@
             const overlayTextInput = document.getElementById(`${type}_overlayText`);
             if (showOverlayCheckbox && overlayTextInput) {
               showOverlayCheckbox.checked = !!interactionData.showOverlayText; // Ensure boolean
-              overlayTextInput.value = interactionData.showOverlayText ? interactionData.overlayText : '';
+              overlayTextInput.value = interactionData.showOverlayText ? (interactionData.overlayText || '') : ''; // Handle undefined
               toggleOverlayTextContainer(showOverlayCheckbox); // Ensure visibility matches state
             }
-              
+
             const disappearCheckbox = document.getElementById(`${type}_disappearOnClick`);
             if (disappearCheckbox) {
               disappearCheckbox.checked = !!interactionData.disappearOnClick; // Ensure boolean
@@ -2124,28 +2225,17 @@
             // Load Custom Overlay Style Settings
             const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
             if (useCustomOverlayCheckbox) {
-              // IMPROVED: Always start by populating with existing overlay style from the data
-              // or global defaults if no custom style exists
+              // FIX #6: Simplified logic - If custom style data exists, check the box and populate. Otherwise, uncheck and populate with defaults.
               if (interactionData.overlayStyle && Object.keys(interactionData.overlayStyle).length > 0) {
-                // If custom style data exists, check the box and populate controls
                 useCustomOverlayCheckbox.checked = true;
                 populateOverlayStyleControls(type, interactionData.overlayStyle);
-                console.log(`Found overlay style for ${type}, populating with:`, interactionData.overlayStyle);
+                console.log(`Found custom overlay style for ${type}, populating with:`, interactionData.overlayStyle);
               } else {
-                // If no custom style data but there's opacity defined directly, create an overlay style from it
-                if (typeof interactionData.customOpacity === 'number') {
-                  const derivedStyle = { ...globalOverlayDefaults, opacity: interactionData.customOpacity };
-                  useCustomOverlayCheckbox.checked = true; 
-                  populateOverlayStyleControls(type, derivedStyle);
-                  console.log(`Using derived style from customOpacity:`, derivedStyle);
-                } else {
-                  // No style data at all, uncheck box and populate with defaults
-                  useCustomOverlayCheckbox.checked = false;
-                  populateOverlayStyleControls(type, globalOverlayDefaults);
-                  console.log(`No custom style found for ${type}, using global defaults`);
-                }
+                useCustomOverlayCheckbox.checked = false;
+                populateOverlayStyleControls(type, globalOverlayDefaults); // Populate with defaults
+                console.log(`No custom style found for ${type}, using global defaults`);
               }
-              toggleCustomOverlayContainer(useCustomOverlayCheckbox);
+              toggleCustomOverlayContainer(useCustomOverlayCheckbox); // Ensure visibility
             }
           }
 
@@ -2175,13 +2265,13 @@
               console.warn(`Animation type "${animationType}" not found. Setting to 'none'.`);
               dom.animationType.value = 'none';
           }
-          
+
           // Only populate specific fields if animation is not 'none'
           if (animationType !== 'none') {
               // Populate common trigger
               const triggerEl = document.getElementById('animationTrigger');
               triggerEl.value = animationData.trigger || 'automatic';
-              
+
               // Populate type-specific options
               if (animationType === 'pulse') {
                   document.getElementById('pulseColor').value = animationData.pulseColor || '#1a73e8';
@@ -2204,56 +2294,13 @@
       updateStatus("Element data loaded into forms.");
     }
 
+
     // --- Helper to Populate Overlay Style Controls ---
     function populateOverlayStyleControls(prefix, styleData) {
-        // Get current values from the form elements to preserve them if needed
-        let currentValues = {};
-        try {
-            // Try to get current values from UI elements to preserve them
-            const opacityEl = document.getElementById(`${prefix}_overlayOpacity`);
-            if (opacityEl) {
-                currentValues.opacity = parseInt(opacityEl.value, 10);
-            }
-            
-            const colorEl = document.getElementById(`${prefix}_overlayColor`);
-            if (colorEl) {
-                currentValues.color = colorEl.value;
-            }
-            
-            const shapeEl = document.getElementById(`${prefix}_overlayShape`);
-            if (shapeEl) {
-                currentValues.shape = shapeEl.value;
-            }
-            
-            const outlineEnabledEl = document.getElementById(`${prefix}_outlineEnabled`);
-            if (outlineEnabledEl) {
-                currentValues.outlineEnabled = outlineEnabledEl.checked;
-            }
-            
-            const outlineColorEl = document.getElementById(`${prefix}_outlineColor`);
-            if (outlineColorEl) {
-                currentValues.outlineColor = outlineColorEl.value;
-            }
-            
-            const outlineWidthEl = document.getElementById(`${prefix}_outlineWidth`);
-            if (outlineWidthEl) {
-                currentValues.outlineWidth = parseInt(outlineWidthEl.value, 10);
-            }
-            
-            const outlineStyleEl = document.getElementById(`${prefix}_outlineStyle`);
-            if (outlineStyleEl) {
-                currentValues.outlineStyle = outlineStyleEl.value;
-            }
-        } catch (e) {
-            console.error("Error getting current form values:", e);
-        }
-
-        // Merge in this order: global defaults < current form values < provided style data
-        // This ensures we keep current UI state unless explicitly overridden
-        const data = { 
-            ...globalOverlayDefaults, 
-            ...currentValues,
-            ...(styleData || {})
+        // FIX #6: Simplified logic - Directly merge defaults and provided data.
+        const data = {
+            ...globalOverlayDefaults,
+            ...(styleData || {}) // Merge provided data on top
         };
 
         // Fill common controls
@@ -2268,19 +2315,27 @@
             outlineEnabledCheckbox.checked = !!data.outlineEnabled;
             // Ensure sub-options visibility matches checkbox state immediately
              toggleOutlineOptionsVisibility(outlineEnabledCheckbox);
+        } else {
+             console.warn(`Outline checkbox not found for prefix: ${prefix}`);
         }
+
+        // Always populate outline fields, visibility is controlled by toggleOutlineOptionsVisibility
         trySetInputValue(`${prefix}_outlineColor`, data.outlineColor);
         updateColorPreview(document.getElementById(`${prefix}_outlineColor`));
         trySetInputValue(`${prefix}_outlineWidth`, data.outlineWidth);
         trySetInputValue(`${prefix}_outlineStyle`, data.outlineStyle);
-        
+
         trySetInputValue(`${prefix}_textColor`, data.textColor);
         updateColorPreview(document.getElementById(`${prefix}_textColor`));
         trySetInputValue(`${prefix}_textSize`, data.textSize);
         trySetInputValue(`${prefix}_hoverText`, data.hoverText);
     }
 
+
     function resetForms() {
+      // FIX #4: Reset Nickname
+      if (dom.elementNicknameInput) dom.elementNicknameInput.value = '';
+
       // Reset Interaction Form
       dom.interactionType.value = 'none';
       document.getElementById('interactionText').value = '';
@@ -2296,27 +2351,31 @@
       document.getElementById('revealAndSpotlight_showText').checked = false;
       document.getElementById('revealAndSpotlight_text').value = '';
       document.getElementById('revealAndSpotlight_showNotes').checked = false;
-      toggleRevealAndSpotlightTextContainer(); // Hide text container
+      toggleRevealAndSpotlightTextContainer(); // Use toggle function
+
       document.getElementById('revealOnClick_targetElementId').value = '';
       document.getElementById('revealOnClick_showTextModal').checked = false;
       document.getElementById('revealOnClick_textModal').value = '';
-      toggleRevealOnClickTextModalContainer(); // Hide modal text container
-      
+      // **ReferenceError Fix:** Call the correct toggle function
+      toggleRevealOnClickTextModalContainer(); // Use toggle function
+
       // Reset all overlay text checkboxes and inputs
       document.querySelectorAll('#interactionSettingsContent input[id$="_showOverlayText"]').forEach(cb => cb.checked = false);
       document.querySelectorAll('#interactionSettingsContent input[id$="_overlayText"]').forEach(input => input.value = '');
-      
+
       // Reset all disappearOnClick checkboxes
       document.querySelectorAll('#interactionSettingsContent input[id$="_disappearOnClick"]').forEach(cb => cb.checked = false);
-      
+
       // Reset custom overlay style checkboxes and populate with defaults
       const interactionTypes = ['showText', 'highlight', 'openUrl', 'spotlight', 'goToSlide', 'revealElement', 'revealAndSpotlight', 'revealOnClick'];
       interactionTypes.forEach(type => {
         const cb = document.getElementById(`${type}_useCustomOverlay`);
         if (cb) {
           cb.checked = false;
-          populateOverlayStyleControls(type, globalOverlayDefaults); // Reset to defaults
-          toggleCustomOverlayContainer(cb); // Hide the container
+          // Ensure controls reflect defaults even if hidden
+          populateOverlayStyleControls(type, globalOverlayDefaults);
+          // Hide the container itself
+          toggleCustomOverlayContainer(cb);
         }
       });
 
@@ -2337,6 +2396,7 @@
       // Global overlay style form is NOT reset here, it's loaded on startup/refresh
     }
 
+
     // --- Save Functions ---
 
     // Save Global Overlay Settings
@@ -2349,6 +2409,10 @@
                     updateStatus(result.message || "Global overlay styles saved.");
                     // Update local cache of defaults
                     globalOverlayDefaults = settings;
+                    // Re-populate interaction controls to reflect new defaults (if no custom style applied)
+                    if (currentElementId) {
+                         loadElementDataIntoForms(); // Re-load forms to potentially apply new defaults
+                    }
                 } else {
                     showError(result.error || "Failed to save global overlay styles.");
                 }
@@ -2364,6 +2428,8 @@
       let interactionData = { type: type }; // Base object
 
       try {
+        console.log(`Saving interaction data for ${currentElementId}, type: ${type}`);
+        
         // Gather type-specific data
         if (type === 'showText') {
           interactionData.text = document.getElementById('interactionText').value;
@@ -2374,18 +2440,21 @@
         else if (type === 'openUrl') {
           const url = document.getElementById('interactionUrl').value.trim();
           if (!url) { showError("Please enter a URL."); return; }
+          // Basic URL validation (optional but recommended)
+          try { new URL(url); } catch (_) { showError("Invalid URL format. Please include http:// or https://"); return; }
           interactionData.url = url;
         }
         else if (type === 'spotlight') {
-          interactionData.spotlightTarget = document.getElementById('spotlightTarget').value.trim() || null;
+          interactionData.spotlightTarget = document.getElementById('spotlightTarget').value.trim() || null; // Store null if empty
           interactionData.showText = document.getElementById('spotlightShowText').checked;
+          // Only include 'text' if showText is checked
           interactionData.text = interactionData.showText ? document.getElementById('spotlightText').value : undefined;
           interactionData.showNotes = document.getElementById('spotlightShowNotes').checked;
         }
         else if (type === 'goToSlide') {
           const targetSlideInput = document.getElementById('targetSlideNumber');
           const targetSlide = parseInt(targetSlideInput.value, 10);
-          if (isNaN(targetSlide) || targetSlide < 1) { showError("Please enter a valid slide number."); targetSlideInput.focus(); return; }
+          if (isNaN(targetSlide) || targetSlide < 1) { showError("Please enter a valid slide number (1 or higher)."); targetSlideInput.focus(); return; }
           interactionData.targetSlide = targetSlide;
         }
         else if (type === 'revealElement') {
@@ -2396,7 +2465,7 @@
           interactionData.targetElementId = targetId;
         }
         else if (type === 'revealAndSpotlight') {
-          const targetId = validateRevealAndSpotlightTarget();
+          const targetId = validateRevealAndSpotlightTarget(); // Uses updated validation
           if (!targetId) return; // Validation failed, exit
           interactionData.targetElementId = targetId;
 
@@ -2416,13 +2485,14 @@
           interactionData.showTextModal = document.getElementById('revealOnClick_showTextModal').checked;
           interactionData.textModal = interactionData.showTextModal ? document.getElementById('revealOnClick_textModal').value : undefined;
         }
-        
+
         // Gather common Overlay Text Settings if type is not 'none'
         if (type !== 'none') {
           const showOverlayCheckbox = document.getElementById(`${type}_showOverlayText`);
           const overlayTextInput = document.getElementById(`${type}_overlayText`);
           if (showOverlayCheckbox && overlayTextInput) {
             interactionData.showOverlayText = showOverlayCheckbox.checked;
+            // Only include overlayText if checkbox is checked
             interactionData.overlayText = interactionData.showOverlayText ? overlayTextInput.value.trim() : undefined;
           }
 
@@ -2432,65 +2502,46 @@
             interactionData.disappearOnClick = disappearCheckbox.checked;
           }
 
-          // IMPROVED CUSTOM OVERLAY STYLE HANDLING
-          // Check for custom overlay style settings or differences from global defaults
+          // CRITICAL: Custom Overlay Style Handling
           const useCustomOverlayCheckbox = document.getElementById(`${type}_useCustomOverlay`);
-          const currentSettings = collectOverlayStyleSettings(type);
+          // Always include the flag for the backend to know user's intent
+          interactionData.useCustomOverlay = useCustomOverlayCheckbox?.checked || false;
           
-          // Compare with global defaults to see if there are actual differences
-          let hasDifferences = false;
-          for (const [key, value] of Object.entries(currentSettings)) {
-            if (key === 'opacity' && value !== globalOverlayDefaults.opacity) {
-              hasDifferences = true;
-              console.log(`Opacity differs from global: ${value} vs ${globalOverlayDefaults.opacity}`);
-              break;
-            }
-            if (key === 'color' && value !== globalOverlayDefaults.color) {
-              hasDifferences = true;
-              break;
-            }
-            // Only check other properties if they're important
-            if (['shape', 'outlineEnabled', 'outlineColor', 'textColor'].includes(key) && 
-                value !== globalOverlayDefaults[key]) {
-              hasDifferences = true;
-              break;
-            }
-          }
-          
-          // Only auto-check if user hasn't explicitly unchecked the box
-          // This prevents auto-checking when the user specifically wants to use global styles
-          if (hasDifferences && useCustomOverlayCheckbox && !useCustomOverlayCheckbox.hasBeenExplicitlyUnchecked) {
-            useCustomOverlayCheckbox.checked = true;
-            console.log("Auto-checked custom overlay style due to differences from global defaults");
-          }
-
-          // Use custom overlay style only if checkbox is checked
-          if (useCustomOverlayCheckbox && useCustomOverlayCheckbox.checked) {
-            interactionData.overlayStyle = currentSettings;
-            interactionData.useCustomOverlay = true;
+          // If user checked the custom overlay box, collect style data
+          if (useCustomOverlayCheckbox?.checked) {
+            interactionData.overlayStyle = collectOverlayStyleSettings(type);
+            console.log(`Collected custom overlay style:`, interactionData.overlayStyle);
           } else {
-            // Ensure overlayStyle is NOT included if checkbox is unchecked
-            delete interactionData.overlayStyle;
-            interactionData.useCustomOverlay = false;
+            // Explicitly set to null if not using custom style to signal removal
+            interactionData.overlayStyle = null;
+            console.log(`Setting overlayStyle to null to signal removal`);
           }
-
-        } else {
-          // Ensure related fields are removed if type is 'none'
-          delete interactionData.showOverlayText;
-          delete interactionData.overlayText;
-          delete interactionData.overlayStyle;
-          delete interactionData.disappearOnClick;
-          interactionData.useCustomOverlay = false;
         }
 
+        // Remove undefined properties before saving to keep JSON clean
+        Object.keys(interactionData).forEach(key => {
+          if (interactionData[key] === undefined) {
+            delete interactionData[key];
+          }
+        });
+
+        updateStatus("Saving interaction data...");
+        console.log("Sending Interaction Data:", JSON.stringify(interactionData));
+
         google.script.run
-          .withSuccessHandler(handleSaveSuccess('interaction', interactionData))
-          .withFailureHandler(showError)
+          .withSuccessHandler(function(result) {
+            console.log("Save Result:", result);
+            handleSaveSuccess('interaction', interactionData)(result);
+          })
+          .withFailureHandler(function(error) {
+            console.error("Save Error:", error);
+            showError(error);
+          })
           .mergeElementData(currentElementId, interactionData, 'interaction');
 
       } catch (e) {
+        console.error("Error preparing interaction data:", e);
         showError("Error preparing interaction data: " + e.message);
-        console.error(e);
       }
     }
 
@@ -2512,11 +2563,20 @@
                     const distInput = document.getElementById('floatDistance');
                     const distance = parseFloat(distInput.value);
                     if (isNaN(distance) || distance < parseFloat(distInput.min) || distance > parseFloat(distInput.max)) {
-                         showError(`Invalid float distance (${distInput.min}-${distInput.max}).`); distInput.focus(); return;
+                         showError(`Invalid float distance (${distInput.min}-${distInput.max}px).`); distInput.focus(); return;
                     }
                     animationData.floatDistance = distance;
                     animationData.floatSpeed = document.getElementById('floatSpeed').value;
                 }
+                 // No specific options for bounce, shake, flash, growShrink needed here
+            } else {
+                // If type is none, ensure other properties aren't saved
+                delete animationData.trigger;
+                delete animationData.pulseColor;
+                delete animationData.pulseSpeed;
+                delete animationData.wiggleIntensity;
+                delete animationData.floatDistance;
+                delete animationData.floatSpeed;
             }
 
              updateStatus("Saving animation data...");
@@ -2539,69 +2599,105 @@
         settings.color = document.getElementById(`${prefix}_overlayColor`)?.value || '#e53935';
         settings.opacity = parseInt(document.getElementById(`${prefix}_overlayOpacity`)?.value, 10) || 15;
         settings.outlineEnabled = document.getElementById(`${prefix}_outlineEnabled`)?.checked || false;
-        // Only collect outline details if enabled
+
+        // Only collect outline details if enabled in the form
         if (settings.outlineEnabled) {
             settings.outlineColor = document.getElementById(`${prefix}_outlineColor`)?.value || '#e53935';
             settings.outlineWidth = parseInt(document.getElementById(`${prefix}_outlineWidth`)?.value, 10) || 1;
             settings.outlineStyle = document.getElementById(`${prefix}_outlineStyle`)?.value || 'dashed';
+        } else {
+             // Explicitly set to undefined if disabled so they are removed if merging
+             settings.outlineColor = undefined;
+             settings.outlineWidth = undefined;
+             settings.outlineStyle = undefined;
         }
+
         settings.textColor = document.getElementById(`${prefix}_textColor`)?.value || '#ffffff';
         settings.textSize = parseInt(document.getElementById(`${prefix}_textSize`)?.value, 10) || 14;
         settings.hoverText = document.getElementById(`${prefix}_hoverText`)?.value || 'Click here';
 
+         // Remove undefined properties before returning
+        Object.keys(settings).forEach(key => {
+          if (settings[key] === undefined) {
+            delete settings[key];
+          }
+        });
+
         return settings;
     }
 
+    // FIX #1: Updated handleSaveSuccess to rely on backend response
     function handleSaveSuccess(dataType, savedClientData) {
-       return function(result) {
-         console.log(`Save result for ${dataType}:`, result); // Log the full result object
-         if (result.success) {
-           updateStatus(result.message || `${dataType.charAt(0).toUpperCase() + dataType.slice(1)} saved.`);
+      return function(result) {
+        console.log(`Save result for ${dataType}:`, result); // Log the full result object
 
-           // Update local cache ONLY if the save was for the currently selected element
-           if (result.elementId === currentElementId) {
-               // Update raw description first from verified full data if available
-               if (result.verifiedFull !== undefined) {
-                   // Convert empty object (cleared state) to null/empty string for consistency?
-                   currentElementDescription = Object.keys(result.verifiedFull).length === 0 ? "" : JSON.stringify(result.verifiedFull);
-                   console.log("Updated raw description from verified data:", currentElementDescription);
-                   // Re-parse the verified data to update the local object cache
-                   currentElementData = parseElementData(currentElementDescription);
-                   console.log("Updated currentElementData from verified data:", currentElementData);
-               } else {
-                    // Fallback if verifiedFull is missing (should not happen ideally)
-                    console.warn("Verified full data missing from save result. Updating local cache cautiously.");
-                    if (!currentElementData) currentElementData = { interaction: null, animation: null };
-                     // Update only the specific part based on client data (less reliable)
-                    currentElementData[dataType] = (savedClientData.type !== 'none' || (dataType === 'interaction' && savedClientData.overlayStyle)) ? savedClientData : null;
-                    // Re-stringify the potentially incomplete local data
-                    currentElementDescription = JSON.stringify(currentElementData);
-               }
+        if (!result || !result.success) {
+            showError(result?.error || `Failed to save ${dataType}. Backend did not confirm success.`);
+            return;
+        }
 
-             // Refresh UI elements tied to the current selection
-             updateElementStatus(); // Update status dots/text based on new currentElementData
-           }
+        updateStatus(result.message || `${dataType.charAt(0).toUpperCase() + dataType.slice(1)} saved successfully.`);
 
-           // Refresh the relevant list
-           if (dataType === 'interaction') { loadInteractiveElements(); }
-           else if (dataType === 'animation') { loadAnimatedElements(); }
+        // Update local cache ONLY if the save was for the currently selected element
+        if (result.elementId === currentElementId) {
+            // --- CRITICAL ---
+            // Rely on the backend sending back the *complete* updated data or description string.
+            // Assume backend returns 'updatedData' (parsed object) or 'updatedDescription' (JSON string)
+            if (result.updatedData) {
+                currentElementData = result.updatedData;
+                // Attempt to stringify for description cache consistency (optional)
+                try { 
+                  currentElementDescription = JSON.stringify(result.updatedData); 
+                  console.log("Updated currentElementData from verified backend object:", currentElementData);
+                } catch(e) { 
+                  console.error("Error stringifying updated data:", e);
+                  currentElementDescription = null; 
+                }
+            } else if (result.updatedDescription !== undefined) { // Check specifically for undefined, as "" is valid
+                currentElementDescription = result.updatedDescription;
+                try {
+                  currentElementData = parseElementData(currentElementDescription); // Re-parse the verified string
+                  console.log("Re-parsed currentElementData from backend string:", currentElementData);
+                } catch(e) {
+                  console.error("Error parsing updatedDescription:", e);
+                  // If we can't parse, at least keep the raw string
+                  currentElementDescription = result.updatedDescription;
+                  currentElementData = { interaction: null, animation: null, nickname: null };
+                }
+            } else {
+                // If backend doesn't return updated data, we cannot reliably update the cache.
+                console.error("Backend success response did NOT include 'updatedData' or 'updatedDescription'. Local cache might be stale.");
+                showError(`Save confirmed, but failed to update local data cache for ${dataType}. Please refresh manually.`);
+                // Avoid updating local cache with potentially incorrect 'savedClientData'
+            }
 
-         } else {
-           showError(result.error || `Failed to save ${dataType}.`);
-         }
-       };
-     }
+            // Refresh UI elements tied to the current selection IF data was updated
+            if (result.updatedData || result.updatedDescription !== undefined) {
+                updateElementStatus(); // Update status dots/text based on new currentElementData
+                // Update nickname input specifically
+                if (dom.elementNicknameInput) {
+                    dom.elementNicknameInput.value = currentElementData?.nickname || '';
+                }
+            }
+        }
 
-    // --- Status Management (UPDATED) ---
+        // Refresh the relevant list(s) regardless of which element was saved
+        // Refresh all lists to ensure consistency across sections
+        loadCurrentListData();
+      };
+    }
+
+
+    // --- Status Management ---
     function updateElementStatus() {
-        if (!currentElementId) {
+        if (!currentElementId || !currentElementData) { // Also check currentElementData exists
             dom.elementStatusDiv.classList.add('hidden');
             return;
         }
         dom.elementStatusDiv.classList.remove('hidden');
 
         // Determine interaction status based on parsed data
-        const interaction = currentElementData?.interaction;
+        const interaction = currentElementData.interaction;
         // Interaction exists if the block is present and has a type other than 'none' OR it has custom overlay style
         const hasEffectiveInteraction = interaction && ( (interaction.type && interaction.type !== 'none') || interaction.overlayStyle );
         dom.interactionStatusDot.classList.toggle('has-interaction', hasEffectiveInteraction);
@@ -2610,7 +2706,7 @@
         dom.interactionStatusText.title = hasEffectiveInteraction ? JSON.stringify(interaction, null, 2) : 'No interaction applied';
 
         // Determine animation status
-        const animation = currentElementData?.animation;
+        const animation = currentElementData.animation;
         const hasAnimation = animation?.type && animation.type !== 'none';
         dom.animationStatusDot.classList.toggle('has-animation', hasAnimation);
         dom.animationStatusDot.classList.toggle('inactive', !hasAnimation);
@@ -2625,29 +2721,35 @@
         dom.styleStatusText.title = hasCustomStyle ? JSON.stringify(interaction.overlayStyle, null, 2) : 'Using global overlay styles';
     }
 
+
     // --- Helper Functions ---
     function updateStatus(message) {
         if (dom.statusBar) {
             dom.statusBar.textContent = message;
-            dom.statusBar.style.color = "#5f6368";
+            dom.statusBar.style.color = "#5f6368"; // Reset color on status update
             dom.statusBar.title = message;
         }
         console.log("Status:", message);
     }
-    
+
     function showError(error) {
         let displayError = "An unknown error occurred.";
         if (typeof error === 'string') displayError = error;
-        else if (error?.message) displayError = error.message;
+        else if (error && typeof error === 'object' && error.message) displayError = error.message; // Check if error is object with message
         else if (error?.toString && typeof error.toString === 'function') displayError = error.toString();
         else try { displayError = JSON.stringify(error); } catch (e) {}
 
+        // Prepend "Error: " if not already present
+        if (!displayError.toLowerCase().startsWith('error:')) {
+            displayError = `Error: ${displayError}`;
+        }
+
         if (dom.statusBar) {
-             dom.statusBar.textContent = `Error: ${displayError}`;
-             dom.statusBar.style.color = "#d93025";
+             dom.statusBar.textContent = displayError;
+             dom.statusBar.style.color = "#d93025"; // Set error color
              dom.statusBar.title = `Error details: ${displayError}`;
         }
-        console.error("Sidebar Error:", error); // Log raw error
+        console.error("Sidebar Error:", error); // Log raw error for details
     }
 
     // Helper function to set input values with error handling
@@ -2657,13 +2759,15 @@
             if (element.type === 'checkbox') {
                 element.checked = !!value; // Convert to boolean
             } else if (element.type === 'number') {
-                element.value = Number(value) || 0; // Ensure number for number inputs
+                // Handle potentially null/undefined values for numbers before converting
+                element.value = (value !== undefined && value !== null) ? Number(value) : '';
             } else {
+                // Set to empty string if value is null or undefined
                 element.value = value !== undefined && value !== null ? value : '';
             }
             return true;
         }
-        console.warn(`Element not found: ${elementId}`);
+        // console.warn(`Element not found during trySetInputValue: ${elementId}`); // Reduce console noise
         return false;
     }
 
@@ -2674,55 +2778,79 @@
       google.script.run
         .withSuccessHandler(function(result) {
           if (result.success) {
-            console.log("--- Element Debug Info ---", result);
+            console.log("--- Element Debug Info ---");
+            console.log("Element ID:", result.id);
+            console.log("Raw Description:", result.description);
+            console.log("Parsed Data (Frontend):", parseElementData(result.description));
+            console.log("--------------------------");
             updateStatus("Debug info logged to console.");
           } else { showError(result.error || "Debug failed"); }
         })
         .withFailureHandler(showError)
-        .debugElementDescription(currentElementId);
+        .getElementDescriptionForDebug(currentElementId); // Assumes backend function exists
     }
+
 
     // New function to validate element IDs for revealAndSpotlight
     function validateRevealAndSpotlightTarget() {
         const targetIdInput = document.getElementById('revealAndSpotlight_targetElementId');
         if (!targetIdInput) return null;
-        
+
         const targetId = targetIdInput.value.trim();
         if (!targetId) {
             showError("Please enter the Target Element Object ID.");
             targetIdInput.focus();
             return null;
         }
-        
+
         // Check if target matches current element ID
         if (targetId === currentElementId) {
             showError("Element cannot reveal/spotlight itself. Please select a different target element.");
             targetIdInput.focus();
             return null;
         }
-        
-        // Additional validation: check for obvious issues in ID format
-        if (targetId.length < 4 || targetId.includes(' ')) {
-            showError("The element ID format appears invalid. Element IDs should not contain spaces.");
-            return null;
+
+        // Basic check for spaces (common issue)
+        if (targetId.includes(' ')) {
+             showError("Element IDs usually don't contain spaces. Please double-check the ID.");
+             targetIdInput.focus();
+             return null; // Optional: allow saving anyway but warn
         }
-        
+
         return targetId;
     }
 
     // --- List Population ---
     function populateInteractionList(elements) {
-      // ... existing logic ...
+        // Re-use the logic from displayInteractiveElements, adapted if needed
+        displayInteractiveElements({ elements: elements });
     }
 
     function populateAnimationList(elements) {
-      // ... existing logic ...
+        // Re-use the logic from displayAnimatedElements, adapted if needed
+        displayAnimatedElements({ elements: elements });
     }
 
     // NEW: Populate the Navigation Sequence List
     function populateSequenceList(elements) {
         dom.sequenceList.innerHTML = ''; // Clear existing items
-        const sequenceItems = elements || currentInteractiveElements; // Use passed data or stored data
+        // Filter elements that actually have an interaction type (needed for sequencing)
+        const sequenceItems = (elements || currentInteractiveElements || []).filter(el => {
+             const data = parseElementData(el.description);
+             return data.interaction && data.interaction.type && data.interaction.type !== 'none';
+        });
+
+        // TODO: Fetch saved sequence order from backend and re-order `sequenceItems` array here *before* generating list items.
+        // Example placeholder for fetched order:
+        // let savedOrder = ['id3', 'id1', 'id2'];
+        // sequenceItems.sort((a, b) => {
+        //     let indexA = savedOrder.indexOf(a.id);
+        //     let indexB = savedOrder.indexOf(b.id);
+        //     if (indexA === -1) indexA = Infinity; // Items not in saved order go to end
+        //     if (indexB === -1) indexB = Infinity;
+        //     return indexA - indexB;
+        // });
+
 
         if (!sequenceItems || sequenceItems.length === 0) {
             dom.noSequenceItemsMessage.classList.remove('hidden');
@@ -2735,47 +2863,51 @@
         dom.sequenceList.classList.remove('hidden');
         dom.saveSequenceBtn.disabled = false;
 
-        // TODO: Later, fetch the *saved* sequence order here and sort `sequenceItems` accordingly.
-        // For now, populate in the default order received.
-
         sequenceItems.forEach((element, index) => {
             const listItem = document.createElement('li');
             listItem.className = 'sequence-item';
             listItem.setAttribute('draggable', 'true');
             listItem.setAttribute('data-element-id', element.id); // Store the REAL ID
 
-            // Use displayId if available, otherwise index+1 as fallback
-            const displayId = element.displayId !== undefined ? element.displayId : (index + 1); 
-            const interactionType = element.interaction?.type !== 'none' ? element.interaction?.type : '';
-            const animationType = element.animation?.type !== 'none' ? element.animation?.type : '';
-            let typeLabel = [interactionType, animationType].filter(Boolean).join(' / ') || 'No Action';
+            const data = parseElementData(element.description);
+            const nickname = data.nickname || '';
+            const interactionType = data.interaction?.type || 'none'; // Should not be none due to filter
+            const animationType = data.animation?.type !== 'none' ? data.animation?.type : '';
+            let typeLabel = [interactionType, animationType].filter(Boolean).join(' / ');
+
+            const nameToDisplay = nickname || element.name || 'Unnamed Element';
+            const titleText = `Element: ${nameToDisplay}\nObject ID: ${element.id}\nType: ${typeLabel}`;
 
             listItem.innerHTML = `
-                <span class="drag-handle" title="Drag to reorder">&#x2630;</span> 
-                <span class="item-id" title="Sequence ID">${displayId}</span> 
-                <span class="item-name" title="Element Name: ${element.name || 'Unnamed'}\nObject ID: ${element.id}">${element.name || 'Unnamed Element'}</span> 
-                <span class="item-type" title="Type">${typeLabel}</span>
+                <span class="drag-handle" title="Drag to reorder">&#x2630;</span>
+                <span class="item-id" title="Sequence Position">${index + 1}</span>
+                <span class="item-name" title="${titleText}">${nameToDisplay}</span>
+                <span class="item-type" title="Interaction/Animation Type">${typeLabel}</span>
             `;
             dom.sequenceList.appendChild(listItem);
         });
-        
+
         // Re-attach drag/drop listeners after repopulating
-        setupSequenceDragDrop(); 
+        setupSequenceDragDrop();
+        adjustSectionHeight(dom.sequenceSettingsContainer.closest('.section')); // Adjust height after populating
     }
+
 
     // --- Drag and Drop Logic for Sequence List ---
     function setupSequenceDragDrop() {
         const list = dom.sequenceList;
+        if (!list) return; // Guard if list doesn't exist
         const items = list.querySelectorAll('.sequence-item');
 
         items.forEach(item => {
-            item.removeEventListener('dragstart', handleDragStart); // Remove previous listeners
+            // Clean up potential old listeners first
+            item.removeEventListener('dragstart', handleDragStart);
             item.removeEventListener('dragover', handleDragOver);
             item.removeEventListener('dragenter', handleDragEnter);
             item.removeEventListener('dragleave', handleDragLeave);
             item.removeEventListener('drop', handleDrop);
             item.removeEventListener('dragend', handleDragEnd);
-
+            // Add new listeners
             item.addEventListener('dragstart', handleDragStart, false);
             item.addEventListener('dragover', handleDragOver, false);
             item.addEventListener('dragenter', handleDragEnter, false);
@@ -2786,9 +2918,9 @@
     }
 
     function handleDragStart(e) {
-        dragSrcElement = this;
+        dragSrcElement = this; // Use the declared variable
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/html', this.innerHTML); // Optional: for visual feedback
+        e.dataTransfer.setData('text/plain', this.getAttribute('data-element-id')); // Use plain text for element ID
         this.classList.add('dragging');
     }
 
@@ -2796,56 +2928,78 @@
         if (e.preventDefault) {
             e.preventDefault(); // Necessary. Allows us to drop.
         }
-        e.dataTransfer.dropEffect = 'move'; 
+        e.dataTransfer.dropEffect = 'move';
         return false;
     }
 
     function handleDragEnter(e) {
-        // Optional: Add visual feedback when entering a drop target
          if (this !== dragSrcElement) {
-           this.style.borderTop = '2px dashed #1a73e8'; // Highlight drop zone
+           // Use outline instead of border-top to avoid layout shifts
+           this.style.outline = '2px dashed #1a73e8';
+           this.style.outlineOffset = '-2px'; // Keep outline inside
          }
     }
 
     function handleDragLeave(e) {
-        // Optional: Remove visual feedback when leaving a drop target
-        this.style.borderTop = ''; // Clear highlight
+        // Check if the leave is to an element outside the list or another item
+        // Simple removal is usually fine.
+        this.style.outline = '';
+        this.style.outlineOffset = '';
     }
 
+    // FIX #9: Added call to updateSequenceNumbers
     function handleDrop(e) {
+        e.preventDefault(); // Prevent default browser drop behavior
         if (e.stopPropagation) {
             e.stopPropagation(); // stops the browser from redirecting.
         }
 
-        // Don't do anything if dropping the same column we're dragging.
-        if (dragSrcElement !== this) {
-            // Swap the HTML content
-            // dragSrcElement.innerHTML = this.innerHTML;
-            // this.innerHTML = e.dataTransfer.getData('text/html');
+        this.style.outline = ''; // Clear visual feedback
+        this.style.outlineOffset = '';
 
-            // More robust: Move the element itself
+        // Don't do anything if dropping onto the element being dragged.
+        if (dragSrcElement && dragSrcElement !== this) {
             const list = dom.sequenceList;
-            const dropIndex = Array.from(list.children).indexOf(this);
-            const dragIndex = Array.from(list.children).indexOf(dragSrcElement);
+            // Determine position relative to the drop target
+            const rect = this.getBoundingClientRect();
+            const verticalMidpoint = rect.top + rect.height / 2;
 
-            if (dragIndex < dropIndex) {
-                 list.insertBefore(dragSrcElement, this.nextSibling);
+            if (e.clientY < verticalMidpoint) {
+                // Insert before the target element
+                list.insertBefore(dragSrcElement, this);
             } else {
-                 list.insertBefore(dragSrcElement, this);
+                // Insert after the target element
+                list.insertBefore(dragSrcElement, this.nextSibling);
             }
+
+            updateSequenceNumbers(); // Update visual numbering
         }
-         this.style.borderTop = ''; // Clear highlight on drop
+
         return false;
     }
 
     function handleDragEnd(e) {
         // Clean up styles applied during drag
         this.classList.remove('dragging');
+        // Clear outline from all items just in case dragLeave didn't fire correctly
         dom.sequenceList.querySelectorAll('.sequence-item').forEach(item => {
-             item.style.borderTop = ''; // Ensure all highlights are cleared
+             item.style.outline = '';
+             item.style.outlineOffset = '';
         });
-        dragSrcElement = null; // Reset dragged item
+        dragSrcElement = null; // Reset dragged item reference
     }
+
+    // FIX #9: Function to update visual sequence numbers
+    function updateSequenceNumbers() {
+        const items = dom.sequenceList.querySelectorAll('.sequence-item');
+        items.forEach((item, index) => {
+            const idSpan = item.querySelector('.item-id');
+            if (idSpan) {
+                idSpan.textContent = index + 1; // Update the number (1-based index)
+            }
+        });
+    }
+
 
     // NEW: Save the Navigation Sequence
     function saveNavigationSequence() {
@@ -2853,17 +3007,23 @@
             showError("Cannot save sequence: Current slide ID is unknown. Please refresh.");
             return;
         }
-        
+
         const orderedItems = dom.sequenceList.querySelectorAll('.sequence-item');
         const orderedElementIds = Array.from(orderedItems).map(item => item.getAttribute('data-element-id'));
 
-        if (orderedElementIds.length === 0 && currentInteractiveElements.length > 0) {
-             if (!confirm("The sequence list is empty. This will clear any previously saved sequence for this slide. Continue?")) {
+        // Check if the sequence is empty but there *were* interactive items
+        const initialInteractiveItems = (currentInteractiveElements || []).filter(el => {
+             const data = parseElementData(el.description);
+             return data.interaction && data.interaction.type && data.interaction.type !== 'none';
+        });
+
+        if (orderedElementIds.length === 0 && initialInteractiveItems.length > 0) {
+             if (!confirm("The sequence list is now empty. This will clear the saved navigation sequence for this slide. Continue?")) {
                  return;
              }
-        } else if (orderedElementIds.length === 0) {
-             // No items and no interactive elements, nothing to save/clear
-             updateStatus("No elements to sequence.");
+        } else if (orderedElementIds.length === 0 && initialInteractiveItems.length === 0) {
+             // No items now and no items initially, nothing to save/clear
+             updateStatus("No interactive elements to sequence on this slide.");
              return;
         }
 
@@ -2890,7 +3050,7 @@
             showError("No element selected.");
             return;
         }
-        if (confirm("Are you sure you want to clear all settings (interactions, animations, and styles) for the selected element?")) {
+        if (confirm("Are you sure you want to clear all settings (interactions, animations, nickname, and styles) for the selected element?")) {
             updateStatus("Clearing all settings...");
             google.script.run
                 .withSuccessHandler(function(result) {
@@ -2898,70 +3058,79 @@
                         updateStatus(result.message || "All settings cleared successfully.");
                         // Reset the forms and our local data cache
                         resetForms();
-                        currentElementDescription = null;
-                        currentElementData = { interaction: null, animation: null };
-                        
+                        currentElementDescription = ""; // Set to empty string for cleared state
+                        currentElementData = parseElementData(currentElementDescription); // Parse empty string
+
                         // Update the status indicators
                         updateElementStatus();
-                        
-                        // Refresh the lists to show the element is no longer interactive
-                        loadInteractiveElements();
-                        loadAnimatedElements();
+
+                        // Refresh the lists
+                        loadCurrentListData(); // Refresh all lists
                     } else {
                         showError(result.error || "Failed to clear settings.");
                     }
                 })
                 .withFailureHandler(showError)
-                .clearElementDescription(currentElementId);
+                .clearElementDescription(currentElementId); // Pass elementId
         }
     }
 
+    // FIX #1: Updated saveElementNickname logic
     function saveElementNickname(elementId, nickname) {
         if (!elementId) {
             showError("Cannot save nickname: No element ID provided.");
             return;
         }
-        
-        updateStatus(`Saving nickname "${nickname}" for element...`);
-        
-        // Check if we have current data for this element
-        let currentData = currentElementId === elementId ? currentElementData : null;
-        
-        // If we don't have the current data and it's not the currently selected element,
-        // we need to fetch it first
-        if (!currentData) {
-            // Create a basic structure with just the nickname
-            currentData = { nickname: nickname };
-        } else {
-            // Add nickname to existing data
-            currentData.nickname = nickname;
-        }
-        
-        // Convert to JSON for storage
-        const dataToSave = JSON.stringify(currentData);
-        
+
+        const trimmedNickname = nickname.trim(); // Ensure it's trimmed
+
+        updateStatus(`Saving nickname "${trimmedNickname}" for element...`);
+
         google.script.run
-            .withSuccessHandler(function(result) {
-                if (result.success) {
+            .withSuccessHandler(function(result) { // Use anonymous function for 'this' context if needed later
+                console.log("Save nickname result:", result);
+                if (result && result.success) {
                     updateStatus(`Nickname saved successfully!`);
-                    
-                    // Update lists to show the new nickname
-                    loadInteractiveElements();
-                    loadAnimatedElements();
-                    
-                    // Update current element data if this is the selected element
-                    if (elementId === currentElementId) {
-                        currentElementDescription = result.verifiedFull ? 
-                            JSON.stringify(result.verifiedFull) : dataToSave;
-                        currentElementData = result.verifiedFull || currentData;
+
+                    // --- CRITICAL ---
+                    // Update local cache ONLY if the save was for the currently selected element AND backend provided data
+                    if (result.elementId === currentElementId) {
+                         if (result.updatedData) {
+                             currentElementData = result.updatedData;
+                             try { currentElementDescription = JSON.stringify(result.updatedData); } catch(e) { currentElementDescription = null; }
+                             console.log("Updated currentElementData from nickname save (object):", currentElementData);
+                         } else if (result.updatedDescription !== undefined) { // Check specifically for undefined
+                             currentElementDescription = result.updatedDescription;
+                             currentElementData = parseElementData(currentElementDescription);
+                             console.log("Updated currentElementData from nickname save (string):", currentElementData);
+                         } else {
+                            console.warn("Backend did not return updated data after nickname save. Local cache might be slightly stale until next refresh.");
+                            // Cautious update: only update the nickname part locally
+                             if (currentElementData) {
+                                 currentElementData.nickname = trimmedNickname || null;
+                             }
+                         }
+                         // Ensure form reflects the saved value if it's the current element
+                         if (dom.elementNicknameInput) {
+                             dom.elementNicknameInput.value = currentElementData?.nickname || '';
+                         }
                     }
+
+                    // Refresh lists to show the new nickname everywhere
+                    loadCurrentListData(); // Refresh all lists
+
                 } else {
-                    showError(result.error || "Failed to save nickname.");
+                    showError(result?.error || "Failed to save nickname.");
+                    // Revert optimistic UI update if needed (or just rely on list refresh)
+                     if (elementId === currentElementId && dom.elementNicknameInput) {
+                          dom.elementNicknameInput.value = currentElementData?.nickname || ''; // Revert input
+                     }
                 }
             })
             .withFailureHandler(showError)
-            .mergeElementNickname(elementId, nickname);
+            .mergeElementNickname(elementId, trimmedNickname); // Send trimmed nickname
     }
+
 
   </script>
 </body>

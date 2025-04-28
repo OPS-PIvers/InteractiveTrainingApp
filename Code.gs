@@ -7,16 +7,16 @@
 
 function onOpen() {
   const ui = SlidesApp.getUi();
-  
+
   // Regular menu for all users
   const menu = ui.createMenu('Onboarding Tools')
       .addItem('Show Builder Panel', 'showSidebar')
       .addItem('Get Interactive Viewer Link', 'showViewerLink');
-  
+
   // Check if running as owner/admin and add admin options
   const email = Session.getEffectiveUser().getEmail();
   const ownerEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
-  
+
   if (!ownerEmail) {
     // First run, assume current user is admin
     PropertiesService.getScriptProperties().setProperty('ADMIN_EMAIL', email);
@@ -27,7 +27,7 @@ function onOpen() {
     menu.addSeparator()
         .addItem('[Admin] Set Master Deployment ID', 'setMasterDeploymentId');
   }
-  
+
   menu.addToUi();
 }
 
@@ -49,36 +49,36 @@ function saveNavigationSequence(slideId, elementIds) {
     if (!slideId) {
       return { success: false, error: "Missing slide ID" };
     }
-    
+
     if (!Array.isArray(elementIds)) {
       return { success: false, error: "Element IDs must be provided as an array" };
     }
-    
+
     // Check if elements exist
     if (elementIds.length === 0) {
       // User is clearing the sequence
       PropertiesService.getDocumentProperties().deleteProperty(NAV_SEQUENCE_PREFIX + slideId);
       console.log(`Cleared navigation sequence for slide: ${slideId}`);
-      return { 
-        success: true, 
-        message: "Navigation sequence cleared" 
+      return {
+        success: true,
+        message: "Navigation sequence cleared"
       };
     }
 
     // Store the sequence as a JSON string in document properties
     const sequenceData = JSON.stringify(elementIds);
     PropertiesService.getDocumentProperties().setProperty(NAV_SEQUENCE_PREFIX + slideId, sequenceData);
-    
+
     console.log(`Saved navigation sequence for slide ${slideId}: ${sequenceData}`);
-    return { 
-      success: true, 
-      message: "Navigation sequence saved successfully" 
+    return {
+      success: true,
+      message: "Navigation sequence saved successfully"
     };
   } catch (e) {
     console.error(`Error saving navigation sequence: ${e.message}`);
-    return { 
-      success: false, 
-      error: `Failed to save navigation sequence: ${e.message}` 
+    return {
+      success: false,
+      error: `Failed to save navigation sequence: ${e.message}`
     };
   }
 }
@@ -93,30 +93,30 @@ function getNavigationSequence(slideId) {
     if (!slideId) {
       return { success: false, error: "Missing slide ID" };
     }
-    
+
     const sequenceData = PropertiesService.getDocumentProperties().getProperty(NAV_SEQUENCE_PREFIX + slideId);
-    
+
     if (!sequenceData) {
       // No custom sequence found - this is normal, not an error
-      return { 
-        success: true, 
+      return {
+        success: true,
         hasCustomSequence: false,
-        elementIds: [] 
+        elementIds: []
       };
     }
-    
+
     // Parse the stored JSON string
     const elementIds = JSON.parse(sequenceData);
-    
-    return { 
+
+    return {
       success: true,
       hasCustomSequence: true,
       elementIds: elementIds
     };
   } catch (e) {
     console.error(`Error getting navigation sequence: ${e.message}`);
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: `Failed to get navigation sequence: ${e.message}`
     };
   }
@@ -132,19 +132,19 @@ function clearNavigationSequence(slideId) {
     if (!slideId) {
       return { success: false, error: "Missing slide ID" };
     }
-    
+
     PropertiesService.getDocumentProperties().deleteProperty(NAV_SEQUENCE_PREFIX + slideId);
     console.log(`Cleared navigation sequence for slide: ${slideId}`);
-    
-    return { 
-      success: true, 
-      message: "Navigation sequence cleared successfully" 
+
+    return {
+      success: true,
+      message: "Navigation sequence cleared successfully"
     };
   } catch (e) {
     console.error(`Error clearing navigation sequence: ${e.message}`);
-    return { 
-      success: false, 
-      error: `Failed to clear navigation sequence: ${e.message}` 
+    return {
+      success: false,
+      error: `Failed to clear navigation sequence: ${e.message}`
     };
   }
 }
@@ -161,7 +161,7 @@ function setMasterDeploymentId() {
     '   (e.g., "AKfycbxYgN..." from "https://script.google.com/macros/s/AKfycbxYgN.../exec")',
     ui.ButtonSet.OK_CANCEL
   );
-  
+
   if (response.getSelectedButton() === ui.Button.OK) {
     const deploymentId = response.getResponseText().trim();
     if (deploymentId) {
@@ -185,7 +185,7 @@ function showViewerLink() {
   try {
     const presentationId = SlidesApp.getActivePresentation().getId();
     const masterUrl = getMasterWebAppUrl();
-    
+
     if (!masterUrl) {
       // Guide the user through setup if the master web app URL is not configured
       const ui = SlidesApp.getUi();
@@ -196,12 +196,12 @@ function showViewerLink() {
         'If you are the admin, click "Yes" to set up the master deployment ID now.',
         ui.ButtonSet.YES_NO
       );
-      
+
       // If user clicked "Yes" and is the admin, open the setup dialog
       if (result === ui.Button.YES) {
         const email = Session.getEffectiveUser().getEmail();
         const ownerEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
-        
+
         if (email === ownerEmail || !ownerEmail) {
           // User is admin, show the deployment ID setup dialog
           setMasterDeploymentId();
@@ -217,10 +217,10 @@ function showViewerLink() {
       }
       return;
     }
-    
+
     // Format the complete URL with this presentation's ID
     const viewerUrl = `${masterUrl}?presId=${presentationId}`;
-    
+
     // Show the dialog with the link
     const ui = SlidesApp.getUi();
     const htmlContent = `<div style="font-family: Arial, sans-serif; padding: 10px;">
@@ -318,7 +318,7 @@ function getSelectedElementInfo() {
     // Nothing is selected
     return { error: "No element is selected. Please click on a shape, text box, or image to select it.", canGoPrev: false, canGoNext: false };
   }
-  
+
   // Default error if nothing suitable is selected.
   // Also return nav flags as false in this case.
   return { error: "Please select a single element on the slide (shape, text box, image) to configure interactions.", canGoPrev: false, canGoNext: false };
@@ -429,7 +429,7 @@ function selectNextObjectOnSlide() {
 function setElementInteractionData(elementId, interactionDataJson) {
    const presentation = SlidesApp.getActivePresentation();
    const selection = presentation.getSelection();
-   
+
    // Ensure there's a selection context to find the slide.
    if (!selection || selection.getSelectionType() === SlidesApp.SelectionType.NONE) {
        return { success: false, error: "No slide or element selected. Please select the slide containing your element." };
@@ -485,29 +485,35 @@ function saveDescription(element, jsonString) {
  * @param {string} elementId The ID of the element to modify.
  * @param {object} newData The new data to merge (e.g., { type: 'showText', text: '...', overlayStyle: {...} }).
  * @param {string} dataType Either 'interaction' or 'animation' to indicate which part to update.
- * @returns {object} An object indicating success or failure, with message or error.
+ * @returns {object} An object indicating success or failure, with message or error, and the verified full data.
  */
 function mergeElementData(elementId, newData, dataType) {
   try {
+    // Log the incoming data for debugging
+    console.log(`mergeElementData called for ${elementId}, dataType: ${dataType}`);
+    console.log(`newData:`, JSON.stringify(newData));
+
     // Get the current element description to check for existing data
     const presentation = SlidesApp.getActivePresentation();
-    const selection = presentation.getSelection();
+    let element = null;
+    let slideFoundOn = null;
 
-    // Ensure there's a selection context to find the slide
-    if (!selection || selection.getSelectionType() === SlidesApp.SelectionType.NONE) {
-      return { success: false, error: "No slide or element selected. Please select the slide containing your element." };
+    // Find the element across all slides robustly
+    const slides = presentation.getSlides();
+    for(let i = 0; i < slides.length; i++) {
+        try {
+            const el = slides[i].getPageElementById(elementId);
+            if (el) {
+                element = el;
+                slideFoundOn = slides[i]; // Keep track of the slide
+                break;
+            }
+        } catch (e) { /* Ignore if element not on this slide */ }
     }
 
-    // Get the current slide from the selection
-    const slide = selection.getCurrentPage();
-    if (!slide) {
-      return { success: false, error: "Could not determine the active slide. Please select a slide." };
-    }
-
-    // Find the element on the current slide using its ID
-    const element = slide.getPageElementById(elementId);
     if (!element) {
-      return { success: false, error: "Element not found on the current slide. Please ensure the correct slide is active." };
+        console.error(`Element ID ${elementId} not found in presentation.`);
+        return { success: false, error: `Element not found in presentation.` };
     }
 
     // Get current description and parse as JSON if exists
@@ -517,126 +523,101 @@ function mergeElementData(elementId, newData, dataType) {
     if (description && description.trim() !== "") {
       try {
         currentData = JSON.parse(description);
+        console.log(`Found existing data:`, JSON.stringify(currentData));
       } catch (e) {
-        console.warn(`Invalid JSON in element description, treating as empty: ${e.message}`);
-        // Continue with empty object if parsing fails
+        console.warn(`Invalid JSON in element description for ${elementId}, treating as empty: ${e.message}`);
       }
     }
 
     // --- MERGE LOGIC ---
-    // Create a base object with existing data
     let mergedData = { ...currentData };
 
-    // Update or add the specified data type section
-    if (newData.type === 'none') {
-      // If setting type to 'none', remove that entire section
+    if (newData && newData.type === 'none') {
+      // If type is 'none', delete the entire data block (animation or interaction)
       delete mergedData[dataType];
-    } else {
-      // Otherwise, merge the new data into the appropriate section
-      // Ensure the section exists before merging
-      if (!mergedData[dataType]) {
-          mergedData[dataType] = {};
-      }
-
-      // Preserve existing sub-properties if not overwritten by newData
-      // Example: If saving animation, keep existing interaction data untouched.
-      // If saving interaction, keep existing animation data untouched.
-      // If saving interaction, ensure existing interaction sub-properties are kept unless overridden
-      let existingDataTypeData = mergedData[dataType] || {};
-      mergedData[dataType] = { ...existingDataTypeData, ...newData };
-
-      // Clean up interaction-specific properties based on current state
+      console.log(`Type is 'none', removing entire ${dataType} block`);
+    } else if (newData) {
+      // Initialize the data type block if it doesn't exist
+      if (!mergedData[dataType]) mergedData[dataType] = {};
+      
+      // Special handling for interaction with overlay style
       if (dataType === 'interaction') {
-        const interaction = mergedData.interaction;
-
-        // Clean up overlayText if showOverlayText is false/undefined
-        if (!interaction.showOverlayText) {
-          delete interaction.overlayText;
-        }
+        const useCustomOverlay = newData.useCustomOverlay;
         
-        // Clean up customOpacity if useCustomOpacity is false/undefined
-        if (!interaction.useCustomOpacity) {
-          delete interaction.customOpacity;
-        }
+        // First merge everything except overlayStyle
+        const { overlayStyle, useCustomOverlay: _, ...dataWithoutStyle } = newData;
+        mergedData.interaction = { ...mergedData.interaction, ...dataWithoutStyle };
         
-        // Remove overlayStyle entirely if interaction.useCustomOverlay (new flag) is false/undefined
-        if (!interaction.useCustomOverlay) { // Assuming a new flag from sidebar indicates customisation
-          delete interaction.overlayStyle;
+        // Handle overlay style specifically
+        if (useCustomOverlay === true && overlayStyle) {
+          // User wants custom style and provided style data
+          mergedData.interaction.overlayStyle = overlayStyle;
+          console.log(`Applied custom overlay style:`, JSON.stringify(overlayStyle));
+        } else if (useCustomOverlay === false) {
+          // User explicitly doesn't want custom style
+          delete mergedData.interaction.overlayStyle;
+          console.log(`Removed custom overlay style`);
+        } else if (overlayStyle === null) {
+          // Only remove if explicitly set to null
+          delete mergedData.interaction.overlayStyle;
+          console.log(`Removed custom overlay style (null case)`);
         }
-        // Remove the useCustomOverlay flag itself after cleanup
-        delete interaction.useCustomOverlay;
+        // Otherwise, don't touch the overlayStyle (undefined case)
         
-        // --- NEW: Handle appearance behavior properties ---
-        if (interaction.appearanceBehavior) {
-          // If the behavior is not 'afterPrevious', remove the dependency element ID
-          if (interaction.appearanceBehavior !== 'afterPrevious') {
-            delete interaction.appearAfterElementId;
-          }
-          // Otherwise ensure the ID exists if provided
-          else if (interaction.appearAfterElementId === undefined || 
-                  interaction.appearAfterElementId === null || 
-                  interaction.appearAfterElementId === '') {
-            // Provide a warning but don't block the save
-            console.warn(`Element ${elementId} has 'afterPrevious' behavior but no valid target element ID`);
-          }
+        // Clean up
+        if (!mergedData.interaction.showOverlayText) {
+          delete mergedData.interaction.overlayText;
         }
-        // If no behavior specified, set to default
-        else {
-          interaction.appearanceBehavior = 'withPresentation';
-          delete interaction.appearAfterElementId;
-        }
+      } else {
+        // For animation or other types, simple merge
+        mergedData[dataType] = { ...mergedData[dataType], ...newData };
       }
+    } else {
+       console.warn(`mergeElementData called with null or undefined newData for ${dataType}`);
     }
 
-    // Check if the entire description should be cleared
-    // Note: An interaction might exist but have no effect (e.g., only overlayStyle) - consider this if needed.
-    // For now, keep if *any* data exists in either section.
-    const interactionIsEmpty = !mergedData.interaction || Object.keys(mergedData.interaction).length === 0 || mergedData.interaction.type === 'none';
-    const animationIsEmpty = !mergedData.animation || Object.keys(mergedData.animation).length === 0 || mergedData.animation.type === 'none';
+    // Log the merged operation for debugging
+    //logMergeOperation(elementId, newData, dataType, currentData, mergedData);
 
-    if (interactionIsEmpty && animationIsEmpty) {
+    // Check if the entire description should be cleared
+    const interactionIsEmpty = !mergedData.interaction || Object.keys(mergedData.interaction).length === 0 || 
+                              (mergedData.interaction.type === 'none' && !mergedData.interaction.overlayStyle);
+    const animationIsEmpty = !mergedData.animation || Object.keys(mergedData.animation).length === 0 || 
+                             mergedData.animation.type === 'none';
+    const nicknameIsEmpty = !mergedData.nickname;
+
+    if (interactionIsEmpty && animationIsEmpty && nicknameIsEmpty) {
       element.setDescription("");
+      console.log(`Cleared description for ${elementId} as all data was empty.`);
       return {
         success: true,
-        message: `${dataType.charAt(0).toUpperCase() + dataType.slice(1)} data cleared.`,
-        elementId: elementId, // Return elementId for client reference
-        verifiedFull: {} // Indicate cleared state
+        message: `${dataType.charAt(0).toUpperCase() + dataType.slice(1)} data resulted in empty description.`,
+        elementId: elementId,
+        updatedDescription: "" // Explicitly return empty string
       };
     }
 
     // --- SAVE MERGED DATA ---
     const mergedJson = JSON.stringify(mergedData);
     element.setDescription(mergedJson);
+    console.log(`Saved merged description for ${elementId}: ${mergedJson.substring(0, 200)}...`);
 
-    // Verify the save worked by reading it back
-    const verifyDesc = element.getDescription();
-
-    // Verify parsing of the saved data
-    let verifiedParsedData = null;
-    try {
-      verifiedParsedData = JSON.parse(verifyDesc);
-    } catch(e) {
-       console.error("Verification failed: Could not parse saved description back.");
-    }
-
+    // Return the updated description string for client-side cache update
     return {
       success: true,
       message: `${dataType.charAt(0).toUpperCase() + dataType.slice(1)} data saved successfully.`,
-      elementId: elementId, // Return elementId for client reference
-      verifiedDataType: dataType,
-      verifiedData: verifiedParsedData ? verifiedParsedData[dataType] : null, // Return the specific part from *verified* parse
-      verifiedFull: verifiedParsedData // Return the full *verified* parsed object
+      elementId: elementId,
+      updatedDescription: mergedJson // Return the actual saved string
     };
   } catch (e) {
-    console.error(`Error in mergeElementData: ${e.message}`);
+    console.error(`Error in mergeElementData for ${elementId}: ${e.message}\nStack: ${e.stack}`);
     return {
       success: false,
       error: `Failed to merge data: ${e.message}`,
-      elementId: elementId // Return elementId even on error
+      elementId: elementId
     };
   }
 }
-
 
 
 
@@ -650,18 +631,17 @@ function mergeElementData(elementId, newData, dataType) {
 function getAllInteractiveElements() {
   try {
     const selection = SlidesApp.getActivePresentation().getSelection();
-    if (!selection) { 
-      return { 
-        error: "No active presentation found. Please make sure you have a presentation open." 
-      }; 
+    if (!selection) {
+      return {
+        error: "No active presentation found. Please make sure you have a presentation open."
+      };
     }
 
-    // Use the current page from selection, or default to the first slide
     const slide = selection.getCurrentPage() || SlidesApp.getActivePresentation().getSlides()[0];
-    if (!slide) { 
-      return { 
-        error: "Could not determine the active slide. Please select a slide in your presentation." 
-      }; 
+    if (!slide) {
+      return {
+        error: "Could not determine the active slide. Please select a slide in your presentation."
+      };
     }
 
     const slideId = slide.getObjectId();
@@ -672,108 +652,95 @@ function getAllInteractiveElements() {
 
     // Get saved navigation sequence if it exists
     const sequenceResult = getNavigationSequence(slideId);
-    const savedSequence = sequenceResult.success && sequenceResult.hasCustomSequence ? 
+    const savedSequence = sequenceResult.success && sequenceResult.hasCustomSequence ?
                           sequenceResult.elementIds : null;
-    
-    // Create index mapping for sequential display IDs
-    const displayIdMap = new Map();
 
     for (let i = 0; i < elements.length; i++) {
       const element = elements[i];
+      const elementId = element.getObjectId();
       const desc = element.getDescription();
+      let data = null;
+      let isInteractive = false; // Flag to determine if it should be listed
 
-      if (desc && desc.trim().startsWith('{') && desc.trim().endsWith('}')) { // Basic check for JSON
-        let data = null;
+      // Basic info always included
+      let elementBaseData = {
+          id: elementId,
+          type: element.getPageElementType().toString(),
+          left: element.getLeft(),
+          top: element.getTop(),
+          width: element.getWidth(),
+          height: element.getHeight(),
+          interaction: null, // Initialize as null
+          animation: null,
+          nickname: null
+      };
+
+      // Try to get name/text
+       try {
+           const elementType = element.getPageElementType();
+           if (elementType === SlidesApp.PageElementType.SHAPE && element.asShape().getText) {
+               elementBaseData.name = element.asShape().getText().asString().trim();
+           } else if (elementType === SlidesApp.PageElementType.TEXT_BOX && element.asTextBox().getText) {
+               elementBaseData.name = element.asTextBox().getText().asString().trim();
+           } else if (elementType === SlidesApp.PageElementType.IMAGE && element.getTitle) {
+               elementBaseData.name = element.getTitle() || "Image";
+           } else if (elementType === SlidesApp.PageElementType.VIDEO && element.getTitle) {
+               elementBaseData.name = element.getTitle() || "Video";
+           } else if (elementType === SlidesApp.PageElementType.GROUP) {
+               elementBaseData.name = "Group";
+           }
+       } catch (e) {
+         console.warn(`Could not get text/name for element ${elementId}: ${e.message}`);
+       }
+       // Fallback name
+       if (!elementBaseData.name) {
+           elementBaseData.name = `${elementBaseData.type} (${elementId.substring(0, 5)}...)`;
+       }
+       // Shorten long names
+       if (elementBaseData.name && elementBaseData.name.length > 50) { // Increased length slightly
+           elementBaseData.name = elementBaseData.name.substring(0, 50).trim() + "...";
+       }
+
+      // Try to parse description for interaction/animation/nickname data
+      if (desc && desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
         try {
           data = JSON.parse(desc);
+          // Merge parsed data into base data
+          if (data.interaction) elementBaseData.interaction = data.interaction;
+          if (data.animation) elementBaseData.animation = data.animation;
+          if (data.nickname) elementBaseData.nickname = data.nickname;
 
-          // Check if data is an object and has *any* interaction or animation keys
-          const hasInteractionData = data.interaction && typeof data.interaction === 'object';
-          const hasAnimationData = data.animation && typeof data.animation === 'object';
+          // Mark as interactive if it has any relevant data block OR a nickname
+          isInteractive = !!(elementBaseData.interaction || elementBaseData.animation || elementBaseData.nickname);
 
-          // Consider it "interactive" if it has either block, regardless of 'type' value
-          if (hasInteractionData || hasAnimationData) {
-            // Get element name with improved error handling
-            let elementName = "";
-            try {
-              if (element.getPageElementType() === SlidesApp.PageElementType.SHAPE && element.asShape().getText) {
-                elementName = element.asShape().getText().asString().substring(0, 30).trim();
-                if (element.asShape().getText().asString().length > 30) elementName += "...";
-              } else if (element.getPageElementType() === SlidesApp.PageElementType.TEXT_BOX && element.asTextBox().getText) {
-                elementName = element.asTextBox().getText().asString().substring(0, 30).trim();
-                if (element.asTextBox().getText().asString().length > 30) elementName += "...";
-              } else if (element.getPageElementType() === SlidesApp.PageElementType.IMAGE) {
-                  elementName = "Image"; // Handle Images
-              } else if (element.getPageElementType() === SlidesApp.PageElementType.VIDEO) {
-                  elementName = "Video"; // Handle Videos
-              }
-              // Add other element types as needed
-            } catch (e) {
-              console.warn(`Could not get text/type name for element ${element.getObjectId()}: ${e.message}`);
-            }
-
-            if (!elementName) {
-              // Fallback name using type and ID
-              elementName = `${element.getPageElementType().toString()} (${element.getObjectId().substring(0, 5)}...)`;
-            }
-
-            // Store the element ID to assign display IDs later
-            displayIdMap.set(element.getObjectId(), {
-              index: interactiveElements.length,
-              name: elementName
-            });
-            
-            // Add element to list, including the raw description for client-side parsing
-            interactiveElements.push({
-              id: element.getObjectId(),
-              name: elementName,
-              elementType: element.getPageElementType().toString(),
-              description: desc // Pass raw description for client parsing
-            });
-          }
         } catch (e) {
-          console.warn(`Element ${element.getObjectId()} has invalid JSON in description: ${e.message}`);
-          console.warn(`Raw description: ${desc}`);
+          console.warn(`Element ${elementId} has invalid JSON in description: ${e.message}`);
+          isInteractive = false; // Don't list if JSON is invalid
         }
       }
-    }
-    
-    // Assign sequential display IDs
-    // First, reorder according to saved sequence if present
-    let orderedElements = [...interactiveElements];
-    if (savedSequence && savedSequence.length > 0) {
-      // Reorder according to saved sequence
-      const orderedTemp = [];
-      const unorderedElements = [...interactiveElements]; // Copy to preserve original
-      
-      // First add elements in the saved sequence order
-      savedSequence.forEach(id => {
-        const elementIndex = unorderedElements.findIndex(el => el.id === id);
-        if (elementIndex !== -1) {
-          orderedTemp.push(unorderedElements[elementIndex]);
-          unorderedElements.splice(elementIndex, 1); // Remove from unordered list
-        }
-      });
-      
-      // Then append any remaining elements (not in saved sequence)
-      orderedElements = [...orderedTemp, ...unorderedElements];
-    }
-    
-    // Assign display IDs to the final ordered list
-    orderedElements.forEach((element, index) => {
-      element.displayId = index + 1; // Assign sequential numbers starting from 1
+
+      // Always add the element with its base info, plus any merged data
+      // Client-side will decide if it's "interactive" based on the presence of interaction/animation/nickname
+      interactiveElements.push(elementBaseData);
+
+    } // End loop through elements
+
+    // Assign sequential display IDs based on the order found on the slide initially
+    interactiveElements.forEach((element, index) => {
+      element.displayId = index + 1; // Assign sequential numbers based on slide order
     });
-    
-    console.log(`Found ${interactiveElements.length} interactive elements on slide ${slideId}`);
-    return { 
-      elements: orderedElements,
+
+    console.log(`Returning ${interactiveElements.length} total elements (with/without data) for slide ${slideId}`);
+    return {
+      elements: interactiveElements, // Return ALL elements with merged data
       slideId: slideId,
-      hasCustomSequence: savedSequence !== null
+      hasCustomSequence: savedSequence !== null,
+      customSequence: savedSequence // Include the saved sequence if it exists
     };
   } catch (error) {
     console.error("Error in getAllInteractiveElements:", error);
-    return { 
-      error: `Failed to get interactive elements: ${error.message}. Please check your slide content and try again.` 
+    return {
+      error: `Failed to get interactive elements: ${error.message}. Please check your slide content and try again.`
     };
   }
 }
@@ -782,49 +749,41 @@ function getAllInteractiveElements() {
 
 
 /**
- * Removes interaction data from a specific element by clearing its description.
- * Called by the sidebar when the delete button is clicked on a list item.
+ * Removes all settings (description) from a specific element.
  * @param {string} elementId The ID of the element to modify.
  * @returns {object} An object indicating success or failure.
  */
-function removeElementInteraction(elementId) {
-  // NOTE: This function clears ALL data (interaction + animation).
-  // If only one type should be removed, mergeElementData with type 'none' should be used.
-  // Keeping this function as is for now, assuming 'Delete' means remove all configs.
+function removeElementInteraction(elementId) { // Renamed for consistency, but clears all
   try {
     const presentation = SlidesApp.getActivePresentation();
-    const selection = presentation.getSelection();
-    
-    // Ensure there's a selection context to find the slide
-    if (!selection || selection.getSelectionType() === SlidesApp.SelectionType.NONE) {
-      return { success: false, error: "No slide or element selected. Please select the slide containing your element." };
+    let element = null;
+
+    // Find the element across all slides robustly
+    const slides = presentation.getSlides();
+    for(let i = 0; i < slides.length; i++) {
+        try {
+            const el = slides[i].getPageElementById(elementId);
+            if (el) { element = el; break; }
+        } catch (e) { /* Ignore */ }
     }
 
-    // Get the current slide from the selection
-    const slide = selection.getCurrentPage();
-    if (!slide) {
-      return { success: false, error: "Could not determine the active slide. Please select a slide." };
-    }
-
-    // Find the element on the current slide using its ID
-    const element = slide.getPageElementById(elementId);
     if (!element) {
-      return { success: false, error: "Element not found on the current slide. Please ensure the correct slide is active." };
+      return { success: false, error: "Element not found in presentation." };
     }
 
-    // Clear the description to remove ALL interaction/animation data.
+    // Clear the description to remove ALL interaction/animation/nickname data.
     element.setDescription("");
     console.log(`Cleared description for element ${elementId}`);
 
     return {
       success: true,
-      message: "All Interaction/Animation data removed successfully."
+      message: "All settings removed successfully."
     };
   } catch (e) {
-    console.error("Error removing element interaction:", e);
+    console.error("Error removing element settings:", e);
     return {
       success: false,
-      error: `Failed to remove interaction: ${e.message}`
+      error: `Failed to remove settings: ${e.message}`
     };
   }
 }
@@ -841,50 +800,39 @@ function selectElementById(elementId) {
     const presentation = SlidesApp.getActivePresentation();
     let targetElement = null;
     let targetSlide = null;
-    
-    // First check current slide
-    const selection = presentation.getSelection();
-    const currentSlide = selection?.getCurrentPage();
-    
-    if (currentSlide) {
-      targetElement = currentSlide.getPageElementById(elementId);
-      if (targetElement) {
-        targetSlide = currentSlide;
-      }
-    }
-    
-    // If not found, search all slides (with progress indicator in UI)
-    if (!targetElement) {
-      const slides = presentation.getSlides();
-      for (let i = 0; i < slides.length; i++) {
-        try {
-          const element = slides[i].getPageElementById(elementId);
-          if (element) {
-            targetElement = element;
-            targetSlide = slides[i];
-            break;
-          }
-        } catch (e) {
-          // Skip invalid elements
+
+    // Find the element across all slides
+    const slides = presentation.getSlides();
+    for (let i = 0; i < slides.length; i++) {
+      try {
+        const element = slides[i].getPageElementById(elementId);
+        if (element) {
+          targetElement = element;
+          targetSlide = slides[i];
+          break;
         }
-      }
+      } catch (e) { /* Skip */ }
     }
-    
+
     if (!targetElement || !targetSlide) {
-      return { 
-        success: false, 
-        error: "Element not found in presentation. It may have been deleted." 
+      return {
+        success: false,
+        error: "Element not found in presentation. It may have been deleted."
       };
     }
-    
+
     // Switch to target slide if needed
+    const selection = presentation.getSelection();
+    const currentSlide = selection?.getCurrentPage();
     if (currentSlide?.getObjectId() !== targetSlide.getObjectId()) {
       targetSlide.selectAsCurrentPage();
+      Utilities.sleep(100); // Short delay for UI update
     }
-    
-    // Actually select the element
+
+    // Select the element
     targetElement.select();
-    
+    Utilities.sleep(50); // Short delay after selection
+
     return { success: true, message: "Element selected successfully." };
   } catch (e) {
     console.error("Error in selectElementById:", e);
@@ -896,72 +844,79 @@ function selectElementById(elementId) {
 
 
 /**
- * Clears the description field of the selected element.
- * @returns {object} Result indicating success or failure.
+ * Clears the description field of the currently selected element or specified element ID.
+ * Called via Sidebar action button or delete functions.
+ * @param {string} [elementId] Optional: ID of element to clear. If null, uses current selection.
+ * @returns {object} Result indicating success or failure, includes updatedDescription.
  */
-function clearElementDescription() {
+function clearElementDescription(elementId = null) {
   try {
-    const info = getSelectedElementInfo();
-    if (info.error) {
-      return { success: false, error: info.error };
-    }
-
-    const elementId = info.id;
     const presentation = SlidesApp.getActivePresentation();
     const selection = presentation.getSelection();
-    
-    // Ensure there's a selection context to find the slide
-    if (!selection || selection.getSelectionType() === SlidesApp.SelectionType.NONE) {
-      return { success: false, error: "No slide or element selected. Please select the slide containing your element." };
+    let element = null;
+    let currentElementId = elementId; // Use provided ID if available
+
+    if (currentElementId) {
+       // If ID provided, find it directly across all slides
+       const slides = presentation.getSlides();
+       for(let i=0; i<slides.length; i++) {
+           try {
+               const el = slides[i].getPageElementById(currentElementId);
+               if (el) { element = el; break; }
+           } catch(e){}
+       }
+    } else {
+       // If no ID, rely on current selection
+       if (selection?.getSelectionType() === SlidesApp.SelectionType.PAGE_ELEMENT) {
+           const pageElements = selection.getPageElementRange().getPageElements();
+           if (pageElements.length === 1) {
+               element = pageElements[0];
+               currentElementId = element.getObjectId(); // Get ID from selection
+           } else if (pageElements.length > 1) {
+                return { success: false, error: "Multiple elements selected. Please select only one." };
+           }
+       }
     }
 
-    // Get the current slide from the selection
-    const slide = selection.getCurrentPage();
-    if (!slide) {
-      return { success: false, error: "Could not determine the active slide. Please select a slide." };
-    }
-
-    // Find the element on the current slide using its ID
-    const element = slide.getPageElementById(elementId);
     if (!element) {
-      return { success: false, error: "Element not found on the current slide. Please ensure the correct slide is active." };
+      return { success: false, error: currentElementId ? `Element ID ${currentElementId} not found.` : "No single element selected." };
     }
 
     // Clear the description
     element.setDescription("");
-    console.log(`Cleared description for element ${elementId}`);
+    console.log(`Cleared description for element ${currentElementId}`);
 
     return {
       success: true,
-      message: "Element description cleared successfully.",
-      elementId: elementId
+      message: "Element settings cleared successfully.",
+      elementId: currentElementId,
+      updatedDescription: "" // Explicitly return empty string representing cleared state
     };
   } catch (e) {
+    console.error(`Error clearing description for ${elementId}: ${e.message}`);
     return {
       success: false,
-      error: `Failed to clear description: ${e.message}`
+      error: `Failed to clear settings: ${e.message}`
     };
   }
 }
 
 
-// --- Step Number Functions (REMOVED) ---
-// Functions addStepNumber, resetStepCounter, getCurrentStepNumber were removed.
 
-
-// --- NEW: Global Overlay Style Constants ---
+// --- Global Overlay Style Constants ---
 const OVERLAY_SETTINGS_PREFIX = 'WEBAPP_OVERLAY_';
 const OVERLAY_DEFAULTS = {
   shape: 'rectangle',
-  color: '#e53935', // Default Red
-  opacity: 0, // Default 0% (changed from 15%)
-  outlineEnabled: true, // Default: Outline ON
-  outlineColor: '#e53935', // Default Red
-  outlineWidth: 1, // Default 1px
-  outlineStyle: 'dashed', // Default dashed
-  textColor: '#ffffff', // Default White
-  textSize: 14, // Default 14px
-  hoverText: 'Click here' // Default hover text
+  color: '#e53935',
+  opacity: 0,
+  outlineEnabled: true,
+  outlineColor: '#e53935',
+  outlineWidth: 1,
+  outlineStyle: 'dashed',
+  textColor: '#ffffff',
+  textSize: 14,
+  hoverText: 'Click here',
+  textBackground: false
 };
 
 
@@ -973,36 +928,27 @@ const OVERLAY_DEFAULTS = {
 function getGlobalOverlaySettings() {
   const props = PropertiesService.getScriptProperties();
   const settings = {};
-  
+
   Object.keys(OVERLAY_DEFAULTS).forEach(key => {
     const propKey = OVERLAY_SETTINGS_PREFIX + key.toUpperCase();
     const rawValue = props.getProperty(propKey);
-    
-    // Important: Only use default if value is strictly null (not found)
-    // This ensures '0' values (for opacity) are properly handled
+
     if (rawValue === null) {
-      // Value not found, use default
       settings[key] = OVERLAY_DEFAULTS[key];
-      console.log(`Property ${propKey} not found, using default: ${OVERLAY_DEFAULTS[key]}`);
     } else {
-      // Value found, parse it based on expected type
       const defaultValue = OVERLAY_DEFAULTS[key];
       if (typeof defaultValue === 'number') {
         const numValue = parseFloat(rawValue);
         settings[key] = isNaN(numValue) ? defaultValue : numValue;
-        console.log(`Loaded numeric property ${propKey}: ${numValue}`);
       } else if (typeof defaultValue === 'boolean') {
         settings[key] = (rawValue === 'true');
-        console.log(`Loaded boolean property ${propKey}: ${rawValue}`);
       } else {
-        // Assume string (color, shape, style, hoverText)
-        settings[key] = rawValue;
-        console.log(`Loaded string property ${propKey}: ${rawValue}`);
+        settings[key] = rawValue; // String
       }
     }
   });
 
-  console.log(`getGlobalOverlaySettings: Returning ${JSON.stringify(settings)}`);
+  // console.log(`getGlobalOverlaySettings: Returning ${JSON.stringify(settings)}`); // Reduce logging noise
   return { success: true, settings: settings };
 }
 
@@ -1015,31 +961,30 @@ function getGlobalOverlaySettings() {
 function setGlobalOverlaySettings(settings) {
   try {
     const props = PropertiesService.getScriptProperties();
-    const keys = Object.keys(OVERLAY_DEFAULTS); // Use defaults to know which keys to expect
+    const keys = Object.keys(OVERLAY_DEFAULTS);
 
     keys.forEach(key => {
-      if (settings.hasOwnProperty(key)) {
-        const propKey = OVERLAY_SETTINGS_PREFIX + key.toUpperCase();
+      const propKey = OVERLAY_SETTINGS_PREFIX + key.toUpperCase();
+      if (settings.hasOwnProperty(key) && settings[key] !== undefined && settings[key] !== null) {
         let valueToSave = settings[key];
-
-        // Basic validation/type consistency
         const defaultValue = OVERLAY_DEFAULTS[key];
         if (typeof defaultValue === 'number') {
           valueToSave = parseFloat(valueToSave);
           if (isNaN(valueToSave)) valueToSave = defaultValue;
         } else if (typeof defaultValue === 'boolean') {
-          valueToSave = !!valueToSave; // Ensure boolean
+          valueToSave = !!valueToSave;
         } else if (typeof defaultValue === 'string') {
-           valueToSave = String(valueToSave).trim(); // Ensure string, trim whitespace
+           valueToSave = String(valueToSave).trim();
         }
-
-        props.setProperty(propKey, String(valueToSave)); // Store all as strings
+        props.setProperty(propKey, String(valueToSave));
       } else {
-        console.warn(`setGlobalOverlaySettings: Missing key '${key}' in input settings.`);
+        // If key is missing or invalid in input, delete the property to revert to default
+        props.deleteProperty(propKey);
+        console.log(`setGlobalOverlaySettings: Key '${key}' missing or invalid, deleting property ${propKey}.`);
       }
     });
 
-    console.log(`setGlobalOverlaySettings: Saved ${JSON.stringify(settings)}`);
+    console.log(`setGlobalOverlaySettings: Saved settings.`);
     return { success: true, message: "Global overlay styles saved." };
   } catch (e) {
     console.error("Error setting global overlay settings:", e);
@@ -1060,36 +1005,15 @@ function doGet(e) {
   const presentationId = e?.parameter?.presId || "";
   console.log(`doGet triggered for presentation ID: ${presentationId}`);
 
+  // Check for diagnostic mode
+  if (e?.parameter?.diag === 'true') {
+      console.log("Serving diagnostic page.");
+      return serveDiagnosticPage(e);
+  }
+
   // If no presentation ID is provided, show a helpful intro page
   if (!presentationId) {
-    return HtmlService.createHtmlOutput(`
-      <html>
-      <head>
-        <title>Interactive Training - Welcome</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-          h1, h2 { color: #1a73e8; }
-          .container { max-width: 800px; margin: 0 auto; }
-          .section { margin-bottom: 30px; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
-          .hint { background-color: #e8f0fe; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>Interactive Training Viewer</h1>
-          <div class="section">
-            <h2>Welcome</h2>
-            <p>This interactive viewer lets you view Google Slides presentations with interactive elements.</p>
-            <p>To view a presentation, you need a link that includes the presentation ID.</p>
-            <div class="hint">
-              <p><strong>Need a viewer link?</strong> Open your presentation, click on the "Onboarding Tools" menu, 
-              then select "Get Interactive Viewer Link" to get a shareable URL.</p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `)
+    return HtmlService.createHtmlOutputFromFile('Welcome') // Use separate Welcome.html file
     .setTitle('Interactive Training - Welcome')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
@@ -1107,62 +1031,43 @@ function doGet(e) {
         .setTitle('Interactive Training')
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   } catch (err) {
-    console.error(`Error accessing presentation: ${err.message}`);
-    
+    console.error(`Error accessing presentation ${presentationId}: ${err.message}`);
+
     // Provide more specific error messages
     let errorTitle = 'Error Loading Presentation';
     let errorHeading = 'Error';
-    let errorDescription = `Could not load the presentation (ID: ${presentationId}).`;
-    let errorSuggestion = 'The presentation may not exist or there was a problem loading it.';
-    
-    // Check if this is a permission error - fixed syntax
+    let errorDescription = `Could not load the presentation.`;
+    let errorSuggestion = 'Please check the presentation ID in the URL. The presentation may not exist, have been deleted, or there was a server problem.';
+
     const isPermissionError = err.message && (
-      err.message.includes("Access denied") || 
+      err.message.includes("Access denied") ||
       err.message.includes("permission") ||
-      err.message.includes("Insufficient")
+      err.message.includes("Insufficient") ||
+      err.message.includes("not found")
     );
-    
+
     if (isPermissionError) {
-      errorHeading = 'Access Denied';
-      errorDescription = `You don't have permission to access this presentation (ID: ${presentationId}).`;
-      errorSuggestion = 'The presentation owner needs to share it with you or make it accessible to anyone with the link.';
+      errorHeading = 'Access Denied or Not Found';
+      errorDescription = `Could not access the presentation (ID: ${presentationId.substring(0,15)}...).`;
+      errorSuggestion = 'Please verify the link and ensure the presentation owner has shared it with you or made it accessible.';
     }
-    
+
     // Return a user-friendly error page
-    return HtmlService.createHtmlOutput(`
-      <html>
-      <head>
-        <title>Interactive Training - ${errorTitle}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-          h1, h2 { color: #d93025; }
-          .container { max-width: 800px; margin: 0 auto; }
-          .error-section { margin-bottom: 30px; padding: 20px; border: 1px solid #f44336; border-radius: 8px; background-color: #fff0f0; }
-          .suggestion { margin-top: 20px; padding: 15px; background-color: #fffde7; border-radius: 8px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>${errorTitle}</h1>
-          <div class="error-section">
-            <h2>${errorHeading}</h2>
-            <p>${errorDescription}</p>
-            <div class="suggestion">
-              <p><strong>Suggestion:</strong> ${errorSuggestion}</p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `)
-    .setTitle(`Interactive Training - ${errorTitle}`)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    const errorTemplate = HtmlService.createTemplateFromFile('Error');
+    errorTemplate.errorTitle = errorTitle;
+    errorTemplate.errorHeading = errorHeading;
+    errorTemplate.errorDescription = errorDescription;
+    errorTemplate.errorSuggestion = errorSuggestion;
+    return errorTemplate.evaluate()
+      .setTitle(`Interactive Training - ${errorTitle}`)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
 }
 
+
 /**
  * Fetches data for a specific slide to be displayed in the web app.
- * Includes global overlay style settings.
+ * Includes global overlay style settings and data for ALL elements on the slide.
  * Called by the WebApp.html JavaScript (loadSlide).
  * @param {string} presentationId The ID of the Google Slides presentation.
  * @param {number} slideIndex The 0-based index of the slide to fetch.
@@ -1170,16 +1075,16 @@ function doGet(e) {
  */
 function getSlideDataForWebApp(presentationId, slideIndex) {
   console.log(`Entering getSlideDataForWebApp for ID: ${presentationId}, Index: ${slideIndex}`);
-  
+
   // Validate parameters
   if (!presentationId) {
     console.error("getSlideDataForWebApp: Missing presentation ID parameter");
     return { error: "Presentation ID is required." };
   }
-  slideIndex = parseInt(slideIndex, 10); // Ensure slideIndex is a number
+  slideIndex = parseInt(slideIndex, 10);
   if (isNaN(slideIndex) || slideIndex < 0) {
     console.log("getSlideDataForWebApp: Invalid or missing slide index, defaulting to 0");
-    slideIndex = 0; // Default to first slide if invalid
+    slideIndex = 0;
   }
 
   try {
@@ -1202,145 +1107,79 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
       console.warn(`Failed to get global overlay settings: ${globalOverlayResult.error}`);
     }
     const globalOverlayDefaults = globalOverlayResult.settings || OVERLAY_DEFAULTS;
-    
-    // Prepare the data object to return
+
+    // Prepare the data object
     const slideData = {
       id: slideId,
       index: slideIndex,
       total: slides.length,
-      elements: [],
+      elements: [], // **MODIFIED: Will contain ALL elements**
       globalOverlayDefaults: globalOverlayDefaults,
-      dimensions: {
-        width: presentation.getPageWidth(),
-        height: presentation.getPageHeight()
-      }
+      slideWidth: presentation.getPageWidth(),
+      slideHeight: presentation.getPageHeight(),
+      notes: "" // Initialize notes
     };
-
-    // Get saved navigation sequence if it exists
-    const sequenceResult = getNavigationSequence(slideId);
-    const savedSequence = sequenceResult.success && sequenceResult.hasCustomSequence ? 
-                          sequenceResult.elementIds : null;
-    slideData.hasCustomSequence = savedSequence !== null;
-    slideData.customSequence = savedSequence || [];
-
-    // Get background image data URL
-    try {
-      slideData.backgroundUrl = getSlideBackgroundAsDataUrl(slide);
-      console.log(`[GS] Background URL fetched: ${slideData.backgroundUrl ? 'Success' : 'null'}`);
-    } catch (bgError) {
-      console.error(`Error getting background: ${bgError.message}`);
-    }
 
     // Get slide notes
     try {
-      slideData.notes = slide.getNotesPage().getSpeakerNotesShape().getText().asString();
+      const notesPage = slide.getNotesPage();
+      if (notesPage) {
+        const notesShape = notesPage.getSpeakerNotesShape();
+        if (notesShape) slideData.notes = notesShape.getText().asString();
+      }
     } catch(notesError) {
-      console.warn(`No speaker notes found: ${notesError}`);
-      slideData.notes = "";
+      console.warn(`No speaker notes found or error getting notes: ${notesError}`);
     }
 
-    // Process page elements to find interactive ones
+    // Get background image
+    slideData.backgroundUrl = getSlideBackgroundAsDataUrl_NoCache(slide);
+    console.log(`[GS] Background URL fetched: ${slideData.backgroundUrl ? 'Success' : 'null'}`);
+
+    // **MODIFIED: Process ALL page elements**
     const pageElements = slide.getPageElements();
-    console.log(`[GS] Found ${pageElements.length} elements on slide ${slideIndex}`);
+    console.log(`[GS] Found ${pageElements.length} total elements on slide ${slideIndex}`);
 
-    // Create a mapping of IDs for easier lookup and debugging
-    const elementIdMap = new Map();
-
-    // First pass: collect all elements IDs for complete mapping
-    pageElements.forEach((element) => {
-      elementIdMap.set(element.getObjectId(), {
-        type: element.getPageElementType().toString(),
-        left: element.getLeft(),
-        top: element.getTop(),
-        width: element.getWidth(), 
-        height: element.getHeight()
-      });
-    });
-
-    // Array to store all elements with interactive data
-    const elementsWithData = [];
-
-    // Second pass: process elements with interactive data
     pageElements.forEach((element) => {
       try {
+        const elementId = element.getObjectId();
+        // Base data for EVERY element
+        let elementData = {
+          id: elementId,
+          type: element.getPageElementType().toString(),
+          left: element.getLeft(),
+          top: element.getTop(),
+          width: element.getWidth(),
+          height: element.getHeight(),
+          interaction: null, // Initialize
+          animation: null,
+          nickname: null
+        };
+
+        // Try to get description and merge data
         const desc = element.getDescription();
-        if (!desc || !desc.trim()) return; // Skip if no description
-
-        if (desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
+        if (desc && desc.trim().startsWith('{') && desc.trim().endsWith('}')) {
           try {
-            const data = JSON.parse(desc);
-            const hasInteractionData = data.interaction && typeof data.interaction === 'object';
-            const hasAnimationData = data.animation && typeof data.animation === 'object';
-
-            if (hasInteractionData || hasAnimationData) {
-              // Element has valid interactive data, add it to our list
-              const elementId = element.getObjectId();
-              const elementData = {
-                id: elementId,
-                type: element.getPageElementType().toString(),
-                left: element.getLeft(),
-                top: element.getTop(),
-                width: element.getWidth(),
-                height: element.getHeight(),
-                interaction: data.interaction || null,
-                animation: data.animation || null
-              };
-
-              // Try to extract element text for identification (but don't fail if we can't)
-              try {
-                if (element.getPageElementType() === SlidesApp.PageElementType.SHAPE) {
-                  elementData.text = element.asShape().getText().asString();
-                } else if (element.getPageElementType() === SlidesApp.PageElementType.TEXT_BOX) {
-                  elementData.text = element.asTextBox().getText().asString();
-                }
-              } catch (e) {
-                console.warn(`Couldn't get text for element ${elementId}: ${e.message}`);
-              }
-
-              elementsWithData.push(elementData);
-            }
+            const parsedDesc = JSON.parse(desc);
+            // Merge known properties
+            if (parsedDesc.interaction) elementData.interaction = parsedDesc.interaction;
+            if (parsedDesc.animation) elementData.animation = parsedDesc.animation;
+            if (parsedDesc.nickname) elementData.nickname = parsedDesc.nickname;
           } catch (e) {
-            console.warn(`Element ${element.getObjectId()} has invalid JSON in description: ${e.message}`);
+            console.warn(`Element ${elementId} has invalid JSON in description: ${e.message}`);
           }
         }
+        // Add the element data (basic or merged) to the list
+        slideData.elements.push(elementData);
+
       } catch (e) {
-        console.warn(`Error processing element: ${e.message}`);
+        // Catch errors processing individual elements (e.g., unsupported types)
+        console.warn(`Error processing element ${element?.getObjectId() || 'UNKNOWN'}: ${e.message}`);
       }
-    });
+    }); // End loop through pageElements
 
-    // Apply ordering based on saved sequence (if exists)
-    if (savedSequence && savedSequence.length > 0) {
-      // First add elements in the saved sequence
-      const orderedElements = [];
-      const remainingElements = [...elementsWithData]; // Make a copy to track what's left
+    console.log(`[GS] Finished processing slide ${slideIndex}. Returning data for ${slideData.elements.length} elements.`);
+    return slideData; // Return data for ALL elements
 
-      savedSequence.forEach(id => {
-        const elementIndex = remainingElements.findIndex(el => el.id === id);
-        if (elementIndex !== -1) {
-          orderedElements.push(remainingElements[elementIndex]);
-          remainingElements.splice(elementIndex, 1); // Remove from remaining
-        }
-      });
-
-      // Add any elements not in the sequence at the end
-      slideData.elements = [...orderedElements, ...remainingElements];
-    } else {
-      slideData.elements = elementsWithData;
-    }
-
-    // Assign sequential display IDs for easier reference
-    slideData.elements.forEach((element, index) => {
-      element.displayId = index + 1;
-    });
-
-    // Add debug information about all IDs for troubleshooting
-    slideData._debug = {
-      allElementIds: Array.from(elementIdMap.keys()),
-      interactiveElementIds: slideData.elements.map(el => el.id)
-    };
-
-    console.log(`[GS] Finished processing slide ${slideIndex}. Found ${slideData.elements.length} elements with data.`);
-    return slideData;
   } catch (e) {
     console.error(`Error in getSlideDataForWebApp (ID: ${presentationId}, Index: ${slideIndex}): ${e.toString()}\nStack: ${e.stack}`);
     return { error: `An error occurred while loading slide data: ${e.message}. Check script logs.` };
@@ -1348,155 +1187,183 @@ function getSlideDataForWebApp(presentationId, slideIndex) {
 }
 
 /**
+ * **FIXED VERSION WITHOUT CACHING**
  * Attempts to get the background of a slide as a Base64 Data URL.
  * Uses multiple methods for maximum compatibility.
- * @param {Slide} slide The Google Slides slide object.
+ * Removed caching to prevent "Argument too large" errors.
+ * @param {SlidesApp.Slide} slide The Google Slides slide object.
  * @returns {string|null} Base64 Data URL of the background or null if not found/error.
  */
-function getSlideBackgroundAsDataUrl(slide) {
+function getSlideBackgroundAsDataUrl_NoCache(slide) {
+  const slideId = slide.getObjectId();
+  console.log(`[GS - NoCache] Getting background for slide ${slideId}`);
+  let dataUrl = null;
+
   try {
-    const cache = CacheService.getScriptCache();
-    const slideId = slide.getObjectId();
-    const cacheKey = 'bg_' + slideId;
-    
-    // Check cache first
-    const cachedData = cache.get(cacheKey);
-    if (cachedData) {
-      // Don't return "null" string as a value
-      return cachedData === "null" ? null : cachedData;
-    }
-    
-    // Check for solid fill first (fastest)
-    let dataUrl = null;
+    // Check for solid fill first
     try {
       const background = slide.getBackground();
-      const solidFill = background.getSolidFill();
-      if (solidFill) {
-        // For solid backgrounds, just cache null to avoid repeated checks
-        cache.put(cacheKey, "null", 600); // 10 minute cache
+      if (background.getSolidFill()) {
+        console.log(`[GS - NoCache] Slide ${slideId} has solid fill background.`);
         return null;
       }
     } catch (e) {
-      // Continue to other methods
+      console.warn(`[GS - NoCache] Error checking solid fill for ${slideId}: ${e.message}`);
     }
-    
+
     // Try picture fill next
     try {
       const background = slide.getBackground();
       const fill = background.getPictureFill();
-      if (fill) {
+      if (fill && fill.getBlob) {
         const blob = fill.getBlob();
         if (blob) {
+          console.log(`[GS - NoCache] Found picture fill for ${slideId}. Encoding...`);
           dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
+          console.log(`[GS - NoCache] Picture fill encoding complete for ${slideId}. Length: ${dataUrl ? dataUrl.length : 'N/A'}`);
         }
       }
     } catch (e) {
-      // Continue to API method
+       console.warn(`[GS - NoCache] Error checking picture fill for ${slideId}: ${e.message}`);
     }
-    
-    // Last resort: Slides API
-    if (!dataUrl && typeof Slides !== 'undefined') {
+
+    // Last resort: Slides API (If Slides Service is enabled)
+    if (!dataUrl && typeof Slides !== 'undefined' && Slides.Presentations && Slides.Presentations.Pages) {
       try {
+        console.log(`[GS - NoCache] Trying Slides API thumbnail method for ${slideId}...`);
         const presentationId = slide.getParent().getId();
         const thumbnailResponse = Slides.Presentations.Pages.getThumbnail(
-          presentationId, 
+          presentationId,
           slideId,
-          { 'thumbnailProperties.thumbnailSize': 'LARGE' }
+          { 'thumbnailProperties.thumbnailSize': 'LARGE' } // Request large for better quality
         );
-        
+
         if (thumbnailResponse && thumbnailResponse.contentUrl) {
+          console.log(`[GS - NoCache] Fetching thumbnail URL: ${thumbnailResponse.contentUrl}`);
           const response = UrlFetchApp.fetch(thumbnailResponse.contentUrl, {
-            muteHttpExceptions: true,
-            followRedirects: true,
-            validateHttpsCertificates: true,
-            timeout: 5000 // 5 second timeout
+             muteHttpExceptions: true,
+             followRedirects: true,
+             validateHttpsCertificates: true,
+             headers: { 'Authorization': 'Bearer ' + ScriptApp.getOAuthToken() },
+             deadline: 10 // 10 second deadline
           });
-          
-          if (response.getResponseCode() === 200) {
+
+          const responseCode = response.getResponseCode();
+          console.log(`[GS - NoCache] Thumbnail fetch response code: ${responseCode}`);
+
+          if (responseCode === 200) {
             const blob = response.getBlob();
+            console.log(`[GS - NoCache] Slides API blob received for ${slideId}. Encoding...`);
             dataUrl = `data:${blob.getContentType()};base64,${Utilities.base64Encode(blob.getBytes())}`;
+            console.log(`[GS - NoCache] Slides API encoding complete for ${slideId}. Length: ${dataUrl ? dataUrl.length : 'N/A'}`);
+          } else {
+             console.warn(`[GS - NoCache] Slides API thumbnail fetch failed for ${slideId} with status ${responseCode}. Response: ${response.getContentText().substring(0, 200)}`);
           }
+        } else {
+            console.log(`[GS - NoCache] Slides API did not return a contentUrl for ${slideId}.`);
         }
       } catch (e) {
-        console.error(`API method failed: ${e.message}`);
+        console.error(`[GS - NoCache] Slides API thumbnail method failed for ${slideId}: ${e.message}`);
+        if (e.message && e.message.toLowerCase().includes('api service')) {
+           console.error("[GS - NoCache] Suggestion: Ensure the 'Google Slides API' advanced service is enabled in the Apps Script project settings.");
+        }
       }
+    } else if (!dataUrl) {
+        console.log("[GS - NoCache] Slides API service not available or picture fill did not yield data.");
     }
-    
-    // Cache result (including null) for 10 minutes
-    cache.put(cacheKey, dataUrl || "null", 600);
+
+    // **Crucial:** Check size before returning. If > ~1MB, return null to avoid issues.
+    // 1MB Base64 is roughly 1.37 MB original. Adjust limit as needed. Cache limit is ~100KB.
+    // Web app transfer limit is much higher (~50MB), but rendering large data URLs can be slow.
+    // Let's set a practical limit of 2MB for the data URL string itself.
+    const MAX_DATA_URL_LENGTH = 2 * 1024 * 1024; // 2 MB
+    if (dataUrl && dataUrl.length > MAX_DATA_URL_LENGTH) {
+        console.warn(`[GS - NoCache] Generated background data URL for ${slideId} is too large (${(dataUrl.length / 1024 / 1024).toFixed(2)} MB). Returning null.`);
+        return null;
+    }
+
+    console.log(`[GS - NoCache] Returning dataUrl (length: ${dataUrl ? dataUrl.length : 'null'}) for ${slideId}`);
     return dataUrl;
+
   } catch (e) {
-    console.error(`Background error for ${slide.getObjectId()}: ${e.message}`);
+    console.error(`[GS - NoCache] Unexpected error in getSlideBackgroundAsDataUrl_NoCache for ${slideId}: ${e.message}\nStack: ${e.stack}`);
     return null;
   }
 }
 
-/** 
+
+
+/**
  * Updates just the nickname of an element, preserving other data
  * @param {string} elementId The ID of the element to update
  * @param {string} nickname The new nickname to assign to this element
- * @returns {object} Result object with success/error information
+ * @returns {object} Result object with success/error information and updated description
  */
 function mergeElementNickname(elementId, nickname) {
   try {
-    // Get the current element description to check for existing data
     const presentation = SlidesApp.getActivePresentation();
-    const selection = presentation.getSelection();
-    
-    // Ensure there's a selection context to find the slide
-    if (!selection || selection.getSelectionType() === SlidesApp.SelectionType.NONE) {
-      return { success: false, error: "No slide or element selected. Please select the slide containing your element." };
+    let element = null;
+
+    // Find the element across all slides robustly
+    const slides = presentation.getSlides();
+    for(let i = 0; i < slides.length; i++) {
+        try {
+            const el = slides[i].getPageElementById(elementId);
+            if (el) { element = el; break; }
+        } catch (e) { /* Ignore */ }
     }
 
-    // Get the current slide from the selection
-    const slide = selection.getCurrentPage();
-    if (!slide) {
-      return { success: false, error: "Could not determine the active slide. Please select a slide." };
-    }
-
-    // Find the element on the current slide using its ID
-    const element = slide.getPageElementById(elementId);
     if (!element) {
-      return { success: false, error: "Element not found on the current slide. Please ensure the correct slide is active." };
+        return { success: false, error: "Element not found in presentation." };
     }
 
     // Get current description and parse as JSON if exists
     let currentData = {};
     const description = element.getDescription();
-
-    if (description && description.trim() !== "") {
+    if (description && description.trim().startsWith('{') && description.trim().endsWith('}')) {
       try {
         currentData = JSON.parse(description);
       } catch (e) {
-        console.warn(`Invalid JSON in element description, treating as empty: ${e.message}`);
-        // Continue with empty object if parsing fails
+        console.warn(`Invalid JSON in element description for ${elementId}, treating as empty: ${e.message}`);
       }
+    } else if (description && description.trim()) {
+        console.warn(`Overwriting plain text description for ${elementId} with new nickname data.`);
+        currentData = {}; // Start fresh
     }
 
-    // Add or update the nickname property
-    currentData.nickname = nickname;
+    // Add or update/remove the nickname property
+    const trimmedNickname = nickname ? nickname.trim() : null; // Trim or nullify
+    if (!trimmedNickname) {
+        delete currentData.nickname;
+    } else {
+        currentData.nickname = trimmedNickname;
+    }
 
     // Save merged data
     const mergedJson = JSON.stringify(currentData);
-    element.setDescription(mergedJson);
 
-    // Verify the save worked by reading it back
-    const verifyDesc = element.getDescription();
-    let verifiedParsedData = null;
-    try {
-      verifiedParsedData = JSON.parse(verifyDesc);
-    } catch(e) {
-       console.error("Verification failed: Could not parse saved description back.");
+    if (mergedJson === "{}") {
+        element.setDescription(""); // Clear description if only nickname existed and was removed
+        console.log(`Cleared description for ${elementId} as only nickname existed and was removed.`);
+        return {
+            success: true,
+            message: `Nickname removed successfully.`,
+            elementId: elementId,
+            updatedDescription: "" // Explicitly return empty string
+        };
+    } else {
+        element.setDescription(mergedJson);
+        console.log(`Saved nickname description for ${elementId}.`);
+        return {
+            success: true,
+            message: `Nickname saved successfully.`,
+            elementId: elementId,
+            updatedDescription: mergedJson // Return the actual saved string
+        };
     }
 
-    return {
-      success: true,
-      message: `Nickname saved successfully.`,
-      elementId: elementId,
-      verifiedFull: verifiedParsedData
-    };
   } catch (e) {
-    console.error(`Error in mergeElementNickname: ${e.message}`);
+    console.error(`Error in mergeElementNickname for ${elementId}: ${e.message}\nStack: ${e.stack}`);
     return {
       success: false,
       error: `Failed to save nickname: ${e.message}`,
@@ -1507,13 +1374,12 @@ function mergeElementNickname(elementId, nickname) {
 
 // --- Utility & Debug Functions ---
 
-/** 
+/**
  * Converts a hex color string (#RRGGBB or #RGB) to an RGB object for the Slides API.
  * @param {string} hex Hex color string.
  * @returns {object} {red, green, blue} object with values 0-1.
  */
 function hexToRgb(hex) {
-   // Implementation from previous version - looks correct
      hex = hex.replace(/^#/, '');
      let r = 0, g = 0, b = 0;
      if (hex.length === 3) {
@@ -1552,13 +1418,13 @@ function serveDiagnosticPage(e) {
         .section { margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; }
         .info-item { margin-bottom: 10px; }
         .label { font-weight: bold; color: #666; }
-        pre { background-color: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+        pre { background-color: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-size: 11px; }
         button { background-color: #1a73e8; color: white; border: none; padding: 8px 16px;
                 border-radius: 4px; cursor: pointer; margin-right: 10px; margin-top: 5px; }
         button:hover { background-color: #1558b7; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
         table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; font-size: 12px; }
         th { background-color: #f2f2f2; }
         .slide-thumbnail { max-width: 200px; height: auto; margin-right: 10px; border: 1px solid #ddd; vertical-align: top; }
         #slideDetails { border-top: 1px solid #eee; margin-top: 15px; padding-top: 15px; }
@@ -1675,16 +1541,17 @@ function serveDiagnosticPage(e) {
 
           google.script.run
             .withSuccessHandler(function(result) {
+              loadSlideBtn.textContent = 'Reload Slide Details'; // Reset button text
+              loadSlideBtn.disabled = false; // Re-enable button
+
               if (result.error) {
                 slideDetailsDiv.innerHTML = '<p style="color: red;">Error loading slide: ' + result.error + '</p>';
-                loadSlideBtn.textContent = 'Load Slide Details';
-                loadSlideBtn.disabled = false;
                 return;
               }
 
-              let html = '<div class="info-item"><span class="label">Slide ID:</span> ' + result.slideId + '</div>';
-              html += '<div class="info-item"><span class="label">Slide Index:</span> ' + result.currentSlideIndex + '</div>';
-              html += '<div class="info-item"><span class="label">Notes:</span> <pre>' + (result.slideNotes || 'None') + '</pre></div>';
+              let html = '<div class="info-item"><span class="label">Slide ID:</span> ' + result.id + '</div>'; // Use result.id
+              html += '<div class="info-item"><span class="label">Slide Index:</span> ' + result.index + '</div>'; // Use result.index
+              html += '<div class="info-item"><span class="label">Notes:</span> <pre>' + (result.notes || 'None') + '</pre></div>';
               // Display global overlay defaults
               if (result.globalOverlayDefaults) {
                 html += '<h3>Global Overlay Defaults</h3>';
@@ -1692,21 +1559,19 @@ function serveDiagnosticPage(e) {
               } else {
                 html += '<p style="color: orange;">Global overlay defaults missing.</p>';
               }
-              // html += '<div class="info-item"><span class="label">Overlay Opacity:</span> ' + result.overlayOpacity + '%</div>'; // Deprecated
-              // html += '<div class="info-item"><span class="label">Overlay Shadow:</span> ' + result.overlayShadow + '</div>'; // Deprecated
-              loadSlideBtn.textContent = 'Reload Slide Details';
-              loadSlideBtn.disabled = false;
               html += '<div class="info-item"><span class="label">Background:</span><br>';
               if (result.backgroundUrl) {
-                html += '<img src="' + result.backgroundUrl + '" class="slide-thumbnail" alt="Slide Background Preview"></div>';
+                // Display first few chars of data url for confirmation, not the whole thing
+                html += '<span>Data URL fetched (Length: ' + result.backgroundUrl.length + ')</span>';
+                // html += '<img src="' + result.backgroundUrl + '" class="slide-thumbnail" alt="Slide Background Preview"></div>'; // Avoid rendering large images
               } else {
                 html += '<span>Solid color or no background image</span></div>';
               }
 
-              html += '<h3>Interactive Elements (' + (result.elements?.length || 0) + ')</h3>';
+              html += '<h3>Elements (' + (result.elements?.length || 0) + ')</h3>';
 
               if (result.elements && result.elements.length > 0) {
-                html += '<table><thead><tr><th>ID</th><th>Type</th><Pos (L,T)</th><th>Size (W,H)</th><th>Interaction</th><th>Animation</th></tr></thead><tbody>';
+                 html += '<table><thead><tr><th>ID</th><th>Type</th><th>Pos (L,T)</th><th>Size (W,H)</th><th>Interaction</th><th>Animation</th><th>Nickname</th></tr></thead><tbody>';
 
                 result.elements.forEach(element => {
                   html += '<tr>';
@@ -1715,23 +1580,24 @@ function serveDiagnosticPage(e) {
                   html += '<td>' + Math.round(element.left) + ', ' + Math.round(element.top) + '</td>';
                   html += '<td>' + Math.round(element.width) + ', ' + Math.round(element.height) + '</td>';
 
-                  const interactionDetails = element.interaction ? JSON.stringify(element.interaction, null, 2) : 'None';
+                  const interactionDetails = element.interaction ? JSON.stringify(element.interaction, null, 2) : '<i>null</i>';
                   html += '<td><pre>' + interactionDetails + '</pre></td>';
 
-                  const animationDetails = element.animation ? JSON.stringify(element.animation, null, 2) : 'None';
+                  const animationDetails = element.animation ? JSON.stringify(element.animation, null, 2) : '<i>null</i>';
                   html += '<td><pre>' + animationDetails + '</pre></td>';
+
+                  const nicknameDetails = element.nickname || '<i>null</i>';
+                  html += '<td><pre>' + nicknameDetails + '</pre></td>';
 
                   html += '</tr>';
                 });
 
                 html += '</tbody></table>';
               } else {
-                html += '<p>No interactive elements found on this slide.</p>';
+                html += '<p>No elements found on this slide.</p>';
               }
 
               slideDetailsDiv.innerHTML = html;
-              loadSlideBtn.textContent = 'Reload Slide Details';
-              loadSlideBtn.disabled = false;
             })
             .withFailureHandler(function(error) {
               slideDetailsDiv.innerHTML =
@@ -1791,49 +1657,19 @@ function getDiagnosticPresentationInfo(presentationId) {
  * @param {string} elementId The ID of the element to inspect.
  * @returns {object} Debug information about the element's description.
  */
-function debugElementDescription(elementId) {
+function getElementDescriptionForDebug(elementId) { // Renamed to match sidebar call
   try {
     if (!elementId) return { success: false, error: "No element ID provided." };
     const presentation = SlidesApp.getActivePresentation();
-    const selection = presentation.getSelection();
     let element = null;
-    let slideId = null;
-    let slideIndex = -1;
-    let parsedSuccessfully = false;
-    
-    // First, check the current slide from selection
-    if (selection && selection.getCurrentPage()) {
-      const currentSlide = selection.getCurrentPage();
-      element = currentSlide.getPageElementById(elementId);
-      if (element) {
-        slideId = currentSlide.getObjectId();
-        // Find the slide index
-        const slides = presentation.getSlides();
-        for (let i = 0; i < slides.length; i++) {
-          if (slides[i].getObjectId() === slideId) {
-            slideIndex = i;
-            break;
-          }
-        }
-        console.warn(`Element ${elementId} found on the current slide.`);
-      } else {
-        console.warn(`Element ${elementId} not found on current slide, searching all slides...`);
-      }
-    }
-    
-    // If not found on current slide, search all slides
-    if (!element) {
-      const allSlides = presentation.getSlides();
-      for (let i = 0; i < allSlides.length; i++) {
-          const s = allSlides[i];
-                   const el = s.getPageElementById(elementId);
-          if (el) {
-              element = el;
-              slideId = s.getObjectId();
-              slideIndex = i;
-              break;
-          }
-      }
+
+     // Find the element across all slides robustly
+    const slides = presentation.getSlides();
+    for(let i = 0; i < slides.length; i++) {
+        try {
+            const el = slides[i].getPageElementById(elementId);
+            if (el) { element = el; break; }
+        } catch (e) { /* Ignore */ }
     }
 
     if (!element) {
@@ -1841,61 +1677,14 @@ function debugElementDescription(elementId) {
     }
 
     const description = element.getDescription();
-    let parsedData = null;
-    let parseError = null;
-    let hasInteractionField = false;
-    let interactionType = 'N/A';
-    let hasAnimationField = false;
-    let animationType = 'N/A';
-    let hasOverlayStyleField = false; // Include overlay style check
-
-    if (description && description.trim() !== "") {
-        try {
-            parsedData = JSON.parse(description);
-            if (parsedData && typeof parsedData === 'object') {
-                 hasInteractionField = parsedData.hasOwnProperty('interaction');
-                 if (hasInteractionField && parsedData.interaction && typeof parsedData.interaction === 'object') {
-                    interactionType = parsedData.interaction.type || 'Type missing';
-                    hasOverlayStyleField = parsedData.interaction.hasOwnProperty('overlayStyle'); // Check within interaction
-                 } else if (hasInteractionField) {
-                    interactionType = 'Invalid format';
-                 } else {
-                    interactionType = 'Not present';
-                 }
-                 hasAnimationField = parsedData.hasOwnProperty('animation');
-                 if (hasAnimationField && parsedData.animation && typeof parsedData.animation === 'object') {
-                    animationType = parsedData.animation.type || 'Type missing';
-                 } else if (hasAnimationField) {
-                     animationType = 'Invalid format';
-                 } else {
-                     animationType = 'Not present';
-                 }
-            }
-            parsedSuccessfully = true;
-        } catch (e) {
-            parseError = e.message;
-        }
-    }
 
     return {
         success: true,
-        elementId: elementId,
-        slideId: slideId,
-        slideIndex: slideIndex,
-        hasDescription: !!description,
-        descriptionLength: description ? description.length : 0,
-        rawDescription: description, // Include raw description for inspection
-        parsedSuccessfully: parsedSuccessfully,
-        parseError: parseError,
-        hasInteractionField: hasInteractionField,
-        interactionType: interactionType,
-        hasAnimationField: hasAnimationField,
-        animationType: animationType,
-        hasOverlayStyleField: hasOverlayStyleField, // Include overlay style check
-        parsedData: parsedData // Include parsed data if successful
+        id: elementId,
+        description: description || "(No Description)",
     };
   } catch (e) {
-      console.error(`Error in debugElementDescription for ${elementId}: ${e}`);
+      console.error(`Error in getElementDescriptionForDebug for ${elementId}: ${e}`);
       return { success: false, error: `Debug failed: ${e.message}` };
   }
 }

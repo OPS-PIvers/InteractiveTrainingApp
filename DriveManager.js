@@ -19,13 +19,13 @@ class DriveManager {
       try {
         // Try to find existing root folder
         const rootFolderName = DRIVE_SETTINGS.ROOT_FOLDER_NAME;
-        const rootFolderQuery = `name = '${rootFolderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
         
-        const folders = DriveApp.searchFolders(rootFolderQuery);
+        // Search for folders with the correct name
+        const folderIterator = DriveApp.getFoldersByName(rootFolderName);
         
-        if (folders.hasNext()) {
+        if (folderIterator.hasNext()) {
           // Use existing folder
-          const folder = folders.next();
+          const folder = folderIterator.next();
           this.rootFolderId = folder.getId();
           logDebug(`Found existing root folder: ${rootFolderName} (${this.rootFolderId})`);
         } else {

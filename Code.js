@@ -27,6 +27,8 @@ function onOpen(e) {
       .addItem('Manage Files', 'showFileManager')
       .addSeparator()
       .addItem('View Analytics', 'showAnalyticsDashboard')
+      .addSeparator()
+      .addItem('Locate Root Folder', 'showRootFolderURL')
       .addToUi();
     
     // Initialize the application
@@ -539,4 +541,37 @@ function showFileManager() {
 function showAnalyticsDashboard() {
   const ui = SpreadsheetApp.getUi();
   ui.alert('Coming Soon', 'Analytics dashboard will be implemented in a future phase.', ui.ButtonSet.OK);
+}
+
+/**
+ * Shows the URL of the root project folder
+ */
+function showRootFolderURL() {
+  try {
+    if (!driveManager) {
+      initialize();
+    }
+    
+    const rootFolder = driveManager.getRootFolder();
+    const folderURL = rootFolder.getUrl();
+    const folderName = rootFolder.getName();
+    
+    const ui = SpreadsheetApp.getUi();
+    ui.alert('Root Folder Location', 
+             `Folder: ${folderName}\n\nURL: ${folderURL}\n\nClick OK to open the folder.`,
+             ui.ButtonSet.OK);
+    
+    // Open the folder in a new tab
+    const html = HtmlService.createHtmlOutput(
+      `<script>window.open('${folderURL}', '_blank');google.script.host.close();</script>`
+    )
+    .setWidth(10)
+    .setHeight(10);
+    
+    ui.showModalDialog(html, 'Opening folder...');
+    
+  } catch (error) {
+    logError(`Failed to show root folder URL: ${error.message}`);
+    showErrorAlert('Failed to locate the root folder. Please check the logs for details.');
+  }
 }

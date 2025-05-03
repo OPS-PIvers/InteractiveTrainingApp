@@ -7,13 +7,10 @@
 let sheetAccessor = null;
 let templateManager = null;
 let driveManager = null;
+let mediaProcessor = null;
+let fileUploader = null;
+let projectManager = null;
 
-/**
- * Function that runs when the spreadsheet is opened
- * Sets up custom menu and initializes the application
- * 
- * @param {Object} e - Event object from Google Apps Script
- */
 function onOpen(e) {
   try {
     // Create menu
@@ -23,6 +20,12 @@ function onOpen(e) {
       .addSeparator()
       .addItem('Edit Project', 'showProjectSelector')
       .addItem('View Project', 'showProjectViewer')
+      .addSeparator()
+      .addSubMenu(SpreadsheetApp.getUi().createMenu('Project Tools')
+        .addItem('Add Slide', 'showAddSlideDialog')
+        .addItem('Add Element', 'showAddElementDialog')
+        .addItem('Upload Media', 'showFileUploadDialog')
+        .addItem('Deploy Project', 'showDeployProjectDialog'))
       .addSeparator()
       .addItem('Manage Files', 'showFileManager')
       .addSeparator()
@@ -69,6 +72,11 @@ function initialize() {
     
     // Initialize DriveManager
     driveManager = new DriveManager();
+    
+    // Initialize Phase 2 components
+    mediaProcessor = new MediaProcessor(driveManager);
+    fileUploader = new FileUploader(driveManager, mediaProcessor);
+    projectManager = new ProjectManager(sheetAccessor, templateManager, driveManager);
     
     logInfo('Application successfully initialized');
     return true;
@@ -262,59 +270,21 @@ function showNewProjectDialog() {
  */
 function createNewProject(projectName) {
   try {
-    // Validate project name
-    if (!projectName || projectName.trim() === '') {
-      return { success: false, message: 'Project name cannot be empty' };
-    }
-    
     // Check if the application is initialized
-    if (!sheetAccessor || !templateManager || !driveManager) {
+    if (!projectManager) {
       initialize();
     }
     
-    // Create project tab from template
-    const projectTabName = templateManager.createProjectFromTemplate(projectName);
+    // Use the ProjectManager to create the project
+    const result = projectManager.createProject(projectName);
     
-    if (!projectTabName) {
-      return { success: false, message: 'Failed to create project from template' };
+    // If successful, activate the project tab
+    if (result.success) {
+      const sheet = sheetAccessor.getSheet(result.projectTabName);
+      sheet.activate();
     }
     
-    // Get project info
-    const projectInfo = templateManager.getProjectInfo(projectTabName);
-    
-    if (!projectInfo || !projectInfo.PROJECT_ID) {
-      return { success: false, message: 'Failed to get project information' };
-    }
-    
-    // Create project folders in Drive
-    const folders = driveManager.createProjectFolders(projectInfo.PROJECT_ID, projectName);
-    
-    if (!folders || !folders.projectFolderId) {
-      return { success: false, message: 'Failed to create project folders in Drive' };
-    }
-    
-    // Update project info with folder ID
-    projectInfo.PROJECT_FOLDER_ID = folders.projectFolderId;
-    sheetAccessor.updateProjectInfo(projectTabName, projectInfo);
-    
-    // Create web app URL if needed
-    if (!projectInfo.PROJECT_WEB_APP_URL) {
-      // This will be implemented in a later phase when the web app is set up
-      // For now, we'll leave it blank
-    }
-    
-    // Activate the project tab
-    const sheet = sheetAccessor.getSheet(projectTabName);
-    sheet.activate();
-    
-    logInfo(`Successfully created new project: ${projectName} (${projectInfo.PROJECT_ID})`);
-    
-    return { 
-      success: true, 
-      message: 'Project created successfully',
-      projectId: projectInfo.PROJECT_ID,
-      projectTabName: projectTabName
-    };
+    return result;
   } catch (error) {
     logError(`Failed to create new project: ${error.message}`);
     return { success: false, message: `Error: ${error.message}` };
@@ -475,50 +445,12 @@ function showProjectSelector() {
 function openProjectForEditing(projectId) {
   try {
     // Check if the application is initialized
-    if (!sheetAccessor || !templateManager || !driveManager) {
+    if (!projectManager) {
       initialize();
     }
     
-    // Find the project in the index
-    const result = sheetAccessor.findProjectInIndex(projectId);
-    
-    if (!result.found) {
-      return { success: false, message: 'Project not found in index' };
-    }
-    
-    // Get project data from index
-    const projectData = sheetAccessor.getSheetData(SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME);
-    const projectRow = projectData[result.rowIndex - 1]; // Adjust for 0-based array
-    const projectTitle = projectRow[SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.TITLE];
-    
-    // Find project tab by name
-    const sanitizedTitle = sanitizeSheetName(projectTitle);
-    const sheet = sheetAccessor.getSheet(sanitizedTitle, false);
-    
-    if (!sheet) {
-      return { success: false, message: 'Project sheet not found' };
-    }
-    
-    // Activate the project tab
-    sheet.activate();
-    
-    // Update last accessed timestamp
-    const now = new Date();
-    sheetAccessor.setCellValue(
-      SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME,
-      result.rowIndex,
-      SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.LAST_ACCESSED + 1,
-      now
-    );
-    
-    logInfo(`Opened project for editing: ${projectTitle} (${projectId})`);
-    
-    return { 
-      success: true, 
-      message: 'Project opened successfully',
-      projectId: projectId,
-      projectTitle: projectTitle
-    };
+    // Use the ProjectManager to open the project
+    return projectManager.openProject(projectId);
   } catch (error) {
     logError(`Failed to open project for editing: ${error.message}`);
     return { success: false, message: `Error: ${error.message}` };

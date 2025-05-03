@@ -3,9 +3,14 @@
   "dependencies": {
     "enabledAdvancedServices": [
       {
-        "userSymbol": "Slides",
-        "version": "v1",
-        "serviceId": "slides"
+        "userSymbol": "Drive",
+        "version": "v3",
+        "serviceId": "drive"
+      },
+      {
+        "userSymbol": "Sheets",
+        "version": "v4",
+        "serviceId": "sheets"
       }
     ]
   },

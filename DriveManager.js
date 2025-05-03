@@ -515,8 +515,15 @@ class DriveManager {
     getProjectFolder(projectId) {
       try {
         const rootFolder = this.getRootFolder();
+        if (!rootFolder) {
+          logError('Root folder not found');
+          return null;
+        }
+        
+        // Get all folders in the root directory
         const folderIterator = rootFolder.getFolders();
         
+        // Iterate through folders to find the project folder
         while (folderIterator.hasNext()) {
           const folder = folderIterator.next();
           const folderName = folder.getName();

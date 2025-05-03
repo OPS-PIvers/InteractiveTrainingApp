@@ -125,6 +125,38 @@ function showNewProjectDialog() {
           padding: 8px 16px;
           margin-left: 10px;
         }
+        #status {
+          margin-top: 15px;
+          padding: 10px;
+          border-radius: 4px;
+          display: none;
+        }
+        .success {
+          background-color: #d4edda;
+          color: #155724;
+          border: 1px solid #c3e6cb;
+        }
+        .error {
+          background-color: #f8d7da;
+          color: #721c24;
+          border: 1px solid #f5c6cb;
+        }
+        .loading {
+          display: inline-block;
+          width: 16px;
+          height: 16px;
+          border: 3px solid rgba(0, 0, 0, 0.1);
+          border-radius: 50%;
+          border-top-color: #3498db;
+          animation: spin 1s ease-in-out infinite;
+          margin-right: 10px;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .hidden {
+          display: none;
+        }
       </style>
       <div>
         <h2>Create New Training Project</h2>
@@ -132,18 +164,25 @@ function showNewProjectDialog() {
           <label for="projectName">Project Name:</label>
           <input type="text" id="projectName" placeholder="Enter project name">
         </div>
+        <div id="status"></div>
         <div class="buttons">
-          <button onclick="google.script.host.close()">Cancel</button>
-          <button onclick="createProject()">Create Project</button>
+          <button id="cancelBtn" onclick="cancelDialog()">Cancel</button>
+          <button id="createBtn" onclick="createProject()">
+            <span id="loadingIcon" class="loading hidden"></span>
+            <span id="buttonText">Create Project</span>
+          </button>
         </div>
       </div>
       <script>
         function createProject() {
           const projectName = document.getElementById('projectName').value;
           if (!projectName) {
-            alert('Please enter a project name');
+            showStatus('Please enter a project name', 'error');
             return;
           }
+          
+          // Show loading state
+          setLoading(true);
           
           google.script.run
             .withSuccessHandler(onSuccess)
@@ -152,16 +191,52 @@ function showNewProjectDialog() {
         }
         
         function onSuccess(result) {
+          setLoading(false);
+          
           if (result.success) {
-            alert('Project created successfully!');
-            google.script.host.close();
+            showStatus('Project created successfully! The dialog will close in 3 seconds.', 'success');
+            // Close dialog after a short delay to ensure the message is seen
+            setTimeout(function() {
+              google.script.host.close();
+            }, 3000);
           } else {
-            alert('Failed to create project: ' + result.message);
+            showStatus('Failed to create project: ' + result.message, 'error');
           }
         }
         
         function onFailure(error) {
-          alert('Error: ' + error.message);
+          setLoading(false);
+          showStatus('Error: ' + error.message, 'error');
+        }
+        
+        function cancelDialog() {
+          google.script.host.close();
+        }
+        
+        function showStatus(message, type) {
+          const statusElement = document.getElementById('status');
+          statusElement.textContent = message;
+          statusElement.className = type;
+          statusElement.style.display = 'block';
+        }
+        
+        function setLoading(isLoading) {
+          const loadingIcon = document.getElementById('loadingIcon');
+          const buttonText = document.getElementById('buttonText');
+          const createBtn = document.getElementById('createBtn');
+          const cancelBtn = document.getElementById('cancelBtn');
+          
+          if (isLoading) {
+            loadingIcon.classList.remove('hidden');
+            buttonText.textContent = 'Creating...';
+            createBtn.disabled = true;
+            cancelBtn.disabled = true;
+          } else {
+            loadingIcon.classList.add('hidden');
+            buttonText.textContent = 'Create Project';
+            createBtn.disabled = false;
+            cancelBtn.disabled = false;
+          }
         }
       </script>
     `)

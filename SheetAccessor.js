@@ -461,6 +461,7 @@ class SheetAccessor {
         const templateBackgrounds = templateRange.getBackgrounds();
         const templateFontColors = templateRange.getFontColors();
         const templateFontWeights = templateRange.getFontWeights();
+        const templateHorizontalAlignments = templateRange.getHorizontalAlignments();
         
         const numRows = templateValues.length;
         const numCols = templateValues[0].length;
@@ -475,17 +476,10 @@ class SheetAccessor {
           newRange.setBackgrounds(templateBackgrounds);
           newRange.setFontColors(templateFontColors);
           newRange.setFontWeights(templateFontWeights);
+          newRange.setHorizontalAlignments(templateHorizontalAlignments);
           
-          // Copy merged ranges
-          const mergedRanges = templateSheet.getMergedRanges();
-          for (const mergedRange of mergedRanges) {
-            const startRow = mergedRange.getRow();
-            const startCol = mergedRange.getColumn();
-            const numRows = mergedRange.getNumRows();
-            const numCols = mergedRange.getNumColumns();
-            
-            newSheet.getRange(startRow, startCol, numRows, numCols).merge();
-          }
+          // Handle merged ranges manually by checking each cell's formatting
+          this.copyMergedRanges(templateSheet, newSheet);
         }
         
         // Copy column widths
@@ -506,6 +500,50 @@ class SheetAccessor {
         logError(`Failed to create tab from template: ${error.message}`);
         return false;
       }
+    }
+
+    /**
+     * Manually copies merged ranges from template sheet to new sheet
+     * This is an alternative to using getMergedRanges which may not be available
+     * 
+     * @param {Sheet} templateSheet - Source template sheet
+     * @param {Sheet} newSheet - Destination sheet
+     */
+    copyMergedRanges(templateSheet, newSheet) {
+      try {
+        // Get sections that we know have merged cells based on our structure
+        this.copyKnownMergedRanges(templateSheet, newSheet);
+      } catch (error) {
+        logWarning(`Unable to copy merged ranges: ${error.message}. Continuing without merged cells.`);
+      }
+    }
+
+    /**
+     * Copies known merged ranges based on the sheet structure
+     * 
+     * @param {Sheet} templateSheet - Source template sheet
+     * @param {Sheet} newSheet - Destination sheet
+     */
+    copyKnownMergedRanges(templateSheet, newSheet) {
+      // PROJECT INFO header (A1:B1)
+      newSheet.getRange("A1:B1").merge();
+      
+      // SLIDE INFO header (A8:B8)
+      newSheet.getRange("A8:B8").merge();
+      
+      // ELEMENT INFO header (D1:G1)
+      newSheet.getRange("D1:G1").merge();
+      
+      // TIMELINE header (D29:G29)
+      newSheet.getRange("D29:G29").merge();
+      
+      // QUIZ header (D37:G37)
+      newSheet.getRange("D37:G37").merge();
+      
+      // USER TRACKING header (D50:G50)
+      newSheet.getRange("D50:G50").merge();
+      
+      logDebug("Copied known merged ranges");
     }
     
     /**

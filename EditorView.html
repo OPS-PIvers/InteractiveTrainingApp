@@ -4,18 +4,20 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Edit: <?= project.title ?> - Interactive Training</title>
+  <title>Edit: <?= projectTitle ?> - Interactive Training</title>
   
-  <!-- Include common styles and scripts -->
   <?!= include('Common'); ?>
   
-  <!-- Include Fabric.js library for canvas editing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   
   <style>
-    /* Editor-specific styles */
+    /* Editor-specific styles from original file */
     body {
-      overflow: hidden;
+      overflow: hidden; /* Prevent scrolling of the main body */
+      margin: 0; /* Remove default body margin */
+      display: flex;
+      flex-direction: column;
+      height: 100vh; /* Full viewport height */
     }
     
     .editor-header {
@@ -25,32 +27,247 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-shrink: 0; /* Prevent header from shrinking */
     }
     
     .editor-title {
       margin: 0;
       font-size: 1.2rem;
       font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     
     .editor-actions {
       display: flex;
-      gap: 1rem;
+      gap: 0.5rem; /* Slightly reduced gap */
       align-items: center;
+      flex-shrink: 0;
     }
     
     .editor-actions .btn {
       margin: 0;
     }
+
+    .toolbar {
+        padding: 0.5rem;
+        background-color: #f8f9fa; /* Lighter background */
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .toolbar .btn-secondary { /* Style toolbar buttons */
+        padding: 0.25rem 0.5rem; /* Smaller padding */
+        font-size: 0.85rem;
+    }
+
+    .toolbar-separator {
+        border-right: 1px solid #ccc; 
+        margin: 0 0.5rem; 
+        height: 24px;
+        align-self: center;
+    }
     
+    .editor-container {
+        display: flex;
+        flex-grow: 1; /* Allow main container to fill space */
+        overflow: hidden; /* Prevent overflow */
+        background-color: var(--background-color); /* Match body background */
+    }
+    
+    /* Slides Panel */
+    .slides-panel {
+        width: 200px;
+        background-color: white;
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+         flex-shrink: 0;
+    }
+    .slides-header {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+         flex-shrink: 0;
+    }
+     .slides-header h3 {
+         margin: 0;
+         font-size: 1rem;
+     }
+    #slides-list {
+        overflow-y: auto;
+        flex-grow: 1;
+        padding: 0.5rem;
+    }
+     /* Style for individual slide thumbnails (can be added in canvas-editor.js) */
+    .slide-thumbnail {
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        background-color: #fff;
+    }
+    .slide-thumbnail.active {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2);
+    }
+     .slide-thumbnail-img {
+        height: 80px; /* Adjust size */
+        background-color: #f5f5f5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+        border: 1px dashed #ccc;
+    }
+     .slide-thumbnail-title {
+        font-size: 0.8rem;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+
+    /* Canvas Panel */
+    .canvas-panel {
+        flex-grow: 1; /* Take remaining space */
+        overflow: auto; /* Allow scrolling if canvas is larger */
+        position: relative; /* Needed for scaler positioning */
+        background-color: #e9e9e9; /* Background behind canvas */
+        display: flex; /* Center canvas */
+        justify-content: center;
+        align-items: center;
+        padding: 1rem; /* Add padding around canvas */
+    }
+    
+    .canvas-scaler { /* Centers the canvas */
+        /* Removed absolute positioning - handled by flexbox now */
+        transform-origin: center center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15); /* Add shadow to canvas */
+        background-color: white; /* Ensure canvas itself has white background if needed */
+    }
+    
+    /* Properties Panel */
+    .properties-panel {
+        width: 280px;
+        background-color: white;
+        border-left: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+         flex-shrink: 0;
+    }
+     .properties-panel h3 {
+         margin: 0;
+         font-size: 1rem;
+         padding: 0.75rem;
+         border-bottom: 1px solid var(--border-color);
+          flex-shrink: 0;
+     }
+     #properties-container, #no-selection-message {
+         overflow-y: auto;
+         flex-grow: 1;
+         padding: 1rem;
+     }
+      #no-selection-message p {
+          color: var(--light-text-color);
+          text-align: center;
+          margin-top: 2rem;
+      }
+     /* Property Group Styles (from Common.html, ensure they are loaded) */
+     .property-group { margin-bottom: 1rem; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; }
+     .property-group-header { background-color: #f5f5f5; padding: 0.5rem 0.75rem; font-weight: 500; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;}
+     .property-group-header .toggle-icon { font-size: 0.8rem; }
+     .property-group-content { padding: 0.75rem; font-size: 0.9rem; }
+     .property-row { display: flex; margin-bottom: 0.75rem; align-items: center; }
+     .property-label { flex: 2; padding-right: 0.5rem; }
+     .property-field { flex: 3; }
+     .property-field input[type=number], .property-field input[type=text], .property-field select, .property-field textarea { width: 100%; font-size: 0.85rem; padding: 0.3rem 0.5rem;}
+     .property-field textarea { resize: vertical; min-height: 60px; }
+     .property-field input[type=color] { width: 30px; height: 30px; padding: 0; border: 1px solid #ccc; cursor: pointer; vertical-align: middle; }
+     .property-field input[type=range] { width: calc(100% - 40px); vertical-align: middle; margin-right: 5px; } /* Adjust width for value display */
+     .property-field input[type=checkbox] { margin-right: 5px; vertical-align: middle;}
+     .property-field .color-preview { display: inline-block; width: 20px; height: 20px; border: 1px solid #ccc; border-radius: 3px; vertical-align: middle; margin-left: 5px; }
+     .property-field span { vertical-align: middle; font-size: 0.85rem;} /* For range value display */
+     .property-subgroup { margin-left: 1rem; margin-top: 0.5rem; padding-left: 0.5rem; border-left: 2px solid #eee; }
+
+
+    /* Timeline Panel */
+    .timeline-panel {
+        height: 150px; /* Adjust height as needed */
+        background-color: white;
+        border-top: 1px solid var(--border-color);
+        overflow: hidden; /* Let inner elements scroll */
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0; /* Prevent shrinking */
+    }
+    .timeline-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+         flex-shrink: 0;
+    }
+    .timeline-time {
+        font-size: 0.85rem;
+        min-width: 70px; /* Wider for MM:SS.ms */
+        text-align: center;
+        color: var(--light-text-color);
+    }
+     #timeline-ruler {
+         flex-grow: 1; 
+         height: 20px; 
+         background: #eee; 
+         position: relative; 
+         cursor: pointer;
+         border-radius: 3px;
+     }
+      #timeline-playhead { 
+          position: absolute; 
+          top: 0; left: 0; 
+          width: 2px; 
+          height: 100%; 
+          background: var(--accent-color); 
+          pointer-events: none; /* Don't interfere with clicks on ruler */
+      }
+    #timeline-tracks {
+        overflow-y: auto; /* Allow vertical scrolling for tracks */
+        flex-grow: 1;
+    }
+     /* Timeline Track Styles (can be added in canvas-editor.js) */
+     .timeline-track { display: flex; height: 30px; margin-bottom: 5px; align-items: center; }
+     .timeline-track-label { width: 100px; font-size: 0.8rem; padding-right: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--light-text-color); }
+     .timeline-track-content { flex-grow: 1; height: 100%; position: relative; background-color: #f8f8f8; border: 1px solid #eee; border-radius: 3px; }
+     .timeline-keyframe { position: absolute; width: 10px; height: 10px; border-radius: 50%; background-color: var(--primary-color); top: 50%; transform: translateY(-50%); cursor: pointer; border: 1px solid white; }
+     .timeline-keyframe-start { background-color: var(--secondary-color); } /* Green for start */
+     .timeline-keyframe-end { background-color: var(--accent-color); } /* Red for end */
+
+
     /* Make color inputs and range inputs look nicer */
     input[type="color"] {
       -webkit-appearance: none;
-      border: none;
+      appearance: none;
+      border: 1px solid #ccc; /* Add border */
       width: 30px;
       height: 30px;
       cursor: pointer;
       border-radius: 4px;
+      padding: 0; /* Remove padding */
+      background-color: transparent; /* Ensure background doesn't interfere */
     }
     
     input[type="color"]::-webkit-color-swatch-wrapper {
@@ -59,26 +276,42 @@
     
     input[type="color"]::-webkit-color-swatch {
       border: none;
-      border-radius: 4px;
+      border-radius: 3px; /* Slightly smaller radius */
     }
+     input[type="color"]::-moz-color-swatch { /* Firefox */
+       border: none;
+       border-radius: 3px;
+     }
     
     input[type="range"] {
       -webkit-appearance: none;
-      width: 100%;
+      appearance: none;
+      width: 100%; /* Let flexbox handle sizing */
       height: 5px;
       border-radius: 5px;
       background: #d7dcdf;
       outline: none;
+      cursor: pointer;
+      margin: 0; /* Remove default margin */
     }
     
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
+      appearance: none;
       width: 15px;
       height: 15px;
       border-radius: 50%;
       background: var(--primary-color);
       cursor: pointer;
     }
+     input[type="range"]::-moz-range-thumb { /* Firefox */
+       width: 15px;
+       height: 15px;
+       border-radius: 50%;
+       background: var(--primary-color);
+       cursor: pointer;
+       border: none;
+     }
     
     /* Tooltip styles */
     .tooltip {
@@ -95,152 +328,181 @@
       border-radius: 6px;
       padding: 5px;
       position: absolute;
-      z-index: 1;
-      bottom: 125%;
+      z-index: 1001; /* Ensure above other elements */
+      bottom: 125%; /* Position above the button */
       left: 50%;
-      margin-left: -60px;
+      margin-left: -60px; /* Center the tooltip */
       opacity: 0;
       transition: opacity 0.3s;
       font-size: 0.8rem;
+      pointer-events: none; /* Don't block clicks on button */
     }
     
     .tooltip:hover .tooltip-text {
       visibility: visible;
       opacity: 1;
     }
+
+    /* Dialog Styles (Basic) */
+    .dialog {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1050; /* High z-index */
+    }
+    .dialog-content {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        width: 90%;
+        max-width: 500px; /* Max width */
+    }
+     .dialog-content h2 {
+         margin-top: 0;
+         margin-bottom: 1.5rem;
+         font-size: 1.3rem;
+     }
+    .dialog-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+        gap: 0.5rem;
+    }
+    .hidden {
+        display: none;
+    }
+
   </style>
 </head>
 <body>
-  <!-- Container for alert messages -->
-  <div id="alertContainer" style="display: none; position: fixed; top: 10px; right: 10px; z-index: 1000;"></div>
+  <div id="alertContainer" style="position: fixed; top: 70px; right: 20px; z-index: 1100; width: 300px;"></div>
   
-  <!-- Editor Header -->
   <div class="editor-header">
-    <h1 class="editor-title">Edit: <?= project.title ?></h1>
+    <h1 id="editorProjectTitle" class="editor-title">Edit: <?= projectTitle ?></h1> 
     <div class="editor-actions">
-      <button id="saveButton" class="btn">Save</button>
-      <button id="previewButton" class="btn btn-secondary">Preview</button>
-      <button id="backToProjectsButton" class="btn btn-secondary">Back to Projects</button>
+      <button id="saveButton" class="btn btn-sm">Save</button> <button id="previewButton" class="btn btn-secondary btn-sm">Preview</button>
+      <button id="backToProjectsButton" class="btn btn-secondary btn-sm">Back</button>
     </div>
   </div>
   
-  <!-- Toolbar -->
   <div class="toolbar" id="editor-toolbar">
     <button class="btn btn-secondary" id="btnAddSlide" title="Add Slide">
-      <span class="tooltip">Add Slide<span class="tooltip-text">Add a new slide</span></span>
+      <span class="tooltip">➕ Slide<span class="tooltip-text">Add a new slide</span></span>
     </button>
-    <div style="border-right: 1px solid #ddd; margin: 0 0.5rem; height: 24px;"></div>
+    <div class="toolbar-separator"></div>
     
-    <button class="btn btn-secondary" id="btnRectangle" title="Rectangle">
-      <span class="tooltip">Rectangle<span class="tooltip-text">Add rectangle shape</span></span>
+    <button class="btn btn-secondary" id="btnRectangle" title="Add Rectangle">
+      <span class="tooltip">▭<span class="tooltip-text">Add rectangle shape</span></span>
     </button>
-    <button class="btn btn-secondary" id="btnCircle" title="Circle">
-      <span class="tooltip">Circle<span class="tooltip-text">Add circle shape</span></span>
+    <button class="btn btn-secondary" id="btnCircle" title="Add Circle">
+      <span class="tooltip">○<span class="tooltip-text">Add circle shape</span></span>
     </button>
-    <button class="btn btn-secondary" id="btnText" title="Text">
-      <span class="tooltip">Text<span class="tooltip-text">Add text element</span></span>
+    <button class="btn btn-secondary" id="btnText" title="Add Text">
+      <span class="tooltip">T<span class="tooltip-text">Add text element</span></span>
     </button>
-    <button class="btn btn-secondary" id="btnHotspot" title="Hotspot">
-      <span class="tooltip">Hotspot<span class="tooltip-text">Add interactive hotspot</span></span>
+    <button class="btn btn-secondary" id="btnHotspot" title="Add Hotspot">
+       <span class="tooltip">🎯<span class="tooltip-text">Add interactive hotspot</span></span>
     </button>
-    <button class="btn btn-secondary" id="btnArrow" title="Arrow">
-      <span class="tooltip">Arrow<span class="tooltip-text">Add arrow shape</span></span>
-    </button>
-    
-    <div style="border-right: 1px solid #ddd; margin: 0 0.5rem; height: 24px;"></div>
-    
-    <button class="btn btn-secondary" id="btnUploadImage" title="Upload Image">
-      <span class="tooltip">Upload<span class="tooltip-text">Upload an image</span></span>
-    </button>
-    <button class="btn btn-secondary" id="btnMedia" title="Add Media">
-      <span class="tooltip">Media<span class="tooltip-text">Add video or audio</span></span>
+    <button class="btn btn-secondary" id="btnArrow" title="Add Arrow">
+       <span class="tooltip">→<span class="tooltip-text">Add arrow shape</span></span>
     </button>
     
-    <div style="border-right: 1px solid #ddd; margin: 0 0.5rem; height: 24px;"></div>
+    <div class="toolbar-separator"></div>
     
-    <button class="btn btn-secondary" id="btnDelete" title="Delete">
-      <span class="tooltip">Delete<span class="tooltip-text">Delete selected element</span></span>
+    <button class="btn btn-secondary" id="btnUploadImage" title="Add Image">
+      <span class="tooltip">🖼️ Image<span class="tooltip-text">Upload an image</span></span>
     </button>
-    <button class="btn btn-secondary" id="btnCopy" title="Copy">
-      <span class="tooltip">Copy<span class="tooltip-text">Copy selected element</span></span>
+    <button class="btn btn-secondary" id="btnMedia" title="Add Video/Audio">
+       <span class="tooltip">🎬 Media<span class="tooltip-text">Add video or audio</span></span>
+    </button>
+    
+    <div class="toolbar-separator"></div>
+    
+    <button class="btn btn-secondary" id="btnDelete" title="Delete Selected">
+       <span class="tooltip">🗑️ Delete<span class="tooltip-text">Delete selected element(s)</span></span>
+    </button>
+    <button class="btn btn-secondary" id="btnCopy" title="Copy Selected">
+       <span class="tooltip">📄 Copy<span class="tooltip-text">Copy selected element(s)</span></span>
     </button>
     <button class="btn btn-secondary" id="btnPaste" title="Paste">
-      <span class="tooltip">Paste<span class="tooltip-text">Paste copied element</span></span>
+       <span class="tooltip">📋 Paste<span class="tooltip-text">Paste copied element(s)</span></span>
+    </button>
+     <button class="btn btn-secondary" id="btnDuplicate" title="Duplicate Selected">
+       <span class="tooltip">➕ Duplicate<span class="tooltip-text">Duplicate selected element(s)</span></span>
     </button>
     
-    <div style="border-right: 1px solid #ddd; margin: 0 0.5rem; height: 24px;"></div>
+    <div class="toolbar-separator"></div>
     
     <button class="btn btn-secondary" id="btnBringForward" title="Bring Forward">
-      <span class="tooltip">Forward<span class="tooltip-text">Bring forward</span></span>
+       <span class="tooltip">🔼 Forward<span class="tooltip-text">Bring forward</span></span>
     </button>
     <button class="btn btn-secondary" id="btnSendBackward" title="Send Backward">
-      <span class="tooltip">Backward<span class="tooltip-text">Send backward</span></span>
+       <span class="tooltip">🔽 Backward<span class="tooltip-text">Send backward</span></span>
     </button>
   </div>
   
-  <!-- Main Editor Container -->
   <div class="editor-container">
-    <!-- Slides Panel -->
     <div class="slides-panel" id="slides-panel">
       <div class="slides-header">
         <h3>Slides</h3>
-        <button id="addSlideButton" class="btn btn-secondary btn-sm">Add Slide</button>
+        <button id="addSlideButton" class="btn btn-secondary btn-sm" title="Add New Slide">➕</button>
       </div>
       <div id="slides-list">
-        <!-- Slides will be added here dynamically -->
+        <p style="text-align: center; color: #aaa; font-size: 0.9em; padding: 10px;">Loading slides...</p>
       </div>
     </div>
     
-    <!-- Canvas Panel -->
     <div class="canvas-panel" id="canvas-panel">
-      <div class="canvas-scaler">
-        <canvas id="editor-canvas"></canvas>
+      <div class="canvas-scaler"> 
+        <canvas id="editor-canvas">
+            Your browser does not support the canvas element.
+        </canvas>
       </div>
     </div>
     
-    <!-- Properties Panel -->
     <div class="properties-panel" id="properties-panel">
       <h3>Properties</h3>
       <div id="no-selection-message">
-        <p>Select an element to edit its properties</p>
+        <p>Select an element on the canvas to edit its properties.</p>
       </div>
       <div id="properties-container" style="display:none;">
-        <!-- Properties will be added here dynamically -->
-      </div>
+        </div>
     </div>
   </div>
   
-  <!-- Timeline Panel -->
-  <div class="timeline-panel" id="timeline-panel">
+  <div class="timeline-panel" id="timeline-panel" style="display: none;"> 
     <div class="timeline-controls">
       <button id="playButton" class="btn btn-secondary btn-sm">Play</button>
       <div class="timeline-time" id="current-time">00:00.000</div>
-      <div style="flex:1; height: 20px; background: #eee; position: relative;" id="timeline-ruler">
-        <div id="timeline-playhead" style="position: absolute; top: 0; left: 0; width: 2px; height: 100%; background: red;"></div>
+      <div id="timeline-ruler">
+        <div id="timeline-playhead"></div>
       </div>
       <div class="timeline-time" id="total-time">00:00.000</div>
     </div>
     <div id="timeline-tracks">
-      <!-- Timeline tracks will be added here dynamically -->
-    </div>
+      </div>
   </div>
   
-  <!-- Modals -->
-  
-  <!-- Add Slide Modal -->
   <div class="dialog hidden" id="addSlideModal">
     <div class="dialog-content">
       <h2>Add New Slide</h2>
       <div class="form-group">
-        <label for="slideTitle" class="form-label">Slide Title</label>
+        <label for="slideTitle" class="form-label">Slide Title:</label>
         <input type="text" id="slideTitle" class="form-control" placeholder="Enter slide title">
       </div>
       <div class="form-group">
-        <label for="slideBackground" class="form-label">Background Color</label>
+        <label for="slideBackground" class="form-label">Background Color:</label>
         <input type="color" id="slideBackground" value="#FFFFFF">
       </div>
       <div class="form-group">
-        <label for="slideMedia" class="form-label">Media Type</label>
+        <label for="slideMedia" class="form-label">Background Media:</label>
         <select id="slideMedia" class="form-control">
           <option value="">None</option>
           <option value="image">Image</option>
@@ -248,136 +510,170 @@
           <option value="audio">Audio</option>
         </select>
       </div>
-      <div class="form-group" id="slideMediaUrlGroup" style="display:none;">
-        <label for="slideMediaUrl" class="form-label">Media URL</label>
-        <input type="text" id="slideMediaUrl" class="form-control" placeholder="Enter URL">
+      <div class="form-group hidden" id="slideMediaUrlGroup">
+        <label for="slideMediaUrl" class="form-label">Media URL:</label>
+        <input type="text" id="slideMediaUrl" class="form-control" placeholder="Enter YouTube Video URL">
       </div>
-      <div class="form-group" id="slideMediaUploadGroup" style="display:none;">
-        <label for="slideMediaUpload" class="form-label">Upload File</label>
+      <div class="form-group hidden" id="slideMediaUploadGroup">
+        <label for="slideMediaUpload" class="form-label">Upload File:</label>
         <input type="file" id="slideMediaUpload" class="form-control">
+        <small id="uploadHelpText" class="form-text text-muted"></small> 
       </div>
-      <div class="dialog-actions">
+       <div id="addSlideStatus" class="status-message"></div> <div class="dialog-actions">
         <button class="btn btn-secondary" id="cancelAddSlideBtn">Cancel</button>
         <button class="btn" id="confirmAddSlideBtn">Add Slide</button>
       </div>
     </div>
   </div>
   
-  <!-- Add Media Modal -->
   <div class="dialog hidden" id="addMediaModal">
     <div class="dialog-content">
-      <h2>Add Media</h2>
+      <h2>Add Media Element</h2>
       <div class="form-group">
-        <label for="mediaType" class="form-label">Media Type</label>
+        <label for="mediaType" class="form-label">Media Type:</label>
         <select id="mediaType" class="form-control">
           <option value="youtube">YouTube Video</option>
           <option value="audio">Audio</option>
-        </select>
+          </select>
       </div>
-      <div class="form-group" id="mediaUrlGroup">
-        <label for="mediaUrl" class="form-label">Media URL</label>
-        <input type="text" id="mediaUrl" class="form-control" placeholder="Enter URL">
+       <div class="form-group" id="mediaUrlGroup">
+        <label for="mediaUrl" class="form-label">Media URL:</label>
+        <input type="text" id="mediaUrl" class="form-control" placeholder="Enter YouTube URL">
       </div>
-      <div class="form-group" id="mediaUploadGroup" style="display:none;">
-        <label for="mediaUpload" class="form-label">Upload File</label>
-        <input type="file" id="mediaUpload" class="form-control">
+       <div class="form-group hidden" id="mediaUploadGroup">
+        <label for="mediaUpload" class="form-label">Upload Audio File:</label>
+        <input type="file" id="mediaUpload" class="form-control" accept="audio/*">
+         <small class="form-text text-muted">Upload an audio file (e.g., MP3, WAV).</small>
       </div>
-      <div class="dialog-actions">
+       <div id="addMediaStatus" class="status-message"></div> <div class="dialog-actions">
         <button class="btn btn-secondary" id="cancelAddMediaBtn">Cancel</button>
         <button class="btn" id="confirmAddMediaBtn">Add Media</button>
       </div>
     </div>
   </div>
+
+  <script id="projectData" type="application/json"><?= projectJson ?></script>
   
-  <!-- Includes -->
-  <?!= include('canvas-editor'); ?>
+  <?!= include('Utils'); ?> <?!= include('ConfigClient'); ?> <?!= include('canvas-editor'); ?>
   <?!= include('element-factory'); ?>
   <?!= include('property-panel'); ?>
   
   <script>
+    // Global API client from Common.html
+    // const api = new ApiClient(); // Assuming ApiClient is defined in Common.html
+
     document.addEventListener('DOMContentLoaded', () => {
-        const projectJson = document.getElementById('projectData').dataset.project;
-        initEditor(JSON.parse(projectJson));
+        let projectDataObject;
+        try {
+            // Get the JSON string embedded in the HTML
+            const projectDataElement = document.getElementById('projectData');
+            if (!projectDataElement || !projectDataElement.textContent) {
+                 throw new Error("Project data script tag not found or empty.");
+            }
+            projectDataObject = JSON.parse(projectDataElement.textContent);
+            console.log("Parsed project data:", projectDataObject);
+
+            // Update title dynamically if needed (using placeholder from server first)
+            document.getElementById('editorProjectTitle').textContent = `Edit: ${projectDataObject.title || 'Untitled Project'}`;
+
+            // Initialize the main editor
+            initEditor(projectDataObject); 
+
+        } catch (e) {
+            console.error("Error initializing editor:", e);
+            showAlert(`Fatal Error: Could not load project data. ${e.message}`, 'error', 'alertContainer', false); // Show persistent error
+            // Optionally hide editor elements
+            document.querySelector('.editor-container')?.classList.add('hidden');
+            document.querySelector('.timeline-panel')?.classList.add('hidden');
+            return; // Stop further execution
+        }
       
-      // Set up event handlers for global buttons
+      // --- Set up event handlers for global buttons ---
       document.getElementById('saveButton').addEventListener('click', saveProject);
       document.getElementById('previewButton').addEventListener('click', previewProject);
       document.getElementById('backToProjectsButton').addEventListener('click', () => {
-        window.location.href = window.location.pathname;
+        // Navigate back to the project selector (assuming it's the root)
+        window.location.href = window.location.pathname; 
       });
       
-      // Set up add slide buttons
+      // --- Set up Add Slide Modal ---
       document.getElementById('btnAddSlide').addEventListener('click', showAddSlideModal);
-      document.getElementById('addSlideButton').addEventListener('click', showAddSlideModal);
+      document.getElementById('addSlideButton').addEventListener('click', showAddSlideModal); // Button in panel
       document.getElementById('cancelAddSlideBtn').addEventListener('click', hideAddSlideModal);
-      document.getElementById('confirmAddSlideBtn').addEventListener('click', addNewSlide);
+      document.getElementById('confirmAddSlideBtn').addEventListener('click', handleAddNewSlide); // Renamed handler
       
-      // Set up media type change in add slide modal
+      // Handle media type change in Add Slide modal
       document.getElementById('slideMedia').addEventListener('change', function() {
         const mediaType = this.value;
         const urlGroup = document.getElementById('slideMediaUrlGroup');
         const uploadGroup = document.getElementById('slideMediaUploadGroup');
+        const uploadInput = document.getElementById('slideMediaUpload');
+        const helpText = document.getElementById('uploadHelpText');
         
-        if (mediaType === '') {
-          urlGroup.style.display = 'none';
-          uploadGroup.style.display = 'none';
-        } else if (mediaType === 'video') {
-          urlGroup.style.display = 'block';
-          uploadGroup.style.display = 'none';
+        urlGroup.classList.toggle('hidden', mediaType !== 'video');
+        uploadGroup.classList.toggle('hidden', mediaType !== 'image' && mediaType !== 'audio');
+        
+        if(mediaType === 'image') {
+            uploadInput.accept = 'image/*';
+            helpText.textContent = 'Upload an image file (e.g., JPG, PNG, GIF).';
+        } else if (mediaType === 'audio') {
+             uploadInput.accept = 'audio/*';
+             helpText.textContent = 'Upload an audio file (e.g., MP3, WAV).';
         } else {
-          urlGroup.style.display = 'none';
-          uploadGroup.style.display = 'block';
+             uploadInput.accept = '';
+             helpText.textContent = '';
         }
       });
       
-      // Set up add media modal
+      // --- Set up Add Media Modal ---
       document.getElementById('btnMedia').addEventListener('click', showAddMediaModal);
       document.getElementById('cancelAddMediaBtn').addEventListener('click', hideAddMediaModal);
-      document.getElementById('confirmAddMediaBtn').addEventListener('click', addNewMedia);
+      document.getElementById('confirmAddMediaBtn').addEventListener('click', handleAddNewMediaElement); // Renamed handler
       
-      // Set up media type change in add media modal
+      // Handle media type change in Add Media modal
       document.getElementById('mediaType').addEventListener('change', function() {
         const mediaType = this.value;
         const urlGroup = document.getElementById('mediaUrlGroup');
         const uploadGroup = document.getElementById('mediaUploadGroup');
         
-        if (mediaType === 'youtube') {
-          urlGroup.style.display = 'block';
-          uploadGroup.style.display = 'none';
-        } else {
-          urlGroup.style.display = 'none';
-          uploadGroup.style.display = 'block';
-        }
+        urlGroup.classList.toggle('hidden', mediaType !== 'youtube');
+        uploadGroup.classList.toggle('hidden', mediaType !== 'audio');
       });
       
-      // Set up buttons for shape creation
+      // --- Set up buttons for shape creation ---
       document.getElementById('btnRectangle').addEventListener('click', () => createShape('rectangle'));
       document.getElementById('btnCircle').addEventListener('click', () => createShape('circle'));
       document.getElementById('btnText').addEventListener('click', () => createShape('text'));
       document.getElementById('btnHotspot').addEventListener('click', () => createShape('hotspot'));
       document.getElementById('btnArrow').addEventListener('click', () => createShape('arrow'));
       
-      // Set up buttons for editing operations
+      // --- Set up buttons for editing operations ---
       document.getElementById('btnDelete').addEventListener('click', deleteSelectedObjects);
       document.getElementById('btnCopy').addEventListener('click', copySelectedObjects);
       document.getElementById('btnPaste').addEventListener('click', pasteObjects);
+      document.getElementById('btnDuplicate').addEventListener('click', duplicateSelectedObjects); // Added duplicate
       document.getElementById('btnBringForward').addEventListener('click', bringForward);
       document.getElementById('btnSendBackward').addEventListener('click', sendBackward);
       
-      // Set up image upload button
-      document.getElementById('btnUploadImage').addEventListener('click', uploadImage);
-    });
+      // --- Set up image upload button (for adding image elements) ---
+      document.getElementById('btnUploadImage').addEventListener('click', handleUploadImageElement); // Renamed handler
+    }); // End DOMContentLoaded
     
-    // Functions for modals
+    // ============================================================
+    // Modal Handling Functions
+    // ============================================================
     function showAddSlideModal() {
-      document.getElementById('addSlideModal').classList.remove('hidden');
+      // Reset fields
       document.getElementById('slideTitle').value = 'Slide ' + (editorState.project.slides.length + 1);
       document.getElementById('slideBackground').value = '#FFFFFF';
       document.getElementById('slideMedia').value = '';
       document.getElementById('slideMediaUrl').value = '';
-      document.getElementById('slideMediaUpload').value = '';
-      document.getElementById('slideMediaUrlGroup').style.display = 'none';
-      document.getElementById('slideMediaUploadGroup').style.display = 'none';
+      document.getElementById('slideMediaUpload').value = ''; // Clear file input
+      document.getElementById('slideMediaUrlGroup').classList.add('hidden');
+      document.getElementById('slideMediaUploadGroup').classList.add('hidden');
+      document.getElementById('addSlideStatus').textContent = ''; // Clear status
+      document.getElementById('addSlideModal').classList.remove('hidden');
+      document.getElementById('slideTitle').focus();
     }
     
     function hideAddSlideModal() {
@@ -385,169 +681,366 @@
     }
     
     function showAddMediaModal() {
-      document.getElementById('addMediaModal').classList.remove('hidden');
+       // Reset fields
       document.getElementById('mediaType').value = 'youtube';
       document.getElementById('mediaUrl').value = '';
-      document.getElementById('mediaUpload').value = '';
-      document.getElementById('mediaUrlGroup').style.display = 'block';
-      document.getElementById('mediaUploadGroup').style.display = 'none';
+      document.getElementById('mediaUpload').value = ''; // Clear file input
+      document.getElementById('mediaUrlGroup').classList.remove('hidden');
+      document.getElementById('mediaUploadGroup').classList.add('hidden');
+      document.getElementById('addMediaStatus').textContent = ''; // Clear status
+      document.getElementById('addMediaModal').classList.remove('hidden');
+      document.getElementById('mediaUrl').focus();
     }
     
     function hideAddMediaModal() {
       document.getElementById('addMediaModal').classList.add('hidden');
     }
-    
-    // Save project function
+
+    // ============================================================
+    // Action Handlers (Calling Backend or Editor Functions)
+    // ============================================================
+
+    /**
+     * Saves the current project state to the server.
+     */
     function saveProject() {
-      const project = serializeProject();
+      // Ensure canvas interaction is finished (e.g., deselect object)
+      editorState.canvas?.discardActiveObject()?.renderAll(); 
+
+      const projectToSave = serializeProject(); // Get current state from canvas-editor.js
+      if (!projectToSave) {
+          showAlert('Could not serialize project data for saving.', 'error');
+          return;
+      }
+
+      console.log("Saving project:", projectToSave);
+      showAlert('Saving project...', 'info', 'alertContainer', false); // Persistent saving message
+      const saveButton = document.getElementById('saveButton');
+      saveButton.disabled = true;
+      saveButton.textContent = 'Saving...';
       
-      showAlert('Saving project...', 'info');
-      
-      // Save the project using the API
-      api.updateProject(project.projectId, { 
-        slides: project.slides,
-        elements: project.elements
-      })
-      .then(result => {
-        if (result.success) {
-          showAlert('Project saved successfully!', 'success');
+      // Call the API using google.script.run
+      google.script.run
+          .withSuccessHandler(onSaveSuccess)
+          .withFailureHandler(onSaveFailure)
+          .processApiRequest({ 
+              action: 'project.update', 
+              projectId: projectToSave.projectId, 
+              updates: { // Pass only slides and elements in the 'updates' object
+                  slides: projectToSave.slides, 
+                  elements: projectToSave.elements 
+              } 
+          });
+    }
+
+    function onSaveSuccess(response) {
+        const saveButton = document.getElementById('saveButton');
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save';
+        if (response && response.success) {
+            showAlert('Project saved successfully!', 'success');
+            // Potentially update editor state if server modifies data on save (e.g., timestamps)
+            // if (response.data && response.data.updatedFields) { ... }
         } else {
-          showAlert('Failed to save project: ' + result.message, 'error');
+            showAlert(`Failed to save project: ${response.error || 'Unknown error'}`, 'error');
         }
-      })
-      .catch(error => {
-        showAlert('Error saving project: ' + error.message, 'error');
-      });
+    }
+
+     function onSaveFailure(error) {
+        const saveButton = document.getElementById('saveButton');
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save';
+        showAlert(`Error saving project: ${error.message}`, 'error');
+        console.error("Save Error:", error);
     }
     
-    // Preview project function
+    /**
+     * Opens the viewer mode for the current project in a new tab.
+     */
     function previewProject() {
-      const url = window.location.pathname + '?project=' + editorState.project.projectId;
-      window.open(url, '_blank');
+      if (!editorState.project || !editorState.project.projectId) {
+           showAlert('Cannot preview: Project ID not found.', 'error');
+           return;
+      }
+      // Construct the viewer URL (root path + project ID)
+      const viewerUrl = `${window.location.origin}${window.location.pathname}?project=${editorState.project.projectId}`;
+      window.open(viewerUrl, '_blank');
     }
     
-    // Add new slide function
-    function addNewSlide() {
-      const title = document.getElementById('slideTitle').value;
+    /**
+     * Handles the confirmation click in the "Add Slide" modal.
+     */
+    function handleAddNewSlide() {
+      const title = document.getElementById('slideTitle').value.trim();
       const backgroundColor = document.getElementById('slideBackground').value;
       const mediaType = document.getElementById('slideMedia').value;
-      const mediaUrl = document.getElementById('slideMediaUrl').value;
+      const mediaUrl = document.getElementById('slideMediaUrl').value.trim();
       const mediaFile = document.getElementById('slideMediaUpload').files[0];
+      const statusElement = document.getElementById('addSlideStatus');
+      const addButton = document.getElementById('confirmAddSlideBtn');
       
-      // Create slide data
+      if (!title) {
+           statusElement.textContent = 'Please enter a slide title.';
+           statusElement.style.color = 'red';
+           return;
+      }
+
+      addButton.disabled = true;
+      addButton.textContent = 'Adding...';
+      statusElement.textContent = 'Processing...';
+      statusElement.style.color = 'blue';
+
+      // Prepare base slide data
       const slideData = {
         title: title,
         backgroundColor: backgroundColor,
-        fileType: mediaType === 'video' ? 'YouTube Video' : 
-                  mediaType === 'image' ? 'Image' : 
-                  mediaType === 'audio' ? 'Audio' : '',
-        showControls: true
+        fileType: '', // Determined below
+        fileUrl: '',
+        showControls: true // Default? Or configurable?
       };
       
-      // Handle media URL directly, or upload file if provided
-      if (mediaType === 'video' && mediaUrl) {
-        slideData.fileUrl = mediaUrl;
-        addSlide(slideData);
-      } else if ((mediaType === 'image' || mediaType === 'audio') && mediaFile) {
-        uploadMediaFile(mediaFile, mediaType)
-          .then(result => {
-            if (result.success) {
-              slideData.fileUrl = result.file.downloadUrl;
-              addSlide(slideData);
-            } else {
-              showAlert('Failed to upload media: ' + result.message, 'error');
-            }
-          })
-          .catch(error => {
-            showAlert('Error uploading media: ' + error.message, 'error');
-          });
-      } else {
-        // No media
-        addSlide(slideData);
-      }
-    }
-    
-    // Add media element function
-    function addNewMedia() {
-      const mediaType = document.getElementById('mediaType').value;
-      const mediaUrl = document.getElementById('mediaUrl').value;
-      const mediaFile = document.getElementById('mediaUpload').files[0];
-      
-      if (mediaType === 'youtube' && mediaUrl) {
-        // Add YouTube video element
-        addMediaElement({
-          type: 'youtube',
-          url: mediaUrl
-        });
+      let mediaPromise = Promise.resolve(null); // Promise for handling media processing
+
+      // Determine media type and handle URL/Upload
+      if (mediaType === 'video') {
+          if (!mediaUrl) {
+              statusElement.textContent = 'Please enter a YouTube Video URL.';
+              statusElement.style.color = 'red';
+              addButton.disabled = false;
+              addButton.textContent = 'Add Slide';
+              return;
+          }
+          slideData.fileType = 'YouTube Video';
+          // Optional: Validate YouTube URL format here
+          slideData.fileUrl = mediaUrl; // Use URL directly for YouTube
+      } else if (mediaType === 'image' && mediaFile) {
+          slideData.fileType = 'Image';
+          statusElement.textContent = 'Uploading image...';
+          mediaPromise = uploadMediaFileToServer(mediaFile, 'image'); // Call server upload
       } else if (mediaType === 'audio' && mediaFile) {
-        // Upload audio file and add audio element
-        uploadMediaFile(mediaFile, 'audio')
-          .then(result => {
-            if (result.success) {
-              addMediaElement({
-                type: 'audio',
-                url: result.file.downloadUrl
-              });
-            } else {
-              showAlert('Failed to upload audio: ' + result.message, 'error');
-            }
-          })
-          .catch(error => {
-            showAlert('Error uploading audio: ' + error.message, 'error');
-          });
+          slideData.fileType = 'Audio';
+           statusElement.textContent = 'Uploading audio...';
+          mediaPromise = uploadMediaFileToServer(mediaFile, 'audio'); // Call server upload
       }
-    }
-    
-    // Upload media file function (placeholder - will be implemented properly)
-    function uploadMediaFile(file, type) {
-      return new Promise((resolve, reject) => {
-        // This is a placeholder - in real implementation, this would upload to the server
-        // For now, we'll simulate a successful upload with a fake URL
-        setTimeout(() => {
-          resolve({
-            success: true,
-            file: {
-              downloadUrl: 'https://example.com/placeholder-' + type + '-url'
-            }
-          });
-        }, 1000);
+      
+      // Process media if needed, then add slide
+      mediaPromise.then(uploadResult => {
+          if (uploadResult) { // If media was uploaded
+              if (uploadResult.success && uploadResult.data.downloadUrl) {
+                  slideData.fileUrl = uploadResult.data.downloadUrl; // Use the URL returned by server
+              } else {
+                  throw new Error(`Media upload failed: ${uploadResult.error || 'Unknown error'}`);
+              }
+          }
+          
+          // Call API to add the slide with final data
+          statusElement.textContent = 'Adding slide to project...';
+          return api.addSlide(editorState.project.projectId, slideData); // Use ApiClient instance
+
+      }).then(addSlideResult => {
+          if (addSlideResult.success) {
+              showAlert('Slide added successfully!', 'success');
+              // Update editor state (add slide to project.slides and reload UI)
+              editorState.project.slides.push(addSlideResult.data.slide);
+              loadSlides(); // Reload slide list in UI
+              loadSlide(addSlideResult.data.slide.slideId); // Load the new slide
+              hideAddSlideModal();
+          } else {
+              throw new Error(`Failed to add slide: ${addSlideResult.error || 'Unknown error'}`);
+          }
+      }).catch(error => {
+          console.error("Add slide error:", error);
+          statusElement.textContent = `Error: ${error.message}`;
+          statusElement.style.color = 'red';
+      }).finally(() => {
+           addButton.disabled = false;
+           addButton.textContent = 'Add Slide';
       });
     }
     
-    // Upload image function (placeholder)
-    function uploadImage() {
-      // Create a file input element
+    /**
+     * Handles the confirmation click in the "Add Media Element" modal.
+     */
+    function handleAddNewMediaElement() {
+      const mediaType = document.getElementById('mediaType').value;
+      const mediaUrl = document.getElementById('mediaUrl').value.trim();
+      const mediaFile = document.getElementById('mediaUpload').files[0];
+      const statusElement = document.getElementById('addMediaStatus');
+      const addButton = document.getElementById('confirmAddMediaBtn');
+
+      addButton.disabled = true;
+      addButton.textContent = 'Adding...';
+      statusElement.textContent = 'Processing...';
+      statusElement.style.color = 'blue';
+
+      let mediaPromise = Promise.resolve(null);
+      let elementType = '';
+      let elementData = { /* Defaults for media elements */ }; 
+
+      if (mediaType === 'youtube') {
+          if (!mediaUrl) {
+              statusElement.textContent = 'Please enter a YouTube URL.';
+              statusElement.style.color = 'red';
+              addButton.disabled = false;
+              addButton.textContent = 'Add Media';
+              return;
+          }
+          elementType = 'YouTube Video'; // Or a specific type like 'youtube'
+          elementData.fileUrl = mediaUrl;
+          elementData.type = 'VideoPlaceholder'; // Internal type for canvas
+          elementData.nickname = 'YouTube Video';
+
+      } else if (mediaType === 'audio' && mediaFile) {
+          elementType = 'Audio'; // Or a specific type like 'audio'
+          statusElement.textContent = 'Uploading audio...';
+          mediaPromise = uploadMediaFileToServer(mediaFile, 'audio');
+          elementData.type = 'AudioPlaceholder'; // Internal type for canvas
+          elementData.nickname = 'Audio Player';
+      } else {
+           statusElement.textContent = 'Invalid media type or missing file/URL.';
+           statusElement.style.color = 'red';
+           addButton.disabled = false;
+           addButton.textContent = 'Add Media';
+           return;
+      }
+
+      mediaPromise.then(uploadResult => {
+          if (uploadResult) { // If media was uploaded
+              if (uploadResult.success && uploadResult.data.downloadUrl) {
+                  elementData.fileUrl = uploadResult.data.downloadUrl;
+              } else {
+                  throw new Error(`Media upload failed: ${uploadResult.error || 'Unknown error'}`);
+              }
+          }
+
+          // Now add the element to the project via API
+          statusElement.textContent = 'Adding element...';
+          // Add default position/size etc.
+          elementData.left = editorState.canvas.width / 2;
+          elementData.top = editorState.canvas.height / 2;
+          elementData.width = 300; // Default size
+          elementData.height = mediaType === 'audio' ? 50 : 200; 
+
+          return api.addElement(editorState.project.projectId, editorState.currentSlide.slideId, elementData);
+
+      }).then(addElementResult => {
+           if (addElementResult.success) {
+                showAlert('Media element added successfully!', 'success');
+                // Update editor state and canvas
+                editorState.project.elements.push(addElementResult.data.element);
+                loadElement(addElementResult.data.element); // Add to canvas
+                hideAddMediaModal();
+           } else {
+                throw new Error(`Failed to add element: ${addElementResult.error || 'Unknown error'}`);
+           }
+      }).catch(error => {
+          console.error("Add media element error:", error);
+          statusElement.textContent = `Error: ${error.message}`;
+          statusElement.style.color = 'red';
+      }).finally(() => {
+           addButton.disabled = false;
+           addButton.textContent = 'Add Media';
+      });
+    }
+    
+    /**
+     * Handles the click on the "Upload Image" button in the toolbar (for adding image elements).
+     */
+    function handleUploadImageElement() {
+      // Create a temporary file input element
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = 'image/*';
+      input.accept = 'image/*'; // Accept only image files
       
       // Handle file selection
       input.onchange = function(event) {
         const file = event.target.files[0];
         if (file) {
-          // Display loading message
-          showAlert('Uploading image...', 'info');
+          showAlert('Uploading image...', 'info', 'alertContainer', false);
           
-          // Upload the file
-          uploadMediaFile(file, 'image')
+          // Upload the file using the server function
+          uploadMediaFileToServer(file, 'image')
             .then(result => {
-              if (result.success) {
-                // Add image to canvas
-                addImageElement(result.file.downloadUrl);
-                showAlert('Image uploaded successfully!', 'success');
+              if (result.success && result.data.downloadUrl) {
+                // Add image element to the canvas and project data
+                const imageUrl = result.data.downloadUrl;
+                const elementData = {
+                    type: 'Image', // Or use a more specific internal type if needed
+                    nickname: file.name.split('.')[0] || 'Image',
+                    imageUrl: imageUrl,
+                    left: editorState.canvas.width / 2, // Center it initially
+                    top: editorState.canvas.height / 2,
+                    // Let Fabric determine initial size, or set defaults
+                     width: 200, // Example default width
+                     height: 150 // Example default height
+                };
+                // Add via API
+                return api.addElement(editorState.project.projectId, editorState.currentSlide.slideId, elementData);
               } else {
-                showAlert('Failed to upload image: ' + result.message, 'error');
+                throw new Error(`Image upload failed: ${result.error || 'Unknown error'}`);
               }
             })
+             .then(addElementResult => {
+                 if (addElementResult.success) {
+                     showAlert('Image added successfully!', 'success');
+                     // Update editor state and canvas
+                     editorState.project.elements.push(addElementResult.data.element);
+                     loadElement(addElementResult.data.element); // Add to canvas
+                 } else {
+                     throw new Error(`Failed to add image element: ${addElementResult.error || 'Unknown error'}`);
+                 }
+             })
             .catch(error => {
-              showAlert('Error uploading image: ' + error.message, 'error');
+              showAlert(`Error adding image: ${error.message}`, 'error');
+              console.error("Image Upload/Add Error:", error);
             });
         }
       };
       
-      // Trigger file selection dialog
+      // Trigger the file selection dialog
       input.click();
     }
+
+     /**
+     * Uploads a file to the server using google.script.run.
+     * This requires a corresponding server-side function (e.g., handleFileUpload).
+     * @param {File} file - The file object from an input element.
+     * @param {string} typeHint - 'image' or 'audio' to help server processing.
+     * @returns {Promise<object>} Promise resolving with the server response { success: boolean, data?: { fileId, downloadUrl }, error?: string }.
+     */
+    function uploadMediaFileToServer(file, typeHint) {
+        return new Promise((resolve, reject) => {
+            if (!file) {
+                return reject(new Error("No file selected for upload."));
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const fileData = e.target.result.split(','); // Split base64 header
+                const fileInfo = {
+                    fileName: file.name,
+                    mimeType: file.type,
+                    data: fileData[1], // Base64 data
+                    typeHint: typeHint,
+                    projectId: editorState.project.projectId // Pass project ID for context
+                };
+
+                // Call server-side function via API handler
+                google.script.run
+                    .withSuccessHandler(resolve) // Resolve promise with server response
+                    .withFailureHandler(reject)  // Reject promise with error
+                    .processApiRequest({
+                        action: 'file.upload', // Define this action in ApiHandler
+                        fileInfo: fileInfo
+                    });
+            };
+             reader.onerror = (e) => {
+                 reject(new Error("Error reading file for upload."));
+             };
+            reader.readAsDataURL(file); // Read file as Base64
+        });
+    }
+
   </script>
 </body>
 </html>

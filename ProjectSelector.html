@@ -277,6 +277,11 @@
     
     // Open project for editing
     function editProject(projectId) {
+      console.log("Edit button clicked for project ID:", projectId);
+      
+      // Try manually constructing the URL and log it
+      const editUrl = window.location.pathname + "?action=edit&project=" + projectId;
+      console.log("Attempting to navigate to:", editUrl);
       window.location.href = `${window.location.pathname}?project=${projectId}&mode=editor`;
     }
     

@@ -1,6 +1,18 @@
 /**
- * Utility functions for the Interactive Training Projects Web App
+ * Server-side utility functions for the Interactive Training Projects Web App
+ * Used by Google Apps Script server code
  */
+
+// Logging levels
+const LOG_LEVELS = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3
+};
+
+// Current log level (adjust as needed)
+const CURRENT_LOG_LEVEL = LOG_LEVELS.INFO;
 
 /**
  * Generates a UUID (version 4) for unique identifiers
@@ -8,7 +20,7 @@
  * @return {string} A UUID string
  */
 function generateUUID() {
-    return Utilities.getUuid();
+  return Utilities.getUuid();
 }
 
 /**

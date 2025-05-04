@@ -3,865 +3,929 @@
  * Handles reading/writing data and managing sheet structure
  */
 class SheetAccessor {
-    /**
-     * Creates a new SheetAccessor instance
-     * 
-     * @param {string} spreadsheetId - ID of the spreadsheet to access (optional)
-     */
-    constructor(spreadsheetId) {
-      this.spreadsheetId = spreadsheetId || this.getActiveSpreadsheetId();
-      this.spreadsheet = null;
-      this.openSpreadsheet();
+  /**
+   * Creates a new SheetAccessor instance
+   * * @param {string} spreadsheetId - ID of the spreadsheet to access (optional)
+   */
+  constructor(spreadsheetId) {
+    this.spreadsheetId = spreadsheetId || this.getActiveSpreadsheetId();
+    this.spreadsheet = null;
+    if (!this.spreadsheetId) {
+        throw new Error("Spreadsheet ID could not be determined.");
+    }
+    this.openSpreadsheet(); // Ensure spreadsheet is opened on instantiation
+  }
+  
+  /**
+   * Gets the ID of the active spreadsheet
+   * * @return {string|null} Spreadsheet ID or null if none active
+   */
+  getActiveSpreadsheetId() {
+    try {
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        return ss ? ss.getId() : null;
+    } catch (e) {
+        logWarning("Could not get active spreadsheet ID (may be running in a different context).");
+        return null;
+    }
+  }
+  
+  /**
+   * Opens the spreadsheet with the stored ID
+   */
+  openSpreadsheet() {
+    if (this.spreadsheet) return; // Already open
+    
+    if (!this.spreadsheetId) {
+      throw new Error("Cannot open spreadsheet: No spreadsheet ID provided or available");
     }
     
-    /**
-     * Gets the ID of the active spreadsheet
-     * 
-     * @return {string} Spreadsheet ID
-     */
-    getActiveSpreadsheetId() {
-      const ss = SpreadsheetApp.getActiveSpreadsheet();
-      return ss ? ss.getId() : null;
+    try {
+      this.spreadsheet = SpreadsheetApp.openById(this.spreadsheetId);
+      logDebug(`Opened spreadsheet: ${this.spreadsheet.getName()} (ID: ${this.spreadsheetId})`);
+    } catch (error) {
+      logError(`Failed to open spreadsheet ID ${this.spreadsheetId}: ${error.message}`);
+      this.spreadsheet = null; // Ensure it's null on failure
+      throw error; // Re-throw the error
     }
-    
-    /**
-     * Opens the spreadsheet with the stored ID
-     */
-    openSpreadsheet() {
-      if (!this.spreadsheetId) {
-        throw new Error("No spreadsheet ID provided or available");
+  }
+  
+  /**
+   * Creates a new spreadsheet with the specified name
+   * * @param {string} name - Name for the new spreadsheet
+   * @return {SheetAccessor} A new SheetAccessor instance for the created spreadsheet
+   */
+  static createSpreadsheet(name) {
+    try {
+      const newSpreadsheet = SpreadsheetApp.create(name);
+      logInfo(`Created new spreadsheet: ${name} (${newSpreadsheet.getId()})`);
+      return new SheetAccessor(newSpreadsheet.getId());
+    } catch (error) {
+      logError(`Failed to create spreadsheet '${name}': ${error.message}`);
+      throw error;
+    }
+  }
+  
+  /**
+   * Gets a sheet by name.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {boolean} [createIfNotExist=true] - Whether to create the sheet if it doesn't exist.
+   * @return {GoogleAppsScript.Spreadsheet.Sheet|null} Google Sheets Sheet object or null if not found and createIfNotExist is false.
+   */
+  getSheet(sheetName, createIfNotExist = true) {
+      if (!this.spreadsheet) {
+          logError(`Spreadsheet not open. Cannot get sheet: ${sheetName}`);
+          return null;
       }
-      
-      try {
-        this.spreadsheet = SpreadsheetApp.openById(this.spreadsheetId);
-        logDebug(`Opened spreadsheet: ${this.spreadsheet.getName()}`);
-      } catch (error) {
-        logError(`Failed to open spreadsheet: ${error.message}`);
-        throw error;
-      }
-    }
-    
-    /**
-     * Creates a new spreadsheet with the specified name
-     * 
-     * @param {string} name - Name for the new spreadsheet
-     * @return {SheetAccessor} A new SheetAccessor instance for the created spreadsheet
-     */
-    static createSpreadsheet(name) {
-      try {
-        const newSpreadsheet = SpreadsheetApp.create(name);
-        logInfo(`Created new spreadsheet: ${name} (${newSpreadsheet.getId()})`);
-        return new SheetAccessor(newSpreadsheet.getId());
-      } catch (error) {
-        logError(`Failed to create spreadsheet: ${error.message}`);
-        throw error;
-      }
-    }
-    
-    /**
-     * Gets a sheet by name, creating it if it doesn't exist
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {boolean} createIfNotExist - Whether to create the sheet if it doesn't exist
-     * @return {Sheet} Google Sheets Sheet object
-     */
-    getSheet(sheetName, createIfNotExist = true) {
       let sheet = this.spreadsheet.getSheetByName(sheetName);
       
       if (!sheet && createIfNotExist) {
-        sheet = this.spreadsheet.insertSheet(sheetName);
-        logDebug(`Created new sheet: ${sheetName}`);
+          try {
+              sheet = this.spreadsheet.insertSheet(sheetName);
+              logDebug(`Created new sheet: ${sheetName}`);
+          } catch (error) {
+               logError(`Failed to create sheet '${sheetName}': ${error.message}`);
+               return null;
+          }
+      }
+      
+      if (!sheet && !createIfNotExist) {
+           logDebug(`Sheet not found and not created: ${sheetName}`);
       }
       
       return sheet;
+  }
+  
+  /**
+   * Deletes a sheet by name
+   * * @param {string} sheetName - Name of the sheet to delete
+   * @return {boolean} True if successfully deleted or if sheet didn't exist. False on error.
+   */
+  deleteSheet(sheetName) {
+    if (!this.spreadsheet) {
+        logError(`Spreadsheet not open. Cannot delete sheet: ${sheetName}`);
+        return false;
     }
+    const sheet = this.spreadsheet.getSheetByName(sheetName);
     
-    /**
-     * Deletes a sheet by name
-     * 
-     * @param {string} sheetName - Name of the sheet to delete
-     * @return {boolean} True if successfully deleted
-     */
-    deleteSheet(sheetName) {
-      const sheet = this.spreadsheet.getSheetByName(sheetName);
-      
-      if (sheet) {
-        this.spreadsheet.deleteSheet(sheet);
-        logDebug(`Deleted sheet: ${sheetName}`);
-        return true;
-      }
-      
-      logWarning(`Sheet not found for deletion: ${sheetName}`);
-      return false;
-    }
-    
-    /**
-     * Gets cell value at specified location
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number|string} row - Row number (1-based) or A1 notation
-     * @param {number|string} column - Column number (1-based) or column letter
-     * @return {*} Cell value
-     */
-    getCellValue(sheetName, row, column) {
-      const sheet = this.getSheet(sheetName, false);
-      if (!sheet) return null;
-      
+    if (sheet) {
       try {
-        // Handle A1 notation
-        if (typeof row === "string" && row.match(/^[A-Z]+[0-9]+$/)) {
-          return sheet.getRange(row).getValue();
-        }
-        
-        // Handle column as letter (A, B, C, etc.)
-        if (typeof column === "string" && column.match(/^[A-Z]+$/)) {
-          column = columnToIndex(column) + 1; // Convert to 1-based index
-        }
-        
-        return sheet.getRange(row, column).getValue();
-      } catch (error) {
-        logError(`Failed to get cell value (${sheetName} ${row}:${column}): ${error.message}`);
-        return null;
-      }
-    }
-    
-    /**
-     * Sets a cell value at specified location
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number|string} row - Row number (1-based) or A1 notation
-     * @param {number|string} column - Column number (1-based) or column letter
-     * @param {*} value - Value to set
-     * @return {boolean} True if successful
-     */
-    setCellValue(sheetName, row, column, value) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        // Handle A1 notation
-        if (typeof row === "string" && row.match(/^[A-Z]+[0-9]+$/)) {
-          sheet.getRange(row).setValue(value);
+          this.spreadsheet.deleteSheet(sheet);
+          logDebug(`Deleted sheet: ${sheetName}`);
           return true;
-        }
-        
-        // Handle column as letter (A, B, C, etc.)
-        if (typeof column === "string" && column.match(/^[A-Z]+$/)) {
-          column = columnToIndex(column) + 1; // Convert to 1-based index
-        }
-        
-        sheet.getRange(row, column).setValue(value);
-        return true;
       } catch (error) {
-        logError(`Failed to set cell value (${sheetName} ${row}:${column}): ${error.message}`);
-        return false;
+           logError(`Failed to delete sheet '${sheetName}': ${error.message}`);
+           return false;
       }
     }
     
-    /**
-     * Gets values from a range
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number} startRow - Starting row (1-based)
-     * @param {number|string} startCol - Starting column (1-based) or column letter
-     * @param {number} numRows - Number of rows
-     * @param {number} numCols - Number of columns
-     * @return {Array<Array<*>>} 2D array of values
-     */
-    getRangeValues(sheetName, startRow, startCol, numRows, numCols) {
-      const sheet = this.getSheet(sheetName, false);
-      if (!sheet) return null;
-      
-      try {
-        // Handle column as letter (A, B, C, etc.)
-        if (typeof startCol === "string" && startCol.match(/^[A-Z]+$/)) {
-          startCol = columnToIndex(startCol) + 1; // Convert to 1-based index
-        }
-        
-        return sheet.getRange(startRow, startCol, numRows, numCols).getValues();
-      } catch (error) {
-        logError(`Failed to get range values: ${error.message}`);
-        return null;
-      }
-    }
+    logWarning(`Sheet not found for deletion: ${sheetName}`);
+    return true; // Considered success if it doesn't exist
+  }
+  
+  /**
+   * Gets cell value at specified location
+   * * @param {string} sheetName - Name of the sheet
+   * @param {number|string} row - Row number (1-based) or A1 notation (e.g., "A1")
+   * @param {(number|string)} [column] - Column number (1-based) or column letter (e.g., "B"). Required if row is a number.
+   * @return {*} Cell value, or null on error or if sheet/cell not found.
+   */
+  getCellValue(sheetName, row, column) {
+    const sheet = this.getSheet(sheetName, false);
+    if (!sheet) return null;
     
-    /**
-     * Sets values in a range
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number} startRow - Starting row (1-based)
-     * @param {number|string} startCol - Starting column (1-based) or column letter
-     * @param {Array<Array<*>>} values - 2D array of values
-     * @return {boolean} True if successful
-     */
-    setRangeValues(sheetName, startRow, startCol, values) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        // Handle column as letter (A, B, C, etc.)
-        if (typeof startCol === "string" && startCol.match(/^[A-Z]+$/)) {
-          startCol = columnToIndex(startCol) + 1; // Convert to 1-based index
-        }
-        
-        const numRows = values.length;
-        const numCols = values[0].length;
-        
-        sheet.getRange(startRow, startCol, numRows, numCols).setValues(values);
-        return true;
-      } catch (error) {
-        logError(`Failed to set range values: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Gets all data from a sheet
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @return {Array<Array<*>>} 2D array of all data
-     */
-    getSheetData(sheetName) {
-      const sheet = this.getSheet(sheetName, false);
-      if (!sheet) return [];
-      
-      try {
-        const dataRange = sheet.getDataRange();
-        return dataRange.getValues();
-      } catch (error) {
-        logError(`Failed to get sheet data: ${error.message}`);
-        return [];
-      }
-    }
-    
-    /**
-     * Appends a row to a sheet
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {Array<*>} rowData - Array of values for the row
-     * @return {boolean} True if successful
-     */
-    appendRow(sheetName, rowData) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        sheet.appendRow(rowData);
-        return true;
-      } catch (error) {
-        logError(`Failed to append row: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Creates a section header with merged cells and formatting
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number} row - Starting row (1-based)
-     * @param {string|number} startCol - Starting column (letter or 1-based)
-     * @param {string|number} endCol - Ending column (letter or 1-based)
-     * @param {string} headerText - Text for the header
-     * @return {boolean} True if successful
-     */
-    createSectionHeader(sheetName, row, startCol, endCol, headerText) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        // Convert column letters to indices if needed
-        if (typeof startCol === "string" && startCol.match(/^[A-Z]+$/)) {
-          startCol = columnToIndex(startCol) + 1; // Convert to 1-based index
-        }
-        
-        if (typeof endCol === "string" && endCol.match(/^[A-Z]+$/)) {
-          endCol = columnToIndex(endCol) + 1; // Convert to 1-based index
-        }
-        
-        // Merge cells for header
-        const headerRange = sheet.getRange(row, startCol, 1, endCol - startCol + 1);
-        headerRange.merge();
-        
-        // Set header text and formatting
-        headerRange.setValue(headerText);
-        headerRange.setBackground(DEFAULT_COLORS.SECTION_HEADER_BG);
-        headerRange.setFontWeight("bold");
-        headerRange.setHorizontalAlignment("center");
-        
-        return true;
-      } catch (error) {
-        logError(`Failed to create section header: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Creates a dropdown in a cell with validation
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number|string} row - Row number (1-based) or A1 notation
-     * @param {number|string} column - Column number (1-based) or column letter
-     * @param {Array<string>} options - Array of dropdown options
-     * @return {boolean} True if successful
-     */
-    createDropdown(sheetName, row, column, options) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        // Handle A1 notation
-        let range;
-        if (typeof row === "string" && row.match(/^[A-Z]+[0-9]+$/)) {
-          range = sheet.getRange(row);
-        } else {
-          // Handle column as letter (A, B, C, etc.)
-          if (typeof column === "string" && column.match(/^[A-Z]+$/)) {
-            column = columnToIndex(column) + 1; // Convert to 1-based index
+    try {
+      let range;
+      // Handle A1 notation
+      if (typeof row === "string" && column === undefined) {
+           if (!row.match(/^[A-Z]+[0-9]+$/i)) throw new Error(`Invalid A1 notation: ${row}`);
+           range = sheet.getRange(row);
+      } 
+      // Handle row/column numbers/letters
+      else if (typeof row === 'number' && row > 0 && column !== undefined) {
+          let colIndex;
+          if (typeof column === "string" && column.match(/^[A-Z]+$/i)) {
+              colIndex = columnToIndex(column.toUpperCase()) + 1; // Convert to 1-based index
+          } else if (typeof column === 'number' && column > 0) {
+               colIndex = column;
+          } else {
+               throw new Error(`Invalid column identifier: ${column}`);
           }
-          
-          range = sheet.getRange(row, column);
-        }
-        
-        // Create validation rule
-        const rule = SpreadsheetApp.newDataValidation()
-          .requireValueInList(options, true)
-          .build();
-        
-        range.setDataValidation(rule);
-        return true;
-      } catch (error) {
-        logError(`Failed to create dropdown: ${error.message}`);
-        return false;
+          range = sheet.getRange(row, colIndex);
+      } 
+      // Invalid arguments
+      else {
+          throw new Error(`Invalid arguments for getCellValue: row=${row}, column=${column}`);
       }
-    }
-    
-    /**
-     * Creates a checkbox in a cell
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number|string} row - Row number (1-based) or A1 notation
-     * @param {number|string} column - Column number (1-based) or column letter
-     * @param {boolean} checked - Whether the checkbox is initially checked
-     * @return {boolean} True if successful
-     */
-    createCheckbox(sheetName, row, column, checked = false) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
       
-      try {
-        // Handle A1 notation
-        let range;
-        if (typeof row === "string" && row.match(/^[A-Z]+[0-9]+$/)) {
-          range = sheet.getRange(row);
-        } else {
-          // Handle column as letter (A, B, C, etc.)
-          if (typeof column === "string" && column.match(/^[A-Z]+$/)) {
-            column = columnToIndex(column) + 1; // Convert to 1-based index
-          }
-          
-          range = sheet.getRange(row, column);
-        }
-        
-        // Create checkbox
-        range.insertCheckboxes();
-        
-        // Set initial state
-        if (checked) {
-          range.setValue(true);
-        }
-        
-        return true;
-      } catch (error) {
-        logError(`Failed to create checkbox: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Gets all sheet names in the spreadsheet
-     * 
-     * @return {Array<string>} Array of sheet names
-     */
-    getSheetNames() {
-      try {
-        const sheets = this.spreadsheet.getSheets();
-        return sheets.map(sheet => sheet.getName());
-      } catch (error) {
-        logError(`Failed to get sheet names: ${error.message}`);
-        return [];
-      }
-    }
-    
-    /**
-     * Finds the first empty row in a sheet, starting from a specific column
-     * 
-     * @param {string} sheetName - Name of the sheet
-     * @param {number|string} column - Column to check (1-based or letter)
-     * @param {number} startRow - Row to start checking from (1-based)
-     * @return {number} First empty row (1-based), or -1 if error
-     */
-    findFirstEmptyRow(sheetName, column, startRow = 1) {
-      const sheet = this.getSheet(sheetName, false);
-      if (!sheet) return -1;
-      
-      try {
-        // Handle column as letter (A, B, C, etc.)
-        if (typeof column === "string" && column.match(/^[A-Z]+$/)) {
-          column = columnToIndex(column) + 1; // Convert to 1-based index
-        }
-        
-        const lastRow = sheet.getLastRow();
-        
-        // If sheet is completely empty
-        if (lastRow < startRow) {
-          return startRow;
-        }
-        
-        // Get all values in the column from startRow to lastRow
-        const values = sheet.getRange(startRow, column, lastRow - startRow + 1, 1).getValues();
-        
-        // Find first empty row
-        for (let i = 0; i < values.length; i++) {
-          if (isEmpty(values[i][0])) {
-            return startRow + i;
-          }
-        }
-        
-        // If all rows have values, return the next row after the last
-        return lastRow + 1;
-      } catch (error) {
-        logError(`Failed to find first empty row: ${error.message}`);
-        return -1;
-      }
-    }
-    
-    /**
-     * Creates a new tab with the structure from the template tab
-     * 
-     * @param {string} newTabName - Name for the new tab
-     * @param {string} templateTabName - Name of the template tab to copy structure from
-     * @return {boolean} True if successful
-     */
-    createTabFromTemplate(newTabName, templateTabName) {
-      try {
-        const templateSheet = this.getSheet(templateTabName, false);
-        if (!templateSheet) {
-          logError(`Template sheet not found: ${templateTabName}`);
-          return false;
-        }
-        
-        // Create a new sheet
-        const newSheet = this.spreadsheet.insertSheet(newTabName);
-        
-        // Copy template data
-        const templateRange = templateSheet.getDataRange();
-        const templateValues = templateRange.getValues();
-        const templateFormats = templateRange.getNumberFormats();
-        const templateValidations = templateRange.getDataValidations();
-        const templateBackgrounds = templateRange.getBackgrounds();
-        const templateFontColors = templateRange.getFontColors();
-        const templateFontWeights = templateRange.getFontWeights();
-        const templateHorizontalAlignments = templateRange.getHorizontalAlignments();
-        
-        const numRows = templateValues.length;
-        const numCols = templateValues[0].length;
-        
-        if (numRows > 0 && numCols > 0) {
-          const newRange = newSheet.getRange(1, 1, numRows, numCols);
-          
-          // Set values and formatting
-          newRange.setValues(templateValues);
-          newRange.setNumberFormats(templateFormats);
-          newRange.setDataValidations(templateValidations);
-          newRange.setBackgrounds(templateBackgrounds);
-          newRange.setFontColors(templateFontColors);
-          newRange.setFontWeights(templateFontWeights);
-          newRange.setHorizontalAlignments(templateHorizontalAlignments);
-          
-          // Handle merged ranges manually by checking each cell's formatting
-          this.copyMergedRanges(templateSheet, newSheet);
-        }
-        
-        // Copy column widths
-        for (let col = 1; col <= templateSheet.getMaxColumns(); col++) {
-          const width = templateSheet.getColumnWidth(col);
-          newSheet.setColumnWidth(col, width);
-        }
-        
-        // Copy row heights
-        for (let row = 1; row <= templateSheet.getMaxRows(); row++) {
-          const height = templateSheet.getRowHeight(row);
-          newSheet.setRowHeight(row, height);
-        }
-        
-        logInfo(`Created new tab from template: ${newTabName}`);
-        return true;
-      } catch (error) {
-        logError(`Failed to create tab from template: ${error.message}`);
-        return false;
-      }
-    }
-
-    /**
-     * Manually copies merged ranges from template sheet to new sheet
-     * This is an alternative to using getMergedRanges which may not be available
-     * 
-     * @param {Sheet} templateSheet - Source template sheet
-     * @param {Sheet} newSheet - Destination sheet
-     */
-    copyMergedRanges(templateSheet, newSheet) {
-      try {
-        // Get sections that we know have merged cells based on our structure
-        this.copyKnownMergedRanges(templateSheet, newSheet);
-      } catch (error) {
-        logWarning(`Unable to copy merged ranges: ${error.message}. Continuing without merged cells.`);
-      }
-    }
-
-    /**
-     * Copies known merged ranges based on the sheet structure
-     * 
-     * @param {Sheet} templateSheet - Source template sheet
-     * @param {Sheet} newSheet - Destination sheet
-     */
-    copyKnownMergedRanges(templateSheet, newSheet) {
-      // PROJECT INFO header (A1:B1)
-      newSheet.getRange("A1:B1").merge();
-      
-      // SLIDE INFO header (A8:B8)
-      newSheet.getRange("A8:B8").merge();
-      
-      // ELEMENT INFO header (D1:G1)
-      newSheet.getRange("D1:G1").merge();
-      
-      // TIMELINE header (D29:G29)
-      newSheet.getRange("D29:G29").merge();
-      
-      // QUIZ header (D37:G37)
-      newSheet.getRange("D37:G37").merge();
-      
-      // USER TRACKING header (D50:G50)
-      newSheet.getRange("D50:G50").merge();
-      
-      logDebug("Copied known merged ranges");
-    }
-    
-    /**
-     * Updates project info section in a project tab
-     * 
-     * @param {string} sheetName - Name of the project sheet
-     * @param {Object} projectInfo - Project info object with keys matching SHEET_STRUCTURE.PROJECT_TAB.PROJECT_INFO.FIELDS
-     * @return {boolean} True if successful
-     */
-    updateProjectInfo(sheetName, projectInfo) {
-      const sheet = this.getSheet(sheetName, false);
-      if (!sheet) return false;
-      
-      try {
-        const projectInfoFields = SHEET_STRUCTURE.PROJECT_TAB.PROJECT_INFO.FIELDS;
-        
-        // Update each field in the project info section
-        for (const field in projectInfoFields) {
-          if (projectInfo.hasOwnProperty(field) && projectInfoFields.hasOwnProperty(field)) {
-            const fieldInfo = projectInfoFields[field];
-            const row = fieldInfo.ROW;
-            const col = fieldInfo.VALUE_COL;
-            
-            this.setCellValue(sheetName, row, col, projectInfo[field]);
-          }
-        }
-        
-        return true;
-      } catch (error) {
-        logError(`Failed to update project info: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Initializes a project index tab with headers
-     * 
-     * @param {string} sheetName - Name for the project index sheet (default: ProjectIndex)
-     * @return {boolean} True if successful
-     */
-    initializeProjectIndexTab(sheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        // Set headers
-        const headers = SHEET_STRUCTURE.PROJECT_INDEX.HEADERS;
-        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-        
-        // Format header row
-        sheet.getRange(1, 1, 1, headers.length)
-          .setBackground(DEFAULT_COLORS.SECTION_HEADER_BG)
-          .setFontWeight("bold");
-        
-        // Freeze header row
-        sheet.setFrozenRows(1);
-        
-        // Auto-resize columns
-        for (let i = 1; i <= headers.length; i++) {
-          sheet.autoResizeColumn(i);
-        }
-        
-        logInfo(`Initialized project index tab: ${sheetName}`);
-        return true;
-      } catch (error) {
-        logError(`Failed to initialize project index tab: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Adds a project entry to the project index
-     * 
-     * @param {Object} projectInfo - Project info with projectId, title, createdAt, modifiedAt
-     * @param {string} sheetName - Name of the project index sheet (default: ProjectIndex)
-     * @return {boolean} True if successful
-     */
-    addProjectToIndex(projectInfo, sheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        const columns = SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS;
-        
-        // Check if project already exists
-        const projectExists = this.findProjectInIndex(projectInfo.projectId, sheetName);
-        if (projectExists.found) {
-          // Update existing entry
-          const rowIndex = projectExists.rowIndex;
-          sheet.getRange(rowIndex, columns.TITLE + 1).setValue(projectInfo.title);
-          sheet.getRange(rowIndex, columns.MODIFIED_AT + 1).setValue(projectInfo.modifiedAt);
-          sheet.getRange(rowIndex, columns.LAST_ACCESSED + 1).setValue(new Date());
-          
-          logDebug(`Updated project in index: ${projectInfo.projectId}`);
-          return true;
-        }
-        
-        // Create new entry
-        const newRow = [
-          projectInfo.projectId,
-          projectInfo.title,
-          projectInfo.createdAt,
-          projectInfo.modifiedAt,
-          new Date()
-        ];
-        
-        sheet.appendRow(newRow);
-        logInfo(`Added project to index: ${projectInfo.projectId}`);
-        return true;
-      } catch (error) {
-        logError(`Failed to add project to index: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Finds a project in the project index by ID
-     * 
-     * @param {string} projectId - ID of the project to find
-     * @param {string} sheetName - Name of the project index sheet (default: ProjectIndex)
-     * @return {Object} Object with found (boolean) and rowIndex (number) properties
-     */
-    findProjectInIndex(projectId, sheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME) {
-      const sheet = this.getSheet(sheetName, false);
-      if (!sheet) return { found: false, rowIndex: -1 };
-      
-      try {
-        const dataRange = sheet.getDataRange();
-        const values = dataRange.getValues();
-        
-        // Skip header row
-        for (let i = 1; i < values.length; i++) {
-          if (values[i][SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.PROJECT_ID] === projectId) {
-            return { found: true, rowIndex: i + 1 }; // +1 because array is 0-based, but sheets are 1-based
-          }
-        }
-        
-        return { found: false, rowIndex: -1 };
-      } catch (error) {
-        logError(`Failed to find project in index: ${error.message}`);
-        return { found: false, rowIndex: -1 };
-      }
-    }
-    
-    /**
-     * Creates a dynamic section in a project tab based on the sheet structure
-     * 
-     * @param {string} sheetName - Name of the project sheet
-     * @param {string} sectionName - Name of the section to create (e.g., "SLIDE_INFO", "ELEMENT_INFO")
-     * @param {number} instanceNumber - Instance of the section (for multiple slides, elements, etc.)
-     * @param {Object} initial - Initial values for the section fields
-     * @return {boolean} True if successful
-     */
-    createSection(sheetName, sectionName, instanceNumber = 1, initial = {}) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        const sectionStructure = SHEET_STRUCTURE.PROJECT_TAB[sectionName];
-        if (!sectionStructure) {
-          logError(`Section structure not found: ${sectionName}`);
-          return false;
-        }
-        
-        // Determine section location
-        let startRow = sectionStructure.SECTION_START_ROW;
-        let startCol = sectionStructure.SECTION_START_COL || "A";
-        let endCol = sectionStructure.SECTION_END_COL || "B";
-        
-        // For sections like SLIDE_INFO that can have multiple instances
-        if (instanceNumber > 1 && sectionName === "SLIDE_INFO") {
-          // Calculate row offset for additional slides
-          const rowsPerSlide = sectionStructure.SECTION_END_ROW - sectionStructure.SECTION_START_ROW + 1;
-          startRow += (instanceNumber - 1) * rowsPerSlide;
-        }
-        
-        // Create header with instance number if applicable
-        let headerText = sectionStructure.HEADER;
-        if (sectionName === "SLIDE_INFO") {
-          headerText = headerText.replace("1", instanceNumber);
-        }
-        
-        // Create the section header
-        this.createSectionHeader(sheetName, startRow, startCol, endCol, headerText);
-        
-        // Set field labels and initial values
-        const fields = sectionStructure.FIELDS;
-        for (const field in fields) {
-          if (fields.hasOwnProperty(field)) {
-            const fieldInfo = fields[field];
-            let fieldRow = fieldInfo.ROW;
-            const labelCol = fieldInfo.LABEL_COL || startCol;
-            const valueCol = fieldInfo.VALUE_COL || (typeof labelCol === "string" ? String.fromCharCode(labelCol.charCodeAt(0) + 1) : labelCol + 1);
-            
-            // Adjust row for multiple instances
-            if (instanceNumber > 1 && sectionName === "SLIDE_INFO") {
-              fieldRow += (instanceNumber - 1) * (sectionStructure.SECTION_END_ROW - sectionStructure.SECTION_START_ROW + 1);
-            }
-            
-            // Set field label
-            this.setCellValue(sheetName, fieldRow, labelCol, field.replace(/_/g, ' '));
-            
-            // Set initial value if provided
-            if (initial.hasOwnProperty(field)) {
-              this.setCellValue(sheetName, fieldRow, valueCol, initial[field]);
-            }
-            
-            // Add validation where needed
-            if (field === "FILE_TYPE" && sectionName === "SLIDE_INFO") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(FILE_TYPES));
-            } else if (field === "SHOW_CONTROLS" && sectionName === "SLIDE_INFO") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "TYPE" && sectionName === "ELEMENT_INFO") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(ELEMENT_TYPES).map(type => type.LABEL));
-            } else if (field === "INITIALLY_HIDDEN" && sectionName === "ELEMENT_INFO") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "OUTLINE" && sectionName === "ELEMENT_INFO") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "SHADOW" && sectionName === "ELEMENT_INFO") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "FONT" && sectionName === "ELEMENT_INFO") {
-              this.createDropdown(sheetName, fieldRow, valueCol, FONTS);
-            } else if (field === "TRIGGERS" && sectionName === "ELEMENT_INFO") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(TRIGGER_TYPES));
-            } else if (field === "INTERACTION_TYPE" && sectionName === "ELEMENT_INFO") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(INTERACTION_TYPES));
-            } else if (field === "TEXT_MODAL" && sectionName === "ELEMENT_INFO") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "ANIMATION_TYPE" && sectionName === "ELEMENT_INFO") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(ANIMATION_TYPES));
-            } else if (field === "ANIMATION_SPEED" && sectionName === "ELEMENT_INFO") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(ANIMATION_SPEEDS));
-            } else if (field === "ANIMATION_IN" && sectionName === "TIMELINE") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(ANIMATION_IN_TYPES));
-            } else if (field === "ANIMATION_OUT" && sectionName === "TIMELINE") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(ANIMATION_OUT_TYPES));
-            } else if (field === "QUESTION_TYPE" && sectionName === "QUIZ") {
-              this.createDropdown(sheetName, fieldRow, valueCol, Object.values(QUESTION_TYPES));
-            } else if (field === "INCLUDE_FEEDBACK" && sectionName === "QUIZ") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "PROVIDE_CORRECT_ANSWER" && sectionName === "QUIZ") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "TRACK_COMPLETION" && sectionName === "USER_TRACKING") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, true);
-            } else if (field === "REQUIRE_QUIZ_COMPLETION" && sectionName === "USER_TRACKING") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            } else if (field === "SEND_COMPLETION_EMAIL" && sectionName === "USER_TRACKING") {
-              this.createCheckbox(sheetName, fieldRow, valueCol, false);
-            }
-          }
-        }
-        
-        logInfo(`Created ${sectionName} section (instance ${instanceNumber}) in ${sheetName}`);
-        return true;
-      } catch (error) {
-        logError(`Failed to create section ${sectionName}: ${error.message}`);
-        return false;
-      }
-    }
-    
-    /**
-     * Adds an element column to the element info section
-     * 
-     * @param {string} sheetName - Name of the project sheet
-     * @param {number} elementIndex - Index of the element (1-based)
-     * @param {Object} initialValues - Initial values for the element
-     * @return {boolean} True if successful
-     */
-    addElementColumn(sheetName, elementIndex, initialValues = {}) {
-      const sheet = this.getSheet(sheetName);
-      if (!sheet) return false;
-      
-      try {
-        const sectionStructure = SHEET_STRUCTURE.PROJECT_TAB.ELEMENT_INFO;
-        
-        // Calculate column based on element index (starting from E for first element)
-        const startCol = columnToIndex("E") + (elementIndex - 1);
-        const colLetter = indexToColumn(startCol);
-        
-        // Set element header
-        this.setCellValue(sheetName, sectionStructure.ELEMENT_HEADERS_ROW, colLetter, `Element ${elementIndex}`);
-        
-        // Set initial values and create controls
-        const fields = sectionStructure.FIELDS;
-        for (const field in fields) {
-          if (fields.hasOwnProperty(field)) {
-            const fieldInfo = fields[field];
-            const row = fieldInfo.ROW;
-            
-            // If there's an initial value, set it
-            if (initialValues.hasOwnProperty(field)) {
-              this.setCellValue(sheetName, row, colLetter, initialValues[field]);
-            }
-            
-            // Add validation where needed
-            if (field === "TYPE") {
-              this.createDropdown(sheetName, row, colLetter, Object.values(ELEMENT_TYPES).map(type => type.LABEL));
-            } else if (field === "INITIALLY_HIDDEN" || field === "OUTLINE" || field === "SHADOW" || field === "TEXT_MODAL") {
-              this.createCheckbox(sheetName, row, colLetter, false);
-            } else if (field === "FONT") {
-              this.createDropdown(sheetName, row, colLetter, FONTS);
-            } else if (field === "TRIGGERS") {
-              this.createDropdown(sheetName, row, colLetter, Object.values(TRIGGER_TYPES));
-            } else if (field === "INTERACTION_TYPE") {
-              this.createDropdown(sheetName, row, colLetter, Object.values(INTERACTION_TYPES));
-            } else if (field === "ANIMATION_TYPE") {
-              this.createDropdown(sheetName, row, colLetter, Object.values(ANIMATION_TYPES));
-            } else if (field === "ANIMATION_SPEED") {
-              this.createDropdown(sheetName, row, colLetter, Object.values(ANIMATION_SPEEDS));
-            }
-          }
-        }
-        
-        logInfo(`Added element column ${elementIndex} in ${sheetName}`);
-        return true;
-      } catch (error) {
-        logError(`Failed to add element column: ${error.message}`);
-        return false;
-      }
+      return range.getValue();
+    } catch (error) {
+      logError(`Failed to get cell value (${sheetName} ${row}:${column || ''}): ${error.message}`);
+      return null;
     }
   }
+  
+  /**
+   * Sets a cell value at specified location
+   * * @param {string} sheetName - Name of the sheet
+   * @param {number|string} row - Row number (1-based) or A1 notation (e.g., "A1")
+   * @param {(number|string)} [column] - Column number (1-based) or column letter (e.g., "B"). Required if row is a number.
+   * @param {*} value - Value to set
+   * @return {boolean} True if successful, false otherwise.
+   */
+  setCellValue(sheetName, row, column, value) {
+    // Use createIfNotExist = true, as setting a value often implies the sheet should exist.
+    const sheet = this.getSheet(sheetName, true); 
+    if (!sheet) return false;
+    
+    try {
+      let range;
+       // Handle A1 notation
+      if (typeof row === "string" && column === undefined) {
+           if (!row.match(/^[A-Z]+[0-9]+$/i)) throw new Error(`Invalid A1 notation: ${row}`);
+           range = sheet.getRange(row);
+      } 
+      // Handle row/column numbers/letters
+      else if (typeof row === 'number' && row > 0 && column !== undefined) {
+          let colIndex;
+          if (typeof column === "string" && column.match(/^[A-Z]+$/i)) {
+              colIndex = columnToIndex(column.toUpperCase()) + 1; // Convert to 1-based index
+          } else if (typeof column === 'number' && column > 0) {
+               colIndex = column;
+          } else {
+               throw new Error(`Invalid column identifier: ${column}`);
+          }
+          range = sheet.getRange(row, colIndex);
+      } 
+      // Invalid arguments
+      else {
+          throw new Error(`Invalid arguments for setCellValue: row=${row}, column=${column}`);
+      }
+
+      range.setValue(value);
+      // logDebug(`Set cell value (${sheetName} ${row}:${column || ''}) to: ${value}`); // Optional: verbose logging
+      return true;
+    } catch (error) {
+      logError(`Failed to set cell value (${sheetName} ${row}:${column || ''}): ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Gets values from a range defined by start/end rows and columns or A1 notation.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {number|string} startRowOrA1Notation - Starting row (1-based) or A1 notation string (e.g., "A1:C5").
+   * @param {number|string} [startCol] - Starting column (1-based) or column letter. Required if startRowOrA1Notation is a number.
+   * @param {number} [numRows] - Number of rows. Required if startRowOrA1Notation is a number.
+   * @param {number} [numCols] - Number of columns. Required if startRowOrA1Notation is a number.
+   * @return {Array<Array<*>>|null} 2D array of values, or null on error or if sheet not found.
+   */
+  getRangeValues(sheetName, startRowOrA1Notation, startCol, numRows, numCols) {
+    const sheet = this.getSheet(sheetName, false);
+    if (!sheet) return null;
+    
+    try {
+      let range;
+      if (typeof startRowOrA1Notation === "string") {
+          // Assume A1 notation if only one argument is string
+           if (!startRowOrA1Notation.match(/^[A-Z]+[0-9]+(:[A-Z]+[0-9]+)?$/i)) throw new Error(`Invalid A1 notation: ${startRowOrA1Notation}`);
+           range = sheet.getRange(startRowOrA1Notation);
+      } else if (typeof startRowOrA1Notation === 'number' && startCol !== undefined && numRows !== undefined && numCols !== undefined) {
+          // Handle column as letter (A, B, C, etc.)
+          let startColIndex;
+          if (typeof startCol === "string" && startCol.match(/^[A-Z]+$/i)) {
+            startColIndex = columnToIndex(startCol.toUpperCase()) + 1; // Convert to 1-based index
+          } else if (typeof startCol === 'number') {
+               startColIndex = startCol;
+          } else {
+               throw new Error(`Invalid start column: ${startCol}`);
+          }
+          if (startRowOrA1Notation <= 0 || startColIndex <= 0 || numRows <= 0 || numCols <= 0) {
+               throw new Error(`Invalid range dimensions: ${startRowOrA1Notation},${startColIndex},${numRows},${numCols}`);
+          }
+          range = sheet.getRange(startRowOrA1Notation, startColIndex, numRows, numCols);
+      } else {
+           throw new Error("Invalid arguments for getRangeValues.");
+      }
+      
+      return range.getValues();
+    } catch (error) {
+      logError(`Failed to get range values (${sheetName}, ${startRowOrA1Notation}): ${error.message}`);
+      return null;
+    }
+  }
+  
+  /**
+   * Sets values in a range defined by start row/col or A1 notation.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {number|string} startRowOrA1Notation - Starting row (1-based) or A1 notation string (e.g., "A1").
+   * @param {(number|string)} [startCol] - Starting column (1-based) or column letter. Required if startRowOrA1Notation is a number.
+   * @param {Array<Array<*>>} values - 2D array of values to set. Must not be empty.
+   * @return {boolean} True if successful, false otherwise.
+   */
+  setRangeValues(sheetName, startRowOrA1Notation, startCol, values) {
+    // Use createIfNotExist = true
+    const sheet = this.getSheet(sheetName, true); 
+    if (!sheet) return false;
+    
+    if (!values || !Array.isArray(values) || values.length === 0 || !Array.isArray(values[0]) || values[0].length === 0) {
+        logError(`Invalid or empty values array provided for setRangeValues in ${sheetName}.`);
+        return false; // Cannot set empty values
+    }
+
+    try {
+      const numRows = values.length;
+      const numCols = values[0].length;
+      let range;
+
+      if (typeof startRowOrA1Notation === "string") {
+           // A1 notation provided for the top-left cell
+           if (!startRowOrA1Notation.match(/^[A-Z]+[0-9]+$/i)) throw new Error(`Invalid A1 notation for top-left cell: ${startRowOrA1Notation}`);
+           range = sheet.getRange(startRowOrA1Notation).offset(0, 0, numRows, numCols);
+      } else if (typeof startRowOrA1Notation === 'number' && startCol !== undefined) {
+           // Handle column as letter (A, B, C, etc.)
+           let startColIndex;
+           if (typeof startCol === "string" && startCol.match(/^[A-Z]+$/i)) {
+             startColIndex = columnToIndex(startCol.toUpperCase()) + 1; // Convert to 1-based index
+           } else if (typeof startCol === 'number') {
+                startColIndex = startCol;
+           } else {
+                throw new Error(`Invalid start column: ${startCol}`);
+           }
+           if (startRowOrA1Notation <= 0 || startColIndex <= 0) {
+                throw new Error(`Invalid start coordinates: ${startRowOrA1Notation},${startColIndex}`);
+           }
+           range = sheet.getRange(startRowOrA1Notation, startColIndex, numRows, numCols);
+      } else {
+          throw new Error("Invalid arguments for setRangeValues.");
+      }
+      
+      range.setValues(values);
+      // logDebug(`Set range values (${sheetName}, ${startRowOrA1Notation}, ${numRows}x${numCols})`); // Optional: verbose logging
+      return true;
+    } catch (error) {
+      logError(`Failed to set range values (${sheetName}, ${startRowOrA1Notation}): ${error.message}\n${error.stack}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Gets all data from a sheet's data region.
+   * * @param {string} sheetName - Name of the sheet.
+   * @return {Array<Array<*>>} 2D array of all data, or empty array on error or if sheet not found/empty.
+   */
+  getSheetData(sheetName) {
+    const sheet = this.getSheet(sheetName, false);
+    if (!sheet) return [];
+    
+    try {
+      // Check if sheet has data before getting range
+      if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
+          return []; // Sheet is empty
+      }
+      const dataRange = sheet.getDataRange();
+      return dataRange.getValues();
+    } catch (error) {
+      logError(`Failed to get sheet data for ${sheetName}: ${error.message}`);
+      return [];
+    }
+  }
+  
+  /**
+   * Appends a row to a sheet.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {Array<*>} rowData - Array of values for the row.
+   * @return {boolean} True if successful, false otherwise.
+   */
+  appendRow(sheetName, rowData) {
+    // Use createIfNotExist = true
+    const sheet = this.getSheet(sheetName, true); 
+    if (!sheet) return false;
+    
+    if (!rowData || !Array.isArray(rowData)) {
+        logError(`Invalid rowData provided for appendRow in ${sheetName}.`);
+        return false;
+    }
+
+    try {
+      sheet.appendRow(rowData);
+      return true;
+    } catch (error) {
+      logError(`Failed to append row to ${sheetName}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Clears the content and formatting of a specified range.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {number|string} startRowOrA1Notation - Starting row (1-based) or A1 notation string (e.g., "A1:C5").
+   * @param {number|string} [startCol] - Starting column (1-based) or column letter. Required if startRowOrA1Notation is a number.
+   * @param {number} [numRows] - Number of rows. Required if startRowOrA1Notation is a number.
+   * @param {number} [numCols] - Number of columns. Required if startRowOrA1Notation is a number.
+   * @return {boolean} True if successful, false otherwise.
+   */
+  clearRange(sheetName, startRowOrA1Notation, startCol, numRows, numCols) {
+      const sheet = this.getSheet(sheetName, false); // Don't create if clearing
+      if (!sheet) {
+          logWarning(`Sheet ${sheetName} not found for clearing range.`);
+          return true; // Consider it success if sheet doesn't exist
+      }
+
+      try {
+          let range;
+          if (typeof startRowOrA1Notation === "string") {
+              // Assume A1 notation
+              if (!startRowOrA1Notation.match(/^[A-Z]+[0-9]+(:[A-Z]+[0-9]+)?$/i)) throw new Error(`Invalid A1 notation: ${startRowOrA1Notation}`);
+              range = sheet.getRange(startRowOrA1Notation);
+          } else if (typeof startRowOrA1Notation === 'number' && startCol !== undefined && numRows !== undefined && numCols !== undefined) {
+              // Handle column as letter
+              let startColIndex;
+              if (typeof startCol === "string" && startCol.match(/^[A-Z]+$/i)) {
+                  startColIndex = columnToIndex(startCol.toUpperCase()) + 1;
+              } else if (typeof startCol === 'number') {
+                  startColIndex = startCol;
+              } else {
+                  throw new Error(`Invalid start column: ${startCol}`);
+              }
+               if (startRowOrA1Notation <= 0 || startColIndex <= 0 || numRows <= 0 || numCols <= 0) {
+                   throw new Error(`Invalid range dimensions for clearing: ${startRowOrA1Notation},${startColIndex},${numRows},${numCols}`);
+               }
+              range = sheet.getRange(startRowOrA1Notation, startColIndex, numRows, numCols);
+          } else {
+              throw new Error("Invalid arguments for clearRange.");
+          }
+
+          range.clear({ contentsOnly: false, formatOnly: false }); // Clear everything: content, formatting, notes, etc.
+          logDebug(`Cleared range ${range.getA1Notation()} in ${sheetName}`);
+          return true;
+      } catch (error) {
+          logError(`Failed to clear range (${sheetName}, ${startRowOrA1Notation}): ${error.message}`);
+          return false;
+      }
+  }
+
+  /**
+   * Inserts a specified number of rows after a given row index.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {number} afterRow - The row index (1-based) after which to insert rows.
+   * @param {number} numRows - The number of rows to insert (default: 1).
+   * @return {boolean} True if successful, false otherwise.
+   */
+  insertRows(sheetName, afterRow, numRows = 1) {
+      const sheet = this.getSheet(sheetName, true); // Create sheet if it doesn't exist? Maybe false is safer.
+      if (!sheet) return false;
+
+      if (typeof afterRow !== 'number' || afterRow < 0 || typeof numRows !== 'number' || numRows <= 0) {
+           logError(`Invalid arguments for insertRows: afterRow=${afterRow}, numRows=${numRows}`);
+           return false;
+      }
+
+      try {
+          sheet.insertRowsAfter(afterRow, numRows);
+          logDebug(`Inserted ${numRows} rows after row ${afterRow} in ${sheetName}`);
+          return true;
+      } catch (error) {
+          logError(`Failed to insert rows in ${sheetName}: ${error.message}`);
+          return false;
+      }
+  }
+
+  /**
+   * Deletes a specified number of rows starting from a given row index.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {number} startRow - The starting row index (1-based) to delete.
+   * @param {number} numRows - The number of rows to delete (default: 1).
+   * @return {boolean} True if successful, false otherwise.
+   */
+  deleteRows(sheetName, startRow, numRows = 1) {
+      const sheet = this.getSheet(sheetName, false); // Don't create if deleting
+      if (!sheet) {
+           logWarning(`Sheet ${sheetName} not found for deleting rows.`);
+           return true; // Consider success if sheet doesn't exist
+      }
+
+      if (typeof startRow !== 'number' || startRow <= 0 || typeof numRows !== 'number' || numRows <= 0) {
+           logError(`Invalid arguments for deleteRows: startRow=${startRow}, numRows=${numRows}`);
+           return false;
+      }
+
+      // Avoid deleting all rows if possible
+      if (startRow + numRows -1 > sheet.getMaxRows()) {
+           numRows = sheet.getMaxRows() - startRow + 1;
+           if (numRows <= 0) {
+               logDebug(`No rows to delete at startRow ${startRow} in ${sheetName}`);
+               return true; // Nothing to delete
+           }
+      }
+      // Prevent deleting the very last row if it's the only one? Optional safeguard.
+      // if (sheet.getMaxRows() === 1 && startRow === 1 && numRows === 1) {
+      //     logWarning("Attempted to delete the last remaining row. Clearing instead.");
+      //     return this.clearRange(sheetName, 1, 1, 1, sheet.getMaxColumns());
+      // }
+
+
+      try {
+          sheet.deleteRows(startRow, numRows);
+          logDebug(`Deleted ${numRows} rows starting from row ${startRow} in ${sheetName}`);
+          return true;
+      } catch (error) {
+          logError(`Failed to delete rows in ${sheetName}: ${error.message}`);
+          return false;
+      }
+  }
+  
+  // --- Functions related to specific sheet structures (Project Index, Project Tabs) ---
+  // These rely on the structure defined in Config.js
+
+  /**
+   * Creates a section header with merged cells and formatting
+   * * @param {string} sheetName - Name of the sheet
+   * @param {number} row - Starting row (1-based)
+   * @param {string|number} startCol - Starting column (letter or 1-based)
+   * @param {string|number} endCol - Ending column (letter or 1-based)
+   * @param {string} headerText - Text for the header
+   * @return {boolean} True if successful
+   */
+  createSectionHeader(sheetName, row, startCol, endCol, headerText) {
+    const sheet = this.getSheet(sheetName);
+    if (!sheet) return false;
+    
+    try {
+      // Convert column letters to indices if needed
+      let startColIndex = (typeof startCol === "string" && startCol.match(/^[A-Z]+$/i)) 
+                          ? columnToIndex(startCol.toUpperCase()) + 1 
+                          : (typeof startCol === 'number' ? startCol : 1);
+      let endColIndex = (typeof endCol === "string" && endCol.match(/^[A-Z]+$/i)) 
+                        ? columnToIndex(endCol.toUpperCase()) + 1 
+                        : (typeof endCol === 'number' ? endCol : startColIndex);
+      
+      if (startColIndex <= 0 || endColIndex < startColIndex || row <= 0) {
+           throw new Error(`Invalid range for section header: ${row}, ${startCol}, ${endCol}`);
+      }
+
+      // Merge cells for header
+      const headerRange = sheet.getRange(row, startColIndex, 1, endColIndex - startColIndex + 1);
+      headerRange.merge();
+      
+      // Set header text and formatting
+      headerRange.setValue(headerText);
+      headerRange.setBackground(DEFAULT_COLORS.SECTION_HEADER_BG);
+      headerRange.setFontWeight("bold");
+      headerRange.setHorizontalAlignment("center");
+      
+      return true;
+    } catch (error) {
+      logError(`Failed to create section header '${headerText}' in ${sheetName}: ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Creates a dropdown in a cell with validation
+   * * @param {string} sheetName - Name of the sheet
+   * @param {number|string} row - Row number (1-based) or A1 notation
+   * @param {number|string} column - Column number (1-based) or column letter
+   * @param {Array<string>} options - Array of dropdown options
+   * @return {boolean} True if successful
+   */
+  createDropdown(sheetName, row, column, options) {
+    const sheet = this.getSheet(sheetName);
+    if (!sheet) return false;
+    
+    try {
+      let range;
+      if (typeof row === "string" && column === undefined) {
+           if (!row.match(/^[A-Z]+[0-9]+$/i)) throw new Error(`Invalid A1 notation: ${row}`);
+           range = sheet.getRange(row);
+      } else if (typeof row === 'number' && column !== undefined) {
+          let colIndex;
+          if (typeof column === "string" && column.match(/^[A-Z]+$/i)) {
+              colIndex = columnToIndex(column.toUpperCase()) + 1;
+          } else if (typeof column === 'number') {
+              colIndex = column;
+          } else {
+              throw new Error(`Invalid column identifier: ${column}`);
+          }
+           if (row <= 0 || colIndex <= 0) throw new Error(`Invalid coordinates: ${row}, ${colIndex}`);
+          range = sheet.getRange(row, colIndex);
+      } else {
+           throw new Error(`Invalid arguments for createDropdown: row=${row}, column=${column}`);
+      }
+      
+      // Create validation rule
+      const rule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(options, true) // true = show dropdown arrow
+        .setAllowInvalid(false) // Disallow values not in the list
+        .build();
+      
+      range.setDataValidation(rule);
+      return true;
+    } catch (error) {
+      logError(`Failed to create dropdown (${sheetName} ${row}:${column || ''}): ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Creates a checkbox in a cell
+   * * @param {string} sheetName - Name of the sheet
+   * @param {number|string} row - Row number (1-based) or A1 notation
+   * @param {number|string} column - Column number (1-based) or column letter
+   * @param {boolean} [checked=false] - Whether the checkbox is initially checked
+   * @return {boolean} True if successful
+   */
+  createCheckbox(sheetName, row, column, checked = false) {
+    const sheet = this.getSheet(sheetName);
+    if (!sheet) return false;
+    
+    try {
+      let range;
+      if (typeof row === "string" && column === undefined) {
+           if (!row.match(/^[A-Z]+[0-9]+$/i)) throw new Error(`Invalid A1 notation: ${row}`);
+           range = sheet.getRange(row);
+      } else if (typeof row === 'number' && column !== undefined) {
+          let colIndex;
+          if (typeof column === "string" && column.match(/^[A-Z]+$/i)) {
+              colIndex = columnToIndex(column.toUpperCase()) + 1;
+          } else if (typeof column === 'number') {
+              colIndex = column;
+          } else {
+              throw new Error(`Invalid column identifier: ${column}`);
+          }
+           if (row <= 0 || colIndex <= 0) throw new Error(`Invalid coordinates: ${row}, ${colIndex}`);
+          range = sheet.getRange(row, colIndex);
+      } else {
+           throw new Error(`Invalid arguments for createCheckbox: row=${row}, column=${column}`);
+      }
+      
+      // Create checkbox using data validation (more robust than insertCheckboxes sometimes)
+      range.setDataValidation(SpreadsheetApp.newDataValidation()
+          .requireCheckbox()
+          .setAllowInvalid(false)
+          .build());
+      range.setValue(checked); // Set initial state
+      
+      return true;
+    } catch (error) {
+      logError(`Failed to create checkbox (${sheetName} ${row}:${column || ''}): ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Gets all sheet names in the spreadsheet
+   * * @return {Array<string>} Array of sheet names, or empty array on error.
+   */
+  getSheetNames() {
+    if (!this.spreadsheet) {
+        logError("Spreadsheet not open. Cannot get sheet names.");
+        return [];
+    }
+    try {
+      const sheets = this.spreadsheet.getSheets();
+      return sheets.map(sheet => sheet.getName());
+    } catch (error) {
+      logError(`Failed to get sheet names: ${error.message}`);
+      return [];
+    }
+  }
+  
+  /**
+   * Finds the first empty row in a sheet, starting from a specific column and row.
+   * * @param {string} sheetName - Name of the sheet.
+   * @param {number|string} column - Column to check (1-based or letter).
+   * @param {number} [startRow=1] - Row to start checking from (1-based).
+   * @return {number} First empty row number (1-based), or -1 on error.
+   */
+  findFirstEmptyRow(sheetName, column, startRow = 1) {
+    const sheet = this.getSheet(sheetName, false);
+    if (!sheet) return -1;
+    
+    try {
+      let colIndex;
+      if (typeof column === "string" && column.match(/^[A-Z]+$/i)) {
+        colIndex = columnToIndex(column.toUpperCase()) + 1; // Convert to 1-based index
+      } else if (typeof column === 'number' && column > 0) {
+           colIndex = column;
+      } else {
+           throw new Error(`Invalid column identifier: ${column}`);
+      }
+      if (startRow <= 0) startRow = 1;
+
+      const lastRow = sheet.getLastRow();
+      
+      // If sheet is effectively empty or startRow is beyond last row
+      if (lastRow < startRow) {
+        return startRow;
+      }
+      
+      // Get all values in the column from startRow downwards
+      const values = sheet.getRange(startRow, colIndex, lastRow - startRow + 1, 1).getValues();
+      
+      // Find first empty cell (considers null, undefined, empty string)
+      for (let i = 0; i < values.length; i++) {
+        if (values[i][0] === null || values[i][0] === undefined || values[i][0] === '') {
+          return startRow + i; // Return the 1-based row index
+        }
+      }
+      
+      // If no empty rows found in the existing data, return the next row after the last
+      return lastRow + 1;
+    } catch (error) {
+      logError(`Failed to find first empty row in ${sheetName}, column ${column}: ${error.message}`);
+      return -1;
+    }
+  }
+  
+  /**
+   * Creates a new tab by copying structure and formatting from a template tab.
+   * * @param {string} newTabName - Name for the new tab.
+   * @param {string} templateTabName - Name of the template tab to copy structure from.
+   * @return {boolean} True if successful, false otherwise.
+   */
+  createTabFromTemplate(newTabName, templateTabName) {
+    if (!this.spreadsheet) {
+        logError("Spreadsheet not open. Cannot create tab from template.");
+        return false;
+    }
+    try {
+      const templateSheet = this.getSheet(templateTabName, false);
+      if (!templateSheet) {
+        logError(`Template sheet not found: ${templateTabName}`);
+        return false;
+      }
+      
+      // Check if sheet already exists
+      if (this.getSheet(newTabName, false)) {
+           logWarning(`Sheet '${newTabName}' already exists. Skipping creation from template.`);
+           return true; // Or false depending on desired behavior
+      }
+
+      // Create a new sheet by copying the template
+      const newSheet = templateSheet.copyTo(this.spreadsheet).setName(newTabName);
+      
+      // Optional: Clear specific data ranges if template contains placeholder data
+      // Example: newSheet.getRange("E2:G28").clearContent(); // Clear element data values
+      
+      logInfo(`Created new tab '${newTabName}' from template '${templateTabName}'`);
+      return true;
+    } catch (error) {
+      logError(`Failed to create tab '${newTabName}' from template '${templateTabName}': ${error.message}\n${error.stack}`);
+      // Attempt cleanup: delete the partially created sheet if it exists
+      const partialSheet = this.getSheet(newTabName, false);
+      if (partialSheet) {
+          try { this.spreadsheet.deleteSheet(partialSheet); } catch (e) {}
+      }
+      return false;
+    }
+  }
+
+  // Removed copyMergedRanges and copyKnownMergedRanges as copyTo() handles merges.
+
+  /**
+   * Updates project info section in a project tab based on key-value pairs.
+   * Keys should match the keys in SHEET_STRUCTURE.PROJECT_TAB.PROJECT_INFO.FIELDS.
+   * * @param {string} sheetName - Name of the project sheet.
+   * @param {Object} projectInfoUpdates - Object where keys are field names (e.g., "TITLE", "MODIFIED_AT") and values are the new data.
+   * @return {boolean} True if successful, false otherwise.
+   */
+  updateProjectInfo(sheetName, projectInfoUpdates) {
+    const sheet = this.getSheet(sheetName, false);
+    if (!sheet) return false;
+    
+    try {
+      const projectInfoFields = SHEET_STRUCTURE.PROJECT_TAB.PROJECT_INFO.FIELDS;
+      let success = true;
+      
+      // Update each field provided in the updates object
+      for (const [fieldKey, newValue] of Object.entries(projectInfoUpdates)) {
+        if (projectInfoFields.hasOwnProperty(fieldKey)) {
+          const fieldInfo = projectInfoFields[fieldKey];
+          if (!this.setCellValue(sheetName, fieldInfo.ROW, fieldInfo.VALUE_COL, newValue)) {
+               logWarning(`Failed to update project info field '${fieldKey}' in ${sheetName}`);
+               success = false; // Mark as partially failed but continue
+          }
+        } else {
+             logWarning(`Unknown field key '${fieldKey}' provided in updateProjectInfo for ${sheetName}`);
+        }
+      }
+      
+      return success;
+    } catch (error) {
+      logError(`Failed to update project info in ${sheetName}: ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Initializes a project index tab with headers and formatting.
+   * * @param {string} [sheetName=SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME] - Name for the project index sheet.
+   * @return {boolean} True if successful, false otherwise.
+   */
+  initializeProjectIndexTab(sheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME) {
+    // Use createIfNotExist = true
+    const sheet = this.getSheet(sheetName, true); 
+    if (!sheet) return false;
+    
+    try {
+      // Check if headers already exist
+      if (sheet.getRange(1, 1).getValue() === SHEET_STRUCTURE.PROJECT_INDEX.HEADERS[0]) {
+          logDebug(`Project index tab '${sheetName}' already initialized.`);
+          return true;
+      }
+
+      // Set headers
+      const headers = SHEET_STRUCTURE.PROJECT_INDEX.HEADERS;
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      
+      // Format header row
+      sheet.getRange(1, 1, 1, headers.length)
+        .setBackground(DEFAULT_COLORS.SECTION_HEADER_BG)
+        .setFontWeight("bold");
+      
+      // Freeze header row
+      sheet.setFrozenRows(1);
+      
+      // Auto-resize columns
+      for (let i = 1; i <= headers.length; i++) {
+        sheet.autoResizeColumn(i);
+      }
+      
+      logInfo(`Initialized project index tab: ${sheetName}`);
+      return true;
+    } catch (error) {
+      logError(`Failed to initialize project index tab '${sheetName}': ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Adds or updates a project entry in the project index.
+   * * @param {Object} projectInfo - Project info object { projectId, title, createdAt, modifiedAt, lastAccessed? }. Timestamps should be Date objects.
+   * @param {string} [sheetName=SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME] - Name of the project index sheet.
+   * @return {boolean} True if successful, false otherwise.
+   */
+  addProjectToIndex(projectInfo, sheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME) {
+    // Use createIfNotExist = true, and ensure it's initialized
+    const sheet = this.getSheet(sheetName, true); 
+    if (!sheet) return false;
+    if (sheet.getLastRow() === 0) { // Ensure initialized if just created
+        this.initializeProjectIndexTab(sheetName);
+    }
+    
+    if (!projectInfo || !projectInfo.projectId || !projectInfo.title) {
+         logError("Invalid projectInfo provided to addProjectToIndex.");
+         return false;
+    }
+
+    try {
+      const columns = SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS;
+      const now = new Date(); // Use for lastAccessed if not provided
+      
+      // Check if project already exists
+      const projectLocation = this.findProjectInIndex(projectInfo.projectId, sheetName);
+      
+      if (projectLocation.found) {
+        // Update existing entry
+        const rowIndex = projectLocation.rowIndex;
+        // Prepare update values in correct column order
+        const updateValues = [];
+        updateValues[columns.TITLE] = projectInfo.title;
+        // Don't update createdAt
+        updateValues[columns.MODIFIED_AT] = projectInfo.modifiedAt instanceof Date ? projectInfo.modifiedAt : now;
+        updateValues[columns.LAST_ACCESSED] = projectInfo.lastAccessed instanceof Date ? projectInfo.lastAccessed : now;
+        
+        // Write updates (more efficient to getRange().setValues() if updating multiple adjacent cells)
+        sheet.getRange(rowIndex, columns.TITLE + 1).setValue(updateValues[columns.TITLE]);
+        sheet.getRange(rowIndex, columns.MODIFIED_AT + 1).setValue(updateValues[columns.MODIFIED_AT]);
+        sheet.getRange(rowIndex, columns.LAST_ACCESSED + 1).setValue(updateValues[columns.LAST_ACCESSED]);
+
+        logDebug(`Updated project in index: ${projectInfo.projectId}`);
+        
+      } else {
+        // Create new entry - ensure order matches HEADERS/COLUMNS
+        const newRow = [];
+        newRow[columns.PROJECT_ID] = projectInfo.projectId;
+        newRow[columns.TITLE] = projectInfo.title;
+        newRow[columns.CREATED_AT] = projectInfo.createdAt instanceof Date ? projectInfo.createdAt : now;
+        newRow[columns.MODIFIED_AT] = projectInfo.modifiedAt instanceof Date ? projectInfo.modifiedAt : now;
+        newRow[columns.LAST_ACCESSED] = projectInfo.lastAccessed instanceof Date ? projectInfo.lastAccessed : now;
+        
+        // Append the row
+        sheet.appendRow(newRow);
+        logInfo(`Added project to index: ${projectInfo.projectId}`);
+      }
+      return true;
+    } catch (error) {
+      logError(`Failed to add/update project ${projectInfo.projectId} in index: ${error.message}\n${error.stack}`);
+      return false;
+    }
+  }
+
+   /**
+   * Deletes a row from the project index based on Project ID.
+   * * @param {string} projectId - The ID of the project to delete from the index.
+   * @param {string} [sheetName=SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME] - Name of the project index sheet.
+   * @return {boolean} True if the row was found and deleted, false otherwise.
+   */
+  deleteRowFromIndex(projectId, sheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME) {
+      const sheet = this.getSheet(sheetName, false);
+      if (!sheet) {
+          logWarning(`Project index sheet '${sheetName}' not found for deletion.`);
+          return false; // Sheet doesn't exist
+      }
+
+      try {
+          const projectLocation = this.findProjectInIndex(projectId, sheetName);
+
+          if (projectLocation.found) {
+              sheet.deleteRow(projectLocation.rowIndex);
+              logInfo(`Deleted project ${projectId} from index sheet '${sheetName}' (row ${projectLocation.rowIndex}).`);
+              return true;
+          } else {
+              logWarning(`Project ${projectId} not found in index sheet '${sheetName}' for deletion.`);
+              return false; // Project not found
+          }
+      } catch (error) {
+          logError(`Failed to delete project ${projectId} from index sheet '${sheetName}': ${error.message}\n${error.stack}`);
+          return false;
+      }
+  }
+  
+  /**
+   * Finds a project in the project index by ID.
+   * * @param {string} projectId - ID of the project to find.
+   * @param {string} [sheetName=SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME] - Name of the project index sheet.
+   * @return {Object} Object { found: boolean, rowIndex: number (1-based) or -1 }.
+   */
+  findProjectInIndex(projectId, sheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME) {
+    const sheet = this.getSheet(sheetName, false);
+    if (!sheet || sheet.getLastRow() < 1) { // Check if sheet exists and has rows
+        return { found: false, rowIndex: -1 };
+    }
+    
+    try {
+      // Get only the Project ID column data for efficiency
+      const idColumnIndex = SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.PROJECT_ID + 1;
+      const idValues = sheet.getRange(1, idColumnIndex, sheet.getLastRow(), 1).getValues();
+      
+      // Search for the ID (skip header row index 0)
+      for (let i = 1; i < idValues.length; i++) {
+        if (idValues[i][0] === projectId) {
+          return { found: true, rowIndex: i + 1 }; // +1 for 1-based sheet index
+        }
+      }
+      
+      return { found: false, rowIndex: -1 }; // Not found
+    } catch (error) {
+      // Log error but return standard not found object
+      logError(`Error finding project ${projectId} in index '${sheetName}': ${error.message}`);
+      return { found: false, rowIndex: -1 };
+    }
+  }
+  
+  // Removed createSection and addElementColumn as this logic is better handled
+  // by TemplateManager which understands the overall structure and where to insert/find things.
+  // SheetAccessor should focus on primitive read/write/clear/format operations.
+}

@@ -3,803 +3,371 @@
  * Main entry point, onOpen trigger, and menu setup
  */
 
-// Global instances of core classes
+// Global instances of core classes - Initialized in initialize()
 let sheetAccessor = null;
 let templateManager = null;
 let driveManager = null;
-let mediaProcessor = null;
-let fileUploader = null;
+let mediaProcessor = null; // Assuming defined elsewhere if used
+let fileUploader = null;   // Assuming defined elsewhere if used
 let projectManager = null;
-let authManager = null;
+let authManager = null;    // Assuming defined elsewhere if used
 let apiHandler = null;
 
+/**
+ * Runs when the spreadsheet is opened. Creates the application menu.
+ * @param {Event} e The open event object.
+ */
 function onOpen(e) {
   try {
-    // Create menu
-    SpreadsheetApp.getUi()
-      .createMenu('Training Projects')
-      .addItem('Create New Project', 'showNewProjectDialog')
-      .addSeparator()
-      .addItem('Edit Project', 'showProjectSelector')
-      .addItem('View Project', 'showProjectViewer')
-      .addSeparator()
-      .addSubMenu(SpreadsheetApp.getUi().createMenu('Project Tools')
-        .addItem('Add Slide', 'showAddSlideDialog')
-        .addItem('Add Element', 'showAddElementDialog')
-        .addItem('Upload Media', 'showFileUploadDialog')
-        .addItem('Deploy Project', 'showDeployProjectDialog'))
-      .addSeparator()
-      .addItem('Manage Files', 'showFileManager')
-      .addSeparator()
-      .addItem('View Analytics', 'showAnalyticsDashboard')
-      .addSeparator()
-      .addItem('Locate Root Folder', 'showRootFolderURL')
-      .addToUi();
+    // Create menu only if the context allows UI interaction
+    if (e && e.authMode !== ScriptApp.AuthMode.NONE) {
+        SpreadsheetApp.getUi()
+          .createMenu('Training Projects')
+          .addItem('Create New Project', 'showNewProjectDialog')
+          .addSeparator()
+          .addItem('Edit Project', 'showProjectSelector')
+          // .addItem('View Project', 'showProjectViewer') // Placeholder
+          .addSeparator()
+          // .addSubMenu(SpreadsheetApp.getUi().createMenu('Project Tools') // Placeholder
+          //   .addItem('Add Slide', 'showAddSlideDialog')
+          //   .addItem('Add Element', 'showAddElementDialog')
+          //   .addItem('Upload Media', 'showFileUploadDialog')
+          //   .addItem('Deploy Project', 'showDeployProjectDialog'))
+          // .addSeparator()
+          // .addItem('Manage Files', 'showFileManager') // Placeholder
+          // .addSeparator()
+          // .addItem('View Analytics', 'showAnalyticsDashboard') // Placeholder
+          // .addSeparator()
+          .addItem('Locate Root Folder', 'showRootFolderURL')
+          .addToUi();
+    }
     
-    // Initialize the application
+    // Initialize the application backend components
     initialize();
     
-    logInfo('Application initialized on spreadsheet open');
+    logInfo('Application menu created and backend initialized on spreadsheet open.');
   } catch (error) {
-    logError(`Error in onOpen: ${error.message}`);
-    showErrorAlert('Failed to initialize the application. Please refresh and try again.');
+    logError(`Error in onOpen: ${error.message}\n${error.stack}`);
+    // Avoid showing UI alert here if authMode is NONE (e.g., script running automatically)
+    if (e && e.authMode !== ScriptApp.AuthMode.NONE) {
+        showErrorAlert('Failed to initialize the application menu. Please refresh and try again.');
+    }
   }
 }
 
 /**
- * Initializes the application by creating the required global instances
- * Creates necessary structures if they don't exist
+ * Initializes the application by creating the required global instances.
+ * Creates necessary structures (like Template sheet) if they don't exist.
+ * Ensures idempotency (can be called multiple times).
  */
 function initialize() {
+    // Prevent re-initialization if already done
+    if (apiHandler && projectManager && templateManager && sheetAccessor && driveManager && authManager) {
+        logDebug("Application already initialized.");
+        return true;
+    }
+
+    logInfo("Initializing application components...");
+    try {
+        // Initialize SheetAccessor first
+        const spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
+        sheetAccessor = new SheetAccessor(spreadsheetId);
+        
+        // Initialize TemplateManager (depends on SheetAccessor)
+        // This will also ensure the base template sheet exists
+        templateManager = new TemplateManager(sheetAccessor);
+        templateManager.createBaseTemplate(); // Ensure template exists
+
+        // Initialize DriveManager (independent)
+        driveManager = new DriveManager(); // Assuming defined elsewhere
+
+        // Initialize ProjectManager (depends on SheetAccessor, TemplateManager, DriveManager)
+        projectManager = new ProjectManager(sheetAccessor, templateManager, driveManager);
+
+        // Initialize AuthManager (depends on SheetAccessor, DriveManager)
+        authManager = new AuthManager(sheetAccessor, driveManager); // Assuming defined elsewhere
+
+        // Initialize FileUploader and MediaProcessor (if used, assuming defined elsewhere)
+        // mediaProcessor = new MediaProcessor(driveManager);
+        // fileUploader = new FileUploader(driveManager, mediaProcessor);
+        fileUploader = fileUploader || {}; // Placeholder if not fully implemented yet
+
+        // Initialize ApiHandler (depends on ProjectManager, FileUploader, AuthManager)
+        apiHandler = new ApiHandler(projectManager, fileUploader, authManager);
+        
+        // Check if project index exists, create if not
+        const indexSheetName = SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME;
+        if (!sheetAccessor.getSheet(indexSheetName, false)) {
+            logInfo(`Project index sheet '${indexSheetName}' not found. Initializing...`);
+            sheetAccessor.initializeProjectIndexTab(indexSheetName);
+        }
+
+        // Verify all critical components were created successfully
+        if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
+            throw new Error("One or more core components failed to initialize.");
+        }
+        
+        logInfo('Application successfully initialized.');
+        return true;
+    } catch (error) {
+        logError(`Failed to initialize application: ${error.message}\n${error.stack}`);
+        // Reset globals on failure to allow retry?
+        sheetAccessor = templateManager = driveManager = projectManager = authManager = apiHandler = null; 
+        // Re-throw to ensure the caller knows initialization failed
+        throw new Error(`Initialization failed: ${error.message}`);
+    }
+}
+
+/**
+ * Shows a modal dialog with an error message in the Spreadsheet UI.
+ * * @param {string} message - Error message to display.
+ */
+function showErrorAlert(message) {
   try {
-    // Initialize SheetAccessor
-    const spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
-    sheetAccessor = new SheetAccessor(spreadsheetId);
-    
-    // Check if project index exists, create if not
-    const sheets = sheetAccessor.getSheetNames();
-    if (!sheets.includes(SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME)) {
-      sheetAccessor.initializeProjectIndexTab();
-    }
-    
-    // Check if template exists, create if not
-    if (!sheets.includes('Template')) {
-      // Initialize TemplateManager
-      templateManager = new TemplateManager(sheetAccessor);
-      templateManager.createBaseTemplate();
-    } else {
-      // Template exists, just initialize the manager
-      templateManager = new TemplateManager(sheetAccessor);
-    }
-    
-    // Initialize DriveManager
-    driveManager = new DriveManager();
-    
-    // Initialize Phase 2 components
-    mediaProcessor = new MediaProcessor(driveManager);
-    fileUploader = new FileUploader(driveManager, mediaProcessor);
-    projectManager = new ProjectManager(sheetAccessor, templateManager, driveManager);
-    
-    // Initialize Phase 3 components
-    authManager = new AuthManager(sheetAccessor, driveManager);
-    apiHandler = new ApiHandler(projectManager, fileUploader, authManager);
-    
-    // Verify all components were created successfully
-    if (!sheetAccessor || !templateManager || !driveManager || 
-        !mediaProcessor || !fileUploader || !projectManager || 
-        !authManager || !apiHandler) {
-      throw new Error("Some components failed to initialize");
-    }
-    
-    logInfo('Application successfully initialized');
-    return true;
-  } catch (error) {
-    logError(`Failed to initialize application: ${error.message}\n${error.stack}`);
-    // Re-throw to ensure the caller knows initialization failed
-    throw new Error(`Initialization failed: ${error.message}`);
+      const ui = SpreadsheetApp.getUi();
+      ui.alert('Error', message, ui.ButtonSet.OK);
+  } catch (uiError) {
+      logError(`Could not display UI alert: ${uiError.message}`);
+      // Fallback logging
+      Logger.log(`ALERT (UI unavailable): ${message}`);
   }
 }
 
-/**
- * Shows a modal dialog with an error message
- * 
- * @param {string} message - Error message to display
- */
-function showErrorAlert(message) {
-  const ui = SpreadsheetApp.getUi();
-  ui.alert('Error', message, ui.ButtonSet.OK);
-}
+// ============================================================
+// Spreadsheet UI Functions (Dialogs, etc.) - Keep as is or refine
+// ============================================================
 
 /**
- * Shows a dialog to create a new project
+ * Shows a dialog to create a new project.
  */
 function showNewProjectDialog() {
   try {
-    // Check if the application is initialized
-    if (!sheetAccessor || !templateManager || !driveManager) {
-      initialize();
-    }
-    
-    // Create HTML template
-    const htmlOutput = HtmlService.createHtmlOutput(`
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 20px;
-        }
-        .form-group {
-          margin-bottom: 15px;
-        }
-        label {
-          display: block;
-          margin-bottom: 5px;
-          font-weight: bold;
-        }
-        input[type=text] {
-          width: 100%;
-          padding: 8px;
-          box-sizing: border-box;
-        }
-        .buttons {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 20px;
-        }
-        .buttons button {
-          padding: 8px 16px;
-          margin-left: 10px;
-        }
-        #status {
-          margin-top: 15px;
-          padding: 10px;
-          border-radius: 4px;
-          display: none;
-        }
-        .success {
-          background-color: #d4edda;
-          color: #155724;
-          border: 1px solid #c3e6cb;
-        }
-        .error {
-          background-color: #f8d7da;
-          color: #721c24;
-          border: 1px solid #f5c6cb;
-        }
-        .loading {
-          display: inline-block;
-          width: 16px;
-          height: 16px;
-          border: 3px solid rgba(0, 0, 0, 0.1);
-          border-radius: 50%;
-          border-top-color: #3498db;
-          animation: spin 1s ease-in-out infinite;
-          margin-right: 10px;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .hidden {
-          display: none;
-        }
-      </style>
-      <div>
-        <h2>Create New Training Project</h2>
-        <div class="form-group">
-          <label for="projectName">Project Name:</label>
-          <input type="text" id="projectName" placeholder="Enter project name">
-        </div>
-        <div id="status"></div>
-        <div class="buttons">
-          <button id="cancelBtn" onclick="cancelDialog()">Cancel</button>
-          <button id="createBtn" onclick="createProject()">
-            <span id="loadingIcon" class="loading hidden"></span>
-            <span id="buttonText">Create Project</span>
-          </button>
-        </div>
-      </div>
-      <script>
-        function createProject() {
-          const projectName = document.getElementById('projectName').value;
-          if (!projectName) {
-            showStatus('Please enter a project name', 'error');
-            return;
-          }
-          
-          // Show loading state
-          setLoading(true);
-          
-          google.script.run
-            .withSuccessHandler(onSuccess)
-            .withFailureHandler(onFailure)
-            .createNewProject(projectName);
-        }
-        
-        function onSuccess(result) {
-          setLoading(false);
-          
-          if (result.success) {
-            showStatus('Project created successfully! The dialog will close in 3 seconds.', 'success');
-            // Close dialog after a short delay to ensure the message is seen
-            setTimeout(function() {
-              google.script.host.close();
-            }, 3000);
-          } else {
-            showStatus('Failed to create project: ' + result.message, 'error');
-          }
-        }
-        
-        function onFailure(error) {
-          setLoading(false);
-          showStatus('Error: ' + error.message, 'error');
-        }
-        
-        function cancelDialog() {
-          google.script.host.close();
-        }
-        
-        function showStatus(message, type) {
-          const statusElement = document.getElementById('status');
-          statusElement.textContent = message;
-          statusElement.className = type;
-          statusElement.style.display = 'block';
-        }
-        
-        function setLoading(isLoading) {
-          const loadingIcon = document.getElementById('loadingIcon');
-          const buttonText = document.getElementById('buttonText');
-          const createBtn = document.getElementById('createBtn');
-          const cancelBtn = document.getElementById('cancelBtn');
-          
-          if (isLoading) {
-            loadingIcon.classList.remove('hidden');
-            buttonText.textContent = 'Creating...';
-            createBtn.disabled = true;
-            cancelBtn.disabled = true;
-          } else {
-            loadingIcon.classList.add('hidden');
-            buttonText.textContent = 'Create Project';
-            createBtn.disabled = false;
-            cancelBtn.disabled = false;
-          }
-        }
-      </script>
-    `)
+    initialize(); // Ensure initialized
+    const htmlOutput = HtmlService.createTemplateFromFile('NewProjectDialog') // Assuming HTML is in a file
+      .evaluate()
       .setWidth(400)
-      .setHeight(250)
-      .setTitle('Create New Project');
-    
+      .setHeight(250);
     SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Create New Project');
   } catch (error) {
     logError(`Failed to show new project dialog: ${error.message}`);
-    showErrorAlert('Failed to open the new project dialog. Please try again.');
+    showErrorAlert('Failed to open the new project dialog. Please ensure the "NewProjectDialog.html" file exists and try again.');
   }
 }
 
 /**
- * Creates a new project with the specified name
- * Called from the new project dialog
- * 
- * @param {string} projectName - Name for the new project
- * @return {Object} Result object with success flag and message
+ * Server-side function called by the new project dialog's client-side script.
+ * * @param {string} projectName - Name for the new project.
+ * @return {Object} Result object { success: boolean, message: string, projectId?: string, ... }.
  */
 function createNewProject(projectName) {
   try {
-    // Check if the application is initialized
-    if (!projectManager) {
-      initialize();
-    }
-    
+    initialize(); // Ensure initialized
     // Use the ProjectManager to create the project
     const result = projectManager.createProject(projectName);
-    
-    // If successful, activate the project tab
-    if (result.success) {
-      const sheet = sheetAccessor.getSheet(result.projectTabName);
-      sheet.activate();
+    // If successful, activate the project tab for immediate feedback
+    if (result.success && result.projectTabName) {
+      try {
+          sheetAccessor.getSheet(result.projectTabName, false)?.activate();
+      } catch(activateError) {
+           logWarning(`Could not activate sheet ${result.projectTabName}: ${activateError.message}`);
+      }
     }
-    
-    return result;
+    return result; // Return the result object from ProjectManager
   } catch (error) {
-    logError(`Failed to create new project: ${error.message}`);
-    return { success: false, message: `Error: ${error.message}` };
+    logError(`Failed to create new project via dialog function: ${error.message}\n${error.stack}`);
+    return { success: false, message: `Server error: ${error.message}` };
   }
 }
 
 /**
- * Shows a dialog to select an existing project for editing
+ * Shows a dialog to select an existing project for editing.
  */
 function showProjectSelector() {
   try {
-    // Check if the application is initialized
-    if (!sheetAccessor || !templateManager || !driveManager) {
-      initialize();
-    }
-    
-    // Get list of projects
-    const projectIndexSheet = sheetAccessor.getSheet(SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME, false);
-    if (!projectIndexSheet) {
-      showErrorAlert('Project index not found. Please initialize the application first.');
-      return;
-    }
-    
-    const projectData = sheetAccessor.getSheetData(SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME);
-    
-    // Skip header row and filter out any empty rows
-    const projects = projectData.slice(1)
-      .filter(row => row[0] && row[1]) // Ensure projectId and title exist
-      .map(row => {
-        return {
-          projectId: row[SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.PROJECT_ID],
-          title: row[SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.TITLE],
-          createdAt: row[SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.CREATED_AT],
-          modifiedAt: row[SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.MODIFIED_AT]
-        };
-      });
-    
-    // Create HTML for project selector
-    let projectListHtml = '';
-    if (projects.length === 0) {
-      projectListHtml = '<p>No projects found. Please create a new project first.</p>';
-    } else {
-      projectListHtml = '<div class="project-list">';
-      projects.forEach(project => {
-        const createdDate = project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'Unknown';
-        const modifiedDate = project.modifiedAt ? new Date(project.modifiedAt).toLocaleDateString() : 'Unknown';
-        
-        projectListHtml += `
-          <div class="project-item" data-project-id="${project.projectId}">
-            <div class="project-title">${project.title}</div>
-            <div class="project-dates">
-              Created: ${createdDate} | Last Modified: ${modifiedDate}
-            </div>
-            <button onclick="editProject('${project.projectId}')">Edit</button>
-          </div>
-        `;
-      });
-      projectListHtml += '</div>';
-    }
-    
-    // Create HTML template
-    const htmlOutput = HtmlService.createHtmlOutput(`
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 20px;
-        }
-        h2 {
-          margin-bottom: 20px;
-        }
-        .project-list {
-          max-height: 300px;
-          overflow-y: auto;
-        }
-        .project-item {
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          padding: 10px;
-          margin-bottom: 10px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .project-title {
-          font-weight: bold;
-          flex: 2;
-        }
-        .project-dates {
-          font-size: 0.8em;
-          color: #666;
-          flex: 2;
-        }
-        button {
-          padding: 5px 10px;
-          background-color: #4285F4;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-        button:hover {
-          background-color: #3367D6;
-        }
-        .footer {
-          margin-top: 20px;
-          display: flex;
-          justify-content: space-between;
-        }
-      </style>
-      <div>
-        <h2>Select Project to Edit</h2>
-        ${projectListHtml}
-        <div class="footer">
-          <button onclick="google.script.host.close()">Cancel</button>
-          <button onclick="createNewProjectClick()">Create New Project</button>
-        </div>
-      </div>
-      <script>
-        function editProject(projectId) {
-          google.script.run
-            .withSuccessHandler(onSuccess)
-            .withFailureHandler(onFailure)
-            .openProjectForEditing(projectId);
-        }
-        
-        function onSuccess(result) {
-          google.script.host.close();
-        }
-        
-        function onFailure(error) {
-          alert('Error: ' + error.message);
-        }
-        
-        function createNewProjectClick() {
-          google.script.host.close();
-          google.script.run.showNewProjectDialog();
-        }
-      </script>
-    `)
-      .setWidth(500)
-      .setHeight(400)
-      .setTitle('Select Project');
-    
-    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Select Project');
+    initialize(); // Ensure initialized
+    // ProjectSelector.html should fetch its own list via API call
+    const htmlOutput = HtmlService.createTemplateFromFile('ProjectSelector') // Assuming HTML is in a file
+        .evaluate()
+        .setWidth(500)
+        .setHeight(450); // Adjust size as needed
+    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Select Project to Edit');
   } catch (error) {
-    logError(`Failed to show project selector: ${error.message}`);
-    showErrorAlert('Failed to open the project selector. Please try again.');
+    logError(`Failed to show project selector: ${error.message}\n${error.stack}`);
+    showErrorAlert('Failed to open the project selector. Please ensure the "ProjectSelector.html" file exists and try again.');
   }
 }
 
 /**
- * Opens a project for editing
- * Called from the project selector dialog
- * 
- * @param {string} projectId - ID of the project to open
- * @return {Object} Result object with success flag and message
+ * Server-side function called by the project selector dialog to open the editor.
+ * This function activates the sheet. The actual editor loading happens via doGet.
+ * * @param {string} projectId - ID of the project to open.
+ * @return {Object} Result object { success: boolean, message: string }.
  */
 function openProjectForEditing(projectId) {
   try {
-    // Check if the application is initialized
-    if (!projectManager) {
-      initialize();
-    }
-    
-    // Use the ProjectManager to open the project
-    return projectManager.openProject(projectId);
+    initialize(); // Ensure initialized
+    // Use the ProjectManager to activate the sheet and update timestamp
+    const result = projectManager.openProject(projectId);
+    // Note: This function just activates the sheet. The editor UI is loaded via doGet.
+    // We might not even need this server function if the "Edit" button in the dialog
+    // simply constructs the editor URL and closes the dialog.
+    // However, activating the sheet provides feedback to the user in the spreadsheet.
+    return result; 
   } catch (error) {
-    logError(`Failed to open project for editing: ${error.message}`);
-    return { success: false, message: `Error: ${error.message}` };
+    logError(`Failed to open project for editing (server-side): ${error.message}\n${error.stack}`);
+    return { success: false, message: `Server error opening project: ${error.message}` };
   }
 }
 
 /**
- * Other functions that will be implemented in later phases
- */
-function showProjectViewer() {
-  const ui = SpreadsheetApp.getUi();
-  ui.alert('Coming Soon', 'Project viewer will be implemented in a future phase.', ui.ButtonSet.OK);
-}
-
-function showFileManager() {
-  const ui = SpreadsheetApp.getUi();
-  ui.alert('Coming Soon', 'File manager will be implemented in a future phase.', ui.ButtonSet.OK);
-}
-
-function showAnalyticsDashboard() {
-  const ui = SpreadsheetApp.getUi();
-  ui.alert('Coming Soon', 'Analytics dashboard will be implemented in a future phase.', ui.ButtonSet.OK);
-}
-
-/**
- * Shows the URL of the root project folder
+ * Shows the URL of the root project folder in Drive.
  */
 function showRootFolderURL() {
   try {
-    if (!driveManager) {
-      initialize();
+    initialize(); // Ensure initialized
+    const rootFolder = driveManager.getRootFolder(); // Assumes DriveManager handles finding/creating it
+    if (!rootFolder) {
+         showErrorAlert('Could not find or create the root project folder in Google Drive.');
+         return;
     }
-    
-    const rootFolder = driveManager.getRootFolder();
     const folderURL = rootFolder.getUrl();
     const folderName = rootFolder.getName();
     
     const ui = SpreadsheetApp.getUi();
+    // Show URL in a simple alert first
     ui.alert('Root Folder Location', 
-             `Folder: ${folderName}\n\nURL: ${folderURL}\n\nClick OK to open the folder.`,
+             `The root folder for training projects is:\n\nFolder: ${folderName}\nURL: ${folderURL}`,
              ui.ButtonSet.OK);
-    
-    // Open the folder in a new tab
-    const html = HtmlService.createHtmlOutput(
-      `<script>window.open('${folderURL}', '_blank');google.script.host.close();</script>`
-    )
-    .setWidth(10)
-    .setHeight(10);
-    
-    ui.showModalDialog(html, 'Opening folder...');
-    
+             
+    // Optional: Try to open the folder (might be blocked by popup blockers)
+    // const html = HtmlService.createHtmlOutput(`<script>window.open('${folderURL}', '_blank'); google.script.host.close();</script>`).setWidth(100).setHeight(50);
+    // ui.showModalDialog(html, 'Opening Folder...');
+
   } catch (error) {
-    logError(`Failed to show root folder URL: ${error.message}`);
-    showErrorAlert('Failed to locate the root folder. Please check the logs for details.');
+    logError(`Failed to show root folder URL: ${error.message}\n${error.stack}`);
+    showErrorAlert('Failed to locate the root folder. Please check logs.');
   }
 }
 
+// Placeholder functions for menu items not yet implemented
+function showProjectViewer() { SpreadsheetApp.getUi().alert('Coming Soon', 'Project viewer will be implemented in a future phase.', SpreadsheetApp.getUi().ButtonSet.OK); }
+function showAddSlideDialog() { SpreadsheetApp.getUi().alert('Coming Soon', 'Add Slide dialog will be implemented later.', SpreadsheetApp.getUi().ButtonSet.OK); }
+function showAddElementDialog() { SpreadsheetApp.getUi().alert('Coming Soon', 'Add Element dialog will be implemented later.', SpreadsheetApp.getUi().ButtonSet.OK); }
+function showFileUploadDialog() { SpreadsheetApp.getUi().alert('Coming Soon', 'File Upload dialog will be implemented later.', SpreadsheetApp.getUi().ButtonSet.OK); }
+function showDeployProjectDialog() { SpreadsheetApp.getUi().alert('Coming Soon', 'Deploy Project dialog will be implemented later.', SpreadsheetApp.getUi().ButtonSet.OK); }
+function showFileManager() { SpreadsheetApp.getUi().alert('Coming Soon', 'File manager will be implemented in a future phase.', SpreadsheetApp.getUi().ButtonSet.OK); }
+function showAnalyticsDashboard() { SpreadsheetApp.getUi().alert('Coming Soon', 'Analytics dashboard will be implemented in a future phase.', SpreadsheetApp.getUi().ButtonSet.OK); }
+
+
+// ============================================================
+// API Request Processing (Called by google.script.run)
+// ============================================================
+
 /**
- * Processes an API request from the web client
- * Acts as a bridge between the client-side code and the ApiHandler
- * 
- * @param {Object} requestData - Request data from client
- * @return {Object} Response data
+ * Processes an API request from the web client (e.g., Editor, Viewer).
+ * Acts as the single entry point for google.script.run calls from the client.
+ * * @param {Object} requestData - Request data from client { action: string, ... }
+ * @return {Object} Response object { success: boolean, data?: any, error?: string }
  */
 function processApiRequest(requestData) {
+  let response;
+  const startTime = Date.now();
   try {
-    console.log('Processing API request:', requestData);
+    logDebug(`Received processApiRequest: ${JSON.stringify(requestData).substring(0, 500)}...`); // Log start and snippet
     
-    // Check if the application is initialized
-    if (!apiHandler || !projectManager || !authManager) {
-      console.log('Components not initialized, initializing...');
+    // Ensure application is initialized
+    if (!apiHandler) {
+      logInfo('API Handler not initialized in processApiRequest, calling initialize()...');
       initialize();
     }
     
     // Get the current user
     const user = Session.getEffectiveUser().getEmail();
-    console.log('User making request:', user);
     
-    // Handle the request with internal error catching
-    let result;
-    try {
-      result = apiHandler.handleRequest(requestData, user);
-      console.log('Request handled successfully, result type:', typeof result);
-      
-      // Create a simple test response to verify communication works
-      const testResponse = {
-        test: "Communication test",
-        timestamp: new Date().getTime(),
-        action: requestData.action
-      };
-      console.log("Test response:", testResponse);
-    } catch (handlerError) {
-      console.error('Error in request handler:', handlerError);
-      return {
-        success: false,
-        error: `Handler error: ${handlerError.message}`
-      };
-    }
+    // Handle the request using ApiHandler
+    // ApiHandler now returns a standard object { success: boolean, ... }
+    const result = apiHandler.handleRequest(requestData, user); 
     
-    // For API actions that return potentially complex objects, 
-    // use simplified response structure
-    if (requestData.action === 'project.list') {
-      // Special handling for project list which might have complex objects
-      try {
-        const projects = result || [];
-        console.log(`Found ${projects.length} projects, serializing...`);
-        
-        // Create a more simplified project list - just the essential data
-        const simplifiedProjects = projects.map(project => ({
-          projectId: project.projectId || '',
-          title: project.title || 'Unnamed Project',
-          createdAt: project.createdAt instanceof Date ? project.createdAt.getTime() : 
-                    (typeof project.createdAt === 'number' ? project.createdAt : null),
-          modifiedAt: project.modifiedAt instanceof Date ? project.modifiedAt.getTime() : 
-                     (typeof project.modifiedAt === 'number' ? project.modifiedAt : null),
-          slidesCount: project.slides ? project.slides.length : 0
-        }));
-        
-        console.log(`Simplified to ${simplifiedProjects.length} projects`);
-        
-        // Return a simple response structure
-        return {
-          success: true,
-          data: simplifiedProjects
+    // Prepare the final response object
+    if (result && result.success) {
+        response = {
+            success: true,
+            // Apply safe serialization to the data payload before sending back
+            data: result.data !== undefined ? safeSerialize(result.data) : null 
         };
-      } catch (serializeError) {
-        console.error('Error serializing projects:', serializeError);
-        return {
-          success: false,
-          error: `Serialization error: ${serializeError.message}`,
-          fallback: true
-        };
-      }
-    }
-    
-    // For direct ContentService outputs
-    if (result && typeof result.getContent === 'function') {
-      try {
-        return JSON.parse(result.getContent());
-      } catch (e) {
-        return {
-          success: true,
-          data: String(result.getContent())
-        };
-      }
-    }
-    
-    // For normal object results, ensure proper format
-    try {
-      // Use our safe serialization
-      result = safeSerialize(result);
-      
-      return {
-        success: true,
-        data: result
-      };
-    } catch (finalError) {
-      console.error('Error in final response preparation:', finalError);
-      return {
-        success: false,
-        error: `Response preparation error: ${finalError.message}`,
-        fallbackMessage: "Server processed the request but couldn't prepare a valid response"
-      };
-    }
-  } catch (error) {
-    console.error('Error processing API request:', error);
-    logError(`Error processing API request: ${error.message}\n${error.stack}`);
-    return {
-      success: false,
-      error: error.message || 'Unknown server error'
-    };
-  }
-}
-
-/**
- * Requests access to a project
- * Sends an email to the project owner
- * 
- * @param {string} projectId - ID of the project
- * @param {string} requesterEmail - Email of the user requesting access
- * @return {Object} Result of the request
- */
-function requestProjectAccess(projectId, requesterEmail) {
-  try {
-    // Check if the application is initialized
-    if (!projectManager) {
-      initialize();
-    }
-    
-    // Get project info
-    const project = projectManager.getProject(projectId);
-    
-    if (!project) {
-      return { 
-        success: false, 
-        message: 'Project not found'
-      };
-    }
-    
-    // Get project owner email
-    let ownerEmail = '';
-    
-    if (project.folderId) {
-      try {
-        const folder = DriveApp.getFolderById(project.folderId);
-        ownerEmail = folder.getOwner().getEmail();
-      } catch (folderError) {
-        // If can't access folder, use spreadsheet owner
-        ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
-      }
     } else {
-      ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
+         // If ApiHandler returned { success: false, error: ... }
+         response = {
+             success: false,
+             error: result.error || 'An unknown error occurred in the API handler.'
+         };
+         if (result.requireAuth) { // Propagate auth hint
+             response.requireAuth = true;
+         }
     }
-    
-    // Send email
-    const subject = `Access Request: ${project.title} Training Project`;
-    const body = `
-      Hello,
-      
-      ${requesterEmail} has requested access to your interactive training project "${project.title}".
-      
-      To grant access, open the project in Google Drive and share it with them.
-      
-      Project ID: ${projectId}
-      
-      This is an automated message from the Interactive Training Projects Web App.
-    `;
-    
-    MailApp.sendEmail(ownerEmail, subject, body);
-    
-    return {
-      success: true,
-      message: 'Access request sent successfully'
-    };
+
   } catch (error) {
-    logError(`Error requesting project access: ${error.message}`);
-    return {
+    // Catch any unexpected errors during initialization or handling
+    logError(`Critical error processing API request (${requestData ? requestData.action : 'unknown'}): ${error.message}\n${error.stack}`);
+    response = {
       success: false,
-      message: `Error: ${error.message}`
+      error: `Server error processing request: ${error.message}`
     };
-  }
+  } 
+  
+  const duration = Date.now() - startTime;
+  logDebug(`processApiRequest completed for action '${requestData ? requestData.action : 'unknown'}' in ${duration}ms. Success: ${response.success}`);
+  
+  // Return the standard response object - google.script.run handles JSON stringification
+  return response; 
 }
 
-/**
- * Helper function to test API connections from the server side
- * Can be called manually to debug connection issues
- */
-function testApiConnection() {
-  try {
-    // Make sure we're initialized
-    if (!apiHandler || !projectManager || !authManager) {
-      initialize();
-    }
-    
-    const user = Session.getEffectiveUser().getEmail();
-    
-    // Test the auth.getStatus endpoint which should be lightweight
-    const testRequest = {
-      action: 'auth.getStatus'
-    };
-    
-    const result = apiHandler.handleRequest(testRequest, user);
-    console.log('API test result:', result);
-    
-    // Check if the result is what we expect
-    if (!result || !result.success) {
-      return {
-        success: false,
-        error: 'API test failed: Invalid response format',
-        actual: result
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'API connection working correctly',
-      data: result.data
-    };
-  } catch (error) {
-    console.error('API test error:', error);
-    return {
-      success: false,
-      error: `API test failed: ${error.message}`
-    };
-  }
-}
+
+// ============================================================
+// Direct-Callable Functions (Alternative to processApiRequest if needed)
+// ============================================================
 
 /**
- * Simple API method to get projects without complex objects
- * This is a direct function that can be called from the client
- * avoiding potential serialization issues
+ * Simple API method to get projects without complex objects.
+ * Can be called directly from the client to avoid potential serialization issues
+ * with the main processApiRequest if safeSerialize isn't perfect.
+ * * @return {Object} { success: boolean, data: Array<{projectId, title, createdAt, modifiedAt}>, error?: string }
  */
 function getProjectList() {
   try {
-    // Make sure we're initialized
-    if (!projectManager) {
-      initialize();
-    }
-    
+    initialize(); // Ensure initialized
     const user = Session.getEffectiveUser().getEmail();
-    console.log('Getting project list for user:', user);
+    logDebug(`Getting direct project list for user: ${user}`);
     
-    // Get all projects
-    const allProjects = projectManager.getAllProjects();
-    
-    if (!allProjects || !Array.isArray(allProjects)) {
-      console.warn('Invalid projects result from projectManager');
-      return { success: true, data: [] };
+    // Get all projects (basic info)
+    const allProjects = projectManager.getAllProjects(); // This already returns basic info
+    if (!Array.isArray(allProjects)) {
+      throw new Error('Expected array of projects from ProjectManager');
     }
     
-    // Create a simplified list with just essential properties
-    const simplifiedProjects = allProjects.map(project => {
-      // Only include the most basic properties
-      return {
-        projectId: project.projectId || '',
-        title: project.title || 'Unnamed Project',
-        createdAt: project.createdAt instanceof Date ? project.createdAt.getTime() : 
-                  (typeof project.createdAt === 'number' ? project.createdAt : null),
-        modifiedAt: project.modifiedAt instanceof Date ? project.modifiedAt.getTime() : 
-                   (typeof project.modifiedAt === 'number' ? project.modifiedAt : null)
-      };
+    // Filter based on access
+    const accessibleProjects = allProjects.filter(project => {
+        if (!project || typeof project !== 'object' || !project.projectId) return false;
+        return authManager.hasAccess(project.projectId, user);
     });
+
+    // Map to ensure only primitive types are included (safe for direct return)
+    const simplifiedProjects = accessibleProjects.map(project => ({
+        projectId: project.projectId,
+        title: project.title,
+        // Convert dates to timestamps (numbers)
+        createdAt: project.createdAt instanceof Date ? project.createdAt.getTime() : (typeof project.createdAt === 'number' ? project.createdAt : null),
+        modifiedAt: project.modifiedAt instanceof Date ? project.modifiedAt.getTime() : (typeof project.modifiedAt === 'number' ? project.modifiedAt : null)
+    }));
     
-    console.log(`Simplified ${simplifiedProjects.length} projects for direct access`);
-    
-    return {
-      success: true,
-      data: simplifiedProjects
-    };
+    logDebug(`Returning ${simplifiedProjects.length} projects via getProjectList.`);
+    return { success: true, data: simplifiedProjects };
+
   } catch (error) {
-    console.error('Error in direct project list access:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error in getProjectList',
-      data: []
-    };
+    logError(`Error in direct getProjectList: ${error.message}\n${error.stack}`);
+    return { success: false, error: error.message || 'Unknown error in getProjectList', data: [] };
   }
 }
+
+// Removed testApiConnection and requestProjectAccess unless needed for specific UI flows.
+// They can be added back if required.

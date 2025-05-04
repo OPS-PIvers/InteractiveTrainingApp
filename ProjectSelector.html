@@ -275,14 +275,20 @@
       }
     }
     
-    // Open project for editing
     function editProject(projectId) {
       console.log("Edit button clicked for project ID:", projectId);
       
-      // Try manually constructing the URL and log it
-      const editUrl = window.location.pathname + "?action=edit&project=" + projectId;
-      console.log("Attempting to navigate to:", editUrl);
-      window.location.href = `${window.location.pathname}?project=${projectId}&mode=editor`;
+      // Use google.script.run to tell the server to redirect
+      google.script.run
+        .withSuccessHandler(function(url) {
+          console.log("Server provided URL:", url);
+          window.location.href = url;
+        })
+        .withFailureHandler(function(error) {
+          console.error("Server error:", error);
+          alert("Error navigating to editor: " + error);
+        })
+        .getEditorUrl(projectId);
     }
     
     // Open project for viewing

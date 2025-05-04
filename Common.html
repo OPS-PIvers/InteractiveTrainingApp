@@ -287,15 +287,22 @@
             
             console.log('Received API response:', response);
             
-            // More robust error handling
+            // More robust error handling for null/undefined responses
             if (response === null || response === undefined) {
-            throw new Error('Received empty response from server');
+            console.error('Received empty response from server');
+            throw new Error('Server returned an empty response. Please try again or check server logs.');
             }
             
             // Handle case where response might be a string or other non-object
             if (typeof response !== 'object') {
             console.warn('Unexpected response type:', typeof response);
-            throw new Error(`Unexpected response type: ${typeof response}`);
+            try {
+                // Try to parse if it's a JSON string
+                const parsedResponse = JSON.parse(response);
+                return parsedResponse.data || parsedResponse;
+            } catch (e) {
+                throw new Error(`Unexpected response type: ${typeof response}`);
+            }
             }
             
             if (!response.success) {
@@ -307,7 +314,7 @@
             console.error('API error:', error);
             throw error;
         }
-      }
+        }
       
       // Helper methods for common requests
       async getProject(projectId) {

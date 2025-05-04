@@ -158,12 +158,19 @@ class ApiHandler {
         console.log('Listing projects for user:', user);
         
         if (!this.projectManager) {
-            throw new Error('Project manager not initialized');
+            console.error('Project manager not initialized');
+            return [];
         }
         
         // Get all projects from the project manager
         const allProjects = this.projectManager.getAllProjects();
         console.log('All projects found:', allProjects ? allProjects.length : 0);
+        
+        // Extra validation on return value
+        if (!allProjects) {
+            console.warn('Project manager returned null or undefined');
+            return [];
+        }
         
         if (!Array.isArray(allProjects)) {
             console.error('Expected array of projects but got:', typeof allProjects);
@@ -171,9 +178,15 @@ class ApiHandler {
         }
         
         // Filter projects based on user access
-        const accessibleProjects = allProjects.filter(project => 
-            this.authManager.hasAccess(project.projectId, user)
-        );
+        const accessibleProjects = allProjects.filter(project => {
+            // Validate each project object
+            if (!project || typeof project !== 'object' || !project.projectId) {
+            console.warn('Invalid project object:', project);
+            return false;
+            }
+            return this.authManager.hasAccess(project.projectId, user);
+        });
+        
         console.log('Accessible projects:', accessibleProjects.length);
         
         return accessibleProjects;

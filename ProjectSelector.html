@@ -139,19 +139,33 @@
     
     // Load projects from the backend
     async function loadProjects() {
-      try {
+    try {
         document.getElementById('loadingProjects').style.display = 'block';
         document.getElementById('projectList').style.display = 'none';
         document.getElementById('emptyState').style.display = 'none';
         
         // Get projects from the API
-        const projects = await api.listProjects();
+        let projects;
+        try {
+        projects = await api.listProjects();
+        } catch (apiError) {
+        console.error('API error when loading projects:', apiError);
+        showAlert(`Error loading projects: ${apiError.message}. Trying fallback method...`, 'warning');
+        
+        // Fallback to direct server call
+        projects = await new Promise((resolve, reject) => {
+            google.script.run
+            .withSuccessHandler(result => resolve(result.data || []))
+            .withFailureHandler(reject)
+            .testApiConnection();
+        });
+        }
         
         // Show empty state if no projects
-        if (!projects || projects.length === 0) {
-          document.getElementById('emptyState').style.display = 'block';
-          document.getElementById('loadingProjects').style.display = 'none';
-          return;
+        if (!projects || !Array.isArray(projects) || projects.length === 0) {
+        document.getElementById('emptyState').style.display = 'block';
+        document.getElementById('loadingProjects').style.display = 'none';
+        return;
         }
         
         // Render projects
@@ -159,10 +173,13 @@
         
         document.getElementById('projectList').style.display = 'grid';
         document.getElementById('loadingProjects').style.display = 'none';
-      } catch (error) {
+    } catch (error) {
+        console.error('Failed to load projects:', error);
         showAlert(`Failed to load projects: ${error.message}`, 'error');
         document.getElementById('loadingProjects').style.display = 'none';
-      }
+        // Show empty state as fallback
+        document.getElementById('emptyState').style.display = 'block';
+    }
     }
     
     // Render projects to the project list

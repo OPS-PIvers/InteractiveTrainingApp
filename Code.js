@@ -84,6 +84,13 @@ function initialize() {
     authManager = new AuthManager(sheetAccessor, driveManager);
     apiHandler = new ApiHandler(projectManager, fileUploader, authManager);
     
+    // Verify all components were created successfully
+    if (!sheetAccessor || !templateManager || !driveManager || 
+        !mediaProcessor || !fileUploader || !projectManager || 
+        !authManager || !apiHandler) {
+      throw new Error("Some components failed to initialize");
+    }
+    
     logInfo('Application successfully initialized');
     return true;
   } catch (error) {
@@ -529,28 +536,57 @@ function processApiRequest(requestData) {
     // Check if the application is initialized
     if (!apiHandler || !projectManager || !authManager) {
       console.log('Components not initialized, initializing...');
-      initialize();
+      try {
+        initialize();
+      } catch (initError) {
+        console.error('Initialization failed:', initError);
+        return {
+          success: false,
+          error: `Initialization failed: ${initError.message}`
+        };
+      }
     }
     
     // Double-check initialization was successful
     if (!apiHandler || !projectManager || !authManager) {
-      throw new Error('Failed to initialize components');
+      return {
+        success: false,
+        error: 'Failed to initialize components'
+      };
     }
     
     // Get the current user
     const user = Session.getEffectiveUser().getEmail();
     console.log('User making request:', user);
     
+    // Safety check on request data
+    if (!requestData || typeof requestData !== 'object') {
+      return {
+        success: false,
+        error: 'Invalid request data'
+      };
+    }
+    
     // Handle the request with internal error catching
     let result;
     try {
       result = apiHandler.handleRequest(requestData, user);
-      console.log('Request handled successfully, result:', result);
+      console.log('Request handled successfully, result type:', typeof result);
     } catch (handlerError) {
       console.error('Error in request handler:', handlerError);
       return {
         success: false,
         error: `Handler error: ${handlerError.message}`
+      };
+    }
+    
+    // If no result was returned
+    if (result === undefined || result === null) {
+      console.warn('Handler returned empty result');
+      return {
+        success: true,
+        data: null,
+        warning: 'Empty result returned from handler'
       };
     }
     
@@ -568,10 +604,16 @@ function processApiRequest(requestData) {
     }
     
     // For normal object results, ensure proper format
-    return {
-      success: true,
-      data: result
-    };
+    if (result.success !== undefined) {
+      // Result is already in our expected format
+      return result;
+    } else {
+      // Wrap the result in our expected format
+      return {
+        success: true,
+        data: result
+      };
+    }
   } catch (error) {
     console.error('Error processing API request:', error);
     logError(`Error processing API request: ${error.message}\n${error.stack}`);
@@ -647,6 +689,50 @@ function requestProjectAccess(projectId, requesterEmail) {
     return {
       success: false,
       message: `Error: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Helper function to test API connections from the server side
+ * Can be called manually to debug connection issues
+ */
+function testApiConnection() {
+  try {
+    // Make sure we're initialized
+    if (!apiHandler || !projectManager || !authManager) {
+      initialize();
+    }
+    
+    const user = Session.getEffectiveUser().getEmail();
+    
+    // Test the auth.getStatus endpoint which should be lightweight
+    const testRequest = {
+      action: 'auth.getStatus'
+    };
+    
+    const result = apiHandler.handleRequest(testRequest, user);
+    console.log('API test result:', result);
+    
+    // Check if the result is what we expect
+    if (!result || !result.success) {
+      return {
+        success: false,
+        error: 'API test failed: Invalid response format',
+        actual: result
+      };
+    }
+    
+    return {
+      success: true,
+      message: 'API connection working correctly',
+      data: result.data
+    };
+  } catch (error) {
+    console.error('API test error:', error);
+    return {
+      success: false,
+      error: `API test failed: ${error.message}`
     };
   }
 }

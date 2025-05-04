@@ -271,23 +271,35 @@
             
             console.log('Sending API request:', requestData);
             
-            // Make the request
+            // Make the request with better error handling
             const response = await new Promise((resolve, reject) => {
             google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
+                .withSuccessHandler(function(result) {
+                console.log('Raw server response:', result);
+                resolve(result);
+                })
+                .withFailureHandler(function(error) {
+                console.error('Server error:', error);
+                reject(error);
+                })
                 .processApiRequest(requestData);
             });
             
             console.log('Received API response:', response);
             
-            // Check for errors with better null handling
-            if (!response) {
+            // More robust error handling
+            if (response === null || response === undefined) {
             throw new Error('Received empty response from server');
             }
             
+            // Handle case where response might be a string or other non-object
+            if (typeof response !== 'object') {
+            console.warn('Unexpected response type:', typeof response);
+            throw new Error(`Unexpected response type: ${typeof response}`);
+            }
+            
             if (!response.success) {
-            throw new Error(response.error || 'Unknown error');
+            throw new Error(response.error || 'Unknown server error');
             }
             
             return response.data;

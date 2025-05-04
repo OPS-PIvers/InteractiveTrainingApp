@@ -154,15 +154,34 @@ class ApiHandler {
      * @return {Array<Object>} Array of project objects
      */
     listProjects(requestData, user) {
-      // Get all projects from the project manager
-      const allProjects = this.projectManager.getAllProjects();
-      
-      // Filter projects based on user access
-      const accessibleProjects = allProjects.filter(project => 
-        this.authManager.hasAccess(project.projectId, user)
-      );
-      
-      return accessibleProjects;
+        try {
+        console.log('Listing projects for user:', user);
+        
+        if (!this.projectManager) {
+            throw new Error('Project manager not initialized');
+        }
+        
+        // Get all projects from the project manager
+        const allProjects = this.projectManager.getAllProjects();
+        console.log('All projects found:', allProjects ? allProjects.length : 0);
+        
+        if (!Array.isArray(allProjects)) {
+            console.error('Expected array of projects but got:', typeof allProjects);
+            return [];
+        }
+        
+        // Filter projects based on user access
+        const accessibleProjects = allProjects.filter(project => 
+            this.authManager.hasAccess(project.projectId, user)
+        );
+        console.log('Accessible projects:', accessibleProjects.length);
+        
+        return accessibleProjects;
+        } catch (error) {
+        console.error('Error listing projects:', error);
+        // Return empty array instead of throwing to avoid breaking the UI
+        return [];
+        }
     }
     
     /**

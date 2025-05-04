@@ -527,33 +527,53 @@ function processApiRequest(requestData) {
     console.log('Processing API request:', requestData);
     
     // Check if the application is initialized
-    if (!apiHandler) {
-      console.log('ApiHandler not initialized, initializing...');
+    if (!apiHandler || !projectManager || !authManager) {
+      console.log('Components not initialized, initializing...');
       initialize();
     }
     
-    // Verify initialization
-    if (!apiHandler) {
-      throw new Error('Failed to initialize API handler');
+    // Double-check initialization was successful
+    if (!apiHandler || !projectManager || !authManager) {
+      throw new Error('Failed to initialize components');
     }
     
     // Get the current user
     const user = Session.getEffectiveUser().getEmail();
+    console.log('User making request:', user);
     
-    // Handle the request and ensure a response is returned
-    const result = apiHandler.handleRequest(requestData, user);
-    
-    // If result is already a TextOutput, return it directly
-    if (result && typeof result.getContent === 'function') {
-      return result;
+    // Handle the request with internal error catching
+    let result;
+    try {
+      result = apiHandler.handleRequest(requestData, user);
+      console.log('Request handled successfully, result:', result);
+    } catch (handlerError) {
+      console.error('Error in request handler:', handlerError);
+      return {
+        success: false,
+        error: `Handler error: ${handlerError.message}`
+      };
     }
     
-    // Otherwise, ensure we're returning a properly structured response
+    // If result is already a ContentService TextOutput, return its content
+    if (result && typeof result.getContent === 'function') {
+      // Extract the JSON content from TextOutput and return as object
+      try {
+        return JSON.parse(result.getContent());
+      } catch (e) {
+        return {
+          success: true,
+          data: result.getContent()
+        };
+      }
+    }
+    
+    // For normal object results, ensure proper format
     return {
       success: true,
       data: result
     };
   } catch (error) {
+    console.error('Error processing API request:', error);
     logError(`Error processing API request: ${error.message}\n${error.stack}`);
     return {
       success: false,

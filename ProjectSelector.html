@@ -126,7 +126,13 @@
   
   <script>
     // Load projects when page loads
-    document.addEventListener('DOMContentLoaded', loadProjects);
+    document.addEventListener('DOMContentLoaded', function() {
+        // First check API connection
+        window.checkApiConnection();
+        
+        // Then load projects with a small delay to ensure API is ready
+        setTimeout(loadProjects, 500);
+    });
     
     // Create project button
     document.getElementById('createProjectButton').addEventListener('click', showCreateProjectDialog);

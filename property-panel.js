@@ -236,7 +236,7 @@ let propertyPanelState = {
     const outlineCheckbox = addCheckboxProperty(propertyGroup, 'Outline', hasOutline, value => {
       const outlineProps = document.getElementById('outline-properties');
       if (value) {
-        const currentStroke = elementData?.outlineColor || DEFAULT_COLORS.OUTLINE;
+        const currentStroke = elementData?.outlineColor || ClientConfig.DEFAULT_COLORS.OUTLINE;
         const currentWidth = elementData?.outlineWidth || 1;
         fabricObject.set({
           stroke: currentStroke,
@@ -268,7 +268,7 @@ let propertyPanelState = {
     outlineProperties.style.display = hasOutline ? 'block' : 'none';
     outlineProperties.className = 'property-subgroup'; // Add class for styling/indentation
     
-    addColorProperty(outlineProperties, 'Outline Color', fabricObject.stroke || DEFAULT_COLORS.OUTLINE, value => {
+    addColorProperty(outlineProperties, 'Outline Color', fabricObject.stroke || ClientConfig.DEFAULT_COLORS.OUTLINE, value => {
       fabricObject.set('stroke', value);
       editorState.canvas.renderAll();
       updateElementProperty(fabricObject.elementId, 'outlineColor', value);
@@ -346,7 +346,7 @@ let propertyPanelState = {
     });
     
     // Add font family property
-    addSelectProperty(propertyGroup, 'Font', FONTS, fabricObject.fontFamily, value => {
+    addSelectProperty(propertyGroup, 'Font', ClientConfig.FONTS, fabricObject.fontFamily, value => {
       fabricObject.set('fontFamily', value);
       editorState.canvas.renderAll();
       updateElementProperty(fabricObject.elementId, 'font', value);
@@ -390,19 +390,19 @@ let propertyPanelState = {
     const propertyGroup = createPropertyGroup('Interaction', 'interaction-group');
     
     // Add Trigger Type property
-    addSelectProperty(propertyGroup, 'Trigger', Object.values(TRIGGER_TYPES), elementData?.triggers || TRIGGER_TYPES.CLICK, value => {
+    addSelectProperty(propertyGroup, 'Trigger', Object.values(ClientConfig.TRIGGER_TYPES), elementData?.triggers || ClientConfig.TRIGGER_TYPES.CLICK, value => {
       updateElementProperty(fabricObject.elementId, 'triggers', value);
       // Update fabric object property if needed for runtime behavior
       fabricObject.triggers = value;
     });
     
     // Add Interaction Type property
-    addSelectProperty(propertyGroup, 'Action', Object.values(INTERACTION_TYPES), elementData?.interactionType || INTERACTION_TYPES.REVEAL, value => {
+    addSelectProperty(propertyGroup, 'Action', Object.values(ClientConfig.INTERACTION_TYPES), elementData?.interactionType || ClientConfig.INTERACTION_TYPES.REVEAL, value => {
       updateElementProperty(fabricObject.elementId, 'interactionType', value);
       // Update fabric object property if needed for runtime behavior
       fabricObject.interactionType = value;
       // Show/hide specific fields based on action
-      document.getElementById('text-modal-message-group').style.display = (value === INTERACTION_TYPES.REVEAL) ? 'flex' : 'none';
+      document.getElementById('text-modal-message-group').style.display = (value === ClientConfig.INTERACTION_TYPES.REVEAL) ? 'flex' : 'none';
     });
     
     // Add Text Modal Message property (only shown for Reveal interaction)
@@ -410,7 +410,7 @@ let propertyPanelState = {
       updateElementProperty(fabricObject.elementId, 'textModalMessage', value);
     });
     textModalGroup.id = 'text-modal-message-group';
-    textModalGroup.style.display = (elementData?.interactionType === INTERACTION_TYPES.REVEAL || !elementData?.interactionType) ? 'flex' : 'none';
+    textModalGroup.style.display = (elementData?.interactionType === ClientConfig.INTERACTION_TYPES.REVEAL || !elementData?.interactionType) ? 'flex' : 'none';
     
     // Add the property group to the container
     container.appendChild(propertyGroup);
@@ -444,13 +444,13 @@ let propertyPanelState = {
     }, 0, 1000, 0.1); // Min 0, Max 1000, Step 0.1
     
     // Add Animation In property
-    addSelectProperty(propertyGroup, 'Animation In', Object.values(ANIMATION_IN_TYPES), timelineData.animationIn || ANIMATION_IN_TYPES.NONE, value => {
+    addSelectProperty(propertyGroup, 'Animation In', Object.values(ClientConfig.ANIMATION_IN_TYPES), timelineData.animationIn || ClientConfig.ANIMATION_IN_TYPES.NONE, value => {
       timelineData.animationIn = value;
       updateElementProperty(fabricObject.elementId, 'timeline', timelineData);
     });
     
     // Add Animation Out property
-    addSelectProperty(propertyGroup, 'Animation Out', Object.values(ANIMATION_OUT_TYPES), timelineData.animationOut || ANIMATION_OUT_TYPES.NONE, value => {
+    addSelectProperty(propertyGroup, 'Animation Out', Object.values(ClientConfig.ANIMATION_OUT_TYPES), timelineData.animationOut || ClientConfig.ANIMATION_OUT_TYPES.NONE, value => {
       timelineData.animationOut = value;
       updateElementProperty(fabricObject.elementId, 'timeline', timelineData);
     });
@@ -525,7 +525,7 @@ let propertyPanelState = {
       // Add common Font Family
       const firstFont = objects[0].fontFamily;
       const sameFont = objects.every(obj => obj.fontFamily === firstFont);
-      addSelectProperty(propertyGroup, 'Font', FONTS, sameFont ? firstFont : '', value => {
+      addSelectProperty(propertyGroup, 'Font', ClientConfig.FONTS, sameFont ? firstFont : '', value => {
         if (value === '') return;
         objects.forEach(obj => {
           obj.set('fontFamily', value);

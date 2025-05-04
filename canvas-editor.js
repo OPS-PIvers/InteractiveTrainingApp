@@ -66,8 +66,8 @@ let editorState = {
     
     // Create a new Fabric canvas
     editorState.canvas = new fabric.Canvas(canvasElement, {
-      width: UI_SETTINGS.CANVAS.DEFAULT_WIDTH,
-      height: UI_SETTINGS.CANVAS.DEFAULT_HEIGHT,
+      width: ClientConfig.UI_SETTINGS.CANVAS.DEFAULT_WIDTH,
+      height: ClientConfig.UI_SETTINGS.CANVAS.DEFAULT_HEIGHT,
       backgroundColor: '#FFFFFF',
       preserveObjectStacking: true
     });
@@ -98,8 +98,8 @@ let editorState = {
     const containerHeight = document.getElementById('canvas-panel').clientHeight;
     
     // Calculate the best fit for the canvas while maintaining aspect ratio
-    const canvasWidth = UI_SETTINGS.CANVAS.DEFAULT_WIDTH;
-    const canvasHeight = UI_SETTINGS.CANVAS.DEFAULT_HEIGHT;
+    const canvasWidth = ClientConfig.UI_SETTINGS.CANVAS.DEFAULT_WIDTH;
+    const canvasHeight = ClientConfig.UI_SETTINGS.CANVAS.DEFAULT_HEIGHT;
     const canvasRatio = canvasWidth / canvasHeight;
     
     let scaleFactor;
@@ -941,45 +941,45 @@ let editorState = {
       angle: 0,
       initiallyHidden: false,
       opacity: 100,
-      color: DEFAULT_COLORS.ELEMENT,
+      color: ClientConfig.DEFAULT_COLORS.ELEMENT,
       outline: false,
       outlineWidth: 1,
-      outlineColor: DEFAULT_COLORS.OUTLINE,
+      outlineColor: ClientConfig.DEFAULT_COLORS.OUTLINE,
       shadow: false
     };
     
     // Set type-specific properties
     switch (shapeType) {
       case 'rectangle':
-        element.width = ELEMENT_TYPES.RECTANGLE.DEFAULT_WIDTH;
-        element.height = ELEMENT_TYPES.RECTANGLE.DEFAULT_HEIGHT;
+        element.width = ClientConfig.ELEMENT_TYPES.RECTANGLE.DEFAULT_WIDTH;
+        element.height = ClientConfig.ELEMENT_TYPES.RECTANGLE.DEFAULT_HEIGHT;
         break;
         
       case 'circle':
-        element.width = ELEMENT_TYPES.CIRCLE.DEFAULT_RADIUS * 2;
-        element.height = ELEMENT_TYPES.CIRCLE.DEFAULT_RADIUS * 2;
+        element.width = ClientConfig.ELEMENT_TYPES.CIRCLE.DEFAULT_RADIUS * 2;
+        element.height = ClientConfig.ELEMENT_TYPES.CIRCLE.DEFAULT_RADIUS * 2;
         break;
         
       case 'text':
-        element.width = ELEMENT_TYPES.TEXT.DEFAULT_WIDTH;
-        element.height = ELEMENT_TYPES.TEXT.DEFAULT_HEIGHT;
+        element.width = ClientConfig.ELEMENT_TYPES.TEXT.DEFAULT_WIDTH;
+        element.height = ClientConfig.ELEMENT_TYPES.TEXT.DEFAULT_HEIGHT;
         element.text = 'Double click to edit text';
-        element.font = ELEMENT_TYPES.TEXT.DEFAULT_FONT;
-        element.fontSize = ELEMENT_TYPES.TEXT.DEFAULT_FONT_SIZE;
-        element.fontColor = DEFAULT_COLORS.TEXT;
+        element.font = ClientConfig.ELEMENT_TYPES.TEXT.DEFAULT_FONT;
+        element.fontSize = ClientConfig.ELEMENT_TYPES.TEXT.DEFAULT_FONT_SIZE;
+        element.fontColor = ClientConfig.DEFAULT_COLORS.TEXT;
         break;
         
       case 'hotspot':
-        element.width = ELEMENT_TYPES.HOTSPOT.DEFAULT_WIDTH;
-        element.height = ELEMENT_TYPES.HOTSPOT.DEFAULT_HEIGHT;
+        element.width = ClientConfig.ELEMENT_TYPES.HOTSPOT.DEFAULT_WIDTH;
+        element.height = ClientConfig.ELEMENT_TYPES.HOTSPOT.DEFAULT_HEIGHT;
         element.color = 'rgba(66, 133, 244, 0.3)';
         element.interactionType = INTERACTION_TYPES.REVEAL;
         element.triggers = TRIGGER_TYPES.CLICK;
         break;
         
       case 'arrow':
-        element.width = ELEMENT_TYPES.ARROW.DEFAULT_LENGTH;
-        element.height = ELEMENT_TYPES.ARROW.DEFAULT_WIDTH;
+        element.width = ClientConfig.ELEMENT_TYPES.ARROW.DEFAULT_LENGTH;
+        element.height = ClientConfig.LEMENT_TYPES.ARROW.DEFAULT_WIDTH;
         break;
     }
     

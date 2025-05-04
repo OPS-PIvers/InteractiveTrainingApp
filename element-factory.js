@@ -16,8 +16,8 @@ function createRectangleElement(element) {
       top: element.top,
       width: element.width,
       height: element.height,
-      fill: element.color || DEFAULT_COLORS.ELEMENT,
-      stroke: element.outline ? (element.outlineColor || DEFAULT_COLORS.OUTLINE) : undefined,
+      fill: element.color || ClientConfig.DEFAULT_COLORS.ELEMENT,
+      stroke: element.outline ? (element.outlineColor || ClientConfig.DEFAULT_COLORS.OUTLINE) : undefined,
       strokeWidth: element.outline ? (element.outlineWidth || 1) : 0,
       opacity: element.opacity ? element.opacity / 100 : 1,
       angle: element.angle || 0,
@@ -54,13 +54,13 @@ function createRectangleElement(element) {
       top: element.top,
       width: element.width,
       height: element.height,
-      fill: element.color || DEFAULT_COLORS.ELEMENT,
-      stroke: element.outline ? (element.outlineColor || DEFAULT_COLORS.OUTLINE) : undefined,
+      fill: element.color || ClientConfig.DEFAULT_COLORS.ELEMENT,
+      stroke: element.outline ? (element.outlineColor || ClientConfig.DEFAULT_COLORS.OUTLINE) : undefined,
       strokeWidth: element.outline ? (element.outlineWidth || 1) : 0,
       opacity: element.opacity ? element.opacity / 100 : 1,
       angle: element.angle || 0,
-      rx: ELEMENT_TYPES.ROUNDED_RECTANGLE.DEFAULT_RADIUS,
-      ry: ELEMENT_TYPES.ROUNDED_RECTANGLE.DEFAULT_RADIUS,
+      rx: ClientConfig.ELEMENT_TYPES.ROUNDED_RECTANGLE.DEFAULT_RADIUS,
+      ry: ClientConfig.ELEMENT_TYPES.ROUNDED_RECTANGLE.DEFAULT_RADIUS,
       originX: 'center',
       originY: 'center',
       hasControls: true,
@@ -96,8 +96,8 @@ function createRectangleElement(element) {
       left: element.left,
       top: element.top,
       radius: radius,
-      fill: element.color || DEFAULT_COLORS.ELEMENT,
-      stroke: element.outline ? (element.outlineColor || DEFAULT_COLORS.OUTLINE) : undefined,
+      fill: element.color || ClientConfig.DEFAULT_COLORS.ELEMENT,
+      stroke: element.outline ? (element.outlineColor || ClientConfig.DEFAULT_COLORS.OUTLINE) : undefined,
       strokeWidth: element.outline ? (element.outlineWidth || 1) : 0,
       opacity: element.opacity ? element.opacity / 100 : 1,
       angle: element.angle || 0,
@@ -133,9 +133,9 @@ function createRectangleElement(element) {
       left: element.left,
       top: element.top,
       width: element.width,
-      fill: element.fontColor || DEFAULT_COLORS.TEXT,
+      fill: element.fontColor || ClientConfig.DEFAULT_COLORS.TEXT,
       fontFamily: element.font || FONTS[0],
-      fontSize: element.fontSize || ELEMENT_TYPES.TEXT.DEFAULT_FONT_SIZE,
+      fontSize: element.fontSize || ClientConfig.ELEMENT_TYPES.TEXT.DEFAULT_FONT_SIZE,
       textAlign: 'center',
       backgroundColor: element.color || 'transparent',
       opacity: element.opacity ? element.opacity / 100 : 1,
@@ -151,7 +151,7 @@ function createRectangleElement(element) {
     // Add border if specified
     if (element.outline) {
       text.set({
-        stroke: element.outlineColor || DEFAULT_COLORS.OUTLINE,
+        stroke: element.outlineColor || ClientConfig.DEFAULT_COLORS.OUTLINE,
         strokeWidth: element.outlineWidth || 1
       });
     }
@@ -224,8 +224,8 @@ function createRectangleElement(element) {
     const arrow = new fabric.Path(pathString, {
       left: element.left,
       top: element.top,
-      fill: element.color || DEFAULT_COLORS.ELEMENT,
-      stroke: element.outline ? (element.outlineColor || DEFAULT_COLORS.OUTLINE) : undefined,
+      fill: element.color || ClientConfig.DEFAULT_COLORS.ELEMENT,
+      stroke: element.outline ? (element.outlineColor || ClientConfig.DEFAULT_COLORS.OUTLINE) : undefined,
       strokeWidth: element.outline ? (element.outlineWidth || 1) : 0,
       opacity: element.opacity ? element.opacity / 100 : 1,
       angle: element.angle || 0,
@@ -314,7 +314,7 @@ function createRectangleElement(element) {
       // Add border if specified
       if (element.outline) {
         img.set({
-          stroke: element.outlineColor || DEFAULT_COLORS.OUTLINE,
+          stroke: element.outlineColor || ClientConfig.DEFAULT_COLORS.OUTLINE,
           strokeWidth: element.outlineWidth || 1
         });
       }

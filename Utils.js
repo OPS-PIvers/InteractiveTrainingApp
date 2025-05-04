@@ -12,8 +12,10 @@ if (typeof LOG_LEVELS === 'undefined') {
   };
 }
 
-// Current log level (adjust as needed)
-const CURRENT_LOG_LEVEL = LOG_LEVELS.INFO;
+// Same for CURRENT_LOG_LEVEL
+if (typeof CURRENT_LOG_LEVEL === 'undefined') {
+  const CURRENT_LOG_LEVEL = LOG_LEVELS.INFO;
+}
 
 /**
  * Generates a UUID (version 4) for unique identifiers

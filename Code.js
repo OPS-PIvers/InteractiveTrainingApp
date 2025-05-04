@@ -80,15 +80,16 @@ function initialize() {
     fileUploader = new FileUploader(driveManager, mediaProcessor);
     projectManager = new ProjectManager(sheetAccessor, templateManager, driveManager);
     
-    // Initialize Phase 3 components - do this AFTER the components they depend on
+    // Initialize Phase 3 components
     authManager = new AuthManager(sheetAccessor, driveManager);
     apiHandler = new ApiHandler(projectManager, fileUploader, authManager);
     
     logInfo('Application successfully initialized');
     return true;
   } catch (error) {
-    logError(`Failed to initialize application: ${error.message}`);
-    return false;
+    logError(`Failed to initialize application: ${error.message}\n${error.stack}`);
+    // Re-throw to ensure the caller knows initialization failed
+    throw new Error(`Initialization failed: ${error.message}`);
   }
 }
 
@@ -523,21 +524,40 @@ function showRootFolderURL() {
  */
 function processApiRequest(requestData) {
   try {
+    console.log('Processing API request:', requestData);
+    
     // Check if the application is initialized
     if (!apiHandler) {
+      console.log('ApiHandler not initialized, initializing...');
       initialize();
+    }
+    
+    // Verify initialization
+    if (!apiHandler) {
+      throw new Error('Failed to initialize API handler');
     }
     
     // Get the current user
     const user = Session.getEffectiveUser().getEmail();
     
-    // Handle the request
-    return apiHandler.handleRequest(requestData, user);
+    // Handle the request and ensure a response is returned
+    const result = apiHandler.handleRequest(requestData, user);
+    
+    // If result is already a TextOutput, return it directly
+    if (result && typeof result.getContent === 'function') {
+      return result;
+    }
+    
+    // Otherwise, ensure we're returning a properly structured response
+    return {
+      success: true,
+      data: result
+    };
   } catch (error) {
     logError(`Error processing API request: ${error.message}\n${error.stack}`);
     return {
       success: false,
-      error: error.message
+      error: error.message || 'Unknown server error'
     };
   }
 }

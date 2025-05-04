@@ -263,29 +263,37 @@
       // Make an API request
       async request(action, data = {}) {
         try {
-          // Add action to the data
-          const requestData = {
+            // Add action to the data
+            const requestData = {
             action: action,
             ...data
-          };
-          
-          // Make the request
-          const response = await new Promise((resolve, reject) => {
+            };
+            
+            console.log('Sending API request:', requestData);
+            
+            // Make the request
+            const response = await new Promise((resolve, reject) => {
             google.script.run
-              .withSuccessHandler(resolve)
-              .withFailureHandler(reject)
-              .processApiRequest(requestData);
-          });
-          
-          // Check for errors
-          if (!response.success) {
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .processApiRequest(requestData);
+            });
+            
+            console.log('Received API response:', response);
+            
+            // Check for errors with better null handling
+            if (!response) {
+            throw new Error('Received empty response from server');
+            }
+            
+            if (!response.success) {
             throw new Error(response.error || 'Unknown error');
-          }
-          
-          return response.data;
+            }
+            
+            return response.data;
         } catch (error) {
-          console.error('API error:', error);
-          throw error;
+            console.error('API error:', error);
+            throw error;
         }
       }
       
@@ -455,4 +463,21 @@
     if (window.location.search) {
       document.getElementById('backButton').style.display = 'inline-block';
     }
+
+    // Add to the end of Common.html
+    function checkApiConnection() {
+    console.log('Checking API connection...');
+    
+    google.script.run
+        .withSuccessHandler(function(result) {
+        console.log('API connection test result:', result);
+        })
+        .withFailureHandler(function(error) {
+        console.error('API connection test failed:', error);
+        })
+        .processApiRequest({action: 'auth.getStatus'});
+    }
+
+    // Make it available globally
+    window.checkApiConnection = checkApiConnection;
   </script>

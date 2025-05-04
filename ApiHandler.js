@@ -63,36 +63,48 @@ class ApiHandler {
      * @return {TextOutput} Response data as JSON
      */
     handleRequest(requestData, user) {
-      try {
-        // Validate request format
-        if (!requestData.action) {
-          return this.createErrorResponse('Missing required parameter: action');
+        try {
+          // Validate request format
+          if (!requestData.action) {
+            return {
+              success: false,
+              error: 'Missing required parameter: action'
+            };
+          }
+          
+          // Find the endpoint handler
+          const handler = this.endpoints[requestData.action];
+          
+          if (!handler) {
+            return {
+              success: false,
+              error: `Unknown action: ${requestData.action}`
+            };
+          }
+          
+          // Check authorization for this endpoint
+          if (!this.authManager.canPerformAction(requestData.action, requestData.projectId, user)) {
+            return {
+              success: false,
+              error: 'Not authorized to perform this action'
+            };
+          }
+          
+          // Call the handler with the request data
+          const result = handler(requestData, user);
+          
+          // Return a properly structured response
+          return {
+            success: true,
+            data: result
+          };
+        } catch (error) {
+          logError(`API error: ${error.message}\n${error.stack}`);
+          return {
+            success: false,
+            error: `Server error: ${error.message}`
+          };
         }
-        
-        // Find the endpoint handler
-        const handler = this.endpoints[requestData.action];
-        
-        if (!handler) {
-          return this.createErrorResponse(`Unknown action: ${requestData.action}`);
-        }
-        
-        // Check authorization for this endpoint
-        if (!this.authManager.canPerformAction(requestData.action, requestData.projectId, user)) {
-          return this.createErrorResponse('Not authorized to perform this action', 403);
-        }
-        
-        // Call the handler with the request data
-        const result = handler(requestData, user);
-        
-        // Return the response
-        return ContentService.createTextOutput(JSON.stringify({
-          success: true,
-          data: result
-        })).setMimeType(ContentService.MimeType.JSON);
-      } catch (error) {
-        logError(`API error: ${error.message}\n${error.stack}`);
-        return this.createErrorResponse(`Server error: ${error.message}`, 500);
-      }
     }
     
     /**

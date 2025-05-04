@@ -260,8 +260,8 @@
         this.baseUrl = window.location.href.split('?')[0];
       }
       
-      // Make an API request
-      async request(action, data = {}) {
+    // Modify the request method in the ApiClient class
+    async request(action, data = {}) {
         try {
             // Add action to the data
             const requestData = {
@@ -287,34 +287,45 @@
             
             console.log('Received API response:', response);
             
-            // More robust error handling for null/undefined responses
+            // Try to handle the response even if it's not what we expect
             if (response === null || response === undefined) {
-            console.error('Received empty response from server');
+            // For project list, return empty array as fallback
+            if (action === 'project.list') {
+                console.warn('Empty response for project list, returning empty array');
+                return [];
+            }
+            
             throw new Error('Server returned an empty response. Please try again or check server logs.');
             }
             
-            // Handle case where response might be a string or other non-object
-            if (typeof response !== 'object') {
-            console.warn('Unexpected response type:', typeof response);
+            // Handle case where response might be a string
+            if (typeof response === 'string') {
             try {
-                // Try to parse if it's a JSON string
-                const parsedResponse = JSON.parse(response);
-                return parsedResponse.data || parsedResponse;
+                return JSON.parse(response).data || response;
             } catch (e) {
-                throw new Error(`Unexpected response type: ${typeof response}`);
+                return response; // Just return the string if it's not JSON
             }
-            }
-            
-            if (!response.success) {
-            throw new Error(response.error || 'Unknown server error');
-            }
-            
-            return response.data;
-        } catch (error) {
-            console.error('API error:', error);
-            throw error;
         }
+        
+        // Handle the success/error standard format
+        if (response.success === false) {
+        throw new Error(response.error || 'Unknown server error');
         }
+        
+        // Return the data property if it exists, otherwise the whole response
+        return response.data !== undefined ? response.data : response;
+    } catch (error) {
+        console.error('API error:', error);
+        
+        // Special handling for project list to avoid breaking the UI
+        if (action === 'project.list') {
+        console.warn('Returning empty array due to error in project list');
+        return [];
+        }
+        
+        throw error;
+    }
+    }
       
       // Helper methods for common requests
       async getProject(projectId) {

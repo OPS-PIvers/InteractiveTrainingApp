@@ -536,42 +536,26 @@ function processApiRequest(requestData) {
     // Check if the application is initialized
     if (!apiHandler || !projectManager || !authManager) {
       console.log('Components not initialized, initializing...');
-      try {
-        initialize();
-      } catch (initError) {
-        console.error('Initialization failed:', initError);
-        return {
-          success: false,
-          error: `Initialization failed: ${initError.message}`
-        };
-      }
-    }
-    
-    // Double-check initialization was successful
-    if (!apiHandler || !projectManager || !authManager) {
-      return {
-        success: false,
-        error: 'Failed to initialize components'
-      };
+      initialize();
     }
     
     // Get the current user
     const user = Session.getEffectiveUser().getEmail();
     console.log('User making request:', user);
     
-    // Safety check on request data
-    if (!requestData || typeof requestData !== 'object') {
-      return {
-        success: false,
-        error: 'Invalid request data'
-      };
-    }
-    
     // Handle the request with internal error catching
     let result;
     try {
       result = apiHandler.handleRequest(requestData, user);
       console.log('Request handled successfully, result type:', typeof result);
+      
+      // Create a simple test response to verify communication works
+      const testResponse = {
+        test: "Communication test",
+        timestamp: new Date().getTime(),
+        action: requestData.action
+      };
+      console.log("Test response:", testResponse);
     } catch (handlerError) {
       console.error('Error in request handler:', handlerError);
       return {
@@ -580,38 +564,69 @@ function processApiRequest(requestData) {
       };
     }
     
-    // If no result was returned
-    if (result === undefined || result === null) {
-      console.warn('Handler returned empty result');
-      return {
-        success: true,
-        data: null,
-        warning: 'Empty result returned from handler'
-      };
+    // For API actions that return potentially complex objects, 
+    // use simplified response structure
+    if (requestData.action === 'project.list') {
+      // Special handling for project list which might have complex objects
+      try {
+        const projects = result || [];
+        console.log(`Found ${projects.length} projects, serializing...`);
+        
+        // Create a more simplified project list - just the essential data
+        const simplifiedProjects = projects.map(project => ({
+          projectId: project.projectId || '',
+          title: project.title || 'Unnamed Project',
+          createdAt: project.createdAt instanceof Date ? project.createdAt.getTime() : 
+                    (typeof project.createdAt === 'number' ? project.createdAt : null),
+          modifiedAt: project.modifiedAt instanceof Date ? project.modifiedAt.getTime() : 
+                     (typeof project.modifiedAt === 'number' ? project.modifiedAt : null),
+          slidesCount: project.slides ? project.slides.length : 0
+        }));
+        
+        console.log(`Simplified to ${simplifiedProjects.length} projects`);
+        
+        // Return a simple response structure
+        return {
+          success: true,
+          data: simplifiedProjects
+        };
+      } catch (serializeError) {
+        console.error('Error serializing projects:', serializeError);
+        return {
+          success: false,
+          error: `Serialization error: ${serializeError.message}`,
+          fallback: true
+        };
+      }
     }
     
-    // If result is already a ContentService TextOutput, return its content
+    // For direct ContentService outputs
     if (result && typeof result.getContent === 'function') {
-      // Extract the JSON content from TextOutput and return as object
       try {
         return JSON.parse(result.getContent());
       } catch (e) {
         return {
           success: true,
-          data: result.getContent()
+          data: String(result.getContent())
         };
       }
     }
     
     // For normal object results, ensure proper format
-    if (result.success !== undefined) {
-      // Result is already in our expected format
-      return result;
-    } else {
-      // Wrap the result in our expected format
+    try {
+      // Use our safe serialization
+      result = safeSerialize(result);
+      
       return {
         success: true,
         data: result
+      };
+    } catch (finalError) {
+      console.error('Error in final response preparation:', finalError);
+      return {
+        success: false,
+        error: `Response preparation error: ${finalError.message}`,
+        fallbackMessage: "Server processed the request but couldn't prepare a valid response"
       };
     }
   } catch (error) {
@@ -733,6 +748,58 @@ function testApiConnection() {
     return {
       success: false,
       error: `API test failed: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Simple API method to get projects without complex objects
+ * This is a direct function that can be called from the client
+ * avoiding potential serialization issues
+ */
+function getProjectList() {
+  try {
+    // Make sure we're initialized
+    if (!projectManager) {
+      initialize();
+    }
+    
+    const user = Session.getEffectiveUser().getEmail();
+    console.log('Getting project list for user:', user);
+    
+    // Get all projects
+    const allProjects = projectManager.getAllProjects();
+    
+    if (!allProjects || !Array.isArray(allProjects)) {
+      console.warn('Invalid projects result from projectManager');
+      return { success: true, data: [] };
+    }
+    
+    // Create a simplified list with just essential properties
+    const simplifiedProjects = allProjects.map(project => {
+      // Only include the most basic properties
+      return {
+        projectId: project.projectId || '',
+        title: project.title || 'Unnamed Project',
+        createdAt: project.createdAt instanceof Date ? project.createdAt.getTime() : 
+                  (typeof project.createdAt === 'number' ? project.createdAt : null),
+        modifiedAt: project.modifiedAt instanceof Date ? project.modifiedAt.getTime() : 
+                   (typeof project.modifiedAt === 'number' ? project.modifiedAt : null)
+      };
+    });
+    
+    console.log(`Simplified ${simplifiedProjects.length} projects for direct access`);
+    
+    return {
+      success: true,
+      data: simplifiedProjects
+    };
+  } catch (error) {
+    console.error('Error in direct project list access:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown error in getProjectList',
+      data: []
     };
   }
 }

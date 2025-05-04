@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Error - Interactive Training</title>
+  
+  <!-- Include common styles and scripts -->
+  <?!= include('Common'); ?>
+  
+  <style>
+    .error-container {
+      text-align: center;
+      padding: 3rem;
+      margin: 2rem auto;
+      max-width: 600px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .error-code {
+      font-size: 5rem;
+      font-weight: bold;
+      color: var(--error-color);
+      margin: 0;
+      line-height: 1;
+    }
+    
+    .error-title {
+      font-size: 2rem;
+      margin: 1rem 0;
+    }
+    
+    .error-message {
+      color: var(--light-text-color);
+      margin-bottom: 2rem;
+    }
+    
+    .error-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h1 class="error-code"><?= statusCode ?></h1>
+      <h2 class="error-title">
+        <?= statusCode === 404 ? 'Not Found' : 
+            statusCode === 403 ? 'Access Denied' : 
+            statusCode === 500 ? 'Server Error' : 'Error' ?>
+      </h2>
+      <p class="error-message"><?= message ?></p>
+      <button class="btn" onclick="goHome()">Go to Home</button>
+    </div>
+  </div>
+  
+  <script>
+    function goHome() {
+      window.location.href = window.location.pathname;
+    }
+  </script>
+</body>
+</html>

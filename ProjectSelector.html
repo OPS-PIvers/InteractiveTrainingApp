@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Select Project - Interactive Training</title>
+  
+  <!-- Include common styles and scripts -->
+  <?!= include('Common'); ?>
+  
+  <style>
+    .project-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    
+    .project-card {
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      background-color: white;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .project-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+    
+    .project-header {
+      padding: 1.5rem;
+      background-color: var(--primary-color);
+      color: white;
+    }
+    
+    .project-title {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 500;
+    }
+    
+    .project-body {
+      padding: 1.5rem;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    
+    .project-dates {
+      color: var(--light-text-color);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    
+    .project-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .empty-state-icon {
+      font-size: 3rem;
+      color: var(--light-text-color);
+      margin-bottom: 1rem;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Container for alert messages -->
+  <div id="alertContainer" style="display: none;"></div>
+  
+  <div class="container">
+    <div class="d-flex justify-between align-center mb-3">
+      <h1>Your Training Projects</h1>
+      <button id="createProjectButton" class="btn">Create New Project</button>
+    </div>
+    
+    <div id="loadingProjects" class="loading">
+      <p>Loading projects...</p>
+    </div>
+    
+    <div id="projectList" class="project-list" style="display: none;"></div>
+    
+    <div id="emptyState" class="empty-state" style="display: none;">
+      <div class="empty-state-icon">📂</div>
+      <h2>No Projects Found</h2>
+      <p>Get started by creating your first interactive training project.</p>
+      <button class="btn mt-2" onclick="showCreateProjectDialog()">Create New Project</button>
+    </div>
+  </div>
+  
+  <!-- Create Project Dialog -->
+  <div id="createProjectDialog" class="dialog hidden">
+    <div class="dialog-content">
+      <h2>Create New Project</h2>
+      <div class="form-group">
+        <label for="projectName" class="form-label">Project Name</label>
+        <input type="text" id="projectName" class="form-control" placeholder="Enter project name">
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" onclick="closeCreateProjectDialog()">Cancel</button>
+        <button class="btn" onclick="createNewProject()">Create Project</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Load projects when page loads
+    document.addEventListener('DOMContentLoaded', loadProjects);
+    
+    // Create project button
+    document.getElementById('createProjectButton').addEventListener('click', showCreateProjectDialog);
+    
+    // Load projects from the backend
+    async function loadProjects() {
+      try {
+        document.getElementById('loadingProjects').style.display = 'block';
+        document.getElementById('projectList').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        
+        // Get projects from the API
+        const projects = await api.listProjects();
+        
+        // Show empty state if no projects
+        if (!projects || projects.length === 0) {
+          document.getElementById('emptyState').style.display = 'block';
+          document.getElementById('loadingProjects').style.display = 'none';
+          return;
+        }
+        
+        // Render projects
+        renderProjects(projects);
+        
+        document.getElementById('projectList').style.display = 'grid';
+        document.getElementById('loadingProjects').style.display = 'none';
+      } catch (error) {
+        showAlert(`Failed to load projects: ${error.message}`, 'error');
+        document.getElementById('loadingProjects').style.display = 'none';
+      }
+    }
+    
+    // Render projects to the project list
+    function renderProjects(projects) {
+      const projectListEl = document.getElementById('projectList');
+      projectListEl.innerHTML = '';
+      
+      projects.forEach(project => {
+        const createdDate = formatDate(project.createdAt);
+        const modifiedDate = formatDate(project.modifiedAt);
+        
+        const projectCard = document.createElement('div');
+        projectCard.className = 'project-card';
+        projectCard.innerHTML = `
+          <div class="project-header">
+            <h2 class="project-title">${sanitizeHtml(project.title)}</h2>
+          </div>
+          <div class="project-body">
+            <div>
+              <div class="project-dates">
+                <div>Created: ${createdDate}</div>
+                <div>Last Modified: ${modifiedDate}</div>
+              </div>
+            </div>
+            <div class="project-actions">
+              <button class="btn btn-secondary" onclick="editProject('${project.projectId}')">Edit</button>
+              <button class="btn" onclick="viewProject('${project.projectId}')">View</button>
+            </div>
+          </div>
+        `;
+        
+        projectListEl.appendChild(projectCard);
+      });
+    }
+    
+    // Show create project dialog
+    function showCreateProjectDialog() {
+      const dialog = document.getElementById('createProjectDialog');
+      dialog.classList.remove('hidden');
+      document.getElementById('projectName').focus();
+    }
+    
+    // Close create project dialog
+    function closeCreateProjectDialog() {
+      const dialog = document.getElementById('createProjectDialog');
+      dialog.classList.add('hidden');
+      document.getElementById('projectName').value = '';
+    }
+    
+    // Create a new project
+    async function createNewProject() {
+      try {
+        const projectName = document.getElementById('projectName').value.trim();
+        
+        if (!projectName) {
+          showAlert('Please enter a project name', 'error');
+          return;
+        }
+        
+        // Create project through API
+        const result = await api.createProject(projectName);
+        
+        // Close dialog
+        closeCreateProjectDialog();
+        
+        // Show success message
+        showAlert('Project created successfully!', 'success');
+        
+        // Reload projects
+        loadProjects();
+      } catch (error) {
+        showAlert(`Failed to create project: ${error.message}`, 'error');
+      }
+    }
+    
+    // Open project for editing
+    function editProject(projectId) {
+      window.location.href = `${window.location.pathname}?project=${projectId}&mode=editor`;
+    }
+    
+    // Open project for viewing
+    function viewProject(projectId) {
+      window.location.href = `${window.location.pathname}?project=${projectId}`;
+    }
+  </script>
+</body>
+</html>

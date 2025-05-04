@@ -50,7 +50,7 @@ function onOpen(e) {
  */
 function initialize() {
   try {
-    // Initialize SheetAccessor
+    // Initialize existing components
     const spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
     sheetAccessor = new SheetAccessor(spreadsheetId);
     
@@ -77,6 +77,10 @@ function initialize() {
     mediaProcessor = new MediaProcessor(driveManager);
     fileUploader = new FileUploader(driveManager, mediaProcessor);
     projectManager = new ProjectManager(sheetAccessor, templateManager, driveManager);
+    
+    // Initialize Phase 3 components
+    authManager = new AuthManager(sheetAccessor, driveManager);
+    apiHandler = new ApiHandler(projectManager, fileUploader, authManager);
     
     logInfo('Application successfully initialized');
     return true;
@@ -505,5 +509,102 @@ function showRootFolderURL() {
   } catch (error) {
     logError(`Failed to show root folder URL: ${error.message}`);
     showErrorAlert('Failed to locate the root folder. Please check the logs for details.');
+  }
+}
+
+/**
+ * Processes an API request from the web client
+ * Acts as a bridge between the client-side code and the ApiHandler
+ * 
+ * @param {Object} requestData - Request data from client
+ * @return {Object} Response data
+ */
+function processApiRequest(requestData) {
+  try {
+    // Check if the application is initialized
+    if (!apiHandler) {
+      initialize();
+    }
+    
+    // Get the current user
+    const user = Session.getEffectiveUser().getEmail();
+    
+    // Handle the request
+    return apiHandler.handleRequest(requestData, user);
+  } catch (error) {
+    logError(`Error processing API request: ${error.message}\n${error.stack}`);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Requests access to a project
+ * Sends an email to the project owner
+ * 
+ * @param {string} projectId - ID of the project
+ * @param {string} requesterEmail - Email of the user requesting access
+ * @return {Object} Result of the request
+ */
+function requestProjectAccess(projectId, requesterEmail) {
+  try {
+    // Check if the application is initialized
+    if (!projectManager) {
+      initialize();
+    }
+    
+    // Get project info
+    const project = projectManager.getProject(projectId);
+    
+    if (!project) {
+      return { 
+        success: false, 
+        message: 'Project not found'
+      };
+    }
+    
+    // Get project owner email
+    let ownerEmail = '';
+    
+    if (project.folderId) {
+      try {
+        const folder = DriveApp.getFolderById(project.folderId);
+        ownerEmail = folder.getOwner().getEmail();
+      } catch (folderError) {
+        // If can't access folder, use spreadsheet owner
+        ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
+      }
+    } else {
+      ownerEmail = SpreadsheetApp.getActiveSpreadsheet().getOwner().getEmail();
+    }
+    
+    // Send email
+    const subject = `Access Request: ${project.title} Training Project`;
+    const body = `
+      Hello,
+      
+      ${requesterEmail} has requested access to your interactive training project "${project.title}".
+      
+      To grant access, open the project in Google Drive and share it with them.
+      
+      Project ID: ${projectId}
+      
+      This is an automated message from the Interactive Training Projects Web App.
+    `;
+    
+    MailApp.sendEmail(ownerEmail, subject, body);
+    
+    return {
+      success: true,
+      message: 'Access request sent successfully'
+    };
+  } catch (error) {
+    logError(`Error requesting project access: ${error.message}`);
+    return {
+      success: false,
+      message: `Error: ${error.message}`
+    };
   }
 }

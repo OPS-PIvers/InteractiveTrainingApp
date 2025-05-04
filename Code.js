@@ -371,9 +371,3 @@ function getProjectList() {
 
 // Removed testApiConnection and requestProjectAccess unless needed for specific UI flows.
 // They can be added back if required.
-
-// Server-side function in Code.gs
-function getEditorUrl(projectId) {
-  console.log("getEditorUrl called for project:", projectId);
-  return ScriptApp.getService().getUrl() + "?action=edit&project=" + projectId;
-}

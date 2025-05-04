@@ -137,6 +137,10 @@ function doGet(e) {
     return ContentService.createTextOutput(jsonString)
       .setMimeType(ContentService.MimeType.JSON);
   }
+  function getEditorUrl(projectId) {
+    console.log("getEditorUrl called for project:", projectId);
+    return ScriptApp.getService().getUrl() + "?action=edit&project=" + projectId;
+  }
   
   /**
    * Serves the viewer application for a project

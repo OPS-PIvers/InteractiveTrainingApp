@@ -13,7 +13,7 @@
 function doGet(e) {
     try {
       // Initialize application if needed
-      if (!sheetAccessor || !templateManager || !driveManager || !projectManager) {
+    if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
         initialize();
       }
       
@@ -66,7 +66,7 @@ function doGet(e) {
   function doPost(e) {
     try {
       // Initialize application if needed
-      if (!sheetAccessor || !templateManager || !driveManager || !projectManager) {
+      if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
         initialize();
       }
       

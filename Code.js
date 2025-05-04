@@ -10,6 +10,8 @@ let driveManager = null;
 let mediaProcessor = null;
 let fileUploader = null;
 let projectManager = null;
+let authManager = null;
+let apiHandler = null;
 
 function onOpen(e) {
   try {
@@ -50,7 +52,7 @@ function onOpen(e) {
  */
 function initialize() {
   try {
-    // Initialize existing components
+    // Initialize SheetAccessor
     const spreadsheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
     sheetAccessor = new SheetAccessor(spreadsheetId);
     
@@ -78,7 +80,7 @@ function initialize() {
     fileUploader = new FileUploader(driveManager, mediaProcessor);
     projectManager = new ProjectManager(sheetAccessor, templateManager, driveManager);
     
-    // Initialize Phase 3 components
+    // Initialize Phase 3 components - do this AFTER the components they depend on
     authManager = new AuthManager(sheetAccessor, driveManager);
     apiHandler = new ApiHandler(projectManager, fileUploader, authManager);
     

@@ -278,22 +278,30 @@
     function editProject(projectId) {
       console.log("Edit button clicked for project ID:", projectId);
       
-      // Use google.script.run to tell the server to redirect
-      google.script.run
-        .withSuccessHandler(function(url) {
-          console.log("Server provided URL:", url);
-          window.location.href = url;
-        })
-        .withFailureHandler(function(error) {
-          console.error("Server error:", error);
-          alert("Error navigating to editor: " + error);
-        })
-        .getEditorUrl(projectId);
-    }
-    
-    // Open project for viewing
-    function viewProject(projectId) {
-      window.location.href = `${window.location.pathname}?project=${projectId}`;
+      // Create the URL
+      const editUrl = window.location.pathname + "?action=edit&project=" + projectId;
+      console.log("Attempting to navigate to:", editUrl);
+      
+      try {
+        // Try different navigation methods
+        console.log("Attempting navigation method 1...");
+        window.location.assign(editUrl);
+        
+        // If the above doesn't work, force a hard redirect
+        setTimeout(function() {
+          console.log("Attempting navigation method 2...");
+          window.location.href = editUrl;
+          
+          // Last resort - try window.open
+          setTimeout(function() {
+            console.log("Attempting navigation method 3...");
+            window.open(editUrl, "_self");
+          }, 500);
+        }, 500);
+      } catch (e) {
+        console.error("Navigation error:", e);
+        alert("Error navigating to editor. Please try again or check console for errors.");
+      }
     }
   </script>
 </body>

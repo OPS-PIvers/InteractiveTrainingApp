@@ -417,6 +417,3 @@ class AuthManager {
       }
     }
   }
-  
-  // Create instance to be used by the web app
-  const authManager = new AuthManager(sheetAccessor, driveManager);

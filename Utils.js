@@ -3,13 +3,14 @@
  * Used by Google Apps Script server code
  */
 
-// Logging levels
-const LOG_LEVELS = {
-  DEBUG: 0,
-  INFO: 1,
-  WARN: 2,
-  ERROR: 3
-};
+if (typeof LOG_LEVELS === 'undefined') {
+  const LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3
+  };
+}
 
 // Current log level (adjust as needed)
 const CURRENT_LOG_LEVEL = LOG_LEVELS.INFO;

@@ -139,9 +139,9 @@ function doGet(e) {
   }
   function getEditorUrl(projectId) {
     console.log("getEditorUrl called for project:", projectId);
-    return ScriptApp.getService().getUrl() + "?action=edit&project=" + projectId;
+    return ScriptApp.getService().getUrl() + "?mode=editor&project=" + projectId;
   }
-  
+
   /**
    * Serves the viewer application for a project
    * * @param {Object} project - Full project data object
@@ -151,6 +151,17 @@ function doGet(e) {
   function serveViewerApp(project, userEmail) {
     try {
       logInfo(`Serving viewer for project: ${project.projectId}`);
+          // Temporary check during development
+      try {
+        HtmlService.createTemplateFromFile('ViewerApp');
+      } catch (e) {
+        console.error("ViewerApp.html not found:", e);
+        return HtmlService.createHtmlOutput(`
+          <h1>Viewer Not Available</h1>
+          <p>ViewerApp.html has not been implemented yet (Phase 6).</p>
+          <p><a href="${ScriptApp.getService().getUrl()}">Return to Project List</a></p>
+        `);
+      }
       let template = HtmlService.createTemplateFromFile('ViewerApp');
       
       // Serialize project data to pass safely to the template

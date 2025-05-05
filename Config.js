@@ -17,7 +17,8 @@ const SHEET_STRUCTURE = {
       TITLE: 1,
       CREATED_AT: 2,
       MODIFIED_AT: 3,
-      LAST_ACCESSED: 4
+      LAST_ACCESSED: 4,
+      PROJECT_ADMINS: 5
     },
     HEADERS: ["Project ID", "Title", "Created At", "Modified At", "Last Accessed"]
   },

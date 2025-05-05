@@ -378,6 +378,36 @@ class AuthManager {
     }
   }
   
+  isProjectAdmin(projectId, userEmail) {
+    try {
+      // Get project info from index
+      const indexSheet = this.sheetAccessor.getSheet(SHEET_STRUCTURE.PROJECT_INDEX.TAB_NAME);
+      const data = indexSheet.getDataRange().getValues();
+      
+      // Find project row
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.PROJECT_ID] === projectId) {
+          // Option A: Check comma-separated list
+          const admins = data[i][SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.PROJECT_ADMINS];
+          if (admins && admins.split(',').map(email => email.trim()).includes(userEmail)) {
+            return true;
+          }
+          
+          // Option B: Check multiple columns
+          // for (let j = 5; j <= 8; j++) {
+          //   if (data[i][j] === userEmail) return true;
+          // }
+          
+          break; // Found project, no need to keep searching
+        }
+      }
+      return false;
+    } catch (error) {
+      logError(`Error checking admin status: ${error.message}`);
+      return false;
+    }
+  }
+
   /**
    * Adds a user as a project admin
    * 

@@ -55,6 +55,43 @@ function serveCombinedView(project, accessLevel) {
   }
 }
 
+function doGet(e) {
+  try {
+    // Initialize if needed
+    if (!initialized) initialize();
+    
+    // Get parameters
+    const params = e.parameter || {};
+    const projectId = params.project || '';
+    
+    if (projectId) {
+      const project = projectManager.getProject(projectId);
+      if (!project) return serveErrorPage('Project not found', 404);
+      
+      const userEmail = Session.getEffectiveUser().getEmail();
+      const hasViewAccess = authManager.hasAccess(projectId, userEmail);
+      const isAdmin = authManager.isProjectAdmin(projectId, userEmail);
+      
+      if (!hasViewAccess) return serveLoginPage(projectId);
+      
+      // Create template with both components, client-side JS will handle toggling
+      const template = HtmlService.createTemplateFromFile('CombinedView');
+      template.project = project;
+      template.user = { email: userEmail, isAdmin: isAdmin };
+      
+      return template.evaluate()
+        .setTitle(`${project.title} - Interactive Training`)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    } else {
+      // Show project selector
+      return serveProjectSelector();
+    }
+  } catch (error) {
+    logError(`Error in doGet: ${error.message}`);
+    return serveErrorPage(`An error occurred: ${error.message}`, 500);
+  }
+}
+
 /**
  * Handles POST requests to the web app
  * Processes API calls from the client-side code

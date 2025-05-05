@@ -4,14 +4,88 @@
  */
 
 /**
+ * Handles GET requests to the web app
+ * Routes requests based on parameters to the appropriate handler
+ *
+ * @param {Object} e - Event object from Apps Script
+ * @return {HtmlOutput} HTML content based on the request
+ */
+function doGet(e) {
+  try {
+    // Initialize application if needed
+    if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
+      initialize();
+    }
+
+    // Get current user
+    const userEmail = Session.getEffectiveUser().getEmail();
+    console.log(`doGet request from user: ${userEmail}`);
+
+    // Parse query parameters
+    const params = e.parameter || {};
+    console.log(`Request parameters: ${JSON.stringify(params)}`);
+
+    // Project selector (default view when no parameters)
+    if (!params.project && !params.action) {
+      console.log("Serving project selector");
+      return serveProjectSelector();
+    }
+
+    // If project ID is provided, get the project
+    if (params.project) {
+      const projectId = params.project;
+      console.log(`Accessing project: ${projectId}`);
+
+      try {
+        // Get project data
+        const project = projectManager.getProject(projectId);
+        
+        if (!project) {
+          console.error(`Project not found: ${projectId}`);
+          return serveErrorPage(`Project not found: ${projectId}`, 404);
+        }
+
+        // Check user access
+        const accessLevel = authManager.getAccessLevel(projectId, userEmail);
+        
+        if (accessLevel === authManager.accessLevels.NONE) {
+          console.warn(`Access denied for user ${userEmail} to project ${projectId}`);
+          return serveLoginPage(projectId);
+        }
+
+        // Based on action parameter, serve appropriate view
+        const action = params.action || 'view'; // Default action is view
+        
+        // Always use combined view but with different default tabs based on action
+        console.log(`Serving combined view with action: ${action} for user with access level: ${accessLevel}`);
+        return serveCombinedView(project, accessLevel, action);
+      } catch (projectError) {
+        console.error(`Error accessing project: ${projectError.message}\n${projectError.stack}`);
+        logError(`Error accessing project: ${projectError.message}`);
+        return serveErrorPage(`Error accessing project: ${projectError.message}`, 500);
+      }
+    }
+
+    // If we get here, show the project selector
+    console.log("No valid action or project ID specified, serving project selector");
+    return serveProjectSelector();
+  } catch (error) {
+    console.error(`Error in doGet: ${error.message}\n${error.stack}`);
+    logError(`Error in doGet: ${error.message}`);
+    return serveErrorPage(`Server error: ${error.message}`, 500);
+  }
+}
+
+/**
  * Serves a combined view with both viewer and editor components
- * The components are shown/hidden based on user permissions
+ * The components are shown/hidden based on user permissions and requested action
  *
  * @param {Object} project - Project data
  * @param {string} accessLevel - User's access level (owner, editor, viewer)
+ * @param {string} defaultAction - Default action/tab to show (view, edit, analytics)
  * @return {HtmlOutput} HTML for the combined view
  */
-function serveCombinedView(project, accessLevel) {
+function serveCombinedView(project, accessLevel, defaultAction = 'view') {
   try {
     // Get the HTML template
     let template = HtmlService.createTemplateFromFile('CombinedView');
@@ -27,14 +101,22 @@ function serveCombinedView(project, accessLevel) {
 
     // Check if user can edit
     template.canEdit = (accessLevel === authManager.accessLevels.OWNER || 
+                         accessLevel === authManager.accessLevels.ADMIN ||
                          accessLevel === authManager.accessLevels.EDITOR);
     
     // Check if user is admin/owner
-    template.isAdmin = (accessLevel === authManager.accessLevels.OWNER);
+    template.isAdmin = (accessLevel === authManager.accessLevels.OWNER || 
+                        accessLevel === authManager.accessLevels.ADMIN);
 
-    // Get analytics data if user is admin/owner or editor
-    if (template.canEdit) {
-      // TODO: Get analytics data if needed
+    // Set the default action/tab
+    template.defaultAction = (defaultAction === 'edit' && template.canEdit) ? 'editor' : 
+                            (defaultAction === 'analytics' && template.canEdit) ? 'analytics' : 
+                            'viewer';
+
+    // Get analytics data if user is admin/owner or editor and analytics is requested
+    if (template.canEdit && defaultAction === 'analytics') {
+      // TODO: Get analytics data if needed for initial load
+      // This could be moved to client-side API call for better performance
     }
 
     // Process the template
@@ -49,46 +131,9 @@ function serveCombinedView(project, accessLevel) {
 
     return htmlOutput;
   } catch (error) {
-    console.error(`Error serving combined view: ${error.message}\n${error.stack}`); // Log error
+    console.error(`Error serving combined view: ${error.message}\n${error.stack}`);
     logError(`Error serving combined view: ${error.message}`);
     return serveErrorPage(`Failed to load training: ${error.message}`, 500);
-  }
-}
-
-function doGet(e) {
-  try {
-    // Initialize if needed
-    if (!initialized) initialize();
-    
-    // Get parameters
-    const params = e.parameter || {};
-    const projectId = params.project || '';
-    
-    if (projectId) {
-      const project = projectManager.getProject(projectId);
-      if (!project) return serveErrorPage('Project not found', 404);
-      
-      const userEmail = Session.getEffectiveUser().getEmail();
-      const hasViewAccess = authManager.hasAccess(projectId, userEmail);
-      const isAdmin = authManager.isProjectAdmin(projectId, userEmail);
-      
-      if (!hasViewAccess) return serveLoginPage(projectId);
-      
-      // Create template with both components, client-side JS will handle toggling
-      const template = HtmlService.createTemplateFromFile('CombinedView');
-      template.project = project;
-      template.user = { email: userEmail, isAdmin: isAdmin };
-      
-      return template.evaluate()
-        .setTitle(`${project.title} - Interactive Training`)
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-    } else {
-      // Show project selector
-      return serveProjectSelector();
-    }
-  } catch (error) {
-    logError(`Error in doGet: ${error.message}`);
-    return serveErrorPage(`An error occurred: ${error.message}`, 500);
   }
 }
 
@@ -118,15 +163,9 @@ function doPost(e) {
       }, 400);
     }
 
-    // *** IMPORTANT: Authentication Check Logic Moved to ApiHandler ***
-    // It's better to check auth within the handler based on the specific action
-
     // Process the API request using ApiHandler
-    // Make sure processApiRequest is exposed or handle it differently
-    // Assuming processApiRequest is the intended global function to call ApiHandler
-    const response = processApiRequest(requestData); // Call the global bridge function
+    const response = processApiRequest(requestData);
 
-    // processApiRequest should already return the correct structure
     // If it returns ContentService, return it directly
     if (response && typeof response.getContent === 'function') {
         return response;
@@ -135,7 +174,7 @@ function doPost(e) {
     return createJsonResponse(response);
 
   } catch (error) {
-    console.error(`Error in doPost: ${error.message}\n${error.stack}`); // Log error
+    console.error(`Error in doPost: ${error.message}\n${error.stack}`);
     logError(`Error in doPost: ${error.message}\n${error.stack}`);
     return createJsonResponse({
       success: false,
@@ -199,7 +238,7 @@ function serveViewerApp(project) {
 
     return htmlOutput;
   } catch (error) {
-    console.error(`Error serving viewer app: ${error.message}\n${error.stack}`); // Log error
+    console.error(`Error serving viewer app: ${error.message}\n${error.stack}`);
     logError(`Error serving viewer app: ${error.message}`);
     return serveErrorPage(`Failed to load viewer: ${error.message}`, 500);
   }
@@ -213,7 +252,7 @@ function serveViewerApp(project) {
  */
 function serveEditorView(project) {
   try {
-    // === ADDED: Logging ===
+    // Log project data for debugging
     console.log(`Serving EditorView for project: ${project.projectId} - ${project.title}`);
     try {
       // Attempt to stringify to check for issues early and log sample data
@@ -221,16 +260,14 @@ function serveEditorView(project) {
       console.log(`Project data sample: ${projectSample}...`);
     } catch (stringifyError) {
       console.error(`Failed to stringify project data before templating: ${stringifyError}`);
-      // Consider returning an error page here if stringify fails critically
       return serveErrorPage(`Failed to prepare project data: ${stringifyError.message}`, 500);
     }
-    // === END Logging ===
 
     // Get the HTML template
     let template = HtmlService.createTemplateFromFile('EditorView');
 
     // Add project data to the template
-    template.project = project; // This makes 'project' available in EditorView.html's scriptlets
+    template.project = project;
 
     // Add user info
     template.user = {
@@ -242,9 +279,7 @@ function serveEditorView(project) {
       .setTitle(`Edit: ${project.title} - Interactive Training`)
       .setFaviconUrl('https://www.google.com/images/icons/product/drive-32.png');
 
-     // === ADDED: Logging ===
-     console.log("Template evaluated successfully for EditorView.");
-     // === END Logging ===
+    console.log("Template evaluated successfully for EditorView.");
 
     // Set appropriate options for the web app
     htmlOutput = htmlOutput
@@ -253,10 +288,8 @@ function serveEditorView(project) {
 
     return htmlOutput;
   } catch (error) {
-    // === UPDATED: Enhanced Logging ===
     console.error(`Error serving editor view: ${error.message}\n${error.stack}`);
     logError(`Error serving editor view: ${error.message}`);
-    // === END UPDATE ===
     return serveErrorPage(`Failed to load editor: ${error.message}`, 500);
   }
 }
@@ -292,7 +325,7 @@ function serveAnalyticsView(project) {
 
     return htmlOutput;
   } catch (error) {
-    console.error(`Error serving analytics view: ${error.message}\n${error.stack}`); // Log error
+    console.error(`Error serving analytics view: ${error.message}\n${error.stack}`);
     logError(`Error serving analytics view: ${error.message}`);
     return serveErrorPage(`Failed to load analytics: ${error.message}`, 500);
   }
@@ -305,17 +338,8 @@ function serveAnalyticsView(project) {
  */
 function serveProjectSelector() {
   try {
-    // *** IMPORTANT: Project listing logic might be better handled client-side via API call ***
-    // For now, keeping server-side rendering as it was
-    // Get all projects (this might fetch more data than needed for just the selector)
-    // Consider having a lighter `projectManager.getProjectListSummary()` if performance becomes an issue
-    // const projects = projectManager.getAllProjects(); // Assuming this works
-
     // Get the HTML template
     let template = HtmlService.createTemplateFromFile('ProjectSelector');
-
-    // *** REMOVED: Passing projects directly to template ***
-    // template.projects = projects; // Data will now be loaded client-side
 
     // Add user info
     template.user = {
@@ -334,7 +358,7 @@ function serveProjectSelector() {
 
     return htmlOutput;
   } catch (error) {
-    console.error(`Error serving project selector: ${error.message}\n${error.stack}`); // Log error
+    console.error(`Error serving project selector: ${error.message}\n${error.stack}`);
     logError(`Error serving project selector: ${error.message}`);
     return serveErrorPage(`Failed to load project selector: ${error.message}`, 500);
   }
@@ -370,7 +394,7 @@ function serveLoginPage(projectId) {
 
     return htmlOutput;
   } catch (error) {
-    console.error(`Error serving login page: ${error.message}\n${error.stack}`); // Log error
+    console.error(`Error serving login page: ${error.message}\n${error.stack}`);
     logError(`Error serving login page: ${error.message}`);
     return serveErrorPage(`Failed to load login page: ${error.message}`, 500);
   }
@@ -405,7 +429,7 @@ function serveErrorPage(message, statusCode) {
     return htmlOutput;
   } catch (error) {
     // Last resort error handling if template fails
-    console.error(`FATAL: Error serving error page itself! Original: ${message}, Template Error: ${error.message}\n${error.stack}`); // Log error
+    console.error(`FATAL: Error serving error page itself! Original: ${message}, Template Error: ${error.message}\n${error.stack}`);
     return HtmlService.createHtmlOutput(`
       <h1>Error</h1>
       <p>Original error: ${message}</p>
@@ -444,4 +468,52 @@ function serveStaticFile(filename) {
       return serveErrorPage("Invalid file request", 400);
   }
   return HtmlService.createHtmlOutputFromFile(filename);
+}
+
+/**
+ * Gets a list of projects with permission information for the current user
+ * Called from the ProjectSelector.html page
+ * 
+ * @return {Object} Response object with project list and success status
+ */
+function getProjectListWithPermissions() {
+  try {
+    // Initialize application if needed
+    if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
+      initialize();
+    }
+    
+    // Get current user email
+    const userEmail = Session.getEffectiveUser().getEmail();
+    
+    // Get all projects (basic info)
+    const projects = projectManager.getAllProjects(false); // Don't need full details
+    
+    // Add access level information for each project
+    const projectsWithPermissions = projects.map(project => {
+      // Get access level for current user
+      const accessLevel = authManager.getAccessLevel(project.projectId, userEmail);
+      
+      // Add access level to project object
+      return {
+        ...project,
+        accessLevel: accessLevel
+      };
+    });
+    
+    return {
+      success: true,
+      data: projectsWithPermissions,
+      message: 'Projects retrieved successfully'
+    };
+  } catch (error) {
+    console.error(`Error getting project list with permissions: ${error.message}\n${error.stack}`);
+    logError(`Error getting project list with permissions: ${error.message}`);
+    
+    return {
+      success: false,
+      message: `Failed to get projects: ${error.message}`,
+      error: error.message
+    };
+  }
 }

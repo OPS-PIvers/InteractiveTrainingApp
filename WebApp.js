@@ -4,56 +4,54 @@
  */
 
 /**
- * Handles GET requests to the web app
- * Routes to different views based on parameters
+ * Serves a combined view with both viewer and editor components
+ * The components are shown/hidden based on user permissions
  *
- * @param {Object} e - Event object from Apps Script
- * @return {HtmlOutput} HTML content to display
+ * @param {Object} project - Project data
+ * @param {string} accessLevel - User's access level (owner, editor, viewer)
+ * @return {HtmlOutput} HTML for the combined view
  */
-function doGet(e) {
+function serveCombinedView(project, accessLevel) {
   try {
-    // Initialize application if needed
-  if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
-      initialize();
+    // Get the HTML template
+    let template = HtmlService.createTemplateFromFile('CombinedView');
+
+    // Add project data to the template
+    template.project = project;
+
+    // Add user info and permissions
+    template.user = {
+      email: Session.getEffectiveUser().getEmail(),
+      accessLevel: accessLevel
+    };
+
+    // Check if user can edit
+    template.canEdit = (accessLevel === authManager.accessLevels.OWNER || 
+                         accessLevel === authManager.accessLevels.EDITOR);
+    
+    // Check if user is admin/owner
+    template.isAdmin = (accessLevel === authManager.accessLevels.OWNER);
+
+    // Get analytics data if user is admin/owner or editor
+    if (template.canEdit) {
+      // TODO: Get analytics data if needed
     }
 
-    // Get parameters
-    const params = e.parameter || {};
-    const mode = params.mode || 'viewer'; // Default to viewer mode
-    const projectId = params.project || ''; // Project ID parameter
+    // Process the template
+    let htmlOutput = template.evaluate()
+      .setTitle(`${project.title} - Interactive Training`)
+      .setFaviconUrl('https://www.google.com/images/icons/product/drive-32.png');
 
-    // Check if a valid project ID is provided
-    if (projectId) {
-      // Get the project
-      const project = projectManager.getProject(projectId);
+    // Set appropriate options for the web app
+    htmlOutput = htmlOutput
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
-      if (!project) {
-        return serveErrorPage('Project not found', 404);
-      }
-
-      // Check authentication if needed
-      if (!authManager.hasAccess(projectId, Session.getEffectiveUser().getEmail())) {
-        return serveLoginPage(projectId);
-      }
-
-      // Serve the appropriate view based on mode
-      switch(mode) {
-        case 'editor':
-          return serveEditorView(project); // <--- Calls the updated function
-        case 'analytics':
-          return serveAnalyticsView(project);
-        case 'viewer':
-        default:
-          return serveViewerApp(project);
-      }
-    } else {
-      // No project ID provided, show project selector
-      return serveProjectSelector();
-    }
+    return htmlOutput;
   } catch (error) {
-    console.error(`Error in doGet: ${error.message}\n${error.stack}`); // Log error
-    logError(`Error in doGet: ${error.message}\n${error.stack}`);
-    return serveErrorPage(`An error occurred: ${error.message}`, 500);
+    console.error(`Error serving combined view: ${error.message}\n${error.stack}`); // Log error
+    logError(`Error serving combined view: ${error.message}`);
+    return serveErrorPage(`Failed to load training: ${error.message}`, 500);
   }
 }
 

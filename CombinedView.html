@@ -7,6 +7,8 @@
   <title><?= project.title ?> - Interactive Training</title>
   
   <?!= include('Common'); ?>
+  <?!= include('EditorStyles'); ?>
+  <?!= include('ViewerStyles'); ?>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   
@@ -79,12 +81,6 @@
       flex-direction: column;
       overflow: hidden;
     }
-    
-    /* Import editor-specific styles */
-    <?!= include('EditorStyles'); ?>
-    
-    /* Import viewer-specific styles */
-    <?!= include('ViewerStyles'); ?>
     
     /* Hide elements */
     .hidden {

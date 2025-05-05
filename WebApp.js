@@ -208,90 +208,21 @@ function createJsonResponse(data, statusCode = 200) {
 }
 
 /**
- * Serves the viewer application for a project
- *
- * @param {Object} project - Project data
- * @return {HtmlOutput} HTML for the viewer application
+ * DEPRECATED: This function is no longer used as we've migrated to CombinedView
+ * Kept for reference purposes only.
  */
 function serveViewerApp(project) {
-  try {
-    // Get the HTML template
-    let template = HtmlService.createTemplateFromFile('ViewerApp');
-
-    // Add project data to the template
-    template.project = project;
-
-    // Add user info
-    template.user = {
-      email: Session.getEffectiveUser().getEmail()
-    };
-
-    // Process the template
-    let htmlOutput = template.evaluate()
-      .setTitle(`${project.title} - Interactive Training`)
-      .setFaviconUrl('https://www.google.com/images/icons/product/drive-32.png');
-
-    // Set appropriate options for the web app
-    htmlOutput = htmlOutput
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-    return htmlOutput;
-  } catch (error) {
-    console.error(`Error serving viewer app: ${error.message}\n${error.stack}`);
-    logError(`Error serving viewer app: ${error.message}`);
-    return serveErrorPage(`Failed to load viewer: ${error.message}`, 500);
-  }
+  console.warn("serveViewerApp() is deprecated - use serveCombinedView() instead");
+  return serveCombinedView(project, "viewer", "viewer");
 }
 
 /**
- * Serves the editor application for a project
- *
- * @param {Object} project - Project data
- * @return {HtmlOutput} HTML for the editor application
+ * DEPRECATED: This function is no longer used as we've migrated to CombinedView
+ * Kept for reference purposes only.
  */
 function serveEditorView(project) {
-  try {
-    // Log project data for debugging
-    console.log(`Serving EditorView for project: ${project.projectId} - ${project.title}`);
-    try {
-      // Attempt to stringify to check for issues early and log sample data
-      const projectSample = JSON.stringify(project).substring(0, 500);
-      console.log(`Project data sample: ${projectSample}...`);
-    } catch (stringifyError) {
-      console.error(`Failed to stringify project data before templating: ${stringifyError}`);
-      return serveErrorPage(`Failed to prepare project data: ${stringifyError.message}`, 500);
-    }
-
-    // Get the HTML template
-    let template = HtmlService.createTemplateFromFile('EditorView');
-
-    // Add project data to the template
-    template.project = project;
-
-    // Add user info
-    template.user = {
-      email: Session.getEffectiveUser().getEmail()
-    };
-
-    // Process the template
-    let htmlOutput = template.evaluate()
-      .setTitle(`Edit: ${project.title} - Interactive Training`)
-      .setFaviconUrl('https://www.google.com/images/icons/product/drive-32.png');
-
-    console.log("Template evaluated successfully for EditorView.");
-
-    // Set appropriate options for the web app
-    htmlOutput = htmlOutput
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-    return htmlOutput;
-  } catch (error) {
-    console.error(`Error serving editor view: ${error.message}\n${error.stack}`);
-    logError(`Error serving editor view: ${error.message}`);
-    return serveErrorPage(`Failed to load editor: ${error.message}`, 500);
-  }
+  console.warn("serveEditorView() is deprecated - use serveCombinedView() instead");
+  return serveCombinedView(project, "editor", "editor");
 }
 
 /**

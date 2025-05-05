@@ -139,67 +139,55 @@
     
     // Load projects from the backend
     async function loadProjects() {
-        try {
-            document.getElementById('loadingProjects').style.display = 'block';
-            document.getElementById('projectList').style.display = 'none';
-            document.getElementById('emptyState').style.display = 'none';
-            
-            let projects = [];
-            
-            // Try different methods to get projects, starting with the most reliable
-            try {
-            // Method 1: Direct function call (most reliable)
-            projects = await new Promise((resolve, reject) => {
-                google.script.run
-                .withSuccessHandler(result => {
-                    console.log("Direct function result:", result);
-                    resolve(result && result.success ? result.data : []);
-                })
-                .withFailureHandler(error => {
-                    console.error("Direct function error:", error);
-                    reject(error);
-                })
-                .getProjectList();
-            });
-            
-            console.log("Got projects via direct method:", projects ? projects.length : 0);
-            } catch (method1Error) {
-            console.warn("Method 1 failed:", method1Error);
-            
-            // Method 2: API client
-            try {
-                projects = await api.listProjects();
-                console.log("Got projects via API client:", projects ? projects.length : 0);
-            } catch (method2Error) {
-                console.warn("Method 2 failed:", method2Error);
-                
-                // Method 3: Fallback with minimal data
-                showAlert("Having trouble loading projects. Using fallback method...", "warning");
-                
-                // Just continue with empty list - the UI will show the empty state
-                console.log("Using empty projects list as fallback");
-            }
-            }
-            
-            // Show empty state if no projects
-            if (!projects || !Array.isArray(projects) || projects.length === 0) {
-            document.getElementById('emptyState').style.display = 'block';
-            document.getElementById('loadingProjects').style.display = 'none';
-            return;
-            }
-            
-            // Render projects
-            renderProjects(projects);
-            
-            document.getElementById('projectList').style.display = 'grid';
-            document.getElementById('loadingProjects').style.display = 'none';
-        } catch (error) {
-            console.error('Failed to load projects:', error);
-            showAlert(`Failed to load projects: ${error.message}`, 'error');
-            document.getElementById('loadingProjects').style.display = 'none';
-            // Show empty state as fallback
-            document.getElementById('emptyState').style.display = 'block';
+      try {
+        document.getElementById('loadingProjects').style.display = 'block';
+        document.getElementById('projectList').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        
+        console.log("Loading projects...");
+        
+        // Call the server directly using google.script.run
+        const projects = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(result => {
+              console.log("Server response:", result);
+              // Check if the result has data property containing projects
+              if (result && result.data && Array.isArray(result.data)) {
+                resolve(result.data);
+              } else if (result && Array.isArray(result)) {
+                resolve(result); // Direct array response
+              } else {
+                console.warn("Unexpected response format:", result);
+                resolve([]); // Empty array as fallback
+              }
+            })
+            .withFailureHandler(error => {
+              console.error("Server error:", error);
+              reject(error);
+            })
+            .getProjectList();
+        });
+        
+        console.log("Projects loaded:", projects);
+        
+        // Show empty state if no projects
+        if (!projects || projects.length === 0) {
+          document.getElementById('emptyState').style.display = 'block';
+          document.getElementById('loadingProjects').style.display = 'none';
+          return;
         }
+        
+        // Render projects
+        renderProjects(projects);
+        
+        document.getElementById('projectList').style.display = 'grid';
+        document.getElementById('loadingProjects').style.display = 'none';
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+        showAlert(`Failed to load projects: ${error.message}`, 'error');
+        document.getElementById('loadingProjects').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'block';
+      }
     }
     
     // Render projects to the project list
@@ -307,27 +295,13 @@
       
       // Create the URL
       const viewUrl = window.location.pathname + "?action=view&project=" + projectId;
-      console.log("Attempting to navigate to:", viewUrl);
+      console.log("Navigating to:", viewUrl);
       
       try {
-        // Try different navigation methods
-        console.log("Attempting navigation method 1...");
-        window.location.assign(viewUrl);
-        
-        // If the above doesn't work, force a hard redirect
-        setTimeout(function() {
-          console.log("Attempting navigation method 2...");
-          window.location.href = viewUrl;
-          
-          // Last resort - try window.open
-          setTimeout(function() {
-            console.log("Attempting navigation method 3...");
-            window.open(viewUrl, "_self");
-          }, 500);
-        }, 500);
+        window.location.href = viewUrl;
       } catch (e) {
         console.error("Navigation error:", e);
-        alert("Error navigating to viewer. Please try again or check console for errors.");
+        alert("Error navigating to viewer. Please try again.");
       }
     }
 

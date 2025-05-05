@@ -192,26 +192,42 @@
     
     // Render projects to the project list
     function renderProjects(projects) {
+      console.log("Rendering projects:", projects);
       const projectListEl = document.getElementById('projectList');
       projectListEl.innerHTML = '';
       
-      // Add debug info at the top if there are problems
-      let hasPermissionIssues = false;
+      if (!Array.isArray(projects)) {
+        console.error("Projects is not an array:", projects);
+        showAlert("Error: Projects data is not in the expected format", "error");
+        document.getElementById('emptyState').style.display = 'block';
+        return;
+      }
       
+      // Add debug info at the top
+      projectListEl.innerHTML = `
+        <div class="alert alert-info mb-3">
+          <p><strong>Debug Info:</strong></p>
+          <p>Projects found: ${projects.length}</p>
+          <p>User email: ${Session.getEffectiveUser ? Session.getEffectiveUser().getEmail() : 'Unknown'}</p>
+        </div>
+      `;
+      
+      // Process each project
       projects.forEach(project => {
-        const createdDate = formatDate(project.createdAt);
-        const modifiedDate = formatDate(project.modifiedAt);
+        // Check if required fields exist
+        if (!project.projectId || !project.title) {
+          console.warn("Project missing required fields:", project);
+          return; // Skip this project
+        }
         
-        // Determine user permissions for this project
+        const createdDate = project.createdAt ? formatDate(project.createdAt) : 'Unknown';
+        const modifiedDate = project.modifiedAt ? formatDate(project.modifiedAt) : 'Unknown';
+        
+        // Determine user permissions for this project - be very permissive
         const canEdit = project.accessLevel === 'owner' || 
                       project.accessLevel === 'admin' || 
                       project.accessLevel === 'editor' || 
                       project.isAdmin === true;
-        
-        // Check for permission issues
-        if (project.accessLevel === 'none' || !project.accessLevel) {
-          hasPermissionIssues = true;
-        }
         
         const projectCard = document.createElement('div');
         projectCard.className = 'project-card';
@@ -222,9 +238,10 @@
           <div class="project-body">
             <div>
               <div class="project-dates">
+                <div>Project ID: ${project.projectId}</div>
                 <div>Created: ${createdDate}</div>
                 <div>Last Modified: ${modifiedDate}</div>
-                <div>Your access: ${project.accessLevel || 'Unknown'}</div>
+                <div>Access level: ${project.accessLevel || 'Unknown'}</div>
                 <div>Admin: ${project.isAdmin === true ? 'Yes' : 'No'}</div>
               </div>
             </div>
@@ -238,16 +255,14 @@
         projectListEl.appendChild(projectCard);
       });
       
-      // Show troubleshooting info if needed
-      if (hasPermissionIssues) {
-        const debugInfo = document.createElement('div');
-        debugInfo.className = 'alert alert-warning mt-3';
-        debugInfo.innerHTML = `
-          <p><strong>Permissions Debug Info:</strong> Some projects have permission issues.</p>
-          <p>Your email: ${Session.getEffectiveUser ? Session.getEffectiveUser().getEmail() : 'Unknown'}</p>
-          <p>Please verify that your email is correctly added to column F in the ProjectIndex sheet.</p>
+      // If no projects were rendered after the debug info, show a message
+      if (projectListEl.children.length === 1) { // Only debug info
+        projectListEl.innerHTML += `
+          <div class="alert alert-warning">
+            <p><strong>No valid projects found.</strong></p>
+            <p>There are ${projects.length} projects in the data, but none could be rendered.</p>
+          </div>
         `;
-        projectListEl.insertAdjacentElement('beforebegin', debugInfo);
       }
     }
     
@@ -331,6 +346,39 @@
       } catch (e) {
         console.error("Navigation error:", e);
         alert("Error navigating to editor. Please try again or check console for errors.");
+      }
+    }
+      // Helper function to format dates
+    function formatDate(timestamp) {
+      if (!timestamp) return 'Unknown';
+      
+      try {
+        let dateObj;
+        
+        // Handle different timestamp formats
+        if (typeof timestamp === 'string') {
+          // Try to parse string date
+          dateObj = new Date(timestamp);
+        } else if (typeof timestamp === 'number') {
+          // Handle milliseconds timestamp
+          dateObj = new Date(timestamp);
+        } else {
+          // Try to use directly if it's a Date object
+          dateObj = timestamp;
+        }
+        
+        // Check if valid date
+        if (isNaN(dateObj.getTime())) {
+          return 'Invalid date';
+        }
+        
+        // Format date: MM/DD/YYYY
+        return (dateObj.getMonth() + 1).toString().padStart(2, '0') + '/' +
+              dateObj.getDate().toString().padStart(2, '0') + '/' +
+              dateObj.getFullYear();
+      } catch (e) {
+        console.error("Error formatting date:", e);
+        return 'Error';
       }
     }
   </script>

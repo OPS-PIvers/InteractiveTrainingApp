@@ -402,10 +402,10 @@ function serveStaticFile(filename) {
 }
 
 /**
- * Gets a list of projects with minimal details for the project selector
- * This is a simplified version without requiring full project loading
+ * Gets a list of projects for the current user
+ * This function is called directly from the ProjectSelector HTML
  * 
- * @return {Object} Response with project list data
+ * @return {Array} Array of project objects with permission info
  */
 function getProjectList() {
   try {
@@ -420,10 +420,11 @@ function getProjectList() {
     console.log(`Getting project list for user: ${userEmail}`);
     
     // Get all projects (basic info)
-    const projects = projectManager.getAllProjects(false); // Don't need full details
+    const allProjects = projectManager.getAllProjects(false); // Don't need full details
+    console.log(`Found ${allProjects.length} total projects`);
     
     // Add access level information for each project
-    const projectsWithPermissions = projects.map(project => {
+    const projectsWithPermissions = allProjects.map(project => {
       // Get access level for current user
       const accessLevel = authManager.getAccessLevel(project.projectId, userEmail);
       console.log(`Project ${project.title}, Access level: ${accessLevel}`);
@@ -432,27 +433,26 @@ function getProjectList() {
       const isAdmin = authManager.isProjectAdmin(project.projectId, userEmail);
       console.log(`Project ${project.title}, Is admin: ${isAdmin}`);
       
-      // Add access level to project object
+      // Add permission info to project
       return {
-        ...project,
+        projectId: project.projectId,
+        title: project.title,
+        createdAt: project.createdAt,
+        modifiedAt: project.modifiedAt, 
         accessLevel: accessLevel,
         isAdmin: isAdmin
       };
     });
     
-    return {
-      success: true,
-      data: projectsWithPermissions,
-      message: 'Projects retrieved successfully'
-    };
+    console.log(`Returning ${projectsWithPermissions.length} projects with permissions`);
+    
+    // IMPORTANT: Return the array directly, not wrapped in an object
+    return projectsWithPermissions;
   } catch (error) {
-    console.error(`Error getting project list: ${error.message}\n${error.stack}`);
+    console.error(`Error getting project list: ${error.message}`);
     logError(`Error getting project list: ${error.message}`);
     
-    return {
-      success: false,
-      message: `Failed to get projects: ${error.message}`,
-      error: error.message
-    };
+    // Return empty array on error
+    return [];
   }
 }

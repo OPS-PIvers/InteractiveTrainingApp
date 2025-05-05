@@ -207,6 +207,9 @@
       const projectListEl = document.getElementById('projectList');
       projectListEl.innerHTML = '';
       
+      // Add debug info at the top if there are problems
+      let hasPermissionIssues = false;
+      
       projects.forEach(project => {
         const createdDate = formatDate(project.createdAt);
         const modifiedDate = formatDate(project.modifiedAt);
@@ -214,7 +217,13 @@
         // Determine user permissions for this project
         const canEdit = project.accessLevel === 'owner' || 
                       project.accessLevel === 'admin' || 
-                      project.accessLevel === 'editor';
+                      project.accessLevel === 'editor' || 
+                      project.isAdmin === true;
+        
+        // Check for permission issues
+        if (project.accessLevel === 'none' || !project.accessLevel) {
+          hasPermissionIssues = true;
+        }
         
         const projectCard = document.createElement('div');
         projectCard.className = 'project-card';
@@ -227,7 +236,8 @@
               <div class="project-dates">
                 <div>Created: ${createdDate}</div>
                 <div>Last Modified: ${modifiedDate}</div>
-                ${project.accessLevel ? `<div>Your access: ${project.accessLevel}</div>` : ''}
+                <div>Your access: ${project.accessLevel || 'Unknown'}</div>
+                <div>Admin: ${project.isAdmin === true ? 'Yes' : 'No'}</div>
               </div>
             </div>
             <div class="project-actions">
@@ -239,6 +249,18 @@
         
         projectListEl.appendChild(projectCard);
       });
+      
+      // Show troubleshooting info if needed
+      if (hasPermissionIssues) {
+        const debugInfo = document.createElement('div');
+        debugInfo.className = 'alert alert-warning mt-3';
+        debugInfo.innerHTML = `
+          <p><strong>Permissions Debug Info:</strong> Some projects have permission issues.</p>
+          <p>Your email: ${Session.getEffectiveUser ? Session.getEffectiveUser().getEmail() : 'Unknown'}</p>
+          <p>Please verify that your email is correctly added to column F in the ProjectIndex sheet.</p>
+        `;
+        projectListEl.insertAdjacentElement('beforebegin', debugInfo);
+      }
     }
     
     // Show create project dialog
@@ -280,7 +302,35 @@
         showAlert(`Failed to create project: ${error.message}`, 'error');
       }
     }
-    
+    function viewProject(projectId) {
+      console.log("View button clicked for project ID:", projectId);
+      
+      // Create the URL
+      const viewUrl = window.location.pathname + "?action=view&project=" + projectId;
+      console.log("Attempting to navigate to:", viewUrl);
+      
+      try {
+        // Try different navigation methods
+        console.log("Attempting navigation method 1...");
+        window.location.assign(viewUrl);
+        
+        // If the above doesn't work, force a hard redirect
+        setTimeout(function() {
+          console.log("Attempting navigation method 2...");
+          window.location.href = viewUrl;
+          
+          // Last resort - try window.open
+          setTimeout(function() {
+            console.log("Attempting navigation method 3...");
+            window.open(viewUrl, "_self");
+          }, 500);
+        }, 500);
+      } catch (e) {
+        console.error("Navigation error:", e);
+        alert("Error navigating to viewer. Please try again or check console for errors.");
+      }
+    }
+
     function editProject(projectId) {
       console.log("Edit button clicked for project ID:", projectId);
       

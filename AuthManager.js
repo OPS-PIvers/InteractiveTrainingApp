@@ -152,35 +152,44 @@ class AuthManager {
       }
       
       // Find the project in the index
-      const projectIdCol = SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.PROJECT_ID;
-      const adminUsersCol = SHEET_STRUCTURE.PROJECT_INDEX.COLUMNS.ADMIN_USERS; // Assumed column for admin users
-      
       const data = indexSheet.getDataRange().getValues();
-      let projectRow = -1;
+      const headers = data[0]; // Get headers
       
-      for (let i = 1; i < data.length; i++) { // Skip header row
+      // Find column index for project ID and admin users
+      const projectIdCol = headers.indexOf('Project ID');
+      const adminUsersCol = headers.indexOf('Admin Users'); 
+      
+      // If Admin Users column not found, try column F (index 5) as fallback
+      const actualAdminCol = adminUsersCol >= 0 ? adminUsersCol : 5;
+      
+      // Log the columns for debugging
+      console.log(`Admin check - Project ID column: ${projectIdCol}, Admin column: ${actualAdminCol}`);
+      
+      if (projectIdCol < 0) {
+        logError('Project ID column not found in index sheet');
+        return false;
+      }
+      
+      // Search for the project
+      for (let i = 1; i < data.length; i++) {
         if (data[i][projectIdCol] === projectId) {
-          projectRow = i;
-          break;
+          // Check admin column
+          const adminUsers = data[i][actualAdminCol] || '';
+          console.log(`Admin users for project ${projectId}: ${adminUsers}`);
+          
+          // Split by commas and check if user email is present
+          if (adminUsers) {
+            const adminList = adminUsers.toString().split(',').map(email => email.trim().toLowerCase());
+            const isAdmin = adminList.includes(userEmail.toLowerCase());
+            console.log(`User ${userEmail} admin status: ${isAdmin}`);
+            return isAdmin;
+          }
+          return false;
         }
       }
       
-      if (projectRow === -1) {
-        logError(`Project not found in index: ${projectId}`);
-        return false;
-      }
-      
-      // Check if the user is in the admin column
-      // The admin column may contain a comma-separated list of admin emails
-      const adminUsers = data[projectRow][adminUsersCol] || '';
-      
-      if (!adminUsers) {
-        return false;
-      }
-      
-      // Split the admin users string by commas and check if userEmail is in the list
-      const adminUsersList = adminUsers.split(',').map(email => email.trim().toLowerCase());
-      return adminUsersList.includes(userEmail.toLowerCase());
+      // Project not found
+      return false;
     } catch (error) {
       logError(`Error checking project admin status: ${error.message}`);
       return false;

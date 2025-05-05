@@ -402,20 +402,22 @@ function serveStaticFile(filename) {
 }
 
 /**
- * Gets a list of projects with permission information for the current user
- * Called from the ProjectSelector.html page
+ * Gets a list of projects with minimal details for the project selector
+ * This is a simplified version without requiring full project loading
  * 
- * @return {Object} Response object with project list and success status
+ * @return {Object} Response with project list data
  */
-function getProjectListWithPermissions() {
+function getProjectList() {
   try {
     // Initialize application if needed
     if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
+      console.log("API Handler not initialized in getProjectList, calling initialize()...");
       initialize();
     }
     
     // Get current user email
     const userEmail = Session.getEffectiveUser().getEmail();
+    console.log(`Getting project list for user: ${userEmail}`);
     
     // Get all projects (basic info)
     const projects = projectManager.getAllProjects(false); // Don't need full details
@@ -424,11 +426,17 @@ function getProjectListWithPermissions() {
     const projectsWithPermissions = projects.map(project => {
       // Get access level for current user
       const accessLevel = authManager.getAccessLevel(project.projectId, userEmail);
+      console.log(`Project ${project.title}, Access level: ${accessLevel}`);
+      
+      // Check if user is a project admin
+      const isAdmin = authManager.isProjectAdmin(project.projectId, userEmail);
+      console.log(`Project ${project.title}, Is admin: ${isAdmin}`);
       
       // Add access level to project object
       return {
         ...project,
-        accessLevel: accessLevel
+        accessLevel: accessLevel,
+        isAdmin: isAdmin
       };
     });
     
@@ -438,8 +446,8 @@ function getProjectListWithPermissions() {
       message: 'Projects retrieved successfully'
     };
   } catch (error) {
-    console.error(`Error getting project list with permissions: ${error.message}\n${error.stack}`);
-    logError(`Error getting project list with permissions: ${error.message}`);
+    console.error(`Error getting project list: ${error.message}\n${error.stack}`);
+    logError(`Error getting project list: ${error.message}`);
     
     return {
       success: false,

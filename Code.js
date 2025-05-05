@@ -328,44 +328,41 @@ function processApiRequest(requestData) {
 // ============================================================
 
 /**
- * Simple API method to get projects without complex objects.
- * Can be called directly from the client to avoid potential serialization issues
- * with the main processApiRequest if safeSerialize isn't perfect.
- * * @return {Object} { success: boolean, data: Array<{projectId, title, createdAt, modifiedAt}>, error?: string }
+ * Simple API method to get projects without complex objects
+ * This serves as a fallback for the client-side code
+ * @returns {Array} - List of projects
  */
 function getProjectList() {
   try {
-    initialize(); // Ensure initialized
-    const user = Session.getEffectiveUser().getEmail();
-    logDebug(`Getting direct project list for user: ${user}`);
+    // Log that this function is being called (for debugging)
+    Logger.log("getProjectList() called as fallback");
     
-    // Get all projects (basic info)
-    const allProjects = projectManager.getAllProjects(); // This already returns basic info
-    if (!Array.isArray(allProjects)) {
-      throw new Error('Expected array of projects from ProjectManager');
+    // Initialize required components if needed
+    if (projectManager === null) {
+      initialize();
     }
     
-    // Filter based on access
-    const accessibleProjects = allProjects.filter(project => {
-        if (!project || typeof project !== 'object' || !project.projectId) return false;
-        return authManager.hasAccess(project.projectId, user);
-    });
-
-    // Map to ensure only primitive types are included (safe for direct return)
-    const simplifiedProjects = accessibleProjects.map(project => ({
+    // Get basic project info
+    const projects = projectManager.getAllProjects(false);
+    
+    // Log the projects found
+    Logger.log("Projects found in getProjectList: " + projects.length);
+    
+    // Format the result for client consumption
+    const formattedProjects = projects.map(project => {
+      return {
         projectId: project.projectId,
         title: project.title,
-        // Convert dates to timestamps (numbers)
-        createdAt: project.createdAt instanceof Date ? project.createdAt.getTime() : (typeof project.createdAt === 'number' ? project.createdAt : null),
-        modifiedAt: project.modifiedAt instanceof Date ? project.modifiedAt.getTime() : (typeof project.modifiedAt === 'number' ? project.modifiedAt : null)
-    }));
+        createdAt: project.createdAt,
+        modifiedAt: project.modifiedAt,
+        lastAccessed: project.lastAccessed
+      };
+    });
     
-    logDebug(`Returning ${simplifiedProjects.length} projects via getProjectList.`);
-    return { success: true, data: simplifiedProjects };
-
+    return formattedProjects;
   } catch (error) {
-    logError(`Error in direct getProjectList: ${error.message}\n${error.stack}`);
-    return { success: false, error: error.message || 'Unknown error in getProjectList', data: [] };
+    Logger.log("Error in getProjectList: " + error.toString());
+    return [];
   }
 }
 

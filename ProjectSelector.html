@@ -138,55 +138,63 @@
     document.getElementById('createProjectButton').addEventListener('click', showCreateProjectDialog);
     
     // Load projects from the backend
+    /**
+     * Loads projects from the server
+     */
     async function loadProjects() {
       try {
-        document.getElementById('loadingProjects').style.display = 'block';
+        // Show loading state
+        document.getElementById('loadingProjects').style.display = 'flex';
         document.getElementById('projectList').style.display = 'none';
         document.getElementById('emptyState').style.display = 'none';
         
-        console.log("Loading projects...");
+        console.log('Loading projects...');
         
-        // Call the server directly using google.script.run
-        const projects = await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(result => {
-              console.log("Server response:", result);
-              // Check if the result has data property containing projects
-              if (result && result.data && Array.isArray(result.data)) {
-                resolve(result.data);
-              } else if (result && Array.isArray(result)) {
-                resolve(result); // Direct array response
-              } else {
-                console.warn("Unexpected response format:", result);
-                resolve([]); // Empty array as fallback
-              }
-            })
-            .withFailureHandler(error => {
-              console.error("Server error:", error);
-              reject(error);
-            })
-            .getProjectList();
-        });
-        
-        console.log("Projects loaded:", projects);
-        
-        // Show empty state if no projects
-        if (!projects || projects.length === 0) {
-          document.getElementById('emptyState').style.display = 'block';
-          document.getElementById('loadingProjects').style.display = 'none';
-          return;
+        // Try to load projects using the API client
+        let projects = [];
+        try {
+          projects = await api.listProjects();
+          console.log('Projects loaded:', projects);
+        } catch (error) {
+          console.error('Error loading projects from API:', error);
+          
+          // Fallback method - direct server call
+          try {
+            projects = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(result => {
+                  console.log('Server response:', result);
+                  resolve(result || []);
+                })
+                .withFailureHandler(error => {
+                  console.error('Server error:', error);
+                  reject(error);
+                })
+                .getProjectList();
+            });
+          } catch (fallbackError) {
+            console.error('Fallback method also failed:', fallbackError);
+            showAlert('Failed to load projects. Please refresh the page or try again later.', 'error');
+          }
         }
         
-        // Render projects
-        renderProjects(projects);
-        
-        document.getElementById('projectList').style.display = 'grid';
+        // Hide loading state
         document.getElementById('loadingProjects').style.display = 'none';
+        
+        // Check if we have any projects
+        if (Array.isArray(projects) && projects.length > 0) {
+          // Render the projects
+          renderProjects(projects);
+          document.getElementById('projectList').style.display = 'grid';
+        } else {
+          // Show empty state
+          document.getElementById('emptyState').style.display = 'block';
+        }
       } catch (error) {
-        console.error('Failed to load projects:', error);
-        showAlert(`Failed to load projects: ${error.message}`, 'error');
+        console.error('Error in loadProjects:', error);
         document.getElementById('loadingProjects').style.display = 'none';
         document.getElementById('emptyState').style.display = 'block';
+        showAlert('An error occurred while loading projects.', 'error');
       }
     }
     

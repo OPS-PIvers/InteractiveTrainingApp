@@ -156,36 +156,48 @@ class ApiHandler {
     }
     
     /**
-     * Lists all projects accessible to the user (basic info).
-     * * @param {Object} requestData - (Not used currently)
-     * @param {string} user - User email
-     * @return {Array<Object>} Array of basic project info objects.
+     * Lists all projects accessible to the user
+     * @param {Object} requestData - The request data
+     * @param {Object} user - The user making the request
+     * @returns {Object} - The list of projects
      */
     listProjects(requestData, user) {
-        try {
-            logDebug(`Listing projects for user: ${user}`);
-            if (!this.projectManager) throw new Error('Project manager not initialized');
-            
-            // Get all projects (basic info)
-            const allProjects = this.projectManager.getAllProjects();
-            if (!Array.isArray(allProjects)) throw new Error('Expected array of projects from ProjectManager');
-            
-            // Filter projects based on user access
-            const accessibleProjects = allProjects.filter(project => {
-                if (!project || typeof project !== 'object' || !project.projectId) {
-                    logWarning(`Invalid project object encountered during list: ${JSON.stringify(project)}`);
-                    return false;
-                }
-                // Check access using AuthManager
-                return this.authManager.hasAccess(project.projectId, user);
-            });
-            
-            logDebug(`Found ${accessibleProjects.length} accessible projects for ${user}.`);
-            return accessibleProjects; // Return the array directly
-        } catch (error) {
-            logError(`Error listing projects for ${user}: ${error.message}\n${error.stack}`);
-            return []; // Return empty array on error to avoid breaking client UI
-        }
+      try {
+        // Get all projects (either basic info or with details)
+        const includeSlidesAndElements = requestData.includeSlidesAndElements || false;
+        const projects = this.projectManager.getAllProjects(includeSlidesAndElements);
+        
+        // Filter projects based on user access if needed
+        const filteredProjects = projects.filter(project => {
+          return this.authManager.canPerformAction('project.get', project.projectId, user.email);
+        });
+        
+        // Add additional metadata to projects if needed
+        const enhancedProjects = filteredProjects.map(project => {
+          const accessLevel = this.authManager.getAccessLevel(project.projectId, user.email);
+          return {
+            ...project,
+            accessLevel: accessLevel,
+            canEdit: accessLevel === 'owner' || accessLevel === 'editor'
+          };
+        });
+        
+        // Log the response for debugging
+        Logger.log("Projects found: " + JSON.stringify(enhancedProjects));
+        
+        return {
+          success: true,
+          data: {
+            projects: enhancedProjects
+          }
+        };
+      } catch (error) {
+        Logger.log("Error in listProjects: " + error.toString());
+        return {
+          success: false,
+          error: error.toString()
+        };
+      }
     }
     
     /**

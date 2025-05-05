@@ -426,78 +426,79 @@
   
   <!-- Common JavaScript -->
   <script>
-    // API client for making requests to the backend
+    /**
+     * API client for making requests to the server
+     */
     class ApiClient {
       constructor() {
-        this.baseUrl = window.location.href.split('?')[0];
+        // Base URL is determined automatically for WebApps
+        this.baseUrl = '';
       }
       
-    // Modify the request method in the ApiClient class
-    async request(action, data = {}) {
+      /**
+       * Makes an API request to the server
+       * @param {string} action - The action to perform
+       * @param {Object} data - The data to send with the request
+       * @returns {Promise<Object>} - The response data
+       */
+      async request(action, data = {}) {
         try {
-            // Add action to the data
-            const requestData = {
+          console.log(`Making API request: ${action}`, data);
+          
+          // Create the request payload
+          const payload = {
             action: action,
             ...data
-            };
-            
-            console.log('Sending API request:', requestData);
-            
-            // Make the request with better error handling
-            const response = await new Promise((resolve, reject) => {
+          };
+          
+          // Make the request
+          const response = await new Promise((resolve, reject) => {
             google.script.run
-                .withSuccessHandler(function(result) {
-                console.log('Raw server response:', result);
+              .withSuccessHandler(result => {
+                console.log(`API response for ${action}:`, result);
                 resolve(result);
-                })
-                .withFailureHandler(function(error) {
-                console.error('Server error:', error);
+              })
+              .withFailureHandler(error => {
+                console.error(`API error for ${action}:`, error);
                 reject(error);
-                })
-                .processApiRequest(requestData);
-            });
-            
-            console.log('Received API response:', response);
-            
-            // Try to handle the response even if it's not what we expect
-            if (response === null || response === undefined) {
-            // For project list, return empty array as fallback
-            if (action === 'project.list') {
-                console.warn('Empty response for project list, returning empty array');
-                return [];
+              })
+              .processApiRequest(payload);
+          });
+          
+          // Check for null response
+          if (response === null) {
+            console.error("Received null response from server");
+            throw new Error("Received null response from server");
+          }
+          
+          // Unwrap the response if possible
+          if (typeof response === 'object' && 'success' in response) {
+            if (response.success) {
+              return response.data || {};
+            } else {
+              throw new Error(response.error || "Unknown error");
             }
-            
-            throw new Error('Server returned an empty response. Please try again or check server logs.');
-            }
-            
-            // Handle case where response might be a string
-            if (typeof response === 'string') {
-            try {
-                return JSON.parse(response).data || response;
-            } catch (e) {
-                return response; // Just return the string if it's not JSON
-            }
+          }
+          
+          // Return the raw response if it doesn't match the expected format
+          return response;
+        } catch (error) {
+          console.error(`API error in ${action}:`, error);
+          throw error;
         }
-        
-        // Handle the success/error standard format
-        if (response.success === false) {
-        throw new Error(response.error || 'Unknown server error');
+      }
+      
+      // Helper methods for common requests
+      async listProjects() {
+        try {
+          const result = await this.request('listProjects');
+          console.log("Projects result:", result);
+          return result.projects || [];
+        } catch (error) {
+          console.error("Error listing projects:", error);
+          return [];
         }
-        
-        // Return the data property if it exists, otherwise the whole response
-        return response.data !== undefined ? response.data : response;
-    } catch (error) {
-        console.error('API error:', error);
-        
-        // Special handling for project list to avoid breaking the UI
-        if (action === 'project.list') {
-        console.warn('Returning empty array due to error in project list');
-        return [];
-        }
-        
-        throw error;
-    }
-    }
+      }
       
       // Helper methods for common requests
       async getProject(projectId) {

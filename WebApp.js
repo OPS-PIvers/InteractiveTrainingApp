@@ -138,19 +138,12 @@ function serveCombinedView(project, accessLevel, defaultAction = 'view') {
 }
 
 /**
- * Handles POST requests to the web app
- * Processes API calls from the client-side code
- *
- * @param {Object} e - Event object from Apps Script
- * @return {ContentService|TextOutput} Response data in appropriate format
+ * Handles POST requests to the web app (primarily for API calls)
+ * @param {Object} e - The event object from Apps Script
+ * @returns {TextOutput} - JSON response
  */
 function doPost(e) {
   try {
-    // Initialize application if needed
-    if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
-      initialize();
-    }
-
     // Parse the request data
     let requestData;
     try {
@@ -158,30 +151,62 @@ function doPost(e) {
     } catch (parseError) {
       return createJsonResponse({
         success: false,
-        message: 'Invalid JSON data',
-        error: parseError.message
+        error: "Invalid JSON in request: " + parseError.toString()
       }, 400);
     }
-
-    // Process the API request using ApiHandler
-    const response = processApiRequest(requestData);
-
-    // If it returns ContentService, return it directly
-    if (response && typeof response.getContent === 'function') {
-        return response;
+    
+    // Get user info
+    const userEmail = Session.getEffectiveUser().getEmail();
+    const user = { email: userEmail };
+    
+    // Log incoming request for debugging
+    Logger.log("API Request: " + JSON.stringify(requestData));
+    
+    // Process the API request
+    if (!requestData.action) {
+      return createJsonResponse({
+        success: false,
+        error: "No action specified in request"
+      }, 400);
     }
-    // Otherwise, wrap it in a JSON response
+    
+    // Initialize required components
+    const sheetAccessor = new SheetAccessor();
+    const templateManager = new TemplateManager(sheetAccessor);
+    const driveManager = new DriveManager();
+    const projectManager = new ProjectManager(sheetAccessor, templateManager, driveManager);
+    const authManager = new AuthManager(sheetAccessor, driveManager);
+    const fileUploader = new FileUploader(driveManager, new MediaProcessor(driveManager));
+    const apiHandler = new ApiHandler(projectManager, fileUploader, authManager);
+    
+    // Process the request and get the response
+    const response = apiHandler.handleRequest(requestData, user);
+    
+    // Log the response for debugging
+    Logger.log("API Response: " + JSON.stringify(response));
+    
+    // Return the JSON response
     return createJsonResponse(response);
-
   } catch (error) {
-    console.error(`Error in doPost: ${error.message}\n${error.stack}`);
-    logError(`Error in doPost: ${error.message}\n${error.stack}`);
+    // Handle unexpected errors
+    Logger.log("Error in doPost: " + error.toString());
     return createJsonResponse({
       success: false,
-      message: 'Server error during POST handling',
-      error: error.message
+      error: "Server error: " + error.toString()
     }, 500);
   }
+}
+
+/**
+ * Creates a JSON response object
+ * @param {Object} data - The data to return
+ * @param {number} statusCode - HTTP status code (optional, defaults to 200)
+ * @returns {TextOutput} - JSON response
+ */
+function createJsonResponse(data, statusCode = 200) {
+  const response = ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+  return response;
 }
 
 /**

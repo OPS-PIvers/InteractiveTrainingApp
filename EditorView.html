@@ -403,7 +403,11 @@
   </style>
 </head>
 <body>
-  <div id="alertContainer" style="position: fixed; top: 70px; right: 20px; z-index: 1100; width: 300px;"></div>
+  <!-- Container for alert messages -->
+  <div id="alertContainer" style="display: none; position: fixed; top: 10px; right: 10px; z-index: 1000;"></div>
+
+  <!-- === ADD THIS LINE === -->
+  <div id="projectData" data-project='<?= JSON.stringify(project) ?>' style="display: none;"></div>
   
   <div class="editor-header">
     <h1 id="editorProjectTitle" class="editor-title">Edit: <?= projectTitle ?></h1> 
@@ -579,489 +583,420 @@
   <?!= include('element-factory'); ?>
   <?!= include('property-panel'); ?>
   
+  <!-- Includes -->
+  <?!= include('canvas-editor'); ?>
+  <?!= include('element-factory'); ?>
+  <?!= include('property-panel'); ?>
+
+  <!-- === START UPDATED SCRIPT BLOCK === -->
   <script>
-    // Global API client from Common.html
-    // const api = new ApiClient(); // Assuming ApiClient is defined in Common.html
-
     document.addEventListener('DOMContentLoaded', () => {
-        let projectDataObject;
-        try {
-            // Get the JSON string embedded in the HTML
-            const projectDataElement = document.getElementById('projectData');
-            if (!projectDataElement || !projectDataElement.textContent) {
-                 throw new Error("Project data script tag not found or empty.");
-            }
-            projectDataObject = JSON.parse(projectDataElement.textContent);
-            console.log("Parsed project data:", projectDataObject);
+      console.log("EditorView DOMContentLoaded"); // Log entry point
 
-            // Update title dynamically if needed (using placeholder from server first)
-            document.getElementById('editorProjectTitle').textContent = `Edit: ${projectDataObject.title || 'Untitled Project'}`;
+      // --- Data Retrieval and Parsing ---
+      const projectDataElement = document.getElementById('projectData');
+      if (!projectDataElement) {
+          console.error("FATAL: Project data element #projectData not found in the HTML!");
+          showAlert("FATAL: Could not find project data container.", "error", "alertContainer", false);
+          document.body.innerHTML = `<div style='padding: 20px; color: red;'>Error loading editor: Project data container missing. Please check EditorView.html.</div>`;
+          return; // Stop execution
+      }
 
-            // Initialize the main editor
-            initEditor(projectDataObject); 
+      const projectJson = projectDataElement.dataset.project;
+      console.log("Raw project JSON string length:", projectJson ? projectJson.length : 0);
+      // Avoid logging potentially huge JSON string fully in production
+      if (projectJson) {
+        console.log("Raw project JSON sample:", projectJson.substring(0, 200) + "...");
+      }
 
-        } catch (e) {
-            console.error("Error initializing editor:", e);
-            showAlert(`Fatal Error: Could not load project data. ${e.message}`, 'error', 'alertContainer', false); // Show persistent error
-            // Optionally hide editor elements
-            document.querySelector('.editor-container')?.classList.add('hidden');
-            document.querySelector('.timeline-panel')?.classList.add('hidden');
-            return; // Stop further execution
-        }
-      
-      // --- Set up event handlers for global buttons ---
-      document.getElementById('saveButton').addEventListener('click', saveProject);
-      document.getElementById('previewButton').addEventListener('click', previewProject);
-      document.getElementById('backToProjectsButton').addEventListener('click', () => {
-        // Navigate back to the project selector (assuming it's the root)
-        window.location.href = window.location.pathname; 
-      });
-      
-      // --- Set up Add Slide Modal ---
-      document.getElementById('btnAddSlide').addEventListener('click', showAddSlideModal);
-      document.getElementById('addSlideButton').addEventListener('click', showAddSlideModal); // Button in panel
-      document.getElementById('cancelAddSlideBtn').addEventListener('click', hideAddSlideModal);
-      document.getElementById('confirmAddSlideBtn').addEventListener('click', handleAddNewSlide); // Renamed handler
-      
-      // Handle media type change in Add Slide modal
-      document.getElementById('slideMedia').addEventListener('change', function() {
-        const mediaType = this.value;
-        const urlGroup = document.getElementById('slideMediaUrlGroup');
-        const uploadGroup = document.getElementById('slideMediaUploadGroup');
-        const uploadInput = document.getElementById('slideMediaUpload');
-        const helpText = document.getElementById('uploadHelpText');
-        
-        urlGroup.classList.toggle('hidden', mediaType !== 'video');
-        uploadGroup.classList.toggle('hidden', mediaType !== 'image' && mediaType !== 'audio');
-        
-        if(mediaType === 'image') {
-            uploadInput.accept = 'image/*';
-            helpText.textContent = 'Upload an image file (e.g., JPG, PNG, GIF).';
-        } else if (mediaType === 'audio') {
-             uploadInput.accept = 'audio/*';
-             helpText.textContent = 'Upload an audio file (e.g., MP3, WAV).';
-        } else {
-             uploadInput.accept = '';
-             helpText.textContent = '';
-        }
-      });
-      
-      // --- Set up Add Media Modal ---
-      document.getElementById('btnMedia').addEventListener('click', showAddMediaModal);
-      document.getElementById('cancelAddMediaBtn').addEventListener('click', hideAddMediaModal);
-      document.getElementById('confirmAddMediaBtn').addEventListener('click', handleAddNewMediaElement); // Renamed handler
-      
-      // Handle media type change in Add Media modal
-      document.getElementById('mediaType').addEventListener('change', function() {
-        const mediaType = this.value;
-        const urlGroup = document.getElementById('mediaUrlGroup');
-        const uploadGroup = document.getElementById('mediaUploadGroup');
-        
-        urlGroup.classList.toggle('hidden', mediaType !== 'youtube');
-        uploadGroup.classList.toggle('hidden', mediaType !== 'audio');
-      });
-      
-      // --- Set up buttons for shape creation ---
-      document.getElementById('btnRectangle').addEventListener('click', () => createShape('rectangle'));
-      document.getElementById('btnCircle').addEventListener('click', () => createShape('circle'));
-      document.getElementById('btnText').addEventListener('click', () => createShape('text'));
-      document.getElementById('btnHotspot').addEventListener('click', () => createShape('hotspot'));
-      document.getElementById('btnArrow').addEventListener('click', () => createShape('arrow'));
-      
-      // --- Set up buttons for editing operations ---
-      document.getElementById('btnDelete').addEventListener('click', deleteSelectedObjects);
-      document.getElementById('btnCopy').addEventListener('click', copySelectedObjects);
-      document.getElementById('btnPaste').addEventListener('click', pasteObjects);
-      document.getElementById('btnDuplicate').addEventListener('click', duplicateSelectedObjects); // Added duplicate
-      document.getElementById('btnBringForward').addEventListener('click', bringForward);
-      document.getElementById('btnSendBackward').addEventListener('click', sendBackward);
-      
-      // --- Set up image upload button (for adding image elements) ---
-      document.getElementById('btnUploadImage').addEventListener('click', handleUploadImageElement); // Renamed handler
+
+      if (!projectJson) {
+           console.error("FATAL: Project JSON data is missing or empty in data-project attribute!");
+           showAlert("FATAL: Project JSON data missing.", "error", "alertContainer", false);
+           document.body.innerHTML = `<div style='padding: 20px; color: red;'>Error loading editor: Project data attribute missing or empty.</div>`;
+           return; // Stop execution
+      }
+
+      let projectData;
+      try {
+          projectData = JSON.parse(projectJson);
+          console.log("Parsed project data successfully:", projectData);
+
+          // --- Initialization ---
+          // Call initEditor with the PARSED data (assuming initEditor is defined in canvas-editor.js)
+          initEditor(projectData);
+
+          // --- Event Listeners (Only set up if initEditor succeeds) ---
+          console.log("Setting up event listeners...");
+
+          // Global buttons
+          document.getElementById('saveButton').addEventListener('click', saveProject);
+          document.getElementById('previewButton').addEventListener('click', previewProject);
+          document.getElementById('backToProjectsButton').addEventListener('click', () => {
+            window.location.href = window.location.pathname; // Go back to project selector
+          });
+
+          // Add slide buttons
+          document.getElementById('btnAddSlide').addEventListener('click', showAddSlideModal);
+          document.getElementById('addSlideButton').addEventListener('click', showAddSlideModal); // In slides panel
+          document.getElementById('cancelAddSlideBtn').addEventListener('click', hideAddSlideModal);
+          document.getElementById('confirmAddSlideBtn').addEventListener('click', addNewSlide);
+
+          // Media type change in add slide modal
+          document.getElementById('slideMedia').addEventListener('change', function() {
+            const mediaType = this.value;
+            const urlGroup = document.getElementById('slideMediaUrlGroup');
+            const uploadGroup = document.getElementById('slideMediaUploadGroup');
+            urlGroup.style.display = (mediaType === 'video') ? 'block' : 'none';
+            uploadGroup.style.display = (mediaType === 'image' || mediaType === 'audio') ? 'block' : 'none';
+          });
+
+          // Add media modal buttons
+          document.getElementById('btnMedia').addEventListener('click', showAddMediaModal);
+          document.getElementById('cancelAddMediaBtn').addEventListener('click', hideAddMediaModal);
+          document.getElementById('confirmAddMediaBtn').addEventListener('click', addNewMedia);
+
+          // Media type change in add media modal
+          document.getElementById('mediaType').addEventListener('change', function() {
+            const mediaType = this.value;
+            const urlGroup = document.getElementById('mediaUrlGroup');
+            const uploadGroup = document.getElementById('mediaUploadGroup');
+            urlGroup.style.display = (mediaType === 'youtube') ? 'block' : 'none';
+            uploadGroup.style.display = (mediaType === 'audio') ? 'block' : 'none';
+          });
+
+          // Shape creation buttons
+          document.getElementById('btnRectangle').addEventListener('click', () => createShape('rectangle'));
+          document.getElementById('btnCircle').addEventListener('click', () => createShape('circle'));
+          document.getElementById('btnText').addEventListener('click', () => createShape('text'));
+          document.getElementById('btnHotspot').addEventListener('click', () => createShape('hotspot'));
+          document.getElementById('btnArrow').addEventListener('click', () => createShape('arrow'));
+
+          // Editing operations buttons
+          document.getElementById('btnDelete').addEventListener('click', deleteSelectedObjects);
+          document.getElementById('btnCopy').addEventListener('click', copySelectedObjects);
+          document.getElementById('btnPaste').addEventListener('click', pasteObjects);
+          document.getElementById('btnBringForward').addEventListener('click', bringForward);
+          document.getElementById('btnSendBackward').addEventListener('click', sendBackward);
+
+          // Upload image button
+          document.getElementById('btnUploadImage').addEventListener('click', uploadImage);
+
+          console.log("Event listeners set up.");
+
+      } catch (e) {
+          console.error("FATAL: Failed to parse project JSON:", e);
+          console.error("JSON string that failed:", projectJson); // Log the problematic string
+          showAlert(`FATAL: Could not parse project data. Error: ${e.message}. Check console for details.`, "error", "alertContainer", false); // Make error visible
+          document.body.innerHTML = `<div style='padding: 20px; color: red;'>Error loading editor data. Invalid format. Check console.</div>`; // Overwrite body on critical error
+          // Stop further execution in this block
+          return;
+      }
     }); // End DOMContentLoaded
-    
-    // ============================================================
-    // Modal Handling Functions
-    // ============================================================
+
+    // --- Function Definitions ---
+    // (These functions are called by the event listeners above. They might be defined
+    // here, or in the included files like canvas-editor.js. Keeping them here for
+    // reference based on the previous example, but ideally they live in included files.)
+
+    // Functions for modals
     function showAddSlideModal() {
-      // Reset fields
+      // Ensure editorState is initialized before accessing project
+      if (!window.editorState || !editorState.project || !editorState.project.slides) {
+          console.error("Cannot show add slide modal: editor state not ready.");
+          showAlert("Editor not fully loaded, please wait.", "warning");
+          return;
+      }
+      document.getElementById('addSlideModal').classList.remove('hidden');
       document.getElementById('slideTitle').value = 'Slide ' + (editorState.project.slides.length + 1);
       document.getElementById('slideBackground').value = '#FFFFFF';
       document.getElementById('slideMedia').value = '';
       document.getElementById('slideMediaUrl').value = '';
       document.getElementById('slideMediaUpload').value = ''; // Clear file input
-      document.getElementById('slideMediaUrlGroup').classList.add('hidden');
-      document.getElementById('slideMediaUploadGroup').classList.add('hidden');
-      document.getElementById('addSlideStatus').textContent = ''; // Clear status
-      document.getElementById('addSlideModal').classList.remove('hidden');
-      document.getElementById('slideTitle').focus();
+      document.getElementById('slideMediaUrlGroup').style.display = 'none';
+      document.getElementById('slideMediaUploadGroup').style.display = 'none';
     }
-    
+
     function hideAddSlideModal() {
       document.getElementById('addSlideModal').classList.add('hidden');
     }
-    
+
     function showAddMediaModal() {
-       // Reset fields
+      document.getElementById('addMediaModal').classList.remove('hidden');
       document.getElementById('mediaType').value = 'youtube';
       document.getElementById('mediaUrl').value = '';
       document.getElementById('mediaUpload').value = ''; // Clear file input
-      document.getElementById('mediaUrlGroup').classList.remove('hidden');
-      document.getElementById('mediaUploadGroup').classList.add('hidden');
-      document.getElementById('addMediaStatus').textContent = ''; // Clear status
-      document.getElementById('addMediaModal').classList.remove('hidden');
-      document.getElementById('mediaUrl').focus();
+      document.getElementById('mediaUrlGroup').style.display = 'block';
+      document.getElementById('mediaUploadGroup').style.display = 'none';
     }
-    
+
     function hideAddMediaModal() {
       document.getElementById('addMediaModal').classList.add('hidden');
     }
 
-    // ============================================================
-    // Action Handlers (Calling Backend or Editor Functions)
-    // ============================================================
-
-    /**
-     * Saves the current project state to the server.
-     */
-    function saveProject() {
-      // Ensure canvas interaction is finished (e.g., deselect object)
-      editorState.canvas?.discardActiveObject()?.renderAll(); 
-
-      const projectToSave = serializeProject(); // Get current state from canvas-editor.js
-      if (!projectToSave) {
-          showAlert('Could not serialize project data for saving.', 'error');
+    // Save project function
+    async function saveProject() {
+      // Assuming serializeProject() is defined in canvas-editor.js and returns the current project state
+      if (typeof serializeProject !== 'function') {
+           console.error("saveProject error: serializeProject function not found.");
+           showAlert("Error: Cannot serialize project state.", "error");
+           return;
+      }
+      const projectToSave = serializeProject();
+      if (!projectToSave || !projectToSave.projectId) {
+          console.error("saveProject error: Invalid project data from serializeProject.");
+          showAlert("Error: Invalid project data.", "error");
           return;
       }
 
-      console.log("Saving project:", projectToSave);
-      showAlert('Saving project...', 'info', 'alertContainer', false); // Persistent saving message
-      const saveButton = document.getElementById('saveButton');
-      saveButton.disabled = true;
-      saveButton.textContent = 'Saving...';
-      
-      // Call the API using google.script.run
-      google.script.run
-          .withSuccessHandler(onSaveSuccess)
-          .withFailureHandler(onSaveFailure)
-          .processApiRequest({ 
-              action: 'project.update', 
-              projectId: projectToSave.projectId, 
-              updates: { // Pass only slides and elements in the 'updates' object
-                  slides: projectToSave.slides, 
-                  elements: projectToSave.elements 
-              } 
-          });
+
+      showAlert('Saving project...', 'info');
+
+      // Define the updates to send - be specific!
+      const updatesToSend = {
+          slides: projectToSave.slides,
+          elements: projectToSave.elements
+          // Add other fields ONLY if they are meant to be updated from the editor
+          // title: projectToSave.title, // Example if title is editable
+      };
+
+      try {
+          // Use the global 'api' instance from Common.html
+          const result = await api.updateProject(projectToSave.projectId, updatesToSend);
+          console.log("Save successful:", result); // ApiClient already handles the {success, data} structure
+          showAlert('Project saved successfully!', 'success');
+      } catch (error) {
+          console.error("Save project error:", error);
+          showAlert('Error saving project: ' + error.message, 'error');
+      }
     }
 
-    function onSaveSuccess(response) {
-        const saveButton = document.getElementById('saveButton');
-        saveButton.disabled = false;
-        saveButton.textContent = 'Save';
-        if (response && response.success) {
-            showAlert('Project saved successfully!', 'success');
-            // Potentially update editor state if server modifies data on save (e.g., timestamps)
-            // if (response.data && response.data.updatedFields) { ... }
-        } else {
-            showAlert(`Failed to save project: ${response.error || 'Unknown error'}`, 'error');
-        }
-    }
-
-     function onSaveFailure(error) {
-        const saveButton = document.getElementById('saveButton');
-        saveButton.disabled = false;
-        saveButton.textContent = 'Save';
-        showAlert(`Error saving project: ${error.message}`, 'error');
-        console.error("Save Error:", error);
-    }
-    
-    /**
-     * Opens the viewer mode for the current project in a new tab.
-     */
+    // Preview project function
     function previewProject() {
-      if (!editorState.project || !editorState.project.projectId) {
-           showAlert('Cannot preview: Project ID not found.', 'error');
+       if (!window.editorState || !editorState.project || !editorState.project.projectId) {
+           console.error("Cannot preview: editor state not ready.");
+           showAlert("Editor not fully loaded, cannot preview.", "warning");
            return;
-      }
-      // Construct the viewer URL (root path + project ID)
-      const viewerUrl = `${window.location.origin}${window.location.pathname}?project=${editorState.project.projectId}`;
-      window.open(viewerUrl, '_blank');
+       }
+      const url = window.location.pathname + '?project=' + editorState.project.projectId;
+      window.open(url, '_blank');
     }
-    
-    /**
-     * Handles the confirmation click in the "Add Slide" modal.
-     */
-    function handleAddNewSlide() {
-      const title = document.getElementById('slideTitle').value.trim();
+
+    // Add new slide function
+    async function addNewSlide() {
+       if (!window.editorState || !editorState.project || !editorState.project.projectId) {
+           console.error("Cannot add slide: editor state not ready.");
+           showAlert("Editor not fully loaded, cannot add slide.", "warning");
+           return;
+       }
+      const title = document.getElementById('slideTitle').value;
       const backgroundColor = document.getElementById('slideBackground').value;
-      const mediaType = document.getElementById('slideMedia').value;
-      const mediaUrl = document.getElementById('slideMediaUrl').value.trim();
-      const mediaFile = document.getElementById('slideMediaUpload').files[0];
-      const statusElement = document.getElementById('addSlideStatus');
-      const addButton = document.getElementById('confirmAddSlideBtn');
-      
-      if (!title) {
-           statusElement.textContent = 'Please enter a slide title.';
-           statusElement.style.color = 'red';
-           return;
-      }
+      const mediaTypeSelect = document.getElementById('slideMedia');
+      const mediaType = mediaTypeSelect.value;
+      const mediaUrl = document.getElementById('slideMediaUrl').value;
+      const mediaFileInput = document.getElementById('slideMediaUpload');
+      const mediaFile = mediaFileInput.files[0];
 
-      addButton.disabled = true;
-      addButton.textContent = 'Adding...';
-      statusElement.textContent = 'Processing...';
-      statusElement.style.color = 'blue';
+      const fileTypeMap = {
+          'image': 'Image',
+          'video': 'YouTube Video',
+          'audio': 'Audio',
+          '': ''
+      };
 
-      // Prepare base slide data
       const slideData = {
-        title: title,
+        title: title || 'Untitled Slide',
         backgroundColor: backgroundColor,
-        fileType: '', // Determined below
-        fileUrl: '',
-        showControls: true // Default? Or configurable?
+        fileType: fileTypeMap[mediaType],
+        showControls: true, // Default? Or make it an option?
+        fileUrl: '' // Initialize
       };
-      
-      let mediaPromise = Promise.resolve(null); // Promise for handling media processing
 
-      // Determine media type and handle URL/Upload
-      if (mediaType === 'video') {
-          if (!mediaUrl) {
-              statusElement.textContent = 'Please enter a YouTube Video URL.';
-              statusElement.style.color = 'red';
-              addButton.disabled = false;
-              addButton.textContent = 'Add Slide';
-              return;
-          }
-          slideData.fileType = 'YouTube Video';
-          // Optional: Validate YouTube URL format here
-          slideData.fileUrl = mediaUrl; // Use URL directly for YouTube
-      } else if (mediaType === 'image' && mediaFile) {
-          slideData.fileType = 'Image';
-          statusElement.textContent = 'Uploading image...';
-          mediaPromise = uploadMediaFileToServer(mediaFile, 'image'); // Call server upload
-      } else if (mediaType === 'audio' && mediaFile) {
-          slideData.fileType = 'Audio';
-           statusElement.textContent = 'Uploading audio...';
-          mediaPromise = uploadMediaFileToServer(mediaFile, 'audio'); // Call server upload
-      }
-      
-      // Process media if needed, then add slide
-      mediaPromise.then(uploadResult => {
-          if (uploadResult) { // If media was uploaded
-              if (uploadResult.success && uploadResult.data.downloadUrl) {
-                  slideData.fileUrl = uploadResult.data.downloadUrl; // Use the URL returned by server
-              } else {
-                  throw new Error(`Media upload failed: ${uploadResult.error || 'Unknown error'}`);
+      try {
+          if (mediaType === 'video' && mediaUrl) {
+              slideData.fileUrl = mediaUrl;
+              const response = await api.addSlide(editorState.project.projectId, slideData);
+              console.log("Slide added via API (Video URL):", response);
+              // Update local state immediately for responsiveness
+              if (response && response.slide) { // Check API response structure
+                  editorState.project.slides.push(response.slide);
+                  if (typeof loadSlides === 'function') loadSlides(); // Reload slides panel if function exists
+                  if (typeof loadSlide === 'function') loadSlide(response.slide.slideId); // Load the new slide if function exists
               }
-          }
-          
-          // Call API to add the slide with final data
-          statusElement.textContent = 'Adding slide to project...';
-          return api.addSlide(editorState.project.projectId, slideData); // Use ApiClient instance
-
-      }).then(addSlideResult => {
-          if (addSlideResult.success) {
-              showAlert('Slide added successfully!', 'success');
-              // Update editor state (add slide to project.slides and reload UI)
-              editorState.project.slides.push(addSlideResult.data.slide);
-              loadSlides(); // Reload slide list in UI
-              loadSlide(addSlideResult.data.slide.slideId); // Load the new slide
               hideAddSlideModal();
-          } else {
-              throw new Error(`Failed to add slide: ${addSlideResult.error || 'Unknown error'}`);
+              showAlert('Slide added successfully!', 'success');
+
+          } else if ((mediaType === 'image' || mediaType === 'audio') && mediaFile) {
+              showAlert('Uploading media file...', 'info');
+              const uploadResult = await uploadMediaFile(mediaFile, mediaType); // Assumes this returns { success: bool, file: { downloadUrl: string } }
+              slideData.fileUrl = uploadResult.file.downloadUrl; // Use URL from upload
+              const response = await api.addSlide(editorState.project.projectId, slideData);
+              console.log("Slide added via API (File Upload):", response);
+              if (response && response.slide) {
+                   editorState.project.slides.push(response.slide);
+                   if (typeof loadSlides === 'function') loadSlides();
+                   if (typeof loadSlide === 'function') loadSlide(response.slide.slideId);
+              }
+              hideAddSlideModal();
+              showAlert('Media uploaded and slide added!', 'success');
+
+          } else { // No media
+              const response = await api.addSlide(editorState.project.projectId, slideData);
+              console.log("Slide added via API (No Media):", response);
+               if (response && response.slide) {
+                   editorState.project.slides.push(response.slide);
+                   if (typeof loadSlides === 'function') loadSlides();
+                   if (typeof loadSlide === 'function') loadSlide(response.slide.slideId);
+               }
+              hideAddSlideModal();
+              showAlert('Slide added successfully!', 'success');
           }
-      }).catch(error => {
-          console.error("Add slide error:", error);
-          statusElement.textContent = `Error: ${error.message}`;
-          statusElement.style.color = 'red';
-      }).finally(() => {
-           addButton.disabled = false;
-           addButton.textContent = 'Add Slide';
-      });
-    }
-    
-    /**
-     * Handles the confirmation click in the "Add Media Element" modal.
-     */
-    function handleAddNewMediaElement() {
-      const mediaType = document.getElementById('mediaType').value;
-      const mediaUrl = document.getElementById('mediaUrl').value.trim();
-      const mediaFile = document.getElementById('mediaUpload').files[0];
-      const statusElement = document.getElementById('addMediaStatus');
-      const addButton = document.getElementById('confirmAddMediaBtn');
-
-      addButton.disabled = true;
-      addButton.textContent = 'Adding...';
-      statusElement.textContent = 'Processing...';
-      statusElement.style.color = 'blue';
-
-      let mediaPromise = Promise.resolve(null);
-      let elementType = '';
-      let elementData = { /* Defaults for media elements */ }; 
-
-      if (mediaType === 'youtube') {
-          if (!mediaUrl) {
-              statusElement.textContent = 'Please enter a YouTube URL.';
-              statusElement.style.color = 'red';
-              addButton.disabled = false;
-              addButton.textContent = 'Add Media';
-              return;
-          }
-          elementType = 'YouTube Video'; // Or a specific type like 'youtube'
-          elementData.fileUrl = mediaUrl;
-          elementData.type = 'VideoPlaceholder'; // Internal type for canvas
-          elementData.nickname = 'YouTube Video';
-
-      } else if (mediaType === 'audio' && mediaFile) {
-          elementType = 'Audio'; // Or a specific type like 'audio'
-          statusElement.textContent = 'Uploading audio...';
-          mediaPromise = uploadMediaFileToServer(mediaFile, 'audio');
-          elementData.type = 'AudioPlaceholder'; // Internal type for canvas
-          elementData.nickname = 'Audio Player';
-      } else {
-           statusElement.textContent = 'Invalid media type or missing file/URL.';
-           statusElement.style.color = 'red';
-           addButton.disabled = false;
-           addButton.textContent = 'Add Media';
-           return;
+      } catch (error) {
+          console.error("Error adding slide:", error);
+          showAlert(`Error adding slide: ${error.message}`, 'error');
+      } finally {
+           mediaFileInput.value = ''; // Clear file input regardless of success/failure
       }
+    }
 
-      mediaPromise.then(uploadResult => {
-          if (uploadResult) { // If media was uploaded
-              if (uploadResult.success && uploadResult.data.downloadUrl) {
-                  elementData.fileUrl = uploadResult.data.downloadUrl;
-              } else {
-                  throw new Error(`Media upload failed: ${uploadResult.error || 'Unknown error'}`);
-              }
+    // Add media element function
+    async function addNewMedia() {
+      // This function likely needs to interact heavily with canvas-editor.js
+      // to actually *add* the element to the canvas after processing/uploading.
+       if (!window.editorState || !editorState.project || !editorState.currentSlide) {
+           console.error("Cannot add media element: editor state not ready.");
+           showAlert("Editor not fully loaded or no slide selected.", "warning");
+           return;
+       }
+      const mediaType = document.getElementById('mediaType').value;
+      const mediaUrl = document.getElementById('mediaUrl').value;
+      const mediaFileInput = document.getElementById('mediaUpload');
+      const mediaFile = mediaFileInput.files[0];
+
+      showAlert('Processing media...', 'info');
+
+      try {
+          if (mediaType === 'youtube' && mediaUrl) {
+              // Usually, YouTube videos are background/slide level, not elements.
+              // If it's meant to be an element, you need a canvas-editor function.
+              console.warn("Adding YouTube as element not standard. Check requirements.");
+              showAlert("Adding YouTube as element not implemented.", "warning");
+              // Example: if (typeof addYouTubeElement === 'function') addYouTubeElement(mediaUrl);
+              hideAddMediaModal();
+
+          } else if (mediaType === 'audio' && mediaFile) {
+              const uploadResult = await uploadMediaFile(mediaFile, 'audio');
+              showAlert('Audio uploaded. Adding element...', 'info');
+              // Now, add the audio element to the canvas/project data
+              // This likely requires calling a function in canvas-editor.js
+              // Example: if (typeof addAudioElement === 'function') addAudioElement(uploadResult.file.downloadUrl);
+              console.warn("Adding Audio element to canvas not implemented.");
+              showAlert("Audio uploaded, element addition pending.", "warning");
+              hideAddMediaModal();
+
+          } else {
+               showAlert("Invalid media selection.", "warning");
           }
-
-          // Now add the element to the project via API
-          statusElement.textContent = 'Adding element...';
-          // Add default position/size etc.
-          elementData.left = editorState.canvas.width / 2;
-          elementData.top = editorState.canvas.height / 2;
-          elementData.width = 300; // Default size
-          elementData.height = mediaType === 'audio' ? 50 : 200; 
-
-          return api.addElement(editorState.project.projectId, editorState.currentSlide.slideId, elementData);
-
-      }).then(addElementResult => {
-           if (addElementResult.success) {
-                showAlert('Media element added successfully!', 'success');
-                // Update editor state and canvas
-                editorState.project.elements.push(addElementResult.data.element);
-                loadElement(addElementResult.data.element); // Add to canvas
-                hideAddMediaModal();
-           } else {
-                throw new Error(`Failed to add element: ${addElementResult.error || 'Unknown error'}`);
-           }
-      }).catch(error => {
-          console.error("Add media element error:", error);
-          statusElement.textContent = `Error: ${error.message}`;
-          statusElement.style.color = 'red';
-      }).finally(() => {
-           addButton.disabled = false;
-           addButton.textContent = 'Add Media';
-      });
-    }
-    
-    /**
-     * Handles the click on the "Upload Image" button in the toolbar (for adding image elements).
-     */
-    function handleUploadImageElement() {
-      // Create a temporary file input element
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*'; // Accept only image files
-      
-      // Handle file selection
-      input.onchange = function(event) {
-        const file = event.target.files[0];
-        if (file) {
-          showAlert('Uploading image...', 'info', 'alertContainer', false);
-          
-          // Upload the file using the server function
-          uploadMediaFileToServer(file, 'image')
-            .then(result => {
-              if (result.success && result.data.downloadUrl) {
-                // Add image element to the canvas and project data
-                const imageUrl = result.data.downloadUrl;
-                const elementData = {
-                    type: 'Image', // Or use a more specific internal type if needed
-                    nickname: file.name.split('.')[0] || 'Image',
-                    imageUrl: imageUrl,
-                    left: editorState.canvas.width / 2, // Center it initially
-                    top: editorState.canvas.height / 2,
-                    // Let Fabric determine initial size, or set defaults
-                     width: 200, // Example default width
-                     height: 150 // Example default height
-                };
-                // Add via API
-                return api.addElement(editorState.project.projectId, editorState.currentSlide.slideId, elementData);
-              } else {
-                throw new Error(`Image upload failed: ${result.error || 'Unknown error'}`);
-              }
-            })
-             .then(addElementResult => {
-                 if (addElementResult.success) {
-                     showAlert('Image added successfully!', 'success');
-                     // Update editor state and canvas
-                     editorState.project.elements.push(addElementResult.data.element);
-                     loadElement(addElementResult.data.element); // Add to canvas
-                 } else {
-                     throw new Error(`Failed to add image element: ${addElementResult.error || 'Unknown error'}`);
-                 }
-             })
-            .catch(error => {
-              showAlert(`Error adding image: ${error.message}`, 'error');
-              console.error("Image Upload/Add Error:", error);
-            });
-        }
-      };
-      
-      // Trigger the file selection dialog
-      input.click();
+      } catch (error) {
+          console.error("Error adding media:", error);
+          showAlert(`Error adding media: ${error.message}`, 'error');
+      } finally {
+          mediaFileInput.value = ''; // Clear file input
+      }
     }
 
-     /**
-     * Uploads a file to the server using google.script.run.
-     * This requires a corresponding server-side function (e.g., handleFileUpload).
-     * @param {File} file - The file object from an input element.
-     * @param {string} typeHint - 'image' or 'audio' to help server processing.
-     * @returns {Promise<object>} Promise resolving with the server response { success: boolean, data?: { fileId, downloadUrl }, error?: string }.
-     */
-    function uploadMediaFileToServer(file, typeHint) {
+    // Upload media file function (placeholder - REQUIRES SERVER IMPLEMENTATION)
+    function uploadMediaFile(file, type) {
+        // This needs to call google.script.run to a server-side function
+        // that uses FileUploader.js to handle the upload.
         return new Promise((resolve, reject) => {
-            if (!file) {
-                return reject(new Error("No file selected for upload."));
-            }
+             console.warn("uploadMediaFile called - requires server implementation.");
+             showAlert('File upload functionality requires server-side setup.', 'warning');
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const fileData = e.target.result.split(','); // Split base64 header
-                const fileInfo = {
-                    fileName: file.name,
-                    mimeType: file.type,
-                    data: fileData[1], // Base64 data
-                    typeHint: typeHint,
-                    projectId: editorState.project.projectId // Pass project ID for context
-                };
+             // --- Example using FileReader (client-side part) ---
+             const reader = new FileReader();
+             reader.onload = (e) => {
+                 const fileData = e.target.result.split(','); // Get base64 part
+                 const fileInfo = {
+                     fileName: file.name,
+                     mimeType: file.type,
+                     data: fileData[1] // Base64 string
+                 };
+                 console.log(`Read file ${file.name}, size ${file.size}, type ${file.type}. Calling server...`);
 
-                // Call server-side function via API handler
-                google.script.run
-                    .withSuccessHandler(resolve) // Resolve promise with server response
-                    .withFailureHandler(reject)  // Reject promise with error
-                    .processApiRequest({
-                        action: 'file.upload', // Define this action in ApiHandler
-                        fileInfo: fileInfo
-                    });
-            };
-             reader.onerror = (e) => {
-                 reject(new Error("Error reading file for upload."));
+                 // *** Replace with your actual server-side upload function ***
+                 google.script.run
+                     .withSuccessHandler(response => {
+                         console.log("Server upload response:", response);
+                         if (response && response.success && response.file) {
+                             resolve(response); // Should contain { success: true, file: { downloadUrl: ... } }
+                         } else {
+                              reject(new Error(response.message || 'Server upload failed.'));
+                         }
+                     })
+                     .withFailureHandler(error => {
+                          console.error("Server upload error:", error);
+                          reject(error);
+                     })
+                     .uploadFileToServer(fileInfo, editorState.project.projectId, type); // <<< Example server function name
+
              };
-            reader.readAsDataURL(file); // Read file as Base64
+             reader.onerror = (e) => {
+                 console.error("FileReader error:", e);
+                 reject(new Error("Failed to read file locally."));
+             };
+             reader.readAsDataURL(file); // Read file as Base64
         });
     }
 
+    // Upload image function (Trigger for file input)
+    function uploadImage() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+
+      input.onchange = async function(event) { // Make async
+        const file = event.target.files[0];
+        if (file) {
+           showAlert('Uploading image...', 'info');
+           try {
+               const uploadResult = await uploadMediaFile(file, 'image');
+               showAlert('Image uploaded. Adding to canvas...', 'info');
+                // Assumes addImageElement exists in canvas-editor.js and handles adding
+                // the element to both the canvas and the project data structure
+                if (typeof addImageElement === 'function') {
+                    addImageElement(uploadResult.file.downloadUrl); // Pass URL to the function
+                    showAlert('Image added successfully!', 'success');
+                } else {
+                    console.error("addImageElement function not found in canvas-editor.js");
+                    showAlert('Image uploaded, but failed to add to canvas.', 'warning');
+                }
+           } catch (error) {
+               console.error("Image upload/add error:", error);
+               showAlert('Error uploading/adding image: ' + error.message, 'error');
+           } finally {
+               input.value = ''; // Clear file input
+           }
+        }
+      };
+      input.click();
+    }
+
+    // --- Placeholders for functions assumed to be in included files ---
+    // These need to be defined in canvas-editor.js or element-factory.js etc.
+    function initEditor(projectData) { console.warn("initEditor placeholder called"); }
+    function serializeProject() { console.warn("serializeProject placeholder called"); return editorState.project; }
+    function createShape(type) { console.warn("createShape placeholder called", type); }
+    function deleteSelectedObjects() { console.warn("deleteSelectedObjects placeholder called"); }
+    function copySelectedObjects() { console.warn("copySelectedObjects placeholder called"); }
+    function pasteObjects() { console.warn("pasteObjects placeholder called"); }
+    function bringForward() { console.warn("bringForward placeholder called"); }
+    function sendBackward() { console.warn("sendBackward placeholder called"); }
+    function addImageElement(url) { console.warn("addImageElement placeholder called", url); }
+    // Add placeholders for any other functions called by buttons/listeners if not defined here
+
   </script>
+  <!-- === END UPDATED SCRIPT BLOCK === -->
+
 </body>
 </html>

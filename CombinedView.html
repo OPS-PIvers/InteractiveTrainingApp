@@ -82,6 +82,76 @@
       overflow: hidden;
     }
     
+    /* Mode Toggle Switch */
+    .mode-toggle {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    margin-right: 1rem;
+    }
+
+    .mode-label {
+    font-size: 0.9rem;
+    margin: 0 0.5rem;
+    color: white;
+    font-weight: 500;
+    }
+
+    .switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+    }
+
+    .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    }
+
+    .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.3);
+    transition: .4s;
+    }
+
+    .slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    }
+
+    input:checked + .slider {
+    background-color: #e6f2ff;
+    }
+
+    input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+    }
+
+    input:checked + .slider:before {
+    transform: translateX(26px);
+    }
+
+    .slider.round {
+    border-radius: 24px;
+    }
+
+    .slider.round:before {
+    border-radius: 50%;
+    }
+
     /* Hide elements */
     .hidden {
       display: none !important;
@@ -129,9 +199,19 @@
   <!-- Project data store -->
   <div id="projectData" data-project='<?= JSON.stringify(project) ?>' style="display: none;"></div>
   
-  <!-- App header -->
+<!-- App header -->
   <div class="app-header">
     <h1 id="appTitle" class="app-title"><?= project.title ?></h1>
+    <?if (canEdit) { ?>
+      <div class="mode-toggle">
+        <span class="mode-label">View</span>
+        <label class="switch">
+          <input type="checkbox" id="modeToggle">
+          <span class="slider round"></span>
+        </label>
+        <span class="mode-label">Edit</span>
+      </div>
+    <? } ?>
     <div class="app-actions">
       <?if (canEdit) { ?>
         <button id="saveButton" class="btn btn-sm">Save</button>
@@ -415,12 +495,16 @@
     let activeView = 'viewer'; // Default view
     let editorInitialized = false;
     let viewerInitialized = false;
+    let analyticsInitialized = false;
     
     document.addEventListener('DOMContentLoaded', () => {
       console.log("CombinedView DOMContentLoaded");
       
       // Initialize view tabs
       setupViewTabs();
+      
+      // Set up the mode toggle switch
+      setupModeToggle();
       
       // Parse project data
       const projectDataElement = document.getElementById('projectData');
@@ -442,8 +526,19 @@
         projectData = JSON.parse(projectJson);
         console.log("Parsed project data successfully");
         
-        // Initialize the viewer immediately (default view)
-        initializeViewer(projectData);
+        // Load saved view preference or default to viewer
+        const savedView = getSavedView();
+        const canEdit = <?= canEdit ?>; // Server-side variable
+        
+        // Only use saved view if it's 'viewer' or if it's 'editor' and user has edit permissions
+        if (savedView === 'editor' && canEdit) {
+          console.log("Loading saved editor view");
+          switchView('editor');
+        } else {
+          // Initialize the viewer as default
+          console.log("Loading default viewer view");
+          initializeViewer(projectData);
+        }
         
         // Set up event listeners for global buttons
         document.getElementById('backToProjectsButton').addEventListener('click', () => {
@@ -461,6 +556,45 @@
         showAlert(`Error: Could not parse project data. ${e.message}`, "error", "alertContainer", false);
       }
     });
+    
+    // Store current view in localStorage
+    function saveCurrentView(viewName) {
+      if (viewName === 'editor' || viewName === 'viewer') {
+        try {
+          localStorage.setItem('preferredView_' + '<?= project.projectId ?>', viewName);
+          console.log(`Saved preferred view: ${viewName}`);
+        } catch (e) {
+          console.warn('Could not save view preference to localStorage:', e);
+        }
+      }
+    }
+    
+    // Get saved view from localStorage
+    function getSavedView() {
+      try {
+        const savedView = localStorage.getItem('preferredView_' + '<?= project.projectId ?>');
+        console.log(`Retrieved saved view: ${savedView}`);
+        return savedView;
+      } catch (e) {
+        console.warn('Could not retrieve view preference from localStorage:', e);
+        return null;
+      }
+    }
+    
+    // Setup mode toggle functionality
+    function setupModeToggle() {
+      const modeToggle = document.getElementById('modeToggle');
+      if (modeToggle) {
+        // Set initial state based on current view
+        modeToggle.checked = activeView === 'editor';
+        
+        // Add change event listener
+        modeToggle.addEventListener('change', function() {
+          const newView = this.checked ? 'editor' : 'viewer';
+          switchView(newView);
+        });
+      }
+    }
     
     function setupViewTabs() {
       const viewerTab = document.getElementById('viewerTab');
@@ -481,11 +615,21 @@
     }
     
     function switchView(viewName) {
+      // Only allow switching to editor if user has permission
+      if (viewName === 'editor' && !<?= canEdit ?>) {
+        showAlert('You do not have permission to edit this project', 'warning');
+        return;
+      }
+      
       // Update active tab
       document.querySelectorAll('.view-tab').forEach(tab => {
         tab.classList.remove('active');
       });
-      document.getElementById(`${viewName}Tab`).classList.add('active');
+      
+      const targetTab = document.getElementById(`${viewName}Tab`);
+      if (targetTab) {
+        targetTab.classList.add('active');
+      }
       
       // Hide all containers
       document.getElementById('viewerContainer').classList.add('hidden');
@@ -514,6 +658,17 @@
       
       // Update title based on active view
       updateTitle(viewName);
+      
+      // Update toggle switch state if switching to editor or viewer
+      if (viewName === 'editor' || viewName === 'viewer') {
+        const toggleSwitch = document.getElementById('modeToggle');
+        if (toggleSwitch) {
+          toggleSwitch.checked = viewName === 'editor';
+        }
+        
+        // Save the current view preference
+        saveCurrentView(viewName);
+      }
     }
     
     function updateTitle(viewName) {
@@ -670,6 +825,7 @@
       document.getElementById('btnDelete').addEventListener('click', deleteSelectedObjects);
       document.getElementById('btnCopy').addEventListener('click', copySelectedObjects);
       document.getElementById('btnPaste').addEventListener('click', pasteObjects);
+      document.getElementById('btnDuplicate').addEventListener('click', duplicateSelectedObjects);
       document.getElementById('btnBringForward').addEventListener('click', bringForward);
       document.getElementById('btnSendBackward').addEventListener('click', sendBackward);
       
@@ -715,10 +871,13 @@
     function updateAnalyticsUI(data) {
       // This would update the analytics UI with the loaded data
       // For now, just a placeholder implementation
-      document.querySelector('.metric-value:nth-child(1)').textContent = data?.totalViews || '0';
-      document.querySelector('.metric-value:nth-child(2)').textContent = `${data?.completionRate || '0'}%`;
-      document.querySelector('.metric-value:nth-child(3)').textContent = data?.avgScore ? `${data.avgScore}%` : 'N/A';
-      document.querySelector('.metric-value:nth-child(4)').textContent = formatTime(data?.avgTime || 0);
+      const metricValues = document.querySelectorAll('.metric-value');
+      if (metricValues.length >= 4) {
+        metricValues[0].textContent = data?.totalViews || '0';
+        metricValues[1].textContent = `${data?.completionRate || '0'}%`;
+        metricValues[2].textContent = data?.avgScore ? `${data.avgScore}%` : 'N/A';
+        metricValues[3].textContent = formatTime(data?.avgTime || 0);
+      }
       
       // Update charts (would use a charting library in the full implementation)
       document.querySelectorAll('.chart-placeholder').forEach(placeholder => {
@@ -860,6 +1019,7 @@
     function deleteSelectedObjects() { console.log("deleteSelectedObjects called"); }
     function copySelectedObjects() { console.log("copySelectedObjects called"); }
     function pasteObjects() { console.log("pasteObjects called"); }
+    function duplicateSelectedObjects() { console.log("duplicateSelectedObjects called"); }
     function bringForward() { console.log("bringForward called"); }
     function sendBackward() { console.log("sendBackward called"); }
   </script>

@@ -211,6 +211,11 @@
         const createdDate = formatDate(project.createdAt);
         const modifiedDate = formatDate(project.modifiedAt);
         
+        // Determine user permissions for this project
+        const canEdit = project.accessLevel === 'owner' || 
+                      project.accessLevel === 'admin' || 
+                      project.accessLevel === 'editor';
+        
         const projectCard = document.createElement('div');
         projectCard.className = 'project-card';
         projectCard.innerHTML = `
@@ -222,10 +227,11 @@
               <div class="project-dates">
                 <div>Created: ${createdDate}</div>
                 <div>Last Modified: ${modifiedDate}</div>
+                ${project.accessLevel ? `<div>Your access: ${project.accessLevel}</div>` : ''}
               </div>
             </div>
             <div class="project-actions">
-              <button class="btn btn-secondary" onclick="editProject('${project.projectId}')">Edit</button>
+              ${canEdit ? `<button class="btn btn-secondary" onclick="editProject('${project.projectId}')">Edit</button>` : ''}
               <button class="btn" onclick="viewProject('${project.projectId}')">View</button>
             </div>
           </div>

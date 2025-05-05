@@ -427,57 +427,72 @@ function serveStaticFile(filename) {
 }
 
 /**
- * Gets a list of projects for the current user
- * This function is called directly from the ProjectSelector HTML
- * 
- * @return {Array} Array of project objects with permission info
+ * Simple API method to get projects without complex objects.
+ * This serves as a fallback for the client-side code.
+ * Returns a standard response object { success: boolean, data: { projects: [...] } }.
+ * @returns {Object} - Standard response object containing the list of projects or an error.
  */
 function getProjectList() {
   try {
-    // Initialize application if needed
-    if (!sheetAccessor || !templateManager || !driveManager || !projectManager || !authManager || !apiHandler) {
-      console.log("API Handler not initialized in getProjectList, calling initialize()...");
+    // Log that this function is being called (for debugging)
+    logDebug("getProjectList() (fallback) called"); // Updated log message
+
+    // Initialize required components if needed
+    if (!projectManager || !authManager) { // Ensure needed managers are initialized
+      logDebug("Initializing components within getProjectList fallback...");
       initialize();
     }
     
-    // Get current user email
+    // Get current user email for permission checks
     const userEmail = Session.getEffectiveUser().getEmail();
-    console.log(`Getting project list for user: ${userEmail}`);
-    
-    // Get all projects (basic info)
-    const allProjects = projectManager.getAllProjects(false); // Don't need full details
-    console.log(`Found ${allProjects.length} total projects`);
-    
-    // Add access level information for each project
-    const projectsWithPermissions = allProjects.map(project => {
-      // Get access level for current user
-      const accessLevel = authManager.getAccessLevel(project.projectId, userEmail);
-      console.log(`Project ${project.title}, Access level: ${accessLevel}`);
-      
-      // Check if user is a project admin
-      const isAdmin = authManager.isProjectAdmin(project.projectId, userEmail);
-      console.log(`Project ${project.title}, Is admin: ${isAdmin}`);
-      
-      // Add permission info to project
-      return {
-        projectId: project.projectId,
-        title: project.title,
-        createdAt: project.createdAt,
-        modifiedAt: project.modifiedAt, 
-        accessLevel: accessLevel,
-        isAdmin: isAdmin
-      };
+
+    // Get basic project info
+    const projectsBasicInfo = projectManager.getAllProjects(false);
+    logDebug(`Fallback: Found ${projectsBasicInfo.length} projects from index.`);
+
+    // Format the result for client consumption, including permissions
+    const formattedProjects = projectsBasicInfo.map(project => {
+       const accessLevel = authManager.getAccessLevel(project.projectId, userEmail);
+       const isAdmin = authManager.isProjectAdmin(project.projectId, userEmail); // Assuming this method exists and works
+       
+       // Format dates using server-side Utils.formatDate
+       const createdAtFormatted = project.createdAt ? formatDate(project.createdAt, "MM/dd/yyyy") : 'Unknown';
+       const modifiedAtFormatted = project.modifiedAt ? formatDate(project.modifiedAt, "MM/dd/yyyy") : 'Unknown';
+       const lastAccessedFormatted = project.lastAccessed ? formatDate(project.lastAccessed, "MM/dd/yyyy HH:mm") : 'Unknown';
+
+       return {
+         projectId: project.projectId,
+         title: project.title,
+         // Return formatted strings for dates to ensure easy serialization
+         createdAt: createdAtFormatted, 
+         modifiedAt: modifiedAtFormatted,
+         lastAccessed: lastAccessedFormatted, 
+         // Include permission info
+         accessLevel: accessLevel,
+         isAdmin: isAdmin,
+         canEdit: (accessLevel === authManager.accessLevels.OWNER || accessLevel === authManager.accessLevels.ADMIN || accessLevel === authManager.accessLevels.EDITOR)
+       };
     });
     
-    console.log(`Returning ${projectsWithPermissions.length} projects with permissions`);
+    logDebug(`Fallback: Returning ${formattedProjects.length} projects with permissions.`);
     
-    // IMPORTANT: Return the array directly, not wrapped in an object
-    return projectsWithPermissions;
+    const responsePayload = {
+      success: true,
+      data: {
+        projects: formattedProjects // The array of projects
+      }
+    };
+
+    // Apply safe serialization before returning
+    // safeSerialize handles Dates, but we've pre-formatted them to strings anyway
+    return safeSerialize(responsePayload); 
+
   } catch (error) {
-    console.error(`Error getting project list: ${error.message}`);
-    logError(`Error getting project list: ${error.message}`);
-    
-    // Return empty array on error
-    return [];
+    logError(`Error in getProjectList fallback: ${error.message}\n${error.stack}`);
+    // Return a standard error structure
+    return safeSerialize({ 
+        success: false, 
+        error: `Failed to get project list: ${error.message}` 
+    });
   }
 }

@@ -26,7 +26,19 @@
       flex-direction: column;
       transition: transform 0.2s, box-shadow 0.2s;
     }
-    
+    .project-card .access-level {
+        font-size: 0.8rem;
+        color: var(--light-text-color);
+        background-color: #f0f0f0;
+        padding: 2px 6px;
+        border-radius: 3px;
+        display: inline-block;
+        margin-top: 5px;
+        text-transform: capitalize;
+    }
+    .project-dates div { /* Add some spacing */
+        margin-bottom: 2px;
+    }
     .project-card:hover {
       transform: translateY(-5px);
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
@@ -128,10 +140,11 @@
     // Load projects when page loads
     document.addEventListener('DOMContentLoaded', function() {
         // First check API connection
-        window.checkApiConnection();
+        //window.checkApiConnection();
         
         // Then load projects with a small delay to ensure API is ready
-        setTimeout(loadProjects, 500);
+        //setTimeout(loadProjects, 500);
+        loadprojects();
     });
     
     // Create project button
@@ -141,60 +154,129 @@
     /**
      * Loads projects from the server
      */
-    async function loadProjects() {
+     async function loadProjects() {
       try {
-        // Show loading state
         document.getElementById('loadingProjects').style.display = 'flex';
         document.getElementById('projectList').style.display = 'none';
         document.getElementById('emptyState').style.display = 'none';
-        
         console.log('Loading projects...');
-        
-        // Try to load projects using the API client
-        let projects = [];
+
+        let result;
         try {
-          projects = await api.listProjects();
-          console.log('Projects loaded:', projects);
-        } catch (error) {
-          console.error('Error loading projects from API:', error);
-          
-          // Fallback method - direct server call
-          try {
-            projects = await new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(result => {
-                  console.log('Server response:', result);
-                  resolve(result || []);
-                })
-                .withFailureHandler(error => {
-                  console.error('Server error:', error);
-                  reject(error);
-                })
-                .getProjectList();
+            // Primary attempt using ApiClient
+            console.log('Attempting load via api.request("project.list")...');
+            result = await api.request('project.list'); // Use the generic request
+            console.log('api.request("project.list") result:', result); // Should contain { projects: [...] }
+        } catch (apiError) {
+            console.warn('api.request("project.list") failed, attempting fallback getProjectList()...', apiError);
+            // Fallback attempt using direct call
+            result = await new Promise((resolve, reject) => {
+                google.script.run
+                    .withSuccessHandler(serverResult => {
+                        console.log('Fallback getProjectList() server raw response:', serverResult);
+                        // The fallback now returns { success: true, data: { projects: [...] } } or { success: false, error: ... }
+                        if (serverResult && serverResult.success && serverResult.data) {
+                            resolve(serverResult.data); // Resolve with the inner data { projects: [...] }
+                        } else if (serverResult && !serverResult.success) {
+                            reject(new Error(serverResult.error || 'Fallback failed with no specific error message.'));
+                        } else {
+                            // Handle unexpected null or non-standard response from fallback
+                            console.error("Unexpected response format from fallback getProjectList():", serverResult);
+                            reject(new Error('Unexpected response format from fallback function.'));
+                        }
+                    })
+                    .withFailureHandler(reject) // Rejects with error message
+                    .getProjectList(); // Call the modified fallback
             });
-          } catch (fallbackError) {
-            console.error('Fallback method also failed:', fallbackError);
-            showAlert('Failed to load projects. Please refresh the page or try again later.', 'error');
-          }
+            console.log('Fallback getProjectList() processed result:', result); // Should be { projects: [...] }
         }
-        
-        // Hide loading state
+
         document.getElementById('loadingProjects').style.display = 'none';
-        
-        // Check if we have any projects
-        if (Array.isArray(projects) && projects.length > 0) {
-          // Render the projects
-          renderProjects(projects);
-          document.getElementById('projectList').style.display = 'grid';
+
+        // Check if we have the projects array within the result
+        const projects = result?.projects;
+
+        if (Array.isArray(projects)) {
+            if (projects.length > 0) {
+              renderProjects(projects);
+              document.getElementById('projectList').style.display = 'grid';
+            } else {
+              // Received an empty array
+              console.log("No projects found.");
+              document.getElementById('emptyState').style.display = 'block';
+            }
         } else {
-          // Show empty state
-          document.getElementById('emptyState').style.display = 'block';
+            // Result structure was unexpected
+            console.error("Project data format unexpected:", result);
+            document.getElementById('emptyState').style.display = 'block';
+            showAlert("Received response, but project data format was unexpected.", "warning");
         }
       } catch (error) {
         console.error('Error in loadProjects:', error);
         document.getElementById('loadingProjects').style.display = 'none';
         document.getElementById('emptyState').style.display = 'block';
-        showAlert('An error occurred while loading projects.', 'error');
+        showAlert(`An error occurred while loading projects: ${error.message}`, 'error');
+      }
+    }
+
+    // Render projects to the project list
+    function renderProjects(projects) {
+      console.log("Rendering projects:", projects);
+      const projectListEl = document.getElementById('projectList');
+      projectListEl.innerHTML = ''; // Clear previous content (including debug info)
+
+      if (!Array.isArray(projects)) {
+        console.error("Render failed: Projects is not an array:", projects);
+        showAlert("Error: Cannot render projects, data is not in the expected format.", "error");
+        document.getElementById('emptyState').style.display = 'block';
+        return;
+      }
+
+      // Process each project
+      projects.forEach(project => {
+        // Basic validation
+        if (!project.projectId || !project.title) {
+          console.warn("Skipping project with missing ID or title:", project);
+          return;
+        }
+
+        // Use the permissions passed from the server
+        const canEdit = project.canEdit; // Should be boolean
+        const accessLevel = project.accessLevel || 'unknown';
+
+        const projectCard = document.createElement('div');
+        projectCard.className = 'project-card';
+        projectCard.innerHTML = `
+          <div class="project-header">
+            <h2 class="project-title">${sanitizeHtml(project.title)}</h2>
+          </div>
+          <div class="project-body">
+            <div>
+              <div class="project-dates">
+                <div>Project ID: ${project.projectId}</div>
+                <div>Created: ${project.createdAt || 'Unknown'}</div>
+                <div>Modified: ${project.modifiedAt || 'Unknown'}</div>
+                <div>Last Accessed: ${project.lastAccessed || 'Never'}</div>
+              </div>
+              <span class="access-level">Access: ${accessLevel}</span>
+              ${project.isAdmin ? '<span class="access-level" style="background-color: var(--warning-color); color: #333;">Admin</span>' : ''}
+            </div>
+            <div class="project-actions">
+              ${canEdit ? `<button class="btn btn-secondary" onclick="editProject('${project.projectId}')">Edit</button>` : ''}
+              <button class="btn" onclick="viewProject('${project.projectId}')">View</button>
+            </div>
+          </div>
+        `;
+
+        projectListEl.appendChild(projectCard);
+      });
+
+      // If no valid projects were rendered
+      if (projectListEl.children.length === 0) {
+         console.log("No valid projects to render after filtering.");
+         document.getElementById('emptyState').style.display = 'block';
+         // Optionally add a message indicating some projects might have been filtered due to errors
+         showAlert("No valid projects could be displayed.", "info");
       }
     }
     
@@ -292,69 +374,40 @@
     async function createNewProject() {
       try {
         const projectName = document.getElementById('projectName').value.trim();
-        
+
         if (!projectName) {
-          showAlert('Please enter a project name', 'error');
+          showAlert('Please enter a project name', 'warning', 'alertContainer'); // Specify container
           return;
         }
-        
-        // Create project through API
+
+        // Use ApiClient for consistency
         const result = await api.createProject(projectName);
-        
-        // Close dialog
+
         closeCreateProjectDialog();
-        
-        // Show success message
-        showAlert('Project created successfully!', 'success');
-        
-        // Reload projects
-        loadProjects();
+        showAlert('Project created successfully!', 'success', 'alertContainer'); // Specify container
+        loadProjects(); // Reload projects list
+
       } catch (error) {
-        showAlert(`Failed to create project: ${error.message}`, 'error');
-      }
-    }
-    function viewProject(projectId) {
-      console.log("View button clicked for project ID:", projectId);
-      
-      // Create the URL
-      const viewUrl = window.location.pathname + "?action=view&project=" + projectId;
-      console.log("Navigating to:", viewUrl);
-      
-      try {
-        window.location.href = viewUrl;
-      } catch (e) {
-        console.error("Navigation error:", e);
-        alert("Error navigating to viewer. Please try again.");
+        showAlert(`Failed to create project: ${error.message}`, 'error', 'alertContainer'); // Specify container
       }
     }
 
+    // Navigate to view the project
+    function viewProject(projectId) {
+      console.log("View button clicked for project ID:", projectId);
+      // Construct the URL for the web app's doGet with parameters
+      const viewUrl = `<?= ScriptApp.getService().getUrl() ?>?action=view&project=${projectId}`;
+      console.log("Navigating to viewer:", viewUrl);
+      window.open(viewUrl, '_top'); // Open in the same window/tab
+    }
+
+    // Navigate to edit the project
     function editProject(projectId) {
       console.log("Edit button clicked for project ID:", projectId);
-      
-      // Create the URL
-      const editUrl = window.location.pathname + "?action=edit&project=" + projectId;
-      console.log("Attempting to navigate to:", editUrl);
-      
-      try {
-        // Try different navigation methods
-        console.log("Attempting navigation method 1...");
-        window.location.assign(editUrl);
-        
-        // If the above doesn't work, force a hard redirect
-        setTimeout(function() {
-          console.log("Attempting navigation method 2...");
-          window.location.href = editUrl;
-          
-          // Last resort - try window.open
-          setTimeout(function() {
-            console.log("Attempting navigation method 3...");
-            window.open(editUrl, "_self");
-          }, 500);
-        }, 500);
-      } catch (e) {
-        console.error("Navigation error:", e);
-        alert("Error navigating to editor. Please try again or check console for errors.");
-      }
+       // Construct the URL for the web app's doGet with parameters
+      const editUrl = `<?= ScriptApp.getService().getUrl() ?>?action=edit&project=${projectId}`;
+      console.log("Navigating to editor:", editUrl);
+      window.open(editUrl, '_top'); // Open in the same window/tab
     }
       // Helper function to format dates
     function formatDate(timestamp) {

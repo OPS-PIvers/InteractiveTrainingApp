@@ -29,26 +29,18 @@
 
     // Common elements
     messageAreaEl = document.getElementById('messageArea');
-    loadingSpinnerEl = document.getElementById('loadingSpinner'); // From LoadingSpinner.html
+    loadingSpinnerEl = document.getElementById('loadingSpinner');
     
-    // Create Project section elements
     projectTitleInputEl = document.getElementById('projectTitleInput');
     createProjectButtonEl = document.getElementById('createProjectButton');
     createProjectSectionEl = document.getElementById('createProjectSection');
 
-    // Project List section elements (for Step 4)
     projectListSectionEl = document.getElementById('projectListSection');
-    adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+    adminProjectListContainerEl = document.getElementById('adminProjectListContainer'); // Ensure this is initialized
 
-    // Edit Project section elements (for Step 5)
     editProjectSectionEl = document.getElementById('editProjectSection');
     editingProjectTitleEl = document.getElementById('editingProjectTitle');
     backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
-
-    console.log("projectTitleInputEl:", projectTitleInputEl);
-    console.log("createProjectButtonEl:", createProjectButtonEl);
-    console.log("messageAreaEl:", messageAreaEl);
-    console.log("loadingSpinnerEl:", loadingSpinnerEl);
     
     if (createProjectButtonEl) {
         console.log("Attaching event listener to createProjectButtonEl");
@@ -57,27 +49,8 @@
         console.error("createProjectButtonEl was not found!");
     }
     
-    // Initial view setup (will be expanded in Step 5 for routing)
-    // For now, just ensure the create project section is visible if other sections are hidden by default
-    if (createProjectSectionEl) {
-      // This logic will be refined in Step 5 based on URL parameters
-      // For now, let's assume we start by showing the create/list view.
-      showCreateProjectView(); 
-    }
-
-    // If a projectId is passed (for Step 5), it would be handled here to switch views.
-    // Example (simplified for now):
-    // const urlParams = new URLSearchParams(window.location.search);
-    // const projectIdFromUrl = urlParams.get('projectId');
-    // const pageFromUrl = urlParams.get('page');
-
-    // if (pageFromUrl === 'edit' && projectIdFromUrl) {
-    //   adminAppState.currentProjectId = projectIdFromUrl;
-    //   showEditProjectView(projectIdFromUrl); // This function will be created in Step 5
-    // } else {
-    //   showCreateProjectView(); // Or show project list view by default (Step 4)
-    //   // loadAdminProjectsList(); // Will be called in Step 4
-    // }
+    showCreateProjectView(); // Default view
+    loadAdminProjectsList(); // <--- CALL THIS ON PAGE LOAD
 
   });
 
@@ -85,9 +58,9 @@
   // (These will be expanded and used more in Step 4 & 5)
   function showCreateProjectView() {
     if(createProjectSectionEl) createProjectSectionEl.style.display = 'block';
-    if(projectListSectionEl) projectListSectionEl.style.display = 'block'; // Show list along with create
+    if(projectListSectionEl) projectListSectionEl.style.display = 'block'; 
     if(editProjectSectionEl) editProjectSectionEl.style.display = 'none';
-    // In Step 4, we'll load the project list here too
+    // We load the project list when this view is shown (or on initial page load)
   }
 
   // function showEditProjectView(projectId) { // For Step 5
@@ -154,35 +127,23 @@
       displayMessage("Error: Client-server communication bridge is not available.", false);
       return;
     }
-
-    if (adminAppState.isLoading) {
-      console.log("handleCreateProject: isLoading is true, returning.");
-      return;
-    }
-
-    // Ensure projectTitleInputEl is valid before accessing .value
+    if (adminAppState.isLoading) return;
     if (!projectTitleInputEl) {
         console.error("projectTitleInputEl is not defined or found.");
         displayMessage("Error: Project title input field not found.", false);
         return;
     }
-    
-    const currentProjectTitle = projectTitleInputEl.value.trim(); // Use a different variable name here to avoid any conflict if 'projectTitle' was global
-    console.log("handleCreateProject: projectTitle from input =", currentProjectTitle); 
-
+    const currentProjectTitle = projectTitleInputEl.value.trim();
     if (!currentProjectTitle) {
       displayMessage('Project title cannot be empty.', false);
       projectTitleInputEl.focus();
       return;
     }
     showLoading(true);
-    
-    console.log("DEBUG: About to call server. Sending projectTitle:", currentProjectTitle, "Type:", typeof currentProjectTitle);
-    
     google.script.run
       .withSuccessHandler(onProjectCreated)
       .withFailureHandler(onServerError)
-      .createProject(currentProjectTitle); // Pass the trimmed title
+      .createProject(currentProjectTitle);
   }
 
   function onProjectCreated(response) {
@@ -190,20 +151,71 @@
     console.log("onProjectCreated response:", response);
     if (response && response.success) {
       displayMessage(response.message || 'Project created successfully!', true);
-      if(projectTitleInputEl) projectTitleInputEl.value = ''; // Clear input
+      if(projectTitleInputEl) projectTitleInputEl.value = ''; 
       console.log("Project created data:", response);
-      // In Step 4, we'll call a function here to refresh the project list.
-      // e.g., if (typeof loadAdminProjectsList === 'function') loadAdminProjectsList(); 
+      loadAdminProjectsList(); // <--- REFRESH THE LIST AFTER CREATING A NEW PROJECT
     } else {
-      // Pass the error message from response.error if available
-      let serverError = (response && response.error) ? response.error : { message: 'Failed to create project. No specific error message provided by server.' };
+      let serverError = (response && response.error) ? response.error : { message: 'Failed to create project. No specific error from server.' };
       onServerError(serverError);
     }
   }
 
   // --- Placeholder for functions from other steps ---
-  // function loadAdminProjectsList() { /* ... Step 4 ... */ }
-  // function displayAdminProjects(projectsArray) { /* ... Step 4 ... */ }
+  function loadAdminProjectsList() {
+    console.log("loadAdminProjectsList called");
+    if (!google || !google.script || !google.script.run) {
+      console.error("google.script.run is not available for loadAdminProjectsList!");
+      displayMessage("Error: Client-server communication bridge is not available.", false);
+      return;
+    }
+    showLoading(true);
+    google.script.run
+      .withSuccessHandler(displayAdminProjects)
+      .withFailureHandler(onServerError)
+      .getAllProjectsForAdmin(); // This calls the server function
+  }
+
+  function displayAdminProjects(projectsArray) {
+    showLoading(false);
+    console.log("displayAdminProjects received:", projectsArray);
+
+    if (!adminProjectListContainerEl) {
+        console.error("adminProjectListContainerEl is not found. Cannot display projects.");
+        return;
+    }
+    adminProjectListContainerEl.innerHTML = ''; // Clear any existing list items
+
+    if (!projectsArray || projectsArray.length === 0) {
+      adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>';
+      return;
+    }
+
+    projectsArray.forEach(project => {
+      const projectItem = document.createElement('div');
+      projectItem.className = 'project-item';
+      
+      const titleSpan = document.createElement('span');
+      titleSpan.textContent = project.projectTitle || 'Untitled Project';
+      
+      const statusSpan = document.createElement('span');
+      statusSpan.className = 'status';
+      statusSpan.textContent = `(${project.status || 'N/A'})`;
+
+      const titleAndStatusDiv = document.createElement('div');
+      titleAndStatusDiv.appendChild(titleSpan);
+      titleAndStatusDiv.appendChild(statusSpan);
+
+      const editButton = document.createElement('button');
+      editButton.textContent = 'Edit';
+      editButton.className = 'edit-button'; // For styling
+      editButton.setAttribute('data-project-id', project.projectId); // Store projectId for later use (Step 5)
+      // editButton.onclick = function() { navigateToEditView(project.projectId); }; // Will be implemented in Step 5
+
+      projectItem.appendChild(titleAndStatusDiv);
+      projectItem.appendChild(editButton);
+      adminProjectListContainerEl.appendChild(projectItem);
+    });
+  }
 
   // function initAdminView() { // Will be used more formally from Step 5
       // This function would check URL parameters and decide initial view.

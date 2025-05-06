@@ -27,19 +27,42 @@ const PROJECT_DATA_FILENAME = 'project_data.json';
  * @param {Object} e The event parameter.
  * @return {HtmlOutput} The HTML output to serve.
  */
+// Server/Code.gs
+// ...
 function doGet(e) {
-  // For now, let's return a simple message. This will be replaced in Step 2.
-  // return HtmlService.createHtmlOutput("Welcome to the Interactive Training App. Setup in progress.");
-
   // Placeholder for Step 2: User Auth/Routing
+  // This will be expanded in Step 5 for page routing (edit vs list)
+
+  // Determine if accessing edit page
+  const page = e.parameter.page;
+  const projectId = e.parameter.projectId;
+
   if (isAdminUser()) {
-    // Later, this will serve AdminView.html
-    return HtmlService.createHtmlOutputFromFile('Client/Admin/AdminView.html')
-        .setTitle('Interactive Training App - Admin')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL); // Required for Drive Picker API later
+    if (page === 'edit' && projectId) {
+        // Admin wants to edit a specific project
+        const template = HtmlService.createTemplateFromFile('Client/Admin/AdminView.html');
+        template.projectId = projectId; // Pass projectId to the template
+        template.mode = 'edit';
+        return template.evaluate()
+            .setTitle('Interactive Training App - Admin Edit')
+            .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    } else {
+        // Admin wants the main admin dashboard (project list, create new)
+        const template = HtmlService.createTemplateFromFile('Client/Admin/AdminView.html');
+        template.projectId = null; // No specific project to edit initially
+        template.mode = 'list'; // Default to list view
+        return template.evaluate() // <--- USE .evaluate()
+            .setTitle('Interactive Training App - Admin')
+            .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
   } else {
-    // Later, this will serve ViewerView.html
-    return HtmlService.createHtmlOutputFromFile('Client/Viewer/ViewerView.html')
+    // Viewer view
+    // Add similar logic for viewer project view if needed: ?page=view&projectId=...
+    const template = HtmlService.createTemplateFromFile('Client/Viewer/ViewerView.html');
+    // if (page === 'view' && projectId) {
+    //    template.projectId = projectId;
+    // }
+    return template.evaluate() // <--- USE .evaluate()
         .setTitle('Interactive Training App - Viewer')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }

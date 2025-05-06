@@ -61,18 +61,15 @@
     <!-- Include Loading Spinner -->
     <?!= include('Client/Shared/LoadingSpinner'); ?>
 
-    <script type="text/javascript">
-      // Pass server-side data to client-side JavaScript
-      // Our server-side doGet(e) now ensures MODE_FROM_SERVER and PROJECT_ID_FROM_SERVER
-      // are always either a string or the JavaScript 'null' value.
-      // JSON.stringify will correctly handle these.
-
-      const MODE_FROM_SERVER_JS = <?= JSON.stringify(MODE_FROM_SERVER) ?>;
-      const PROJECT_ID_FROM_SERVER_JS = <?= JSON.stringify(PROJECT_ID_FROM_SERVER) ?>;
-
-      // This console.log is critical for client-side debugging
-      console.log("CLIENT_SIDE AdminView.html: MODE_FROM_SERVER_JS =", MODE_FROM_SERVER_JS, "(type:", typeof MODE_FROM_SERVER_JS, ")");
-      console.log("CLIENT_SIDE AdminView.html: PROJECT_ID_FROM_SERVER_JS =", PROJECT_ID_FROM_SERVER_JS, "(type:", typeof PROJECT_ID_FROM_SERVER_JS, ")");
+    <script>
+      // Server function that passes the data - defined in Code.gs
+      google.script.run.withSuccessHandler(function(serverData) {
+        const MODE_FROM_SERVER_JS = serverData.mode;
+        const PROJECT_ID_FROM_SERVER_JS = serverData.projectId;
+        
+        console.log("Data from server:", MODE_FROM_SERVER_JS, PROJECT_ID_FROM_SERVER_JS);
+        // Continue your code here...
+      }).getServerData();
     </script>
 
     <!-- Client-side JavaScript -->

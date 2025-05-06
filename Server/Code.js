@@ -103,3 +103,10 @@ function include(filename) {
 function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
 }
+
+function getServerData() {
+  return {
+    mode: MODE_FROM_SERVER,
+    projectId: PROJECT_ID_FROM_SERVER
+  };
+}

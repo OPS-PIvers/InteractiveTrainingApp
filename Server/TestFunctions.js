@@ -251,35 +251,31 @@ function test_appendRow() {
   }
   
   function test_deleteTestFolderRecursive() {
-    const testFolderId = getTestProperty('testFolderId');
+    const testFolderId = getTestProperty('testFolderId'); // Get the ID from properties
     if (!testFolderId) {
       Logger.log("No test folder ID stored in script properties. Run test_createFolderInDrive first or set the property manually.");
       return;
     }
   
-    var ui = SpreadsheetApp.getUi(); // Or DocumentApp.getUi() or FormApp.getUi() if script is bound
-                                    // If standalone script, this might not work well without a bound document.
-                                    // In that case, just rely on direct execution and careful checking.
-    
-    // var response = ui.alert(
-    //   'Confirm Deletion', 
-    //   `Really delete folder ID "${testFolderId_global}" and all its contents? This cannot be undone easily.`,
-    //   ui.ButtonSet.YES_NO
-    // );
-  
+    // Optional: Add UI confirmation if running from a bound script, otherwise rely on careful execution
+    // var ui = SpreadsheetApp.getUi(); 
+    // var response = ui.alert('Confirm Deletion', `Really delete folder ID "${testFolderId}" and all its contents? This cannot be undone easily.`, ui.ButtonSet.YES_NO);
     // if (response == ui.Button.NO) {
-    //   Logger.log("Deletion cancelled by user for folder: " + testFolderId_global);
+    //   Logger.log("Deletion cancelled by user for folder: " + testFolderId); // Use testFolderId from properties
     //   return;
     // }
   
-  
     try {
-      Logger.log(`Attempting to delete folder ID "${testFolderId_global}" recursively.`);
-      deleteDriveFolderRecursive(testFolderId_global);
-      Logger.log(`SUCCESS: test_deleteTestFolderRecursive completed for folder ID: ${testFolderId_global}. Check your Drive Trash.`);
-      testFolderId_global = null; // Clear the global ID as it's now deleted
-      testFileId_global = null;   // Clear associated file ID too
+      Logger.log(`Attempting to delete folder ID "${testFolderId}" recursively.`); // Use testFolderId from properties
+      deleteDriveFolderRecursive(testFolderId); // This is your actual service function, using the ID from properties
+      Logger.log(`SUCCESS: test_deleteTestFolderRecursive completed for folder ID: ${testFolderId}. Check your Drive Trash.`); // Use testFolderId from properties
+      
+      // Clean up stored properties
+      deleteTestProperty('testFolderId');
+      deleteTestProperty('testFileId');
+      Logger.log("Stored testFolderId and testFileId properties have been deleted.");
+  
     } catch (e) {
-      Logger.log(`ERROR in test_deleteTestFolderRecursive: ${e.toString()}`);
+      Logger.log(`ERROR in test_deleteTestFolderRecursive: ${e.toString()} - Attempted to delete FolderID: ${testFolderId}`); // Log the ID being processed
     }
   }

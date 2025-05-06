@@ -12,19 +12,26 @@
   
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
+      console.log("DOMContentLoaded event fired!"); // <--- ADD THIS
       projectTitleInputEl = document.getElementById('projectTitleInput');
       createProjectButtonEl = document.getElementById('createProjectButton');
       messageAreaEl = document.getElementById('messageArea');
-      loadingSpinnerEl = document.getElementById('loadingSpinner'); // From LoadingSpinner.html
+      loadingSpinnerEl = document.getElementById('loadingSpinner');
+      
+      console.log("projectTitleInputEl:", projectTitleInputEl); // <--- ADD THIS
+      console.log("createProjectButtonEl:", createProjectButtonEl); // <--- ADD THIS
+      console.log("messageAreaEl:", messageAreaEl); // <--- ADD THIS
+      console.log("loadingSpinnerEl:", loadingSpinnerEl); // <--- ADD THIS
       
       if (createProjectButtonEl) {
+          console.log("Attaching event listener to createProjectButtonEl"); // <--- ADD THIS
           createProjectButtonEl.addEventListener('click', handleCreateProject);
+      } else {
+          console.error("createProjectButtonEl was not found!"); // <--- ADD THIS
       }
       
-      // Initially, only show create project section. This will be expanded.
       const createProjectSection = document.getElementById('createProjectSection');
       if (createProjectSection) createProjectSection.style.display = 'block';
-  
     });
   
     // --- General UI Functions ---
@@ -71,13 +78,11 @@
   
     // --- Project Creation (Step 3) ---
     function handleCreateProject() {
-      if (adminAppState.isLoading) return; // Prevent multiple submissions
-  
-      const projectTitle = projectTitleInputEl.value.trim();
-      if (!projectTitle) {
-        displayMessage('Project title cannot be empty.', false);
-        projectTitleInputEl.focus();
-        return;
+      console.log("handleCreateProject function called!"); 
+      if (!google || !google.script || !google.script.run) { // <--- ADD THIS
+        console.error("google.script.run is not available!"); // <--- ADD THIS
+        displayMessage("Error: Client-server communication bridge is not available.", false); // <--- ADD THIS
+        return; // <--- ADD THIS
       }
       showLoading(true);
       google.script.run

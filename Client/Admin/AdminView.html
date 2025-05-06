@@ -3,18 +3,17 @@
   <head>
     <base target="_top">
     <title>Admin Dashboard</title>
-    <!-- Basic CSS - will be expanded and moved to Admin_CSS.html later -->
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
       .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
       h1, h2 { color: #333; }
       label { display: inline-block; margin-bottom: 5px; font-weight: bold;}
       input[type="text"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-      button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; }
+      button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; margin-right: 5px; /* Added margin for spacing */ }
       button:hover { background-color: #0056b3; }
-      button.edit-button { background-color: #28a745; margin-left: 10px; }
+      button.edit-button { background-color: #28a745; } /* No margin-left needed if general button has margin-right */
       button.edit-button:hover { background-color: #1e7e34; }
-      #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; }
+      #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; /* Ensure space even when empty */ }
       .success { border-color: green; background-color: #d4edda; color: #155724; }
       .error { border-color: red; background-color: #f8d7da; color: #721c24; }
       
@@ -24,8 +23,7 @@
       .project-item span { font-size: 1.1em; }
       .project-item .status { font-style: italic; color: #555; margin-left: 15px; font-size: 0.9em;}
 
-
-      /* Styles for loading spinner - make sure LoadingSpinner.html is created */
+      /* Styles for loading spinner */
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -34,32 +32,50 @@
   <body>
     <h1>Admin Dashboard</h1>
 
-    <div class="container" id="createProjectSection">
-      <h2>Create New Project</h2>
-      <label for="projectTitleInput">Project Title:</label>
-      <input type="text" id="projectTitleInput" placeholder="Enter project title">
-      <button id="createProjectButton">Create Project</button>
-    </div>
+    <!-- Sections to be toggled -->
+    <div id="listViewContainer">
+        <div class="container" id="createProjectSection">
+          <h2>Create New Project</h2>
+          <label for="projectTitleInput">Project Title:</label>
+          <input type="text" id="projectTitleInput" placeholder="Enter project title">
+          <button id="createProjectButton">Create Project</button>
+        </div>
 
-    <div id="messageArea"></div>
-
-    <div class="container" id="projectListSection"> <!-- Ensure this ID matches JS -->
-        <h2>Existing Projects</h2>
-        <div id="adminProjectListContainer">
-            <!-- Projects will be dynamically inserted here -->
+        <div class="container" id="projectListSection">
+            <h2>Existing Projects</h2>
+            <div id="adminProjectListContainer">
+                <!-- Projects will be dynamically inserted here -->
+            </div>
         </div>
     </div>
-    
-    <div class="container" id="editProjectSection" style="display:none;"> <!-- Hidden for now -->
+
+    <div class="container" id="editViewContainer" style="display:none;"> <!-- Hidden by default -->
+        <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
-        <button id="backToProjectsListButton" style="display:none;">Back to Projects List</button>
+        <p><em>(Project editing controls and canvas will appear here in later phases)</em></p>
         <!-- Canvas and other edit controls will go here in later steps -->
     </div>
+
+    <div id="messageArea"></div> <!-- Moved message area to be always visible -->
 
     <!-- Include Loading Spinner -->
     <?!= include('Client/Shared/LoadingSpinner'); ?>
 
+    <script type="text/javascript">
+      // Pass server-side data to client-side JavaScript
+      // Our server-side doGet(e) now ensures MODE_FROM_SERVER and PROJECT_ID_FROM_SERVER
+      // are always either a string or the JavaScript 'null' value.
+      // JSON.stringify will correctly handle these.
+
+      const MODE_FROM_SERVER_JS = <?= JSON.stringify(MODE_FROM_SERVER) ?>;
+      const PROJECT_ID_FROM_SERVER_JS = <?= JSON.stringify(PROJECT_ID_FROM_SERVER) ?>;
+
+      // This console.log is critical for client-side debugging
+      console.log("CLIENT_SIDE AdminView.html: MODE_FROM_SERVER_JS =", MODE_FROM_SERVER_JS, "(type:", typeof MODE_FROM_SERVER_JS, ")");
+      console.log("CLIENT_SIDE AdminView.html: PROJECT_ID_FROM_SERVER_JS =", PROJECT_ID_FROM_SERVER_JS, "(type:", typeof PROJECT_ID_FROM_SERVER_JS, ")");
+    </script>
+
     <!-- Client-side JavaScript -->
-    <?!= include('Client/Admin/Admin_JS'); ?> 
+    <?!= include('Client/Admin/Admin_JS'); ?>
   </body>
 </html>

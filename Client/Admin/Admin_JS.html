@@ -1,76 +1,119 @@
 <script>
-  // --- Global App State (will expand) ---
+  // --- Global App State ---
   let adminAppState = {
     isLoading: false,
-    currentProjectId: null, // Will be used from Step 5
-    projectData: null,      // Will be used from Step 5
-    currentSlideIndex: -1   // Will be used from Step 9
-    // fabricCanvasInstance: null // Will be used from Step 7
+    currentProjectId: null, 
+    projectData: null,      
+    currentSlideIndex: -1,
+    // Read server-passed values (ensure the scriptlet in AdminView.html defines these JS consts)
+    viewMode: typeof MODE_FROM_SERVER_JS !== 'undefined' ? MODE_FROM_SERVER_JS : 'list',
+    initialProjectId: typeof PROJECT_ID_FROM_SERVER_JS !== 'undefined' ? PROJECT_ID_FROM_SERVER_JS : null
   };
 
-  // --- DOM Elements ---
-  let projectTitleInputEl;
-  let createProjectButtonEl;
-  let messageAreaEl;
-  let loadingSpinnerEl;
-
-  // Elements for later steps (project list and edit view)
-  let createProjectSectionEl;
-  let projectListSectionEl;
-  let editProjectSectionEl;
-  let adminProjectListContainerEl;
-  let editingProjectTitleEl;
-  let backToProjectsListButtonEl;
-
+  // --- DOM Elements (Declare all anticipated elements) ---
+  let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
+  let listViewContainerEl, createProjectSectionEl, projectListSectionEl, adminProjectListContainerEl;
+  let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl;
 
   // --- Initialization ---
   document.addEventListener('DOMContentLoaded', function() {
     console.log("DOMContentLoaded event fired!");
+    console.log("Initial viewMode from server via JS const:", adminAppState.viewMode);
+    console.log("Initial projectId from server via JS const:", adminAppState.initialProjectId);
 
-    // Common elements
+    // Initialize all DOM element variables
     messageAreaEl = document.getElementById('messageArea');
     loadingSpinnerEl = document.getElementById('loadingSpinner');
     
+    // List View elements
+    listViewContainerEl = document.getElementById('listViewContainer');
     projectTitleInputEl = document.getElementById('projectTitleInput');
     createProjectButtonEl = document.getElementById('createProjectButton');
-    createProjectSectionEl = document.getElementById('createProjectSection');
-
-    projectListSectionEl = document.getElementById('projectListSection');
-    adminProjectListContainerEl = document.getElementById('adminProjectListContainer'); // Ensure this is initialized
-
-    editProjectSectionEl = document.getElementById('editProjectSection');
+    createProjectSectionEl = document.getElementById('createProjectSection'); // Already part of listViewContainer
+    projectListSectionEl = document.getElementById('projectListSection');     // Already part of listViewContainer
+    adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+    
+    // Edit View elements
+    editViewContainerEl = document.getElementById('editViewContainer');
     editingProjectTitleEl = document.getElementById('editingProjectTitle');
     backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
     
+    // Attach event listeners
     if (createProjectButtonEl) {
-        console.log("Attaching event listener to createProjectButtonEl");
         createProjectButtonEl.addEventListener('click', handleCreateProject);
-    } else {
-        console.error("createProjectButtonEl was not found!");
-    }
-    
-    showCreateProjectView(); // Default view
-    loadAdminProjectsList(); // <--- CALL THIS ON PAGE LOAD
+    } else { console.error("createProjectButtonEl was not found!"); }
 
+    if (backToProjectsListButtonEl) {
+        backToProjectsListButtonEl.addEventListener('click', navigateToProjectList);
+    } else { console.error("backToProjectsListButtonEl was not found!"); }
+    
+    // Initial View Setup based on URL parameters passed from server
+    if (adminAppState.viewMode === 'edit' && adminAppState.initialProjectId) {
+      switchToEditView(adminAppState.initialProjectId);
+      // In Step 10, we will call: loadProjectForEditing(adminAppState.initialProjectId);
+    } else {
+      switchToListView(); 
+      loadAdminProjectsList(); 
+    }
   });
 
   // --- UI Navigation / View Management ---
-  // (These will be expanded and used more in Step 4 & 5)
-  function showCreateProjectView() {
-    if(createProjectSectionEl) createProjectSectionEl.style.display = 'block';
-    if(projectListSectionEl) projectListSectionEl.style.display = 'block'; 
-    if(editProjectSectionEl) editProjectSectionEl.style.display = 'none';
-    // We load the project list when this view is shown (or on initial page load)
+  function switchToListView() {
+    console.log("Switching to List View");
+    adminAppState.currentProjectId = null; 
+    if(listViewContainerEl) listViewContainerEl.style.display = 'block';
+    if(editViewContainerEl) editViewContainerEl.style.display = 'none';
+    if (messageAreaEl) messageAreaEl.innerHTML = ''; // Clear messages on view switch
   }
 
-  // function showEditProjectView(projectId) { // For Step 5
-  //   if(createProjectSectionEl) createProjectSectionEl.style.display = 'none';
-  //   if(projectListSectionEl) projectListSectionEl.style.display = 'none';
-  //   if(editProjectSectionEl) editProjectSectionEl.style.display = 'block';
-  //   if(editingProjectTitleEl) editingProjectTitleEl.textContent = `Editing Project: ${projectId} (Title to be fetched)`;
-  //   // loadProjectForEditing(projectId); // For Step 10
-  // }
+  function switchToEditView(projectIdToEdit) {
+    console.log("Switching to Edit View for project:", projectIdToEdit);
+    adminAppState.currentProjectId = projectIdToEdit; // Set current project ID
+    if(listViewContainerEl) listViewContainerEl.style.display = 'none';
+    if(editViewContainerEl) editViewContainerEl.style.display = 'block';
+    if(editingProjectTitleEl) editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
+    
+    // Clear previous project-specific data if any
+    adminAppState.projectData = null; 
+    adminAppState.currentSlideIndex = -1;
+    // if (adminAppState.fabricCanvasInstance) { adminAppState.fabricCanvasInstance.clear(); } // For later
+    if (messageAreaEl) messageAreaEl.innerHTML = ''; // Clear messages
+  }
 
+  // --- Navigation Functions ---
+  function navigateToEditView(projectId) {
+    if (adminAppState.isLoading) return;
+    console.log(`Requesting to navigate to edit project: ${projectId}`);
+    showLoading(true); // Show spinner during navigation
+    
+    // Attempt to get full web app URL from server for reliable navigation
+    google.script.run
+        .withSuccessHandler(function(webAppUrl) {
+            window.location.href = webAppUrl + '?page=edit&projectId=' + projectId;
+        })
+        .withFailureHandler(function(err) {
+            console.error("Could not get webapp URL from server, using relative path. Error:", err);
+            window.location.href = '?page=edit&projectId=' + projectId; // Fallback
+        })
+        .getWebAppUrl(); // Assumes getWebAppUrl is defined in Server/Code.gs
+  }
+  
+  function navigateToProjectList() {
+    if (adminAppState.isLoading) return;
+    console.log("Requesting to navigate back to project list");
+    showLoading(true);
+
+    google.script.run
+        .withSuccessHandler(function(webAppUrl) {
+            window.location.href = webAppUrl; // Go to base URL for list view
+        })
+        .withFailureHandler(function(err) {
+            console.error("Could not get webapp URL from server, using relative path. Error:", err);
+            // Fallback to trying to go to the current path without query params
+            window.location.href = window.location.origin + window.location.pathname; 
+        })
+        .getWebAppUrl();
+  }
 
   // --- General UI Functions ---
   function showLoading(show) {
@@ -82,18 +125,17 @@
 
   function displayMessage(message, isSuccess) {
     if (messageAreaEl) {
-      messageAreaEl.innerHTML = ''; // Clear previous messages
+      messageAreaEl.innerHTML = ''; 
       const p = document.createElement('p');
       p.textContent = message;
       messageAreaEl.appendChild(p);
       messageAreaEl.className = isSuccess ? 'success' : 'error';
-      
       setTimeout(() => {
-        if (messageAreaEl) { // Check again in case it was removed
+        if (messageAreaEl) {
           messageAreaEl.innerHTML = '';
           messageAreaEl.className = '';
         }
-      }, 7000); // Message visible for 7 seconds
+      }, 7000); 
     } else {
       console.log("Message Area (messageAreaEl) not found. Message:", message, "Success:", isSuccess);
     }
@@ -103,23 +145,22 @@
     showLoading(false);
     console.error('Server Error Object:', errorObject);
     let errorMessage = "An unknown error occurred on the server.";
-    if (typeof errorObject === 'string') { // Simple string error
+    if (typeof errorObject === 'string') { 
         errorMessage = errorObject;
-    } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { // Error object from server with a message property
+    } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { 
         errorMessage = errorObject.message;
-        // For Apps Script ExecutionApi error format
         if (errorObject.details && errorObject.details.length > 0 && errorObject.details[0].errorMessage) {
              errorMessage = errorObject.details[0].errorMessage;
         } else if (errorObject.details && typeof errorObject.details === 'string') {
             errorMessage += " Details: " + errorObject.details;
         }
-    } else if (errorObject && errorObject.name && errorObject.message) { // Standard JavaScript Error object
+    } else if (errorObject && errorObject.name && errorObject.message) { 
         errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`;
     }
     displayMessage('Server Error: ' + errorMessage, false);
   }
 
-  // --- Project Creation (Step 3) ---
+  // --- Project Creation ---
   function handleCreateProject() {
     console.log("handleCreateProject function called!");
     if (!google || !google.script || !google.script.run) {
@@ -134,12 +175,14 @@
         return;
     }
     const currentProjectTitle = projectTitleInputEl.value.trim();
+    console.log("handleCreateProject: projectTitle from input =", currentProjectTitle); 
     if (!currentProjectTitle) {
       displayMessage('Project title cannot be empty.', false);
       projectTitleInputEl.focus();
       return;
     }
     showLoading(true);
+    console.log("DEBUG: About to call server. Sending projectTitle:", currentProjectTitle, "Type:", typeof currentProjectTitle);
     google.script.run
       .withSuccessHandler(onProjectCreated)
       .withFailureHandler(onServerError)
@@ -153,14 +196,14 @@
       displayMessage(response.message || 'Project created successfully!', true);
       if(projectTitleInputEl) projectTitleInputEl.value = ''; 
       console.log("Project created data:", response);
-      loadAdminProjectsList(); // <--- REFRESH THE LIST AFTER CREATING A NEW PROJECT
+      loadAdminProjectsList(); // Refresh the list
     } else {
       let serverError = (response && response.error) ? response.error : { message: 'Failed to create project. No specific error from server.' };
       onServerError(serverError);
     }
   }
 
-  // --- Placeholder for functions from other steps ---
+  // --- Project List ---
   function loadAdminProjectsList() {
     console.log("loadAdminProjectsList called");
     if (!google || !google.script || !google.script.run) {
@@ -172,25 +215,26 @@
     google.script.run
       .withSuccessHandler(displayAdminProjects)
       .withFailureHandler(onServerError)
-      .getAllProjectsForAdmin(); // This calls the server function
+      .getAllProjectsForAdmin();
   }
 
   function displayAdminProjects(projectsArray) {
     showLoading(false);
     console.log("displayAdminProjects received:", projectsArray);
-
     if (!adminProjectListContainerEl) {
         console.error("adminProjectListContainerEl is not found. Cannot display projects.");
         return;
     }
-    adminProjectListContainerEl.innerHTML = ''; // Clear any existing list items
-
+    adminProjectListContainerEl.innerHTML = ''; 
     if (!projectsArray || projectsArray.length === 0) {
       adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>';
       return;
     }
-
     projectsArray.forEach(project => {
+      if (!project || !project.projectId) { // Add a check for valid project object
+          console.warn("Skipping invalid project object:", project);
+          return; 
+      }
       const projectItem = document.createElement('div');
       projectItem.className = 'project-item';
       
@@ -207,30 +251,15 @@
 
       const editButton = document.createElement('button');
       editButton.textContent = 'Edit';
-      editButton.className = 'edit-button'; // For styling
-      editButton.setAttribute('data-project-id', project.projectId); // Store projectId for later use (Step 5)
-      // editButton.onclick = function() { navigateToEditView(project.projectId); }; // Will be implemented in Step 5
+      editButton.className = 'edit-button'; 
+      editButton.setAttribute('data-project-id', project.projectId); 
+      editButton.onclick = function() { 
+        navigateToEditView(project.projectId); 
+      };
 
       projectItem.appendChild(titleAndStatusDiv);
       projectItem.appendChild(editButton);
       adminProjectListContainerEl.appendChild(projectItem);
     });
   }
-
-  // function initAdminView() { // Will be used more formally from Step 5
-      // This function would check URL parameters and decide initial view.
-      // const urlParams = new URLSearchParams(window.location.search);
-      // const viewMode = urlParams.get('page');
-      // const projId = urlParams.get('projectId');
-
-      // if (viewMode === 'edit' && projId) {
-      //    adminAppState.currentProjectId = projId;
-      //    switchToEditView(projId); // You'll build this
-      //    loadProjectForEditing(projId); // You'll build this
-      // } else {
-      //    switchToListProjectsView(); // You'll build this
-      //    loadAdminProjectsList(); // You'll build this
-      // }
-  // }
-
 </script>

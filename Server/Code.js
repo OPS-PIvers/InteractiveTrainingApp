@@ -30,42 +30,44 @@ const PROJECT_DATA_FILENAME = 'project_data.json';
 // Server/Code.gs
 // ...
 function doGet(e) {
-  // Placeholder for Step 2: User Auth/Routing
-  // This will be expanded in Step 5 for page routing (edit vs list)
-
-  // Determine if accessing edit page
-  const page = e.parameter.page;
-  const projectId = e.parameter.projectId;
+  const pageParam = e.parameter.page; // Use different names to avoid confusion
+  const projectIdParam = e.parameter.projectId;
+  let htmlOutput;
 
   if (isAdminUser()) {
-    if (page === 'edit' && projectId) {
-        // Admin wants to edit a specific project
-        const template = HtmlService.createTemplateFromFile('Client/Admin/AdminView.html');
-        template.projectId = projectId; // Pass projectId to the template
-        template.mode = 'edit';
-        return template.evaluate()
-            .setTitle('Interactive Training App - Admin Edit')
-            .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    } else {
-        // Admin wants the main admin dashboard (project list, create new)
-        const template = HtmlService.createTemplateFromFile('Client/Admin/AdminView.html');
-        template.projectId = null; // No specific project to edit initially
-        template.mode = 'list'; // Default to list view
-        return template.evaluate() // <--- USE .evaluate()
-            .setTitle('Interactive Training App - Admin')
-            .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    const template = HtmlService.createTemplateFromFile('Client/Admin/AdminView.html');
+
+    // Explicitly prepare the values for the template
+    // Ensure they are either a string or actual JavaScript null
+    let modeForClient = 'list'; // Default
+    let projectIdForClient = null; // Default
+
+    if (pageParam === 'edit' && projectIdParam) {
+      modeForClient = 'edit'; // String
+      projectIdForClient = projectIdParam; // String
     }
-  } else {
-    // Viewer view
-    // Add similar logic for viewer project view if needed: ?page=view&projectId=...
-    const template = HtmlService.createTemplateFromFile('Client/Viewer/ViewerView.html');
-    // if (page === 'view' && projectId) {
-    //    template.projectId = projectId;
-    // }
-    return template.evaluate() // <--- USE .evaluate()
-        .setTitle('Interactive Training App - Viewer')
+    // If pageParam is not 'edit', modeForClient remains 'list' and projectIdForClient remains null.
+
+    template.MODE_FROM_SERVER = modeForClient; 
+    template.PROJECT_ID_FROM_SERVER = projectIdForClient; 
+    
+    // Log what's being set on the template object BEFORE evaluate()
+    Logger.log(`Server doGet: Setting template.MODE_FROM_SERVER = ${template.MODE_FROM_SERVER} (type: ${typeof template.MODE_FROM_SERVER})`);
+    Logger.log(`Server doGet: Setting template.PROJECT_ID_FROM_SERVER = ${template.PROJECT_ID_FROM_SERVER} (type: ${typeof template.PROJECT_ID_FROM_SERVER})`);
+
+    htmlOutput = template.evaluate()
+        .setTitle(modeForClient === 'edit' ? 'Interactive Training App - Edit Project' : 'Interactive Training App - Admin Dashboard')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } else {
+    const template = HtmlService.createTemplateFromFile('Client/Viewer/ViewerView.html');
+    // In case you add similar params for viewer later:
+    // template.MODE_FROM_SERVER = e.parameter.page || 'list'; 
+    // template.PROJECT_ID_FROM_SERVER = e.parameter.projectId || null;
+    htmlOutput = template.evaluate()
+      .setTitle('Interactive Training App - Viewer')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
+  return htmlOutput;
 }
 
 // --- USER AUTHENTICATION ---
@@ -92,4 +94,12 @@ function isAdminUser() {
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * Gets the deployed web app's URL.
+ * @return {string} The web app URL.
+ */
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
 }

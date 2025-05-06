@@ -28,41 +28,24 @@ const PROJECT_DATA_FILENAME = 'project_data.json';
  * @return {HtmlOutput} The HTML output to serve.
  */
 // Server/Code.gs
-// ...
-function doGet(e) {
-  const pageParam = e.parameter.page; // Use different names to avoid confusion
-  const projectIdParam = e.parameter.projectId;
+function doGet(e) { // 'e' is important here
   let htmlOutput;
+
+  // We no longer need to set template.MODE_FROM_SERVER or template.PROJECT_ID_FROM_SERVER here
+  // The client will fetch this data using getServerData()
 
   if (isAdminUser()) {
     const template = HtmlService.createTemplateFromFile('Client/Admin/AdminView.html');
-
-    // Explicitly prepare the values for the template
-    // Ensure they are either a string or actual JavaScript null
-    let modeForClient = 'list'; // Default
-    let projectIdForClient = null; // Default
-
-    if (pageParam === 'edit' && projectIdParam) {
-      modeForClient = 'edit'; // String
-      projectIdForClient = projectIdParam; // String
+    // We can still determine title based on initial 'e' parameters if needed, or client can set it.
+    let title = 'Interactive Training App - Admin Dashboard';
+    if (e.parameter.page === 'edit' && e.parameter.projectId) {
+        title = 'Interactive Training App - Edit Project';
     }
-    // If pageParam is not 'edit', modeForClient remains 'list' and projectIdForClient remains null.
-
-    template.MODE_FROM_SERVER = modeForClient; 
-    template.PROJECT_ID_FROM_SERVER = projectIdForClient; 
-    
-    // Log what's being set on the template object BEFORE evaluate()
-    Logger.log(`Server doGet: Setting template.MODE_FROM_SERVER = ${template.MODE_FROM_SERVER} (type: ${typeof template.MODE_FROM_SERVER})`);
-    Logger.log(`Server doGet: Setting template.PROJECT_ID_FROM_SERVER = ${template.PROJECT_ID_FROM_SERVER} (type: ${typeof template.PROJECT_ID_FROM_SERVER})`);
-
     htmlOutput = template.evaluate()
-        .setTitle(modeForClient === 'edit' ? 'Interactive Training App - Edit Project' : 'Interactive Training App - Admin Dashboard')
+        .setTitle(title)
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else {
     const template = HtmlService.createTemplateFromFile('Client/Viewer/ViewerView.html');
-    // In case you add similar params for viewer later:
-    // template.MODE_FROM_SERVER = e.parameter.page || 'list'; 
-    // template.PROJECT_ID_FROM_SERVER = e.parameter.projectId || null;
     htmlOutput = template.evaluate()
       .setTitle('Interactive Training App - Viewer')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -104,9 +87,44 @@ function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
 }
 
-function getServerData() {
+/**
+ * Called by the client to get initial mode and projectId based on URL parameters
+ * that were present when the page initially loaded.
+ * @param {object} params The e.parameter object from the initial doGet call, passed by client if needed.
+ *                       Alternatively, the client could parse window.location.search itself.
+ * @return {object} An object containing mode and projectId.
+ */
+function getServerData(initialPageParameters) {
+  // initialPageParameters would be like { page: "edit", projectId: "123" } if client sends them
+  // For this to work, client needs to parse its own URL and send 'e.parameter' like object
+  // OR we rely on the fact that this function is called on page load, and what matters is the initial URL.
+  // Let's assume client sends its initial load parameters.
+
+  // To make this robust, the client should parse its current URL and send the relevant params.
+  // For now, let's keep your structure, but the values for MODE_FROM_SERVER and PROJECT_ID_FROM_SERVER
+  // need to be defined globally or passed into getServerData if they depend on the initial page load 'e' object.
+
+  // Simpler: let the client parse its own URL.
+  // The server function can just be a dummy if the client does all the work.
+  // But your intention was that the SERVER determines the mode.
+  
+  // Let's assume the client will pass its initial load's 'page' and 'projectId' parameters
+  const page = initialPageParameters ? initialPageParameters.page : null;
+  const projectId = initialPageParameters ? initialPageParameters.projectId : null;
+
+  Logger.log(`getServerData called with page: ${page}, projectId: ${projectId}`);
+
+  let modeToReturn = 'list';
+  let projectIdToReturn = null;
+
+  if (page === 'edit' && projectId) {
+    modeToReturn = 'edit';
+    projectIdToReturn = projectId;
+  }
+  // If page is not 'edit', mode is 'list' and projectId remains null.
+
   return {
-    mode: MODE_FROM_SERVER,
-    projectId: PROJECT_ID_FROM_SERVER
+    mode: modeToReturn,
+    projectId: projectIdToReturn
   };
 }

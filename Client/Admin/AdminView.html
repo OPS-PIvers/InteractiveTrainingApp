@@ -61,18 +61,54 @@
     <!-- Include Loading Spinner -->
     <?!= include('Client/Shared/LoadingSpinner'); ?>
 
-    <script>
-      // Server function that passes the data - defined in Code.gs
-      google.script.run.withSuccessHandler(function(serverData) {
+    <script type="text/javascript">
+      // This block will now fetch server data and THEN make it available
+      // to the main Admin_JS logic.
+      // We need a way to signal Admin_JS that this data is ready.
+      // A simple way is to call an initialization function in Admin_JS.
+
+      function initializeAdminAppWithServerData(serverData) {
         const MODE_FROM_SERVER_JS = serverData.mode;
         const PROJECT_ID_FROM_SERVER_JS = serverData.projectId;
         
-        console.log("Data from server:", MODE_FROM_SERVER_JS, PROJECT_ID_FROM_SERVER_JS);
-        // Continue your code here...
-      }).getServerData();
+        console.log("CLIENT_SIDE AdminView.html (after getServerData): Mode -", MODE_FROM_SERVER_JS, 
+                    "(type:", typeof MODE_FROM_SERVER_JS, ") ProjectID -", PROJECT_ID_FROM_SERVER_JS, 
+                    "(type:", typeof PROJECT_ID_FROM_SERVER_JS, ")");
+
+        // Now make these available to adminAppState or call an init function in Admin_JS
+        if (window.adminApp && typeof window.adminApp.initialize === 'function') {
+          window.adminApp.initialize(MODE_FROM_SERVER_JS, PROJECT_ID_FROM_SERVER_JS);
+        } else {
+          console.error("Admin_JS.html or adminApp.initialize function not ready yet.");
+          // Fallback: store globally, though less clean
+          window.GLOBAL_MODE_FROM_SERVER = MODE_FROM_SERVER_JS;
+          window.GLOBAL_PROJECT_ID_FROM_SERVER = PROJECT_ID_FROM_SERVER_JS;
+        }
+      }
+
+      // Function to parse current URL parameters client-side
+      function getInitialPageParameters() {
+        const params = new URLSearchParams(window.location.search);
+        return {
+          page: params.get('page'),
+          projectId: params.get('projectId')
+        };
+      }
+      
+      // Call a server function that passes the data - defined in Code.gs
+      google.script.run
+        .withSuccessHandler(initializeAdminAppWithServerData) // This function will call the main app init
+        .withFailureHandler(function(err) {
+          console.error("Error calling getServerData:", err);
+          // Handle error: perhaps initialize with default 'list' mode
+          if (window.adminApp && typeof window.adminApp.initialize === 'function') {
+            window.adminApp.initialize('list', null); // Default on error
+          }
+        })
+        .getServerData(getInitialPageParameters()); // Pass current URL params
     </script>
 
-    <!-- Client-side JavaScript -->
-    <?!= include('Client/Admin/Admin_JS'); ?>
+    <!-- Client-side JavaScript (Admin_JS.html) -->
+    <?!= include('Client/Admin/Admin_JS'); ?> 
   </body>
 </html>

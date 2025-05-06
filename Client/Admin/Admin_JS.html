@@ -1,115 +1,138 @@
 <script>
-  // --- Global App State ---
-  let adminAppState = {
+  // Create a namespace for our app logic to avoid polluting global scope
+  window.adminApp = {};
+
+  // --- Global App State (within our namespace) ---
+  adminApp.state = {
     isLoading: false,
     currentProjectId: null, 
-    projectData: null,      
-    currentSlideIndex: -1,
-    // Read server-passed values (ensure the scriptlet in AdminView.html defines these JS consts)
-    viewMode: typeof MODE_FROM_SERVER_JS !== 'undefined' ? MODE_FROM_SERVER_JS : 'list',
-    initialProjectId: typeof PROJECT_ID_FROM_SERVER_JS !== 'undefined' ? PROJECT_ID_FROM_SERVER_JS : null
+    projectData: null,      // For loaded project data in later steps
+    currentSlideIndex: -1,  // For slide management in later steps
+    viewMode: 'list',       // Default, will be overridden by initialize
+    initialProjectId: null  // Default, will be overridden by initialize
   };
 
   // --- DOM Elements (Declare all anticipated elements) ---
+  // These will be assigned in adminApp.setupDOMAndListeners
   let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
-  let listViewContainerEl, createProjectSectionEl, projectListSectionEl, adminProjectListContainerEl;
+  let listViewContainerEl, /* createProjectSectionEl, projectListSectionEl, */ adminProjectListContainerEl; // create/projectList sections are within listViewContainer
   let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl;
 
-  // --- Initialization ---
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log("DOMContentLoaded event fired!");
-    console.log("Initial viewMode from server via JS const:", adminAppState.viewMode);
-    console.log("Initial projectId from server via JS const:", adminAppState.initialProjectId);
+  /**
+   * Main initialization function called AFTER server data is fetched by AdminView.html's script block.
+   * This function sets up the rest of the application.
+   */
+  adminApp.initialize = function(modeFromServer, projectIdFromServer) {
+    console.log("Admin_JS: adminApp.initialize called with mode:", modeFromServer, "projectId:", projectIdFromServer);
+    
+    adminApp.state.viewMode = modeFromServer || 'list'; 
+    adminApp.state.initialProjectId = projectIdFromServer || null;
 
-    // Initialize all DOM element variables
-    messageAreaEl = document.getElementById('messageArea');
-    loadingSpinnerEl = document.getElementById('loadingSpinner');
+    // Now that we have initial state, set up DOM references and listeners
+    adminApp.setupDOMReferences();
+    adminApp.attachEventListeners();
     
-    // List View elements
-    listViewContainerEl = document.getElementById('listViewContainer');
-    projectTitleInputEl = document.getElementById('projectTitleInput');
-    createProjectButtonEl = document.getElementById('createProjectButton');
-    createProjectSectionEl = document.getElementById('createProjectSection'); // Already part of listViewContainer
-    projectListSectionEl = document.getElementById('projectListSection');     // Already part of listViewContainer
-    adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
-    
-    // Edit View elements
-    editViewContainerEl = document.getElementById('editViewContainer');
-    editingProjectTitleEl = document.getElementById('editingProjectTitle');
-    backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
-    
-    // Attach event listeners
-    if (createProjectButtonEl) {
-        createProjectButtonEl.addEventListener('click', handleCreateProject);
-    } else { console.error("createProjectButtonEl was not found!"); }
-
-    if (backToProjectsListButtonEl) {
-        backToProjectsListButtonEl.addEventListener('click', navigateToProjectList);
-    } else { console.error("backToProjectsListButtonEl was not found!"); }
-    
-    // Initial View Setup based on URL parameters passed from server
-    if (adminAppState.viewMode === 'edit' && adminAppState.initialProjectId) {
-      switchToEditView(adminAppState.initialProjectId);
-      // In Step 10, we will call: loadProjectForEditing(adminAppState.initialProjectId);
+    // Initial View Setup based on fetched server data
+    if (adminApp.state.viewMode === 'edit' && adminApp.state.initialProjectId) {
+      // adminApp.state.currentProjectId is set inside switchToEditView
+      switchToEditView(adminApp.state.initialProjectId);
+      // In Step 10, we will call: loadProjectForEditing(adminApp.state.initialProjectId);
     } else {
       switchToListView(); 
       loadAdminProjectsList(); 
     }
-  });
+    console.log("Admin_JS: Initialization complete. Current view mode:", adminApp.state.viewMode);
+  };
 
+  /**
+   * Gets references to all necessary DOM elements.
+   */
+  adminApp.setupDOMReferences = function() {
+    messageAreaEl = document.getElementById('messageArea');
+    loadingSpinnerEl = document.getElementById('loadingSpinner');
+    
+    listViewContainerEl = document.getElementById('listViewContainer');
+    projectTitleInputEl = document.getElementById('projectTitleInput');
+    createProjectButtonEl = document.getElementById('createProjectButton');
+    // createProjectSectionEl = document.getElementById('createProjectSection'); // Already part of listViewContainer
+    // projectListSectionEl = document.getElementById('projectListSection');     // Already part of listViewContainer
+    adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+    
+    editViewContainerEl = document.getElementById('editViewContainer');
+    editingProjectTitleEl = document.getElementById('editingProjectTitle');
+    backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
+    console.log("Admin_JS: DOM references set up.");
+  };
+
+  /**
+   * Attaches all primary event listeners.
+   */
+  adminApp.attachEventListeners = function() {
+    if (createProjectButtonEl) {
+        createProjectButtonEl.addEventListener('click', handleCreateProject);
+    } else { console.error("createProjectButtonEl was not found during attachEventListeners!"); }
+
+    if (backToProjectsListButtonEl) {
+        backToProjectsListButtonEl.addEventListener('click', navigateToProjectList);
+    } else { console.error("backToProjectsListButtonEl was not found during attachEventListeners!"); }
+    console.log("Admin_JS: Event listeners attached.");
+  };
+  
   // --- UI Navigation / View Management ---
   function switchToListView() {
     console.log("Switching to List View");
-    adminAppState.currentProjectId = null; 
+    adminApp.state.currentProjectId = null; 
     if(listViewContainerEl) listViewContainerEl.style.display = 'block';
     if(editViewContainerEl) editViewContainerEl.style.display = 'none';
-    if (messageAreaEl) messageAreaEl.innerHTML = ''; // Clear messages on view switch
+    if (messageAreaEl) messageAreaEl.innerHTML = ''; 
   }
 
   function switchToEditView(projectIdToEdit) {
     console.log("Switching to Edit View for project:", projectIdToEdit);
-    adminAppState.currentProjectId = projectIdToEdit; // Set current project ID
+    adminApp.state.currentProjectId = projectIdToEdit; 
     if(listViewContainerEl) listViewContainerEl.style.display = 'none';
     if(editViewContainerEl) editViewContainerEl.style.display = 'block';
     if(editingProjectTitleEl) editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
     
-    // Clear previous project-specific data if any
-    adminAppState.projectData = null; 
-    adminAppState.currentSlideIndex = -1;
-    // if (adminAppState.fabricCanvasInstance) { adminAppState.fabricCanvasInstance.clear(); } // For later
-    if (messageAreaEl) messageAreaEl.innerHTML = ''; // Clear messages
+    adminApp.state.projectData = null; 
+    adminApp.state.currentSlideIndex = -1;
+    // if (adminApp.state.fabricCanvasInstance) { adminApp.state.fabricCanvasInstance.clear(); } // For later
+    if (messageAreaEl) messageAreaEl.innerHTML = ''; 
   }
 
   // --- Navigation Functions ---
   function navigateToEditView(projectId) {
-    if (adminAppState.isLoading) return;
+    if (adminApp.state.isLoading) return;
     console.log(`Requesting to navigate to edit project: ${projectId}`);
-    showLoading(true); // Show spinner during navigation
+    showLoading(true);
     
-    // Attempt to get full web app URL from server for reliable navigation
     google.script.run
         .withSuccessHandler(function(webAppUrl) {
+            // Ensure spinner is hidden before navigation which might take time
+            // showLoading(false); // Or let the page reload handle it
             window.location.href = webAppUrl + '?page=edit&projectId=' + projectId;
         })
         .withFailureHandler(function(err) {
-            console.error("Could not get webapp URL from server, using relative path. Error:", err);
-            window.location.href = '?page=edit&projectId=' + projectId; // Fallback
+            console.error("Could not get webapp URL from server for edit nav, using relative path. Error:", err);
+            showLoading(false);
+            window.location.href = '?page=edit&projectId=' + projectId;
         })
-        .getWebAppUrl(); // Assumes getWebAppUrl is defined in Server/Code.gs
+        .getWebAppUrl();
   }
   
   function navigateToProjectList() {
-    if (adminAppState.isLoading) return;
+    if (adminApp.state.isLoading) return;
     console.log("Requesting to navigate back to project list");
     showLoading(true);
 
     google.script.run
         .withSuccessHandler(function(webAppUrl) {
-            window.location.href = webAppUrl; // Go to base URL for list view
+            // showLoading(false);
+            window.location.href = webAppUrl;
         })
         .withFailureHandler(function(err) {
-            console.error("Could not get webapp URL from server, using relative path. Error:", err);
-            // Fallback to trying to go to the current path without query params
+            console.error("Could not get webapp URL from server for list nav, using relative path. Error:", err);
+            showLoading(false);
             window.location.href = window.location.origin + window.location.pathname; 
         })
         .getWebAppUrl();
@@ -117,9 +140,11 @@
 
   // --- General UI Functions ---
   function showLoading(show) {
-    adminAppState.isLoading = show;
+    adminApp.state.isLoading = show;
     if (loadingSpinnerEl) {
       loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+    } else if (adminApp.state.isLoading) { // If called before DOM fully ready
+        console.warn("showLoading called but loadingSpinnerEl not yet available.");
     }
   }
 
@@ -137,12 +162,12 @@
         }
       }, 7000); 
     } else {
-      console.log("Message Area (messageAreaEl) not found. Message:", message, "Success:", isSuccess);
+      console.warn("displayMessage called but messageAreaEl not yet available. Message:", message);
     }
   }
   
   function onServerError(errorObject) {
-    showLoading(false);
+    showLoading(false); // Ensure spinner is always hidden on error
     console.error('Server Error Object:', errorObject);
     let errorMessage = "An unknown error occurred on the server.";
     if (typeof errorObject === 'string') { 
@@ -168,9 +193,12 @@
       displayMessage("Error: Client-server communication bridge is not available.", false);
       return;
     }
-    if (adminAppState.isLoading) return;
+    if (adminApp.state.isLoading) {
+        console.log("handleCreateProject: isLoading is true, returning.");
+        return;
+    }
     if (!projectTitleInputEl) {
-        console.error("projectTitleInputEl is not defined or found.");
+        console.error("projectTitleInputEl is not defined or found in handleCreateProject.");
         displayMessage("Error: Project title input field not found.", false);
         return;
     }
@@ -182,7 +210,6 @@
       return;
     }
     showLoading(true);
-    console.log("DEBUG: About to call server. Sending projectTitle:", currentProjectTitle, "Type:", typeof currentProjectTitle);
     google.script.run
       .withSuccessHandler(onProjectCreated)
       .withFailureHandler(onServerError)
@@ -209,7 +236,15 @@
     if (!google || !google.script || !google.script.run) {
       console.error("google.script.run is not available for loadAdminProjectsList!");
       displayMessage("Error: Client-server communication bridge is not available.", false);
+      showLoading(false); // Ensure loading is hidden if we can't proceed
       return;
+    }
+    if (!adminProjectListContainerEl) { // Check if container is ready
+        console.error("adminProjectListContainerEl not ready for loadAdminProjectsList. Deferring or error.");
+        // Optionally, you could retry or wait if this happens due to timing.
+        // For now, just log and potentially show an error.
+        showLoading(false);
+        return;
     }
     showLoading(true);
     google.script.run
@@ -231,8 +266,8 @@
       return;
     }
     projectsArray.forEach(project => {
-      if (!project || !project.projectId) { // Add a check for valid project object
-          console.warn("Skipping invalid project object:", project);
+      if (!project || !project.projectId) { 
+          console.warn("Skipping invalid project object during display:", project);
           return; 
       }
       const projectItem = document.createElement('div');
@@ -262,4 +297,7 @@
       adminProjectListContainerEl.appendChild(projectItem);
     });
   }
+
+  // Note: The actual execution starts when adminApp.initialize is called from AdminView.html
+  // after google.script.run.getServerData() completes.
 </script>

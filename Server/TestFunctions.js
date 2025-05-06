@@ -2,6 +2,18 @@
 
 // --- Test SheetService Functions ---
 
+function storeTestProperty(key, value) {
+  PropertiesService.getScriptProperties().setProperty(key, value);
+}
+
+function getTestProperty(key) {
+  return PropertiesService.getScriptProperties().getProperty(key);
+}
+
+function deleteTestProperty(key) {
+  PropertiesService.getScriptProperties().deleteProperty(key);
+}
+
 function test_appendRow() {
     const sheetId = PROJECT_INDEX_SHEET_ID; // Uses the constant from Code.gs
     const sheetName = PROJECT_INDEX_DATA_SHEET_NAME; // Uses the constant from Code.gs
@@ -143,64 +155,78 @@ function test_appendRow() {
   }
   
   
-  // --- Test DriveService Functions ---
-  let testFolderId_global; // To store folder ID between tests
-  let testFileId_global;   // To store file ID between tests
-  
   function test_createFolderInDrive() {
     const folderName = "My Script Test Folder - " + new Date().getTime();
     const parentFolderId = ROOT_PROJECT_FOLDER_ID; // From Code.gs
     try {
       Logger.log(`Attempting to create folder "${folderName}" in parent "${parentFolderId}"`);
-      testFolderId_global = createDriveFolder(folderName, parentFolderId);
-      Logger.log(`SUCCESS: test_createFolderInDrive created folder with ID: ${testFolderId_global}`);
+      const createdFolderId = createDriveFolder(folderName, parentFolderId);
+      if (createdFolderId) {
+        storeTestProperty('testFolderId', createdFolderId); // Store it
+        Logger.log(`SUCCESS: test_createFolderInDrive created folder with ID: ${createdFolderId}. ID stored.`);
+      } else {
+        Logger.log(`FAILURE: test_createFolderInDrive did not return a folder ID.`);
+      }
     } catch (e) {
       Logger.log(`ERROR in test_createFolderInDrive: ${e.toString()}`);
     }
   }
   
   function test_saveJsonFileToDrive() {
-    if (!testFolderId_global) {
-      Logger.log("Please run test_createFolderInDrive first to create a folder.");
+    const testFolderId = getTestProperty('testFolderId'); // Retrieve it
+    if (!testFolderId) {
+      Logger.log("Please run test_createFolderInDrive first to create a folder and store its ID.");
       return;
     }
+  
     const fileName = "test_project_data.json";
     const jsonContent = JSON.stringify({ 
       message: "Hello from test_saveJsonFileToDrive!", 
       timestamp: new Date().toISOString() 
     }, null, 2);
-    const folderId = testFolderId_global;
+    const folderId = testFolderId;
     
     try {
       Logger.log(`Attempting to save JSON file "${fileName}" to folder "${folderId}"`);
-      testFileId_global = saveJsonToDriveFile(fileName, jsonContent, folderId, null /* no overwrite initially */);
-      Logger.log(`SUCCESS: test_saveJsonFileToDrive saved file with ID: ${testFileId_global}`);
+      const createdFileId = saveJsonToDriveFile(fileName, jsonContent, folderId, null /* no overwrite initially */);
+      if (createdFileId) {
+        storeTestProperty('testFileId', createdFileId); // Store the file ID
+        Logger.log(`SUCCESS: test_saveJsonFileToDrive saved file with ID: ${createdFileId}. ID stored.`);
+      } else {
+        Logger.log(`FAILURE: test_saveJsonFileToDrive did not return a file ID.`);
+      }
     } catch (e) {
       Logger.log(`ERROR in test_saveJsonFileToDrive: ${e.toString()}`);
     }
   }
   
   function test_overwriteFileInDrive() {
-    if (!testFolderId_global || !testFileId_global) {
+    const testFolderId = getTestProperty('testFolderId');
+    const testFileId = getTestProperty('testFileId');
+  
+    if (!testFolderId || !testFileId) {
       Logger.log("Please run test_createFolderInDrive and then test_saveJsonFileToDrive first.");
       return;
     }
+  
     const fileName = "test_project_data.json"; // Same filename
     const updatedJsonContent = JSON.stringify({ 
       message: "CONTENT UPDATED by test_overwriteFileInDrive!", 
       timestamp: new Date().toISOString(),
       updateCount: 1 
     }, null, 2);
-    const folderId = testFolderId_global; // Folder ID where file exists
-    const fileIdToOverwrite = testFileId_global; // ID of the file to overwrite
+    const folderId = testFolderId; 
+    const fileIdToOverwrite = testFileId; 
   
     try {
       Logger.log(`Attempting to overwrite file ID "${fileIdToOverwrite}" in folder "${folderId}"`);
       const updatedFileId = saveJsonToDriveFile(fileName, updatedJsonContent, folderId, fileIdToOverwrite);
       Logger.log(`SUCCESS: test_overwriteFileInDrive overwrote file. New/Same ID: ${updatedFileId}`);
-      if (updatedFileId !== fileIdToOverwrite) {
-          Logger.log("WARNING: File ID changed after overwrite. This can happen if original fileId was invalid/deleted.");
-          testFileId_global = updatedFileId; // Update global if it changed
+      if (updatedFileId && updatedFileId !== testFileId) {
+          Logger.log("INFO: File ID changed after overwrite. This can happen if original fileId was invalid/deleted. Updating stored ID.");
+          storeTestProperty('testFileId', updatedFileId); // Update stored ID if it changed
+      } else if (!updatedFileId) {
+          Logger.log("FAILURE: test_overwriteFileInDrive did not return a file ID after attempting overwrite.");
       }
     } catch (e) {
       Logger.log(`ERROR in test_overwriteFileInDrive: ${e.toString()}`);
@@ -208,33 +234,26 @@ function test_appendRow() {
   }
   
   function test_readFileContentFromDrive() {
-    if (!testFileId_global) {
-      Logger.log("Please run test_saveJsonFileToDrive first to create and save a file.");
+    const testFileId = getTestProperty('testFileId'); // Retrieve it
+    if (!testFileId) {
+      Logger.log("Please run test_saveJsonFileToDrive first to create, save a file, and store its ID.");
       return;
     }
-    const fileId = testFileId_global;
+    const fileId = testFileId;
     try {
       Logger.log(`Attempting to read content from file ID "${fileId}"`);
       const content = readDriveFileContent(fileId);
       Logger.log(`SUCCESS: test_readFileContentFromDrive read content:`);
       Logger.log(content);
-    } catch (e)
-   {
+    } catch (e) {
       Logger.log(`ERROR in test_readFileContentFromDrive: ${e.toString()}`);
     }
   }
   
   function test_deleteTestFolderRecursive() {
-    // WARNING: This will delete the folder created by test_createFolderInDrive and all its contents.
-    if (!testFolderId_global) {
-      Logger.log("No test folder ID stored (testFolderId_global is undefined). Run test_createFolderInDrive first or set the ID manually.");
-      // You could prompt user for folder ID if you want to run this standalone
-      // const folderIdToDelete = Browser.inputBox("Enter Folder ID to Delete Recursively (BE CAREFUL!):");
-      // if (!folderIdToDelete || folderIdToDelete.trim() === "") {
-      //   Logger.log("Deletion cancelled or no ID provided.");
-      //   return;
-      // }
-      // testFolderId_global = folderIdToDelete; // for this run
+    const testFolderId = getTestProperty('testFolderId');
+    if (!testFolderId) {
+      Logger.log("No test folder ID stored in script properties. Run test_createFolderInDrive first or set the property manually.");
       return;
     }
   

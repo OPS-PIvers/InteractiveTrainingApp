@@ -33,7 +33,7 @@ function test_appendRow() {
     
     // IMPORTANT: First, run test_appendRow() to add some data.
     // Then, copy one of the ProjectIDs from your sheet and paste it here:
-    const valueToFind = 'REPLACE_THIS_WITH_A_PROJECT_ID_FROM_YOUR_SHEET'; 
+    const valueToFind = 'testID_1746552194750'; 
   
     if (valueToFind === 'REPLACE_THIS_WITH_A_PROJECT_ID_FROM_YOUR_SHEET') {
       Logger.log("Please edit test_findRow and set 'valueToFind' to an actual ProjectID from your sheet.");

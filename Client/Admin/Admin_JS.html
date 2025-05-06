@@ -1,0 +1,109 @@
+<script>
+    // --- Global App State (will expand) ---
+    let adminAppState = {
+      isLoading: false
+    };
+  
+    // --- DOM Elements ---
+    let projectTitleInputEl;
+    let createProjectButtonEl;
+    let messageAreaEl;
+    let loadingSpinnerEl;
+  
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', function() {
+      projectTitleInputEl = document.getElementById('projectTitleInput');
+      createProjectButtonEl = document.getElementById('createProjectButton');
+      messageAreaEl = document.getElementById('messageArea');
+      loadingSpinnerEl = document.getElementById('loadingSpinner'); // From LoadingSpinner.html
+      
+      if (createProjectButtonEl) {
+          createProjectButtonEl.addEventListener('click', handleCreateProject);
+      }
+      
+      // Initially, only show create project section. This will be expanded.
+      const createProjectSection = document.getElementById('createProjectSection');
+      if (createProjectSection) createProjectSection.style.display = 'block';
+  
+    });
+  
+    // --- General UI Functions ---
+    function showLoading(show) {
+      adminAppState.isLoading = show;
+      if (loadingSpinnerEl) {
+        loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+      }
+    }
+  
+    function displayMessage(message, isSuccess) {
+      if (messageAreaEl) {
+        messageAreaEl.innerHTML = ''; // Clear previous messages
+        const p = document.createElement('p');
+        p.textContent = message;
+        messageAreaEl.appendChild(p);
+        messageAreaEl.className = isSuccess ? 'success' : 'error';
+        
+        setTimeout(() => {
+          messageAreaEl.innerHTML = '';
+          messageAreaEl.className = '';
+        }, 7000); // Message visible for 7 seconds
+      } else {
+        console.log("Message Area not found. Message:", message, "Success:", isSuccess);
+      }
+    }
+    
+    function onServerError(errorObject) {
+      showLoading(false);
+      console.error('Server Error Object:', errorObject);
+      let errorMessage = "An unknown error occurred on the server.";
+      if (typeof errorObject === 'string') {
+          errorMessage = errorObject;
+      } else if (errorObject && errorObject.message) {
+          errorMessage = errorObject.message;
+          if (errorObject.details) { // For more structured errors from server
+              errorMessage += " Details: " + errorObject.details;
+          }
+      } else if (errorObject && errorObject.name && errorObject.message) { // Standard Error object
+          errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`;
+      }
+      displayMessage('Server Error: ' + errorMessage, false);
+    }
+  
+    // --- Project Creation (Step 3) ---
+    function handleCreateProject() {
+      if (adminAppState.isLoading) return; // Prevent multiple submissions
+  
+      const projectTitle = projectTitleInputEl.value.trim();
+      if (!projectTitle) {
+        displayMessage('Project title cannot be empty.', false);
+        projectTitleInputEl.focus();
+        return;
+      }
+      showLoading(true);
+      google.script.run
+        .withSuccessHandler(onProjectCreated)
+        .withFailureHandler(onServerError)
+        .AdminController.createProject(projectTitle);
+    }
+  
+    function onProjectCreated(response) {
+      showLoading(false);
+      if (response && response.success) {
+        displayMessage(response.message || 'Project created successfully!', true);
+        if(projectTitleInputEl) projectTitleInputEl.value = ''; // Clear input
+        console.log("Project created:", response);
+        // In Step 4, we'll call a function here to refresh the project list.
+        // e.g., loadAdminProjectsList(); 
+      } else {
+        // Pass the error message from response.error if available
+        onServerError(response.error || { message: 'Failed to create project. No specific error message provided by server.' });
+      }
+    }
+  
+    // --- Placeholder for functions from other steps ---
+    // function loadAdminProjectsList() { /* ... */ }
+    // function displayAdminProjects(projectsArray) { /* ... */ }
+    // function navigateToEditView(projectId) { /* ... */ }
+    // function navigateToProjectList() { /* ... */ }
+  
+  </script>

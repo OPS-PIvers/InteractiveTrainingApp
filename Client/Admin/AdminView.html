@@ -5,15 +5,26 @@
     <title>Admin Dashboard</title>
     <!-- Basic CSS - will be expanded and moved to Admin_CSS.html later -->
     <style>
-      body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
-      .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+      .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+      h1, h2 { color: #333; }
       label { display: inline-block; margin-bottom: 5px; font-weight: bold;}
-      input[type="text"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box; }
-      button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 3px; }
+      input[type="text"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+      button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; }
       button:hover { background-color: #0056b3; }
+      button.edit-button { background-color: #28a745; margin-left: 10px; }
+      button.edit-button:hover { background-color: #1e7e34; }
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; }
-      .success { border-color: green; background-color: #e6ffe6; color: green; }
-      .error { border-color: red; background-color: #ffe6e6; color: red; }
+      .success { border-color: green; background-color: #d4edda; color: #155724; }
+      .error { border-color: red; background-color: #f8d7da; color: #721c24; }
+      
+      /* Styles for project list */
+      #adminProjectListContainer { margin-top: 15px; }
+      .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+      .project-item span { font-size: 1.1em; }
+      .project-item .status { font-style: italic; color: #555; margin-left: 15px; font-size: 0.9em;}
+
+
       /* Styles for loading spinner - make sure LoadingSpinner.html is created */
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
@@ -32,15 +43,17 @@
 
     <div id="messageArea"></div>
 
-    <!-- Hidden sections for later steps -->
-    <div class="container" id="projectListSection" style="display:none;">
+    <div class="container" id="projectListSection"> <!-- Ensure this ID matches JS -->
         <h2>Existing Projects</h2>
-        <div id="adminProjectListContainer"></div>
+        <div id="adminProjectListContainer">
+            <!-- Projects will be dynamically inserted here -->
+        </div>
     </div>
     
-    <div class="container" id="editProjectSection" style="display:none;">
+    <div class="container" id="editProjectSection" style="display:none;"> <!-- Hidden for now -->
         <h2 id="editingProjectTitle">Editing Project: </h2>
         <button id="backToProjectsListButton" style="display:none;">Back to Projects List</button>
+        <!-- Canvas and other edit controls will go here in later steps -->
     </div>
 
     <!-- Include Loading Spinner -->

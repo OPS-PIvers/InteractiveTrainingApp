@@ -85,11 +85,46 @@ function createProject(projectTitle) {
   
   // --- Placeholder functions for later steps ---
   
+  /**
+   * Retrieves all projects from the "ProjectIndex" sheet for admin display.
+   * @return {Array<Object>} An array of project objects, or an empty array if none/error.
+   */
   function getAllProjectsForAdmin() {
-    Logger.log("getAllProjectsForAdmin called, but not yet implemented.");
-    // This will be implemented in Step 4
-    // For now, return an empty array or some mock data if needed for UI testing
-    return []; 
+    try {
+      // PROJECT_INDEX_SHEET_ID and PROJECT_INDEX_DATA_SHEET_NAME are in Code.gs
+      // getAllSheetData is in SheetService.gs
+      const projectsData = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
+
+      if (!projectsData || !Array.isArray(projectsData)) {
+        Logger.log("getAllProjectsForAdmin: No data or invalid data returned from getAllSheetData.");
+        return []; // Return empty array if no data or error in fetching
+      }
+      
+      // Assuming getAllSheetData returns an array of objects where keys are header names
+      // We need: ProjectID, ProjectTitle, Status (and ProjectFolderID, ProjectDataFileID for later use)
+      // The COL_ constants are defined in Code.gs (1-based)
+      // If getAllSheetData returns array of arrays (e.g. if no headers) then adapt this mapping
+      
+      const formattedProjects = projectsData.map(rowObject => {
+        // Ensure keys match your sheet headers exactly if getAllSheetData returns objects
+        // If it returns array of arrays, use indices: rowObject[COL_PROJECT_ID - 1]
+        return {
+          projectId: rowObject['ProjectID'] || rowObject[COL_PROJECT_ID - 1], 
+          projectTitle: rowObject['ProjectTitle'] || rowObject[COL_PROJECT_TITLE - 1],
+          status: rowObject['Status'] || rowObject[COL_STATUS - 1],
+          projectFolderId: rowObject['ProjectFolderID'] || rowObject[COL_PROJECT_FOLDER_ID -1], // For Step 5
+          projectDataFileId: rowObject['ProjectDataFileID'] || rowObject[COL_PROJECT_DATA_FILE_ID -1] // For Step 5
+        };
+      }).filter(p => p.projectId); // Ensure project has a projectId
+
+      Logger.log(`getAllProjectsForAdmin: Retrieved ${formattedProjects.length} projects.`);
+      return formattedProjects;
+
+    } catch (e) {
+      Logger.log(`Error in getAllProjectsForAdmin: ${e.toString()} \nStack: ${e.stack}`);
+      // In case of error, return an empty array to prevent client-side errors
+      return []; 
+    }
   }
   
   function saveProjectData(projectId, projectDataJSON) {

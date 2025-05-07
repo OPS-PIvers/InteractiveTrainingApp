@@ -9,7 +9,7 @@
       .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
       h1, h2 { color: #333; }
       label { display: inline-block; margin-bottom: 5px; font-weight: bold;}
-      input[type="text"], input[type="file"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+      input[type="text"], input[type="file"], select, textarea { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
       button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; margin-right: 5px; }
       button:hover { background-color: #0056b3; }
       button.edit-button { background-color: #28a745; }
@@ -46,8 +46,8 @@
         max-height: 70vh; 
         overflow: auto; 
         border: 1px dashed #ccc; 
-        min-height: 300px; /* Increased min-height for better canvas visibility */
-        margin-top: 15px; /* Added margin top for spacing from toolbar */
+        min-height: 300px; 
+        margin-top: 15px; 
       }
       #fabricCanvasElement { 
         border: 1px solid #000; 
@@ -110,14 +110,12 @@
         display: block;
       }
 
-      /* Styles for Overlay Properties Toolbar */
       #overlayPropertiesToolbar {
         padding: 15px;
         border: 1px solid #ccc;
         background-color: #f9f9f9;
         border-radius: 5px;
-        margin-bottom: 15px; /* Space between toolbar and canvas */
-        /* display: none; /* Controlled by JS */
+        margin-bottom: 15px; 
       }
       #overlayPropertiesToolbar h3 {
           margin-top: 0;
@@ -125,17 +123,13 @@
           border-bottom: 1px solid #e0e0e0;
           padding-bottom: 10px;
       }
-      .toolbar-sections-container { /* New wrapper for responsive sections */
+      .toolbar-sections-container { 
         display: flex;
-        flex-wrap: wrap; /* Allow sections to wrap on smaller screens */
-        gap: 20px; /* Spacing between sections */
+        flex-wrap: wrap; 
+        gap: 20px; 
       }
-      .toolbar-section { /* Renamed from sidebar-section */
-        /* Sections will stack by default or flex based on toolbar-sections-container */
-        /* min-width: 250px; /* Optional: give sections a min-width if they are to flex side-by-side */
-        /* flex-grow: 1; /* Optional: allow sections to grow */
+      .toolbar-section { 
         padding-bottom: 10px;
-        /* border-bottom: 1px solid #eee; /* Remove individual bottom borders if using gap */
       }
       .toolbar-section:last-child {
         border-bottom: none;
@@ -147,17 +141,19 @@
         font-size: 0.9em;
         text-transform: uppercase;
       }
-      #overlayPropertiesToolbar label { /* Changed from #overlaySidebar */
+      #overlayPropertiesToolbar label { 
         display: inline-block; 
         margin-bottom: 3px;
         font-size: 0.9em;
-        width: 90px; 
+        width: 110px; /* Increased width for longer labels */
       }
-      #overlayPropertiesToolbar input[type="number"], /* Changed from #overlaySidebar */
+      #overlayPropertiesToolbar input[type="number"], 
       #overlayPropertiesToolbar input[type="color"],
+      #overlayPropertiesToolbar input[type="text"], /* Added for navigateTo */
+      #overlayPropertiesToolbar select, /* Added for new dropdowns */
       #overlayPropertiesToolbar textarea {
-        width: calc(100% - 105px); /* Max width within its section */
-        max-width: 180px; /* Prevent inputs from becoming too wide */
+        width: calc(100% - 125px); /* Adjusted for wider label */
+        max-width: 180px; 
         padding: 6px;
         margin-bottom: 8px;
         border: 1px solid #ddd;
@@ -165,15 +161,20 @@
         box-sizing: border-box;
         font-size: 0.9em;
       }
-      #overlayPropertiesToolbar input[type="range"] { /* Changed from #overlaySidebar */
-        width: calc(100% - 105px);
+      #overlayPropertiesToolbar input[type="range"] { 
+        width: calc(100% - 125px); /* Adjusted for wider label */
         max-width: 180px; 
         margin-bottom: 8px;
       }
-      #overlayPropertiesToolbar textarea { /* Changed from #overlaySidebar */
+      #overlayPropertiesToolbar textarea { 
         min-height: 60px;
-        width: calc(100% - 105px); /* Ensure textarea uses available space minus label */
-        max-width: 220px; /* Or a suitable max width */
+        width: calc(100% - 125px); /* Adjusted for wider label */
+        max-width: 220px; 
+      }
+      .config-section { /* For conditional display of interaction parameters */
+        margin-top: 5px;
+        padding-left: 10px; /* Indent a bit */
+        border-left: 2px solid #007bff;
       }
     </style>
   </head>
@@ -212,7 +213,6 @@
             <button id="addTextboxButton">Add Text</button>
         </div>
         
-        <!-- NEW: Overlay Properties Toolbar (replaces sidebar) -->
         <div id="overlayPropertiesToolbar" style="display:none;">
             <h3>Overlay Properties</h3>
             <div class="toolbar-sections-container"> 
@@ -246,10 +246,39 @@
                     <label for="objShadowOffsetX">Offset X:</label> <input type="number" id="objShadowOffsetX" class="sidebar-input" value="0"><br>
                     <label for="objShadowOffsetY">Offset Y:</label> <input type="number" id="objShadowOffsetY" class="sidebar-input" value="0">
                 </div>
+
+                <!-- New Section for Interactions -->
+                <div class="toolbar-section">
+                    <h4>Interactions</h4>
+                    <label for="objInteractionTrigger">Trigger:</label>
+                    <select id="objInteractionTrigger" class="sidebar-input">
+                        <option value="">None</option>
+                        <option value="click">On Click</option>
+                        <option value="hover">On Hover</option>
+                    </select><br>
+
+                    <label for="objInteractionAction">Action:</label>
+                    <select id="objInteractionAction" class="sidebar-input">
+                        <option value="">None</option>
+                        <option value="showModal">Show Modal</option>
+                        <option value="navigateToSlide">Navigate to Slide</option>
+                        <option value="navigateToURL">Navigate to URL</option>
+                    </select>
+
+                    <div id="modalContentConfig" class="config-section" style="display:none;">
+                        <label for="objModalContent">Modal Content:</label><br>
+                        <textarea id="objModalContent" rows="3" class="sidebar-input"></textarea>
+                    </div>
+
+                    <div id="navigateToConfig" class="config-section" style="display:none;">
+                        <label for="objNavigateTo">Target (Slide ID/URL):</label>
+                        <input type="text" id="objNavigateTo" class="sidebar-input">
+                    </div>
+                </div>
+
             </div>
         </div>
 
-        <!-- Canvas Area - now directly under toolbar -->
         <div id="fabricCanvasContainer">
           <canvas id="fabricCanvasElement"></canvas>
         </div>
@@ -259,7 +288,6 @@
             <button id="addSlideButton">Add New Slide</button>
             <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button>
             <div id="slideThumbnailsContainer">
-                <!-- Slide thumbnails will be dynamically inserted here -->
             </div>
         </div>
         

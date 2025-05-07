@@ -1,753 +1,756 @@
 <script>
-    // Namespace for the admin application
-    window.adminApp = {};
-  
-    // --- Application State ---
-    adminApp.state = {
-      isLoading: false,
-      currentProjectId: null,
-      currentView: 'list',
-      projectData: null, // Will be populated by loadProjectForEditing
-      currentSlideIndex: -1, // Index of the active slide in projectData.slides
-      fabricCanvasInstance: null,
-      defaultCanvasWidth: 960, // Default new slide width
-      defaultCanvasHeight: 540  // Default new slide height (16:9)
+  // Namespace for the admin application
+  window.adminApp = {};
+
+  // --- Application State ---
+  adminApp.state = {
+    isLoading: false,
+    currentProjectId: null,
+    currentView: 'list',
+    projectData: null, 
+    currentSlideIndex: -1, 
+    fabricCanvasInstance: null,
+    defaultCanvasWidth: 960, 
+    defaultCanvasHeight: 540 
+  };
+
+  // --- DOM Element References ---
+  let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
+  let listViewContainerEl, adminProjectListContainerEl;
+  let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
+  let imageUploaderEl;
+  let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; 
+  let addRectangleButtonEl, addCircleButtonEl; 
+  let addTextboxButtonEl; 
+
+  let overlayPropertiesToolbarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
+      // Interaction property elements
+      objInteractionTriggerEl, objInteractionActionEl, 
+      modalContentConfigEl, objModalContentEl,
+      navigateToConfigEl, objNavigateToEl,
+      // Existing elements
+      objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
+      textSpecificControlsEl, objTextContentEl,
+      objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
+
+  // --- Initialization ---
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("Admin_JS: DOMContentLoaded event fired!");
+    adminApp.setupDOMReferences();
+    adminApp.attachEventListeners();
+    switchToListView();
+    loadAdminProjectsList(); 
+    console.log("Admin_JS: Initialization complete.");
+  });
+
+  // --- Setup and Listeners ---
+  adminApp.setupDOMReferences = function() {
+    messageAreaEl = document.getElementById('messageArea');
+    loadingSpinnerEl = document.getElementById('loadingSpinner');
+    listViewContainerEl = document.getElementById('listViewContainer');
+    projectTitleInputEl = document.getElementById('projectTitleInput');
+    createProjectButtonEl = document.getElementById('createProjectButton');
+    adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+    editViewContainerEl = document.getElementById('editViewContainer');
+    editingProjectTitleEl = document.getElementById('editingProjectTitle');
+    backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
+    fabricCanvasEl = document.getElementById('fabricCanvasElement');
+    imageUploaderEl = document.getElementById('imageUploader');
+    addSlideButtonEl = document.getElementById('addSlideButton');
+    slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
+    saveProjectButtonEl = document.getElementById('saveProjectButton');
+    
+    addRectangleButtonEl = document.getElementById('addRectangleButton');
+    addCircleButtonEl = document.getElementById('addCircleButton');
+    addTextboxButtonEl = document.getElementById('addTextboxButton');
+
+    overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar'); 
+    objXEl = document.getElementById('objX');
+    objYEl = document.getElementById('objY');
+    objWidthEl = document.getElementById('objWidth');
+    objHeightEl = document.getElementById('objHeight');
+    objAngleEl = document.getElementById('objAngle');
+    objFillEl = document.getElementById('objFill');
+    objStrokeColorEl = document.getElementById('objStrokeColor');
+    objStrokeWidthEl = document.getElementById('objStrokeWidth');
+    objOpacityEl = document.getElementById('objOpacity');
+    textSpecificControlsEl = document.getElementById('textSpecificControls');
+    objTextContentEl = document.getElementById('objTextContent');
+    objShadowColorEl = document.getElementById('objShadowColor');
+    objShadowBlurEl = document.getElementById('objShadowBlur');
+    objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
+    objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
+
+    // New Interaction elements
+    objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
+    objInteractionActionEl = document.getElementById('objInteractionAction');
+    modalContentConfigEl = document.getElementById('modalContentConfig');
+    objModalContentEl = document.getElementById('objModalContent');
+    navigateToConfigEl = document.getElementById('navigateToConfig');
+    objNavigateToEl = document.getElementById('objNavigateTo');
+
+    if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
+    if (!slideThumbnailsContainerEl) console.warn("slideThumbnailsContainerEl not found during initial setup.");
+    if (!saveProjectButtonEl) console.warn("saveProjectButtonEl not found during initial setup.");
+    if (!imageUploaderEl) console.warn("imageUploaderEl not found during initial setup.");
+    if (!fabricCanvasEl) console.warn("fabricCanvasEl not found during initial setup.");
+    console.log("Admin_JS: DOM references set up.");
+  };
+
+  adminApp.attachEventListeners = function() {
+    const safelyAddListener = (element, eventType, handler, elementName) => {
+        if (element) {
+            element.addEventListener(eventType, handler);
+        } else {
+            if (elementName === 'createProjectButtonEl') console.warn(`Could not attach listener - ${elementName} not found initially.`);
+        }
     };
-  
-    // --- DOM Element References ---
-    let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
-    let listViewContainerEl, adminProjectListContainerEl;
-    let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
-    let imageUploaderEl;
-    let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; // Step 9
-    let addRectangleButtonEl, addCircleButtonEl; // Step 11
-    let addTextboxButtonEl; // Step 12
-  
-    // Toolbar Element References (Corrected ID for Step 13 - Option 2)
-    let overlayPropertiesToolbarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
-        objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
-        textSpecificControlsEl, objTextContentEl,
-        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
-  
-    // --- Initialization ---
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log("Admin_JS: DOMContentLoaded event fired!");
-      adminApp.setupDOMReferences();
-      adminApp.attachEventListeners();
-      switchToListView();
-      loadAdminProjectsList(); // Load project list on initial view
-      console.log("Admin_JS: Initialization complete.");
-    });
-  
-    // --- Setup and Listeners ---
-    adminApp.setupDOMReferences = function() {
-      messageAreaEl = document.getElementById('messageArea');
-      loadingSpinnerEl = document.getElementById('loadingSpinner');
-      listViewContainerEl = document.getElementById('listViewContainer');
-      projectTitleInputEl = document.getElementById('projectTitleInput');
-      createProjectButtonEl = document.getElementById('createProjectButton');
-      adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
-      editViewContainerEl = document.getElementById('editViewContainer');
-      editingProjectTitleEl = document.getElementById('editingProjectTitle');
-      backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
-      fabricCanvasEl = document.getElementById('fabricCanvasElement');
-      imageUploaderEl = document.getElementById('imageUploader');
-      addSlideButtonEl = document.getElementById('addSlideButton');
-      slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
-      saveProjectButtonEl = document.getElementById('saveProjectButton');
-      
-      // Step 11: Overlay tool buttons
-      addRectangleButtonEl = document.getElementById('addRectangleButton');
-      addCircleButtonEl = document.getElementById('addCircleButton');
-      // Step 12: Textbox button
-      addTextboxButtonEl = document.getElementById('addTextboxButton');
-  
-      // Step 13: Toolbar elements - ID for main container changed
-      overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar'); // CORRECTED ID
-      objXEl = document.getElementById('objX');
-      objYEl = document.getElementById('objY');
-      objWidthEl = document.getElementById('objWidth');
-      objHeightEl = document.getElementById('objHeight');
-      objAngleEl = document.getElementById('objAngle');
-      objFillEl = document.getElementById('objFill');
-      objStrokeColorEl = document.getElementById('objStrokeColor');
-      objStrokeWidthEl = document.getElementById('objStrokeWidth');
-      objOpacityEl = document.getElementById('objOpacity');
-      textSpecificControlsEl = document.getElementById('textSpecificControls');
-      objTextContentEl = document.getElementById('objTextContent');
-      objShadowColorEl = document.getElementById('objShadowColor');
-      objShadowBlurEl = document.getElementById('objShadowBlur');
-      objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
-      objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
-  
-      // Add warnings for elements only expected in edit view
-      if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
-      if (!slideThumbnailsContainerEl) console.warn("slideThumbnailsContainerEl not found during initial setup.");
-      if (!saveProjectButtonEl) console.warn("saveProjectButtonEl not found during initial setup.");
-      if (!imageUploaderEl) console.warn("imageUploaderEl not found during initial setup.");
-      if (!fabricCanvasEl) console.warn("fabricCanvasEl not found during initial setup.");
-      console.log("Admin_JS: DOM references set up.");
-    };
-  
-    adminApp.attachEventListeners = function() {
-      const safelyAddListener = (element, eventType, handler, elementName) => {
-          if (element) {
-              element.addEventListener(eventType, handler);
-          } else {
-              // Log warning only if element is expected globally (like create button)
-              if (elementName === 'createProjectButtonEl') console.warn(`Could not attach listener - ${elementName} not found initially.`);
-          }
-      };
-      safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
-      // Listeners for edit view elements will be attached/re-attached in switchToEditView
-      console.log("Admin_JS: Initial event listeners attached.");
-    };
-  
-    // --- UI View Management ---
-    function switchToListView() {
-      console.log("Switching to List View");
-      adminApp.state.currentView = 'list';
-      adminApp.state.currentProjectId = null;
-      adminApp.state.projectData = null; // Clear project data
+    safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
+    console.log("Admin_JS: Initial event listeners attached.");
+  };
+
+  // --- UI View Management ---
+  function switchToListView() {
+    console.log("Switching to List View");
+    adminApp.state.currentView = 'list';
+    adminApp.state.currentProjectId = null;
+    adminApp.state.projectData = null; 
+    adminApp.state.currentSlideIndex = -1;
+    if (adminApp.state.fabricCanvasInstance) {
+        adminApp.state.fabricCanvasInstance.dispose();
+        adminApp.state.fabricCanvasInstance = null;
+        console.log("Admin_JS: Disposed fabric canvas instance.");
+    }
+    if(listViewContainerEl) listViewContainerEl.style.display = 'block';
+    if(editViewContainerEl) editViewContainerEl.style.display = 'none';
+    if (messageAreaEl) messageAreaEl.innerHTML = '';
+    loadAdminProjectsList();
+  }
+
+  function switchToEditView(projectIdToEdit) {
+      console.log("Switching to Edit View for project ID:", projectIdToEdit);
+      adminApp.state.currentView = 'edit';
+      adminApp.state.currentProjectId = projectIdToEdit;
+      adminApp.state.projectData = null;
       adminApp.state.currentSlideIndex = -1;
+
+      if(listViewContainerEl) listViewContainerEl.style.display = 'none';
+      if(editViewContainerEl) editViewContainerEl.style.display = 'block';
+
+      if(editingProjectTitleEl) { 
+          editingProjectTitleEl.textContent = `Loading Project (ID: ${projectIdToEdit})...`;
+      }
+
       if (adminApp.state.fabricCanvasInstance) {
           adminApp.state.fabricCanvasInstance.dispose();
           adminApp.state.fabricCanvasInstance = null;
-          console.log("Admin_JS: Disposed fabric canvas instance.");
       }
-      if(listViewContainerEl) listViewContainerEl.style.display = 'block';
-      if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
-      // Reload list in case status changed etc.
-      loadAdminProjectsList();
-    }
-  
-    function switchToEditView(projectIdToEdit) {
-        console.log("Switching to Edit View for project ID:", projectIdToEdit);
-        adminApp.state.currentView = 'edit';
-        adminApp.state.currentProjectId = projectIdToEdit;
-        // Clear previous project state BUT DO NOT initialize projectData here anymore
-        adminApp.state.projectData = null;
+      if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; 
+
+      const ensureEditViewListener = (elementVar, id, eventType, handler) => {
+          if (!window[elementVar]) { 
+              window[elementVar] = document.getElementById(id);
+          }
+          const element = window[elementVar];
+          if (element && !element.hasAttribute('listener-attached')) {
+              element.addEventListener(eventType, handler);
+              element.setAttribute('listener-attached', 'true'); 
+              console.log(`Listener attached for ${eventType} on #${id} in switchToEditView.`);
+          } else if (!element) {
+              console.error(`CRITICAL: Element #${id} not found in switchToEditView!`);
+          }
+      };
+
+      fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
+      slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer'); 
+
+      ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView);
+      ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload);
+      ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide);
+      ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject);
+      ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle);
+      ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle);
+      ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox);
+
+      if (typeof fabric !== 'undefined' && fabricCanvasEl) {
+          adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
+              width: adminApp.state.defaultCanvasWidth,
+              height: adminApp.state.defaultCanvasHeight,
+              backgroundColor: '#e9e9e9'
+          });
+          fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
+          fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
+          console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
+
+          initToolbar(); 
+          
+          adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
+            if (e.target) populateToolbar(e.target);
+          });
+          adminApp.state.fabricCanvasInstance.on('selection:created', (e) => { 
+            if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]); 
+          });
+          adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => { 
+             if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]);
+          });
+          adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
+            populateToolbar(null);
+          });
+          if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none'; 
+
+          loadProjectForEditing(projectIdToEdit); 
+
+      } else { 
+          console.error("Fabric.js or canvas element not ready in switchToEditView.");
+          displayMessage("Critical error: Editor components not ready.", false);
+          showLoading(false);
+      }
+  }
+
+  function loadProjectForEditing(projectId) {
+    console.log(`loadProjectForEditing: Called for projectId: ${projectId}`);
+    if (!projectId) { console.error("loadProjectForEditing: No projectId."); displayMessage("Error: Cannot load project.", false); return; }
+    showLoading(true);
+    displayMessage("Loading project data...", true);
+    google.script.run
+        .withSuccessHandler(onProjectDataLoaded)
+        .withFailureHandler(onServerError) 
+        .getProjectDataForEditing(projectId);
+  }
+
+  function onProjectDataLoaded(jsonString) {
+    console.log("onProjectDataLoaded: Received data string length:", jsonString ? jsonString.length : 'null');
+
+    if (jsonString === null || jsonString === undefined) { 
+        showLoading(false);
+        console.error("onProjectDataLoaded: Received null data string from server (Project or data file likely not found).");
+        displayMessage("Error: Could not load project data. Project or its data file may not exist.", false);
+        adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
         adminApp.state.currentSlideIndex = -1;
-  
-        if(listViewContainerEl) listViewContainerEl.style.display = 'none';
-        if(editViewContainerEl) editViewContainerEl.style.display = 'block';
-  
-        if(editingProjectTitleEl) { // Set temporary title
-            editingProjectTitleEl.textContent = `Loading Project (ID: ${projectIdToEdit})...`;
-        }
-  
-        if (adminApp.state.fabricCanvasInstance) {
-            adminApp.state.fabricCanvasInstance.dispose();
-            adminApp.state.fabricCanvasInstance = null;
-        }
-        if (messageAreaEl) messageAreaEl.innerHTML = '';
-        if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; // Clear old thumbnails
-  
-        // Helper to ensure elements are found and listeners attached ONLY ONCE for edit view
-        const ensureEditViewListener = (elementVar, id, eventType, handler) => {
-            if (!window[elementVar]) { // Check if global variable needs assignment
-                window[elementVar] = document.getElementById(id);
-            }
-            const element = window[elementVar];
-            if (element && !element.hasAttribute('listener-attached')) {
-                element.addEventListener(eventType, handler);
-                element.setAttribute('listener-attached', 'true'); // Mark as attached
-                console.log(`Listener attached for ${eventType} on #${id} in switchToEditView.`);
-            } else if (!element) {
-                console.error(`CRITICAL: Element #${id} not found in switchToEditView!`);
-            }
-        };
-  
-        // Ensure elements are referenced (some don't need listeners checked here)
-        fabricCanvasEl = document.getElementById('fabricCanvasElement'); // Ensure reference
-        slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer'); // Ensure reference
-  
-        // Attach listeners for edit view buttons if not already attached
-        ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView);
-        ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload);
-        ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide);
-        ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject);
-        // Step 11: Listeners for overlay tools
-        ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle);
-        ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle);
-        // Step 12: Listener for textbox tool
-        ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox);
-  
-  
-        // Initialize Fabric Canvas with defaults
-        if (typeof fabric !== 'undefined' && fabricCanvasEl) {
-            adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
-                width: adminApp.state.defaultCanvasWidth,
-                height: adminApp.state.defaultCanvasHeight,
-                backgroundColor: '#e9e9e9'
-            });
-            fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
-            fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
-            console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
-  
-            // Step 13: Initialize toolbar and canvas event listeners
-            initToolbar(); // RENAMED from initSidebar
-            
-            adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
-              if (e.target) populateToolbar(e.target);
-            });
-            adminApp.state.fabricCanvasInstance.on('selection:created', (e) => { // When a new selection is made
-              if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]); // Fabric 5.x sends e.selected
-            });
-            adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => { // When an existing selection is changed
-               if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]);
-            });
-            adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
-              populateToolbar(null);
-            });
-            // Initially hide toolbar
-            if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none'; // Using correct variable
-  
-            // ** NOW CALL LOAD PROJECT DATA **
-            loadProjectForEditing(projectIdToEdit); // Load the actual project data
-  
-        } else { /* Error handling */
-            console.error("Fabric.js or canvas element not ready in switchToEditView.");
-            displayMessage("Critical error: Editor components not ready.", false);
-            showLoading(false);
-        }
+        if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
+        updateSlideThumbnailsUI(); 
+        return;
     }
-  
-    // --- Project Loading (Step 10) ---
-    function loadProjectForEditing(projectId) {
-      console.log(`loadProjectForEditing: Called for projectId: ${projectId}`);
-      if (!projectId) { console.error("loadProjectForEditing: No projectId."); displayMessage("Error: Cannot load project.", false); return; }
-      showLoading(true);
-      displayMessage("Loading project data...", true);
-      google.script.run
-          .withSuccessHandler(onProjectDataLoaded)
-          .withFailureHandler(onServerError) // Handles showLoading(false) on error
-          .getProjectDataForEditing(projectId);
+
+    try {
+        const loadedData = JSON.parse(jsonString);
+        console.log("Parsed project data:", loadedData);
+
+        if (!loadedData || typeof loadedData !== 'object') throw new Error("Parsed data is not a valid object.");
+        if (!loadedData.projectId) throw new Error("Loaded project data is missing 'projectId'.");
+        
+        if (!Array.isArray(loadedData.slides)) {
+             console.warn("Loaded data missing 'slides' array or it's invalid, defaulting to empty.");
+             loadedData.slides = [];
+        }
+
+        adminApp.state.projectData = loadedData; 
+
+        if (editingProjectTitleEl) {
+            editingProjectTitleEl.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`;
+        }
+
+        updateSlideThumbnailsUI(); 
+
+        if (adminApp.state.projectData.slides.length > 0) {
+            selectSlide(0); 
+            displayMessage("Project loaded successfully.", true);
+        } else {
+            displayMessage("Project loaded, but it has no slides. Adding one.", true);
+            handleAddSlide(); 
+        }
+        showLoading(false); 
+
+    } catch (e) {
+        showLoading(false);
+        console.error("onProjectDataLoaded: Error parsing JSON data or invalid structure:", e);
+        console.error("Received JSON string that failed parsing:", jsonString); 
+        displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
+        adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
+        adminApp.state.currentSlideIndex = -1;
+        if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`;
+        updateSlideThumbnailsUI(); 
     }
-  
-    function onProjectDataLoaded(jsonString) {
-      console.log("onProjectDataLoaded: Received data string length:", jsonString ? jsonString.length : 'null');
-      // Note: showLoading(false) will be called within this function or in onServerError
-  
-      if (jsonString === null || jsonString === undefined) { // Check specifically for null from server
-          showLoading(false);
-          console.error("onProjectDataLoaded: Received null data string from server (Project or data file likely not found).");
-          displayMessage("Error: Could not load project data. Project or its data file may not exist.", false);
-          adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
-          adminApp.state.currentSlideIndex = -1;
-          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
-          updateSlideThumbnailsUI(); // Show empty state
-          return;
+  }
+
+  function handleAddSlide() {
+      console.log("handleAddSlide called");
+      if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
+      saveCurrentSlideState();
+      const newSlideId = 'slide_' + Utilities.getUuid();
+      const newSlide = { slideId: newSlideId, canvasWidth: adminApp.state.defaultCanvasWidth, canvasHeight: adminApp.state.defaultCanvasHeight, fabricCanvasJSON: null, slideMedia: { type: null, url: null, driveFileId: null, mimeType: null } };
+      if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
+      adminApp.state.projectData.slides.push(newSlide);
+      const newSlideIndex = adminApp.state.projectData.slides.length - 1;
+      selectSlide(newSlideIndex);
+      console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
+  }
+
+  function selectSlide(slideIndex) {
+      if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid index or slides array missing.", slideIndex); return; }
+      console.log(`Selecting slide ${slideIndex + 1}`);
+      saveCurrentSlideState();
+
+      adminApp.state.currentSlideIndex = slideIndex;
+      const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
+      const canvas = adminApp.state.fabricCanvasInstance;
+      if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
+
+      const slideWidth = selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth;
+      const slideHeight = selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight;
+      canvas.setWidth(slideWidth);
+      canvas.setHeight(slideHeight);
+      if (fabricCanvasEl) { fabricCanvasEl.width = slideWidth; fabricCanvasEl.height = slideHeight; }
+      console.log(`Canvas set to dimensions for slide ${slideIndex + 1}: ${slideWidth}x${slideHeight}`);
+
+      canvas.clear();
+      canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
+      canvas.backgroundColor = '#e9e9e9';
+
+      const media = selectedSlideData.slideMedia;
+      if (media && media.type === 'image' && media.url) {
+          if (media.url.startsWith('data:image')) { 
+              console.log("Loading background from base64 data URI.");
+              fabric.Image.fromURL(media.url, function(img) {
+                  if (!adminApp.state.fabricCanvasInstance) return;
+                  if (adminApp.state.currentSlideIndex !== slideIndex) {
+                      console.log("Slide changed before background loaded for index", slideIndex);
+                      return;
+                  }
+                  adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
+                  console.log("Background loaded for slide", slideIndex);
+              }, { crossOrigin: 'anonymous' }); 
+          } else if (media.driveFileId) { 
+               console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
+               showLoading(true); displayMessage("Loading slide background...", true);
+               google.script.run
+                   .withSuccessHandler(function(response) { 
+                        showLoading(false);
+                        if (adminApp.state.currentSlideIndex !== slideIndex) {
+                            console.log("Slide changed before background could be fetched for index", slideIndex);
+                            return;
+                        }
+                        if (response && response.success && response.base64Data) {
+                            fabric.Image.fromURL(response.base64Data, function(img) { 
+                                if (!adminApp.state.fabricCanvasInstance) return;
+                                adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
+                                console.log("Background fetched and loaded for slide", slideIndex);
+                            });
+                        } else { 
+                            console.error("Failed to re-fetch background", response);
+                            displayMessage("Error loading slide background image.", false); 
+                            canvas.renderAll(); 
+                        }
+                   })
+                   .withFailureHandler(onServerError) 
+                   .getImageAsBase64(media.driveFileId);
+           } else {
+              console.warn("Slide media URL/ID not suitable for loading:", media);
+              canvas.renderAll();
+          }
+      } else {
+          console.log("No background media found for slide", slideIndex);
+          canvas.renderAll();
       }
-  
+
+      if (selectedSlideData.fabricCanvasJSON) {
+        console.log("Loading fabricCanvasJSON for slide", slideIndex);
+        canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
+            if (!adminApp.state.fabricCanvasInstance) return; 
+            if (adminApp.state.currentSlideIndex !== slideIndex) {
+                console.log("Slide changed before overlays loaded for index", slideIndex);
+                return;
+            }
+            adminApp.state.fabricCanvasInstance.renderAll(); 
+            console.log("Finished loading canvas JSON for slide", slideIndex);
+            const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
+            populateToolbar(activeObj); 
+          }, function(o, object) { 
+          });
+          } else { 
+          console.log("No fabricCanvasJSON to load for slide", slideIndex);
+          canvas.renderAll(); 
+          populateToolbar(null); 
+      }
+      updateSlideThumbnailsUI(); 
+      if (imageUploaderEl) imageUploaderEl.value = null; 
+  }
+
+  function updateSlideThumbnailsUI() {
+      if (!slideThumbnailsContainerEl || !adminApp.state.projectData) { console.warn("updateSlideThumbnailsUI: Container or project data missing."); return; }
+      slideThumbnailsContainerEl.innerHTML = '';
+      if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
+      adminApp.state.projectData.slides.forEach((slide, index) => {
+          const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
+          thumb.textContent = `Slide ${index + 1}`; thumb.title = `Select Slide ${index + 1}`;
+          if (index === adminApp.state.currentSlideIndex) thumb.classList.add('active-slide');
+          thumb.onclick = function() { selectSlide(index); };
+          const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '×'; deleteBtn.title = "Delete slide";
+          deleteBtn.onclick = function(event) { event.stopPropagation(); handleDeleteSlide(index); };
+          thumb.appendChild(deleteBtn); slideThumbnailsContainerEl.appendChild(thumb);
+      });
+  }
+
+  function handleDeleteSlide(slideIndex) {
+      if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("handleDeleteSlide: Invalid index."); return; }
+      if (adminApp.state.projectData.slides.length <= 1) { displayMessage("Cannot delete the last slide.", false); return; }
+      if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) return;
+      adminApp.state.projectData.slides.splice(slideIndex, 1);
+      console.log("Deleted slide at index:", slideIndex);
+      const indexToSelect = (slideIndex === 0 && adminApp.state.projectData.slides.length > 0) ? 0 : Math.max(0, slideIndex - 1);
+
+      if (adminApp.state.currentSlideIndex === slideIndex) {
+          adminApp.state.currentSlideIndex = -1; 
+          selectSlide(indexToSelect);
+      } else if (adminApp.state.currentSlideIndex > slideIndex) {
+          adminApp.state.currentSlideIndex--; 
+          updateSlideThumbnailsUI(); 
+      } else {
+           updateSlideThumbnailsUI(); 
+      }
+  }
+
+  function saveCurrentSlideState() {
+      if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData || !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) { return; }
       try {
-          const loadedData = JSON.parse(jsonString);
-          console.log("Parsed project data:", loadedData);
-  
-          if (!loadedData || typeof loadedData !== 'object') throw new Error("Parsed data is not a valid object.");
-          if (!loadedData.projectId) throw new Error("Loaded project data is missing 'projectId'.");
-          
-          if (!Array.isArray(loadedData.slides)) {
-               console.warn("Loaded data missing 'slides' array or it's invalid, defaulting to empty.");
-               loadedData.slides = [];
-          }
-  
-          adminApp.state.projectData = loadedData; // Assign loaded data to state
-  
-          if (editingProjectTitleEl) {
-              editingProjectTitleEl.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`;
-          }
-  
-          updateSlideThumbnailsUI(); // Render thumbnails
-  
-          if (adminApp.state.projectData.slides.length > 0) {
-              selectSlide(0); // Select and load the first slide
-              displayMessage("Project loaded successfully.", true);
-          } else {
-              displayMessage("Project loaded, but it has no slides. Adding one.", true);
-              handleAddSlide(); // Add an initial slide if the loaded project was empty
-          }
-          showLoading(false); // Success path loading finished
-  
-      } catch (e) {
-          showLoading(false);
-          console.error("onProjectDataLoaded: Error parsing JSON data or invalid structure:", e);
-          console.error("Received JSON string that failed parsing:", jsonString); // Log the bad string
-          displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
-          adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
-          adminApp.state.currentSlideIndex = -1;
-          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`;
-          updateSlideThumbnailsUI(); // Clear thumbnails
-      }
-    }
-  
-  
-    // --- Slide Management (Step 9 & 10) ---
-    function handleAddSlide() {
-        console.log("handleAddSlide called");
-        if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
-        saveCurrentSlideState();
-        const newSlideId = 'slide_' + Utilities.getUuid();
-        const newSlide = { slideId: newSlideId, canvasWidth: adminApp.state.defaultCanvasWidth, canvasHeight: adminApp.state.defaultCanvasHeight, fabricCanvasJSON: null, slideMedia: { type: null, url: null, driveFileId: null, mimeType: null } };
-        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
-        adminApp.state.projectData.slides.push(newSlide);
-        const newSlideIndex = adminApp.state.projectData.slides.length - 1;
-        selectSlide(newSlideIndex);
-        console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
-    }
-  
-    function selectSlide(slideIndex) {
-        if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid index or slides array missing.", slideIndex); return; }
-        console.log(`Selecting slide ${slideIndex + 1}`);
-        saveCurrentSlideState();
-  
-        adminApp.state.currentSlideIndex = slideIndex;
-        const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
+        const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
         const canvas = adminApp.state.fabricCanvasInstance;
-        if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
-  
-        const slideWidth = selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth;
-        const slideHeight = selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight;
-        canvas.setWidth(slideWidth);
-        canvas.setHeight(slideHeight);
-        if (fabricCanvasEl) { fabricCanvasEl.width = slideWidth; fabricCanvasEl.height = slideHeight; }
-        console.log(`Canvas set to dimensions for slide ${slideIndex + 1}: ${slideWidth}x${slideHeight}`);
-  
-        canvas.clear();
-        canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
-        canvas.backgroundColor = '#e9e9e9';
-  
-        const media = selectedSlideData.slideMedia;
-        if (media && media.type === 'image' && media.url) {
-            if (media.url.startsWith('data:image')) { 
-                console.log("Loading background from base64 data URI.");
-                fabric.Image.fromURL(media.url, function(img) {
-                    if (!adminApp.state.fabricCanvasInstance) return;
-                    if (adminApp.state.currentSlideIndex !== slideIndex) {
-                        console.log("Slide changed before background loaded for index", slideIndex);
-                        return;
-                    }
-                    adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
-                    console.log("Background loaded for slide", slideIndex);
-                }, { crossOrigin: 'anonymous' }); 
-            } else if (media.driveFileId) { 
-                 console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
-                 showLoading(true); displayMessage("Loading slide background...", true);
-                 google.script.run
-                     .withSuccessHandler(function(response) { 
-                          showLoading(false);
-                          if (adminApp.state.currentSlideIndex !== slideIndex) {
-                              console.log("Slide changed before background could be fetched for index", slideIndex);
-                              return;
-                          }
-                          if (response && response.success && response.base64Data) {
-                              fabric.Image.fromURL(response.base64Data, function(img) { 
-                                  if (!adminApp.state.fabricCanvasInstance) return;
-                                  adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
-                                  console.log("Background fetched and loaded for slide", slideIndex);
-                              });
-                          } else { 
-                              console.error("Failed to re-fetch background", response);
-                              displayMessage("Error loading slide background image.", false); 
-                              canvas.renderAll(); 
-                          }
-                     })
-                     .withFailureHandler(onServerError) 
-                     .getImageAsBase64(media.driveFileId);
-             } else {
-                console.warn("Slide media URL/ID not suitable for loading:", media);
-                canvas.renderAll();
-            }
-        } else {
-            console.log("No background media found for slide", slideIndex);
-            canvas.renderAll();
+        const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; 
+        currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
+        currentSlide.canvasWidth = canvas.getWidth();
+        currentSlide.canvasHeight = canvas.getHeight();
+        if (!currentSlide.slideMedia) {
+             currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null };
         }
-  
-        if (selectedSlideData.fabricCanvasJSON) {
-          console.log("Loading fabricCanvasJSON for slide", slideIndex);
-          // Ensure canvas background is set before loading JSON which might rely on dimensions/state
-          // canvas.renderAll(); // Render background first - this might be redundant if loadFromJSON also renders.
-          
-          canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
-              // This callback is executed after all objects are loaded and rendered.
-              if (!adminApp.state.fabricCanvasInstance) return; // Safety check
+        console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved.`);
+      } catch(e) {
+          console.error("Error saving slide state:", e);
+      }
+  }
 
-              // Check if we are still on the same slide index in case of async operations
-              if (adminApp.state.currentSlideIndex !== slideIndex) {
-                  console.log("Slide changed before overlays loaded for index", slideIndex);
-                  return;
-              }
-              
-              adminApp.state.fabricCanvasInstance.renderAll(); // Ensure final render
-              console.log("Finished loading canvas JSON for slide", slideIndex);
+  function handleSaveProject() {
+      if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
+      if (adminApp.state.isLoading) return;
+      saveCurrentSlideState();
+      showLoading(true); displayMessage("Saving project...", true);
+      try {
+          const jsonDataString = JSON.stringify(adminApp.state.projectData);
+          console.log("Saving projectData string length:", jsonDataString.length); 
+          google.script.run
+              .withSuccessHandler(onProjectSaved)
+              .withFailureHandler(onServerError)
+              .saveProjectData(adminApp.state.currentProjectId, jsonDataString);
+      } catch (e) {
+           showLoading(false);
+           console.error("Error stringifying project data:", e);
+           displayMessage("Error preparing data for saving.", false);
+      }
+  }
 
-              // After loading, check if an object is active (Fabric might not auto-select)
-              // For now, we'll just ensure the toolbar reflects no selection.
-              // A more advanced approach could be to re-select the last active object if its ID was saved.
-              const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
-              populateToolbar(activeObj); // Update toolbar based on current selection (likely null)
-            }, function(o, object) { 
-                /* 
-                  Revival function for custom properties (o is the object data, object is the Fabric object instance)
-                  This is where you would re-initialize any complex custom object logic or non-standard properties
-                  if they weren't simple data types that Fabric handles automatically.
-                  For now, our customInteraction, customAnimation, sequenceOrder are simple objects/primitives
-                  and should be revived correctly by Fabric if they are direct properties of the fabric object.
-                */
-                // Example: if (o.customType === 'mySpecialObject') { object.myCustomMethod(); }
-            });
-            } else { // This 'else' is for: if (!selectedSlideData.fabricCanvasJSON)
-            console.log("No fabricCanvasJSON to load for slide", slideIndex);
-            canvas.renderAll(); // Ensure canvas is rendered even if empty
-            populateToolbar(null); // Ensure toolbar is cleared if no JSON to load
-        }
-
-        updateSlideThumbnailsUI(); // Highlight active thumbnail
-        if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
-        // The populateToolbar(null) that was here is now handled within the if/else for fabricCanvasJSON
-    }
-  
-    function updateSlideThumbnailsUI() {
-        if (!slideThumbnailsContainerEl || !adminApp.state.projectData) { console.warn("updateSlideThumbnailsUI: Container or project data missing."); return; }
-        slideThumbnailsContainerEl.innerHTML = '';
-        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
-        adminApp.state.projectData.slides.forEach((slide, index) => {
-            const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
-            thumb.textContent = `Slide ${index + 1}`; thumb.title = `Select Slide ${index + 1}`;
-            if (index === adminApp.state.currentSlideIndex) thumb.classList.add('active-slide');
-            thumb.onclick = function() { selectSlide(index); };
-            const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '×'; deleteBtn.title = "Delete slide";
-            deleteBtn.onclick = function(event) { event.stopPropagation(); handleDeleteSlide(index); };
-            thumb.appendChild(deleteBtn); slideThumbnailsContainerEl.appendChild(thumb);
-        });
-    }
-  
-    function handleDeleteSlide(slideIndex) {
-        if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("handleDeleteSlide: Invalid index."); return; }
-        if (adminApp.state.projectData.slides.length <= 1) { displayMessage("Cannot delete the last slide.", false); return; }
-        if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) return;
-        adminApp.state.projectData.slides.splice(slideIndex, 1);
-        console.log("Deleted slide at index:", slideIndex);
-        const indexToSelect = (slideIndex === 0 && adminApp.state.projectData.slides.length > 0) ? 0 : Math.max(0, slideIndex - 1);
-  
-        if (adminApp.state.currentSlideIndex === slideIndex) {
-            adminApp.state.currentSlideIndex = -1; 
-            selectSlide(indexToSelect);
-        } else if (adminApp.state.currentSlideIndex > slideIndex) {
-            adminApp.state.currentSlideIndex--; 
-            updateSlideThumbnailsUI(); 
-        } else {
-             updateSlideThumbnailsUI(); 
-        }
-    }
-  
-  
-    function saveCurrentSlideState() {
-        if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData || !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) { return; }
-        try {
-          const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-          const canvas = adminApp.state.fabricCanvasInstance;
-          // IMPORTANT: Add all custom props you want to save with objects here
-          const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; 
-          currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
-          currentSlide.canvasWidth = canvas.getWidth();
-          currentSlide.canvasHeight = canvas.getHeight();
-          if (!currentSlide.slideMedia) {
-               currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null };
-          }
-          console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved.`);
-        } catch(e) {
-            console.error("Error saving slide state:", e);
-        }
-    }
-  
-    // --- Project Saving (Step 9) ---
-    function handleSaveProject() {
-        if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
-        if (adminApp.state.isLoading) return;
-        saveCurrentSlideState();
-        showLoading(true); displayMessage("Saving project...", true);
-        try {
-            const jsonDataString = JSON.stringify(adminApp.state.projectData);
-            console.log("Saving projectData string length:", jsonDataString.length); 
-            google.script.run
-                .withSuccessHandler(onProjectSaved)
-                .withFailureHandler(onServerError)
-                .saveProjectData(adminApp.state.currentProjectId, jsonDataString);
-        } catch (e) {
-             showLoading(false);
-             console.error("Error stringifying project data:", e);
-             displayMessage("Error preparing data for saving.", false);
-        }
-    }
-  
-    function onProjectSaved(response) {
-        showLoading(false);
-        if (response && response.success) { displayMessage(response.message || "Project saved!", true); }
-        else { onServerError((response && response.error) ? response.error : "Failed to save."); }
-    }
-  
-    // --- General UI Functions ---
-    function showLoading(show) {
-      adminApp.state.isLoading = show;
-      if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
-      else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
-    }
-    function displayMessage(message, isSuccess) {
-        if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage messageAreaEl not found. Message:", message); }
-    }
-    function onServerError(errorObject) {
-      console.error("onServerError triggered:", errorObject);
+  function onProjectSaved(response) {
       showLoading(false);
-      let errorMessage = "An unknown server error occurred.";
-       if (typeof errorObject === 'string') { errorMessage = errorObject; }
-       else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
-      console.error('Formatted Server Error Message:', errorMessage);
-      displayMessage('Server Error: ' + errorMessage, false);
-    }
-  
-    // --- Project Creation (Step 3) ---
-    function handleCreateProject() {
-        if (adminApp.state.isLoading) return;
-        const currentProjectTitle = projectTitleInputEl.value.trim();
-        if (!currentProjectTitle) { displayMessage('Project title cannot be empty.', false); projectTitleInputEl.focus(); return; }
-        showLoading(true);
-        google.script.run.withSuccessHandler(onProjectCreated).withFailureHandler(onServerError).createProject(currentProjectTitle);
-    }
-    function onProjectCreated(response) {
-        showLoading(false);
-        if (response && response.success) { displayMessage(response.message || 'Project created!', true); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); }
-        else { onServerError((response && response.error) ? response.error : 'Failed to create project.'); }
-    }
-  
-    // --- Project List (Step 4) ---
-    function loadAdminProjectsList() {
-      console.log("loadAdminProjectsList: Function called.");
-      if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found."); showLoading(false); return; }
-      if (!google || !google.script || !google.script.run) { console.error("loadAdminProjectsList: google.script.run unavailable."); displayMessage("Error: Client-server bridge unavailable.", false); return; }
+      if (response && response.success) { displayMessage(response.message || "Project saved!", true); }
+      else { onServerError((response && response.error) ? response.error : "Failed to save."); }
+  }
+
+  function showLoading(show) {
+    adminApp.state.isLoading = show;
+    if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+    else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
+  }
+  function displayMessage(message, isSuccess) {
+      if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage messageAreaEl not found. Message:", message); }
+  }
+  function onServerError(errorObject) {
+    console.error("onServerError triggered:", errorObject);
+    showLoading(false);
+    let errorMessage = "An unknown server error occurred.";
+     if (typeof errorObject === 'string') { errorMessage = errorObject; }
+     else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
+    console.error('Formatted Server Error Message:', errorMessage);
+    displayMessage('Server Error: ' + errorMessage, false);
+  }
+
+  function handleCreateProject() {
+      if (adminApp.state.isLoading) return;
+      const currentProjectTitle = projectTitleInputEl.value.trim();
+      if (!currentProjectTitle) { displayMessage('Project title cannot be empty.', false); projectTitleInputEl.focus(); return; }
       showLoading(true);
-      console.log("loadAdminProjectsList: Calling google.script.run.getAllProjectsForAdmin...");
-      google.script.run
-        .withSuccessHandler(displayAdminProjects)
-        .withFailureHandler(onServerError)
-        .getAllProjectsForAdmin();
-       console.log("loadAdminProjectsList: google.script.run.getAllProjectsForAdmin call initiated.");
-    }
-    function displayAdminProjects(projectsArray) {
-      console.log("displayAdminProjects (Success Handler) received data:", projectsArray);
+      google.script.run.withSuccessHandler(onProjectCreated).withFailureHandler(onServerError).createProject(currentProjectTitle);
+  }
+  function onProjectCreated(response) {
       showLoading(false);
-      if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found."); return; }
-      adminProjectListContainerEl.innerHTML = '';
-      if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
-      projectsArray.forEach(project => { 
-          if (!project || !project.projectId) return; const projectItem = document.createElement('div'); projectItem.className = 'project-item'; const titleSpan = document.createElement('span'); titleSpan.textContent = project.projectTitle || 'Untitled Project'; const statusSpan = document.createElement('span'); statusSpan.className = 'status'; statusSpan.textContent = `(${project.status || 'N/A'})`; const titleAndStatusDiv = document.createElement('div'); titleAndStatusDiv.appendChild(titleSpan); titleAndStatusDiv.appendChild(statusSpan); const editButton = document.createElement('button'); editButton.textContent = 'Edit'; editButton.className = 'edit-button'; editButton.setAttribute('data-project-id', project.projectId); editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; projectItem.appendChild(titleAndStatusDiv); projectItem.appendChild(editButton); adminProjectListContainerEl.appendChild(projectItem);
-       });
-      console.log("displayAdminProjects: Finished rendering project list.");
-    }
+      if (response && response.success) { displayMessage(response.message || 'Project created!', true); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); }
+      else { onServerError((response && response.error) ? response.error : 'Failed to create project.'); }
+  }
+
+  function loadAdminProjectsList() {
+    console.log("loadAdminProjectsList: Function called.");
+    if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found."); showLoading(false); return; }
+    if (!google || !google.script || !google.script.run) { console.error("loadAdminProjectsList: google.script.run unavailable."); displayMessage("Error: Client-server bridge unavailable.", false); return; }
+    showLoading(true);
+    console.log("loadAdminProjectsList: Calling google.script.run.getAllProjectsForAdmin...");
+    google.script.run
+      .withSuccessHandler(displayAdminProjects)
+      .withFailureHandler(onServerError)
+      .getAllProjectsForAdmin();
+     console.log("loadAdminProjectsList: google.script.run.getAllProjectsForAdmin call initiated.");
+  }
+  function displayAdminProjects(projectsArray) {
+    console.log("displayAdminProjects (Success Handler) received data:", projectsArray);
+    showLoading(false);
+    if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found."); return; }
+    adminProjectListContainerEl.innerHTML = '';
+    if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
+    projectsArray.forEach(project => { 
+        if (!project || !project.projectId) return; const projectItem = document.createElement('div'); projectItem.className = 'project-item'; const titleSpan = document.createElement('span'); titleSpan.textContent = project.projectTitle || 'Untitled Project'; const statusSpan = document.createElement('span'); statusSpan.className = 'status'; statusSpan.textContent = `(${project.status || 'N/A'})`; const titleAndStatusDiv = document.createElement('div'); titleAndStatusDiv.appendChild(titleSpan); titleAndStatusDiv.appendChild(statusSpan); const editButton = document.createElement('button'); editButton.textContent = 'Edit'; editButton.className = 'edit-button'; editButton.setAttribute('data-project-id', project.projectId); editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; projectItem.appendChild(titleAndStatusDiv); projectItem.appendChild(editButton); adminProjectListContainerEl.appendChild(projectItem);
+     });
+    console.log("displayAdminProjects: Finished rendering project list.");
+  }
+
+  function handleImageUpload(event) {
+      if (adminApp.state.isLoading) { if(event.target) event.target.value = null; return; }
+      const file = event.target.files[0];
+      if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
+      showLoading(true); displayMessage("Uploading image...", true);
+      const reader = new FileReader();
+      reader.onload = function(e) {
+          const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
+          if (!adminApp.state.currentProjectId) { showLoading(false); displayMessage("Error: No project.", false); if(event.target) event.target.value = null; return; }
+          google.script.run.withSuccessHandler(onImageUploaded).withFailureHandler(onServerError).uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
+      };
+      reader.onerror = function(error) { showLoading(false); displayMessage("Error reading file.", false); console.error(error); if(event.target) event.target.value = null; };
+      reader.readAsDataURL(file);
+  }
+  function onImageUploaded(response) { 
+      showLoading(false); if (imageUploaderEl) imageUploaderEl.value = null;
+      if (response && response.success && response.driveFileId) {
+          displayMessage("Image uploaded. Fetching...", true); showLoading(true);
+          adminApp.state.lastUploadedDriveId = response.driveFileId; 
+          google.script.run.withSuccessHandler(onBase64ImageReceived).withFailureHandler(onServerError).getImageAsBase64(response.driveFileId);
+      } else { onServerError({ message: (response && response.error) ? response.error : "Upload failed." }); }
+  }
+  function onBase64ImageReceived(response) { 
+      showLoading(false);
+      if (response && response.success && response.base64Data) {
+          if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas/Slide not ready.", false); return; }
+          const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+          if (!currentSlide) { displayMessage("Error: Slide data missing.", false); return; }
+          fabric.Image.fromURL(response.base64Data, function(img) {
+              if (!adminApp.state.fabricCanvasInstance) return;
+              if (adminApp.state.currentSlideIndex === -1) return; 
+              const canvas = adminApp.state.fabricCanvasInstance; const imgWidth = img.width; const imgHeight = img.height; const maxWidth = 960;
+              let cvWidth = imgWidth; let cvHeight = imgHeight; const ratio = imgWidth / imgHeight;
+              if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / ratio); }
+              canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
+              if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: cvWidth / imgWidth, scaleY: cvHeight / imgHeight });
+              canvas.renderAll(); displayMessage("Background set.", true);
+              if (!currentSlide.slideMedia) currentSlide.slideMedia = {}; 
+              currentSlide.slideMedia.type = 'image';
+              currentSlide.slideMedia.url = response.base64Data; 
+              currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null; 
+              currentSlide.slideMedia.mimeType = response.mimeType;
+              currentSlide.canvasWidth = cvWidth; currentSlide.canvasHeight = cvHeight;
+              console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated.`);
+              updateSlideThumbnailsUI();
+              delete adminApp.state.lastUploadedDriveId; 
+          });
+      } else { onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image." }); }
+  }
+
+  function addRectangle() {
+    if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
+    const canvas = adminApp.state.fabricCanvasInstance;
+    const rect = new fabric.Rect({ left: 50, top: 50, fill: 'rgba(255,0,0,0.7)', width: 150, height: 100, stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
+    canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll(); console.log("Rectangle added to canvas:", rect);
+  }
+
+  function addCircle() {
+    if (!adminApp.state.fabricCanvasInstance) { console.error("addCircle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
+    const canvas = adminApp.state.fabricCanvasInstance;
+    const circle = new fabric.Circle({ left: 150, top: 150, radius: 50, fill: 'rgba(0,0,255,0.7)', stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
+    canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll(); console.log("Circle added to canvas:", circle);
+  }
+
+  function addTextbox() {
+    if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add text.", false); return; }
+    const canvas = adminApp.state.fabricCanvasInstance;
+    const textbox = new fabric.Textbox('Editable Text', { left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000', customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
+    canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
+  }
   
-    // --- Image Upload Handling (Step 8) ---
-    function handleImageUpload(event) {
-        if (adminApp.state.isLoading) { if(event.target) event.target.value = null; return; }
-        const file = event.target.files[0];
-        if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
-        showLoading(true); displayMessage("Uploading image...", true);
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
-            if (!adminApp.state.currentProjectId) { showLoading(false); displayMessage("Error: No project.", false); if(event.target) event.target.value = null; return; }
-            google.script.run.withSuccessHandler(onImageUploaded).withFailureHandler(onServerError).uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
-        };
-        reader.onerror = function(error) { showLoading(false); displayMessage("Error reading file.", false); console.error(error); if(event.target) event.target.value = null; };
-        reader.readAsDataURL(file);
+  function toHexColor(fabricColor) {
+    if (!fabricColor) return '#000000'; 
+    try {
+      const colorInstance = new fabric.Color(fabricColor);
+      const hex = colorInstance.toHex();
+      return '#' + hex;
+    } catch (e) {
+      console.warn("Could not convert color to HEX:", fabricColor, e);
+      return '#000000'; 
     }
-    function onImageUploaded(response) { 
-        showLoading(false); if (imageUploaderEl) imageUploaderEl.value = null;
-        if (response && response.success && response.driveFileId) {
-            displayMessage("Image uploaded. Fetching...", true); showLoading(true);
-            adminApp.state.lastUploadedDriveId = response.driveFileId; 
-            google.script.run.withSuccessHandler(onBase64ImageReceived).withFailureHandler(onServerError).getImageAsBase64(response.driveFileId);
-        } else { onServerError({ message: (response && response.error) ? response.error : "Upload failed." }); }
-    }
-    function onBase64ImageReceived(response) { 
-        showLoading(false);
-        if (response && response.success && response.base64Data) {
-            if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas/Slide not ready.", false); return; }
-            const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-            if (!currentSlide) { displayMessage("Error: Slide data missing.", false); return; }
-            fabric.Image.fromURL(response.base64Data, function(img) {
-                if (!adminApp.state.fabricCanvasInstance) return;
-                if (adminApp.state.currentSlideIndex === -1) return; 
-                const canvas = adminApp.state.fabricCanvasInstance; const imgWidth = img.width; const imgHeight = img.height; const maxWidth = 960;
-                let cvWidth = imgWidth; let cvHeight = imgHeight; const ratio = imgWidth / imgHeight;
-                if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / ratio); }
-                canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
-                if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
-                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: cvWidth / imgWidth, scaleY: cvHeight / imgHeight });
-                canvas.renderAll(); displayMessage("Background set.", true);
-                if (!currentSlide.slideMedia) currentSlide.slideMedia = {}; 
-                currentSlide.slideMedia.type = 'image';
-                currentSlide.slideMedia.url = response.base64Data; 
-                currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null; 
-                currentSlide.slideMedia.mimeType = response.mimeType;
-                currentSlide.canvasWidth = cvWidth; currentSlide.canvasHeight = cvHeight;
-                console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated.`);
-                updateSlideThumbnailsUI();
-                delete adminApp.state.lastUploadedDriveId; 
+  }
+
+  function initToolbar() { 
+    console.log("initToolbar: Attaching listeners to toolbar inputs."); 
+    const inputs = [
+      {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
+      {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, 
+      {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
+      {el: objAngleEl, prop: 'angle', type: 'number'},
+      {el: objFillEl, prop: 'fill', type: 'color'},
+      {el: objStrokeColorEl, prop: 'stroke', type: 'color'},
+      {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
+      {el: objOpacityEl, prop: 'opacity', type: 'range'},
+      {el: objTextContentEl, prop: 'text', type: 'textarea'},
+      {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
+      {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'},
+      {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
+      {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'}
+    ];
+
+    inputs.forEach(inputConfig => {
+      if (inputConfig.el) {
+        inputConfig.el.addEventListener('input', (e) => { 
+          updateFabricObjectFromToolbar(inputConfig.prop, e.target.value, inputConfig.type); 
+        });
+        if (inputConfig.el.type === 'color' || inputConfig.el.tagName === 'SELECT') { 
+             inputConfig.el.addEventListener('change', (e) => {
+                updateFabricObjectFromToolbar(inputConfig.prop, e.target.value, inputConfig.type); 
             });
-        } else { onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image." }); }
+        }
+      } else {
+        console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); 
+      }
+    });
+
+    // Listeners for Interaction Controls
+    if (objInteractionTriggerEl) objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
+    if (objInteractionActionEl) objInteractionActionEl.addEventListener('change', handleInteractionChange);
+    if (objModalContentEl) objModalContentEl.addEventListener('input', handleInteractionChange);
+    if (objNavigateToEl) objNavigateToEl.addEventListener('input', handleInteractionChange);
+  }
+
+  function populateToolbar(activeObject) { 
+    if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; } 
+    if (!activeObject) {
+      overlayPropertiesToolbarEl.style.display = 'none'; 
+      return;
     }
-  
-    // --- Overlay Creation Functions (Step 11 & 12) ---
-    function addRectangle() {
-      if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
-      const canvas = adminApp.state.fabricCanvasInstance;
-      const rect = new fabric.Rect({ left: 50, top: 50, fill: 'rgba(255,0,0,0.7)', width: 150, height: 100, stroke: 'black', strokeWidth: 1, customInteraction: { trigger: null, action: null, modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
-      canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll(); console.log("Rectangle added to canvas:", rect);
-    }
-  
-    function addCircle() {
-      if (!adminApp.state.fabricCanvasInstance) { console.error("addCircle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
-      const canvas = adminApp.state.fabricCanvasInstance;
-      const circle = new fabric.Circle({ left: 150, top: 150, radius: 50, fill: 'rgba(0,0,255,0.7)', stroke: 'black', strokeWidth: 1, customInteraction: { trigger: null, action: null, modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
-      canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll(); console.log("Circle added to canvas:", circle);
-    }
-  
-    function addTextbox() {
-      if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add text.", false); return; }
-      const canvas = adminApp.state.fabricCanvasInstance;
-      const textbox = new fabric.Textbox('Editable Text', { left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000', customInteraction: { trigger: null, action: null, modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
-      canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
+    overlayPropertiesToolbarEl.style.display = 'block'; 
+
+    if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
+    if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
+    if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
+    if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
+    if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
+
+    if (objFillEl) objFillEl.value = toHexColor(activeObject.fill); 
+    if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke); 
+    if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth; 
+    if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; 
+
+    if (textSpecificControlsEl) {
+      if (activeObject.type === 'textbox' || activeObject.type === 'i-text') { 
+        textSpecificControlsEl.style.display = 'block'; 
+        if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
+      } else {
+        textSpecificControlsEl.style.display = 'none';
+      }
     }
     
-    // Helper function to convert fabric color to HEX for color input
-    function toHexColor(fabricColor) {
-      if (!fabricColor) return '#000000'; 
-      try {
-        const colorInstance = new fabric.Color(fabricColor);
-        const hex = colorInstance.toHex();
-        return '#' + hex;
-      } catch (e) {
-        console.warn("Could not convert color to HEX:", fabricColor, e);
-        return '#000000'; 
-      }
-    }
-  
-    // --- Toolbar Management Functions (RENAMED from Sidebar for Step 13 - Option 2) ---
-    function initToolbar() { // RENAMED from initSidebar
-      console.log("initToolbar: Attaching listeners to toolbar inputs."); // LOG UPDATED
-      const inputs = [
-        {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
-        {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, 
-        {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
-        {el: objAngleEl, prop: 'angle', type: 'number'},
-        {el: objFillEl, prop: 'fill', type: 'color'},
-        {el: objStrokeColorEl, prop: 'stroke', type: 'color'},
-        {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
-        {el: objOpacityEl, prop: 'opacity', type: 'range'},
-        {el: objTextContentEl, prop: 'text', type: 'textarea'},
-        {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
-        {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'},
-        {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
-        {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'}
-      ];
-  
-      inputs.forEach(inputConfig => {
-        if (inputConfig.el) {
-          inputConfig.el.addEventListener('input', (e) => { 
-            updateFabricObjectFromToolbar(inputConfig.prop, e.target.value, inputConfig.type); 
-          });
-          if (inputConfig.el.type === 'color') { 
-               inputConfig.el.addEventListener('change', (e) => {
-                  updateFabricObjectFromToolbar(inputConfig.prop, e.target.value, inputConfig.type); 
-              });
-          }
-        } else {
-          console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); // LOG UPDATED
-        }
-      });
-    }
-  
-    function populateToolbar(activeObject) { 
-      if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; } 
-      if (!activeObject) {
-        overlayPropertiesToolbarEl.style.display = 'none'; 
-        return;
-      }
-      overlayPropertiesToolbarEl.style.display = 'block'; 
-  
-      if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
-      if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
-      if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
-      if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
-      if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
-  
-      if (objFillEl) objFillEl.value = toHexColor(activeObject.fill); 
-      if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke); 
-      if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth; 
-      if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; 
-  
-      if (textSpecificControlsEl) {
-        if (activeObject.type === 'textbox' || activeObject.type === 'i-text') { 
-          textSpecificControlsEl.style.display = 'block'; 
-          if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
-        } else {
-          textSpecificControlsEl.style.display = 'none';
-        }
-      }
-      
-      const shadow = activeObject.shadow;
-      if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; 
-      if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
-      if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
-      if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
-    }
-  
-    function updateFabricObjectFromToolbar(propertyName, value, inputType) { // RENAMED
+    const shadow = activeObject.shadow;
+    if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; 
+    if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
+    if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
+    if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
+
+    // Populate Interaction Controls
+    const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
+    if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
+    if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
+    if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
+    if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
+    
+    // Show/hide conditional interaction config sections
+    updateInteractionConfigVisibility(interaction.action);
+  }
+
+  // Handles changes from any interaction control to update the fabric object
+  function handleInteractionChange() {
       const canvas = adminApp.state.fabricCanvasInstance;
       if (!canvas) return;
       const activeObject = canvas.getActiveObject();
       if (!activeObject) return;
-  
-      let parsedValue = value;
-      if (inputType === 'number' || inputType === 'range') {
-        parsedValue = inputType === 'range' ? parseFloat(value) : parseInt(value, 10);
-        if (isNaN(parsedValue)) {
-            if (propertyName === 'strokeWidth' && value === '') parsedValue = 0;
-            else if (value === '') return; 
-            else return; 
-        }
+
+      if (!activeObject.customInteraction) {
+          activeObject.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "" };
       }
-      
-      if (propertyName === 'width') {
-        // Ensure scale factor is positive and not zero
-        activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001);
-      } else if (propertyName === 'height') {
-        // Ensure scale factor is positive and not zero
-        activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001);
-      } else if (propertyName.startsWith('shadow.')) {
-        const shadowProp = propertyName.split('.')[1];
-        let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
-        shadowOptions[shadowProp] = parsedValue;
-        shadowOptions.blur = parseInt(objShadowBlurEl.value, 10) || 0;
-        shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
-        shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
-        shadowOptions.color = objShadowColorEl.value || '#000000';
-        activeObject.set('shadow', new fabric.Shadow(shadowOptions));
-      } else {
-        activeObject.set(propertyName, parsedValue);
+
+      if (objInteractionTriggerEl) activeObject.customInteraction.trigger = objInteractionTriggerEl.value;
+      if (objInteractionActionEl) activeObject.customInteraction.action = objInteractionActionEl.value;
+      if (objModalContentEl) activeObject.customInteraction.modalContent = objModalContentEl.value;
+      if (objNavigateToEl) activeObject.customInteraction.navigateTo = objNavigateToEl.value;
+
+      updateInteractionConfigVisibility(activeObject.customInteraction.action);
+      console.log("Interaction data updated for object:", activeObject.customInteraction);
+      // No canvas.renderAll() needed here as these are data-only properties.
+      // Changes will be saved when saveCurrentSlideState() or saveProject() is called.
+  }
+
+  // Helper to show/hide interaction specific config sections
+  function updateInteractionConfigVisibility(action) {
+      if (modalContentConfigEl) modalContentConfigEl.style.display = (action === 'showModal') ? 'block' : 'none';
+      if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
+  }
+
+
+  function updateFabricObjectFromToolbar(propertyName, value, inputType) { 
+    const canvas = adminApp.state.fabricCanvasInstance;
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject();
+    if (!activeObject) return;
+
+    let parsedValue = value;
+    if (inputType === 'number' || inputType === 'range') {
+      parsedValue = inputType === 'range' ? parseFloat(value) : parseInt(value, 10);
+      if (isNaN(parsedValue)) {
+          if (propertyName === 'strokeWidth' && value === '') parsedValue = 0;
+          else if (value === '') return; 
+          else return; 
       }
-  
-      if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && propertyName === 'text') {
-          activeObject.initDimensions(); 
-      }
-  
-      activeObject.setCoords(); 
-      canvas.renderAll();
     }
-  
-  
-    // Client-side UUID generator
-    Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
-  
-  </script>
+    
+    if (propertyName === 'width') {
+      activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001);
+    } else if (propertyName === 'height') {
+      activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001);
+    } else if (propertyName.startsWith('shadow.')) {
+      const shadowProp = propertyName.split('.')[1];
+      let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
+      shadowOptions[shadowProp] = parsedValue;
+      shadowOptions.blur = parseInt(objShadowBlurEl.value, 10) || 0;
+      shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
+      shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
+      shadowOptions.color = objShadowColorEl.value || '#000000';
+      activeObject.set('shadow', new fabric.Shadow(shadowOptions));
+    } else {
+      // Check if propertyName is an interaction property (handled by handleInteractionChange)
+      if (!propertyName.startsWith('interaction.')) { // Avoid double-handling
+          activeObject.set(propertyName, parsedValue);
+      }
+    }
+
+    if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && propertyName === 'text') {
+        activeObject.initDimensions(); 
+    }
+
+    activeObject.setCoords(); 
+    canvas.renderAll();
+  }
+
+  Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
+
+</script>

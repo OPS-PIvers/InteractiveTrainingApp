@@ -24,7 +24,7 @@
     console.log("Admin_JS: DOMContentLoaded event fired!");
     
     adminApp.setupDOMReferences();
-    adminApp.attachEventListeners();
+    adminApp.attachEventListeners(); // Listener for imageUploaderEl will be attached here
     
     switchToListView(); 
     loadAdminProjectsList(); 
@@ -48,10 +48,13 @@
     editingProjectTitleEl = document.getElementById('editingProjectTitle');
     backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
     fabricCanvasEl = document.getElementById('fabricCanvasElement');
-    imageUploaderEl = document.getElementById('imageUploader'); // Added for Step 8
+    imageUploaderEl = document.getElementById('imageUploader'); // Should find it here
 
     if (!listViewContainerEl || !editViewContainerEl) {
         console.error("CRITICAL: Main view containers not found!");
+    }
+    if (!imageUploaderEl) { // This would be an issue
+        console.error("CRITICAL: imageUploaderEl NOT found during setupDOMReferences. Check AdminView.html for ID 'imageUploader'.");
     }
     console.log("Admin_JS: DOM references set up.");
   };
@@ -68,13 +71,14 @@
         backToProjectsListButtonEl.addEventListener('click', switchToListView);
     } else { console.error("backToProjectsListButtonEl was not found during attachEventListeners!"); }
 
-    if (imageUploaderEl) { // Added for Step 8
+    if (imageUploaderEl) { // Listener attached here
         imageUploaderEl.addEventListener('change', handleImageUpload);
+        console.log("Admin_JS: Event listener attached to imageUploaderEl.");
     } else {
-        // This might log if Admin_JS loads before editViewContainer is visible, which is expected.
-        // console.warn("imageUploaderEl not found during initial attachEventListeners. Will be available in edit view.");
+        // This error means setupDOMReferences failed to find it, which is the root problem
+        console.error("CRITICAL: imageUploaderEl not found during attachEventListeners, cannot attach listener. Check setupDOMReferences and HTML.");
     }
-    console.log("Admin_JS: Event listeners attached.");
+    console.log("Admin_JS: Event listeners attached (general).");
   };
   
   // --- UI View Management ---
@@ -95,7 +99,7 @@
     adminApp.state.currentProjectId = projectIdToEdit; 
     
     if(listViewContainerEl) listViewContainerEl.style.display = 'none';
-    if(editViewContainerEl) editViewContainerEl.style.display = 'block';
+    if(editViewContainerEl) editViewContainerEl.style.display = 'block'; // This makes imageUploaderEl visible
     
     if(editingProjectTitleEl) {
         editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
@@ -111,18 +115,13 @@
     }
     if (messageAreaEl) messageAreaEl.innerHTML = ''; 
 
-    if (!fabricCanvasEl) {
-        fabricCanvasEl = document.getElementById('fabricCanvasElement');
-    }
-    if (!imageUploaderEl) { // Also ensure imageUploaderEl is available when switching to edit view
-        imageUploaderEl = document.getElementById('imageUploader');
-        if (imageUploaderEl) { // Re-attach listener if element was found now
-             imageUploaderEl.addEventListener('change', handleImageUpload);
-        } else {
-            console.error("CRITICAL: imageUploaderEl still not found in edit view!");
-        }
+    // Ensure fabricCanvasEl is available (it should have been found in setupDOMReferences)
+    if (!fabricCanvasEl) { 
+        fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
     }
 
+    // imageUploaderEl should have been found and its listener attached by setupDOMReferences and attachEventListeners
+    // No need to re-reference or re-attach listener here.
 
     if (typeof fabric !== 'undefined' && fabricCanvasEl) {
       adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
@@ -216,10 +215,10 @@
 
   // --- Project List (Step 4) ---
   function loadAdminProjectsList() {
-    if (!adminProjectListContainerEl) {
-        console.warn("loadAdminProjectsList: adminProjectListContainerEl not ready yet.");
-        return; 
-    }
+    // if (!adminProjectListContainerEl) { // This check seems redundant if setupDOMReferences ensures it.
+    //     console.warn("loadAdminProjectsList: adminProjectListContainerEl not ready yet.");
+    //     return; 
+    // }
     showLoading(true);
     google.script.run
       .withSuccessHandler(displayAdminProjects)
@@ -229,7 +228,10 @@
 
   function displayAdminProjects(projectsArray) {
     showLoading(false);
-    if (!adminProjectListContainerEl) return;
+    if (!adminProjectListContainerEl) {
+        console.error("displayAdminProjects: adminProjectListContainerEl not found.");
+        return;
+    }
     adminProjectListContainerEl.innerHTML = ''; 
     if (!projectsArray || projectsArray.length === 0) {
       adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>';
@@ -239,7 +241,6 @@
       if (!project || !project.projectId) return; 
       const projectItem = document.createElement('div');
       projectItem.className = 'project-item';
-      // ... (rest of project item creation as before) ...
       const titleSpan = document.createElement('span');
       titleSpan.textContent = project.projectTitle || 'Untitled Project';
       const statusSpan = document.createElement('span');
@@ -265,62 +266,55 @@
   function handleImageUpload(event) {
     if (adminApp.state.isLoading) {
       displayMessage("Please wait for the current operation to complete.", false);
-      event.target.value = null; // Reset file input
+      if(event.target) event.target.value = null; 
       return;
     }
     const file = event.target.files[0];
     if (!file) {
-      displayMessage("No file selected.", false);
+      // displayMessage("No file selected.", false); // Can be noisy if user cancels
       return;
     }
     if (!file.type.startsWith('image/')) {
       displayMessage("Please select an image file.", false);
-      event.target.value = null; // Reset file input
+      if(event.target) event.target.value = null; 
       return;
     }
-    // Max file size (e.g., 5MB) - optional client-side check
-    // const maxSize = 5 * 1024 * 1024; 
-    // if (file.size > maxSize) {
-    //   displayMessage("File is too large. Maximum size is 5MB.", false);
-    //   event.target.value = null; // Reset file input
-    //   return;
-    // }
 
     showLoading(true);
-    displayMessage("Uploading image...", true); // Temporary message
+    displayMessage("Uploading image...", true); 
 
     const reader = new FileReader();
     reader.onload = function(e) {
       const fileData = {
         fileName: file.name,
         mimeType: file.type,
-        data: e.target.result.split(',')[1] // Get base64 part
+        data: e.target.result.split(',')[1] 
       };
       
       if (!adminApp.state.currentProjectId) {
           showLoading(false);
           displayMessage("Error: No project selected for upload.", false);
-          event.target.value = null; // Reset file input
+          if(event.target) event.target.value = null; 
           return;
       }
 
       google.script.run
         .withSuccessHandler(onImageUploaded)
-        .withFailureHandler(onServerError) // onServerError already handles showLoading(false)
+        .withFailureHandler(onServerError) 
         .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
     };
     reader.onerror = function(error) {
         showLoading(false);
         displayMessage("Error reading file.", false);
         console.error("FileReader error: ", error);
-        event.target.value = null; // Reset file input
+        if(event.target) event.target.value = null; 
     };
     reader.readAsDataURL(file);
   }
 
   function onImageUploaded(response) {
     showLoading(false);
-    if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
+    if (imageUploaderEl) imageUploaderEl.value = null; 
 
     if (response && response.success && response.webContentLink) {
       displayMessage("Image uploaded successfully! Setting as background...", true);
@@ -331,32 +325,27 @@
       }
 
       fabric.Image.fromURL(response.webContentLink, function(img) {
-        if (!adminApp.state.fabricCanvasInstance) { // Double check in case of async issues
+        if (!adminApp.state.fabricCanvasInstance) { 
             console.error("Canvas became unavailable before image could be set.");
             displayMessage("Error: Canvas became unavailable.", false);
             return;
         }
         adminApp.state.fabricCanvasInstance.setBackgroundImage(img, 
             adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance), {
-          // Scale options to fit the image to the canvas dimensions
           scaleX: adminApp.state.fabricCanvasInstance.width / img.width,
           scaleY: adminApp.state.fabricCanvasInstance.height / img.height
         });
         displayMessage("Image set as background.", true);
-        // TODO in Step 9: Store response.webContentLink and response.driveFileId 
-        // in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex].slideMedia
-        // For now, it's just visual.
         console.log("Image background set. DriveFileID:", response.driveFileId, "WebContentLink:", response.webContentLink);
 
-      }, { crossOrigin: 'anonymous' }); // Add crossOrigin for images from other domains (like Google Drive)
+      }, { crossOrigin: 'anonymous' }); 
 
     } else {
       let errorMsg = "Failed to upload image or retrieve link.";
       if (response && response.error) {
         errorMsg = response.error;
       }
-      onServerError({ message: errorMsg }); // Use onServerError for consistent error display
+      onServerError({ message: errorMsg }); 
     }
   }
-
 </script>

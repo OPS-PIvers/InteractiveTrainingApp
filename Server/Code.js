@@ -94,34 +94,25 @@ function getWebAppUrl() {
  *                       Alternatively, the client could parse window.location.search itself.
  * @return {object} An object containing mode and projectId.
  */
+// Server/Code.gs
 function getServerData(initialPageParameters) {
-  // initialPageParameters would be like { page: "edit", projectId: "123" } if client sends them
-  // For this to work, client needs to parse its own URL and send 'e.parameter' like object
-  // OR we rely on the fact that this function is called on page load, and what matters is the initial URL.
-  // Let's assume client sends its initial load parameters.
-
-  // To make this robust, the client should parse its current URL and send the relevant params.
-  // For now, let's keep your structure, but the values for MODE_FROM_SERVER and PROJECT_ID_FROM_SERVER
-  // need to be defined globally or passed into getServerData if they depend on the initial page load 'e' object.
-
-  // Simpler: let the client parse its own URL.
-  // The server function can just be a dummy if the client does all the work.
-  // But your intention was that the SERVER determines the mode.
-  
-  // Let's assume the client will pass its initial load's 'page' and 'projectId' parameters
+  // initialPageParameters would be like { page: "edit", projectId: "123" }
   const page = initialPageParameters ? initialPageParameters.page : null;
   const projectId = initialPageParameters ? initialPageParameters.projectId : null;
 
-  Logger.log(`getServerData called with page: ${page}, projectId: ${projectId}`);
+  Logger.log(`getServerData called with received client params: page: ${page}, projectId: ${projectId}`); // ADD THIS LOG
 
   let modeToReturn = 'list';
-  let projectIdToReturn = null;
+  let projectIdToReturn = null; // Important: default to null
 
-  if (page === 'edit' && projectId) {
+  if (page === 'edit' && projectId) { // Check if both are present and page is 'edit'
     modeToReturn = 'edit';
-    projectIdToReturn = projectId;
+    projectIdToReturn = projectId; // Pass along the projectId
   }
-  // If page is not 'edit', mode is 'list' and projectId remains null.
+  // If page is not 'edit', or if projectId is missing for 'edit' mode,
+  // it defaults to 'list' mode and projectIdToReturn remains null.
+
+  Logger.log(`getServerData returning: mode: ${modeToReturn}, projectId: ${projectIdToReturn}`); // ADD THIS LOG
 
   return {
     mode: modeToReturn,

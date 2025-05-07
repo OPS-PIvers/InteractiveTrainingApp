@@ -8,15 +8,15 @@
     currentProjectId: null, // ID of the project currently being "edited"
     currentView: 'list',    // Tracks the current visible view: 'list' or 'edit'
     projectData: null,      // Will hold the full data for the project being edited (from Step 10)
-    currentSlideIndex: -1,   // For slide management (from Step 9)
-      fabricCanvasInstance: null // For Fabric.js canvas (from Step 7)
+    currentSlideIndex: -1,  // For slide management (from Step 9)
+    fabricCanvasInstance: null // For Fabric.js canvas (from Step 7)
   };
 
   // --- DOM Element References ---
   // Will be populated by adminApp.setupDOMReferences
   let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
   let listViewContainerEl, adminProjectListContainerEl; // createProjectSection and projectListSection are within listViewContainer
-  let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl;
+  let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
 
   // --- Initialization ---
   document.addEventListener('DOMContentLoaded', function() {
@@ -52,6 +52,9 @@
     // Verify elements are found
     if (!listViewContainerEl || !editViewContainerEl) {
         console.error("CRITICAL: Main view containers not found!");
+    }
+    if (!fabricCanvasEl && adminApp.state.currentView === 'edit') { // Only critical if supposed to be in edit view
+        // console.warn("Admin_JS: fabricCanvasEl not found during setupDOMReferences. Will attempt to init later if view switches to edit.");
     }
     console.log("Admin_JS: DOM references set up.");
   };
@@ -100,9 +103,8 @@
     // Reset data that might be related to a previously edited project
     adminApp.state.projectData = null; 
     adminApp.state.currentSlideIndex = -1;
+    
     if (adminApp.state.fabricCanvasInstance) { 
-      // If a canvas instance already exists, dispose of it to prevent memory leaks
-      // This is important if switching between projects without full page reload
       adminApp.state.fabricCanvasInstance.dispose();
       adminApp.state.fabricCanvasInstance = null;
       console.log("Admin_JS: Disposed previous Fabric canvas instance.");
@@ -110,19 +112,29 @@
     if (messageAreaEl) messageAreaEl.innerHTML = ''; 
 
     // Initialize Fabric.js on the canvas
-    if (fabricCanvasEl) {
+    // Ensure fabricCanvasEl is freshly referenced if setupDOMReferences ran before edit view was visible
+    if (!fabricCanvasEl) {
+        fabricCanvasEl = document.getElementById('fabricCanvasElement');
+    }
+
+    // Check if Fabric.js is loaded
+    if (typeof fabric !== 'undefined' && fabricCanvasEl) {
       adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
         width: 800, // Default width
         height: 600, // Default height
         backgroundColor: '#f0f0f0' // A light grey background to see the canvas area
       });
       console.log("Admin_JS: Fabric.js canvas initialized.", adminApp.state.fabricCanvasInstance);
-    } else {
+    } else if (!fabricCanvasEl) {
       console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
+      displayMessage("Error: Canvas element not found. Cannot initialize editor.", false);
+    } else {
+      // Fabric.js is not loaded yet.
+      console.error("Admin_JS: Fabric.js library (fabric) is not defined yet. This might be due to a slow network or if the CDN link is blocked.");
+      displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check your internet connection, ensure scripts are not blocked, and try refreshing the page.", false);
     }
 
     // In Step 10, you will call: loadProjectForEditing(projectIdToEdit);
-    // For now, this just shows the placeholder edit view.
   }
 
   // --- General UI Functions ---

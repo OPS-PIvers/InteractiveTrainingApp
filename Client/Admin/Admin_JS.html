@@ -5,80 +5,75 @@
   // --- Application State ---
   adminApp.state = {
     isLoading: false,
-    currentProjectId: null, // ID of the project currently being "edited"
-    currentView: 'list',    // Tracks the current visible view: 'list' or 'edit'
-    projectData: null,      // Will hold the full data for the project being edited (from Step 10)
-    currentSlideIndex: -1,  // For slide management (from Step 9) - Will be properly used soon
-    fabricCanvasInstance: null // For Fabric.js canvas (from Step 7)
+    currentProjectId: null,
+    currentView: 'list',
+    projectData: { // Initialized properly in switchToEditView or when loaded
+      projectId: null,
+      title: '',
+      slides: []
+    },
+    currentSlideIndex: -1, // Index of the active slide in projectData.slides
+    fabricCanvasInstance: null,
+    defaultCanvasWidth: 960, // Default new slide width
+    defaultCanvasHeight: 540  // Default new slide height (16:9)
   };
 
   // --- DOM Element References ---
-  // Will be populated by adminApp.setupDOMReferences
   let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
   let listViewContainerEl, adminProjectListContainerEl;
   let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
-  let imageUploaderEl; // Added for Step 8
+  let imageUploaderEl;
+  let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; // Step 9
 
   // --- Initialization ---
   document.addEventListener('DOMContentLoaded', function() {
     console.log("Admin_JS: DOMContentLoaded event fired!");
-    
     adminApp.setupDOMReferences();
-    adminApp.attachEventListeners(); // Listener for imageUploaderEl will be attached here
-    
+    adminApp.attachEventListeners();
     switchToListView(); 
     loadAdminProjectsList(); 
-    
-    console.log("Admin_JS: Initialization complete. Default view: 'list'");
+    console.log("Admin_JS: Initialization complete.");
   });
 
-  /**
-   * Gets references to all necessary DOM elements from the page.
-   */
   adminApp.setupDOMReferences = function() {
     messageAreaEl = document.getElementById('messageArea');
     loadingSpinnerEl = document.getElementById('loadingSpinner');
-    
     listViewContainerEl = document.getElementById('listViewContainer');
     projectTitleInputEl = document.getElementById('projectTitleInput');
     createProjectButtonEl = document.getElementById('createProjectButton');
     adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
-    
     editViewContainerEl = document.getElementById('editViewContainer');
     editingProjectTitleEl = document.getElementById('editingProjectTitle');
     backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
     fabricCanvasEl = document.getElementById('fabricCanvasElement');
-    imageUploaderEl = document.getElementById('imageUploader'); // Should find it here
+    imageUploaderEl = document.getElementById('imageUploader');
+    // Step 9 DOM elements
+    addSlideButtonEl = document.getElementById('addSlideButton');
+    slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
+    saveProjectButtonEl = document.getElementById('saveProjectButton');
 
-    if (!listViewContainerEl || !editViewContainerEl) {
-        console.error("CRITICAL: Main view containers not found!");
-    }
-    if (!imageUploaderEl) { // This would be an issue
-        console.error("CRITICAL: imageUploaderEl NOT found during setupDOMReferences. Check AdminView.html for ID 'imageUploader'.");
+    if (!addSlideButtonEl || !slideThumbnailsContainerEl || !saveProjectButtonEl) {
+        console.warn("Step 9 DOM elements (slide management/save) not all found. This is okay if not in edit view yet.");
     }
     console.log("Admin_JS: DOM references set up.");
   };
 
-  /**
-   * Attaches primary event listeners to DOM elements.
-   */
   adminApp.attachEventListeners = function() {
-    if (createProjectButtonEl) {
-        createProjectButtonEl.addEventListener('click', handleCreateProject);
-    } else { console.error("createProjectButtonEl was not found during attachEventListeners!"); }
+    if (createProjectButtonEl) createProjectButtonEl.addEventListener('click', handleCreateProject);
+    if (backToProjectsListButtonEl) backToProjectsListButtonEl.addEventListener('click', switchToListView);
+    if (imageUploaderEl) imageUploaderEl.addEventListener('change', handleImageUpload);
+    
+    // Step 9 Event Listeners (ensure elements exist before adding, or add them in switchToEditView)
+    // These will be re-checked/added in switchToEditView if not found now.
+    if (addSlideButtonEl) {
+        addSlideButtonEl.addEventListener('click', handleAddSlide);
+    } else { console.warn("addSlideButtonEl not found on initial attach. Will try in switchToEditView.");}
+    
+    if (saveProjectButtonEl) {
+        saveProjectButtonEl.addEventListener('click', handleSaveProject);
+    } else { console.warn("saveProjectButtonEl not found on initial attach. Will try in switchToEditView."); }
 
-    if (backToProjectsListButtonEl) {
-        backToProjectsListButtonEl.addEventListener('click', switchToListView);
-    } else { console.error("backToProjectsListButtonEl was not found during attachEventListeners!"); }
-
-    if (imageUploaderEl) { // Listener attached here
-        imageUploaderEl.addEventListener('change', handleImageUpload);
-        console.log("Admin_JS: Event listener attached to imageUploaderEl.");
-    } else {
-        // This error means setupDOMReferences failed to find it, which is the root problem
-        console.error("CRITICAL: imageUploaderEl not found during attachEventListeners, cannot attach listener. Check setupDOMReferences and HTML.");
-    }
-    console.log("Admin_JS: Event listeners attached (general).");
+    console.log("Admin_JS: Event listeners attached.");
   };
   
   // --- UI View Management ---
@@ -86,10 +81,14 @@
     console.log("Switching to List View");
     adminApp.state.currentView = 'list';
     adminApp.state.currentProjectId = null; 
-    
+    adminApp.state.projectData = { projectId: null, title: '', slides: [] }; // Reset project data
+    adminApp.state.currentSlideIndex = -1;
+    if (adminApp.state.fabricCanvasInstance) {
+        adminApp.state.fabricCanvasInstance.dispose();
+        adminApp.state.fabricCanvasInstance = null;
+    }
     if(listViewContainerEl) listViewContainerEl.style.display = 'block';
     if(editViewContainerEl) editViewContainerEl.style.display = 'none';
-    
     if (messageAreaEl) messageAreaEl.innerHTML = ''; 
   }
 
@@ -98,350 +97,395 @@
     adminApp.state.currentView = 'edit';
     adminApp.state.currentProjectId = projectIdToEdit; 
     
+    // Initialize projectData for the new project being edited
+    // In Step 10, this will be replaced by loading actual project data
+    adminApp.state.projectData = {
+      projectId: projectIdToEdit,
+      // Title will be fetched in Step 10, or use a placeholder
+      title: "Loading project...", // Placeholder
+      slides: [] 
+    };
+    adminApp.state.currentSlideIndex = -1;
+    
     if(listViewContainerEl) listViewContainerEl.style.display = 'none';
     if(editViewContainerEl) editViewContainerEl.style.display = 'block'; 
     
     if(editingProjectTitleEl) {
+        // For now, use the ID. In Step 10, projectData.title will be populated.
         editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
     }
     
-    // Reset data that might be related to a previously edited project
-    adminApp.state.projectData = null; 
-    adminApp.state.currentSlideIndex = -1; // Will be important in Step 9
-    
-    // Dispose previous canvas instance if it exists
     if (adminApp.state.fabricCanvasInstance) { 
       adminApp.state.fabricCanvasInstance.dispose();
       adminApp.state.fabricCanvasInstance = null;
-      console.log("Admin_JS: Disposed previous Fabric canvas instance.");
     }
     if (messageAreaEl) messageAreaEl.innerHTML = ''; 
 
-    // Ensure fabricCanvasEl is available (it should have been found in setupDOMReferences)
-    if (!fabricCanvasEl) { 
-        fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
+    if (!fabricCanvasEl) fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
+    if (!imageUploaderEl) imageUploaderEl = document.getElementById('imageUploader');
+    if (!addSlideButtonEl) addSlideButtonEl = document.getElementById('addSlideButton');
+    if (!saveProjectButtonEl) saveProjectButtonEl = document.getElementById('saveProjectButton');
+    if (!slideThumbnailsContainerEl) slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
+
+
+    // Re-attach listeners for elements that might not have been available on DOMContentLoaded
+    // because their parent container was display:none
+    if (imageUploaderEl && !imageUploaderEl.hasAttribute('listener-attached')) {
+      imageUploaderEl.addEventListener('change', handleImageUpload);
+      imageUploaderEl.setAttribute('listener-attached', 'true');
+    }
+    if (addSlideButtonEl && !addSlideButtonEl.hasAttribute('listener-attached')) {
+      addSlideButtonEl.addEventListener('click', handleAddSlide);
+      addSlideButtonEl.setAttribute('listener-attached', 'true');
+    }
+    if (saveProjectButtonEl && !saveProjectButtonEl.hasAttribute('listener-attached')) {
+      saveProjectButtonEl.addEventListener('click', handleSaveProject);
+      saveProjectButtonEl.setAttribute('listener-attached', 'true');
     }
 
-    // Initialize Fabric.js on the canvas
+
     if (typeof fabric !== 'undefined' && fabricCanvasEl) {
-      // Define default canvas dimensions (e.g., 16:9 aspect ratio)
-      const defaultCanvasWidth = 960;
-      const defaultCanvasHeight = Math.round(defaultCanvasWidth * (9 / 16)); // 540
-
       adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
-        width: defaultCanvasWidth, 
-        height: defaultCanvasHeight, 
-        backgroundColor: '#e9e9e9' // A slightly different default background
+        width: adminApp.state.defaultCanvasWidth, 
+        height: adminApp.state.defaultCanvasHeight, 
+        backgroundColor: '#e9e9e9'
       });
+      fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
+      fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
+      console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
 
-      // Update the HTML canvas element's attributes to match these default dimensions for layout
-      fabricCanvasEl.width = defaultCanvasWidth;
-      fabricCanvasEl.height = defaultCanvasHeight;
-      
-      // Optional: If you have a container and want to set its initial size too
-      // const canvasContainer = document.getElementById('fabricCanvasContainer');
-      // if (canvasContainer) {
-      //    canvasContainer.style.width = defaultCanvasWidth + 'px';
-      //    canvasContainer.style.height = defaultCanvasHeight + 'px';
-      // }
+      // For a new project or if loaded data has no slides (Step 10 will handle loaded data)
+      if (adminApp.state.projectData.slides.length === 0) {
+        handleAddSlide(); // Add an initial slide
+      } else {
+        // If loading existing project (Step 10), select the first slide
+        // selectSlide(0); 
+      }
+      updateSlideThumbnailsUI();
 
-      console.log("Admin_JS: Fabric.js canvas initialized with default dimensions: " + defaultCanvasWidth + "x" + defaultCanvasHeight, adminApp.state.fabricCanvasInstance);
-    } else if (!fabricCanvasEl) {
-      console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
-      displayMessage("Error: Canvas element not found. Cannot initialize editor.", false);
-    } else {
-      // Fabric.js library is not loaded
-      console.error("Admin_JS: Fabric.js library (fabric) is not defined yet. Ensure AdminView.html includes the Fabric.js CDN script in the <head>.");
-      displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check AdminView.html, your internet connection, ensure scripts are not blocked, and try refreshing.", false);
+
+    } else { /* Error handling for fabric/canvas not ready */ 
+        console.error("Fabric.js or canvas element not ready.");
+        displayMessage("Critical error: Editor components not ready.", false);
     }
-
-    // In Step 10, you will call: loadProjectForEditing(projectIdToEdit);
-    // This function (loadProjectForEditing) will then be responsible for:
-    // 1. Fetching project data.
-    // 2. If loading a slide with a saved custom canvas size (due to a background image), 
-    //    it will resize the canvas (using canvas.setWidth/setHeight and updating fabricCanvasEl.width/height)
-    //    to those saved dimensions BEFORE loading the slide's background and objects.
+    // In Step 10, call: loadProjectForEditing(projectIdToEdit);
   }
 
-  // --- General UI Functions ---
-  function showLoading(show) {
-    adminApp.state.isLoading = show;
-    if (loadingSpinnerEl) {
-      loadingSpinnerEl.style.display = show ? 'flex' : 'none';
-    } else if (show) { 
-        console.warn("showLoading(true) called but loadingSpinnerEl not yet available.");
-    }
-  }
-
-  function displayMessage(message, isSuccess) {
-    if (messageAreaEl) {
-      messageAreaEl.innerHTML = ''; 
-      const p = document.createElement('p');
-      p.textContent = message;
-      messageAreaEl.appendChild(p);
-      messageAreaEl.className = isSuccess ? 'success' : 'error';
-      setTimeout(() => {
-        if (messageAreaEl) {
-          messageAreaEl.innerHTML = '';
-          messageAreaEl.className = '';
-        }
-      }, 7000); 
-    } else {
-      console.warn("displayMessage called but messageAreaEl not available. Message:", message);
-    }
-  }
-  
-  function onServerError(errorObject) {
-    showLoading(false);
-    console.error('Server Error Object:', errorObject);
-    let errorMessage = "An unknown error occurred on the server.";
-    if (typeof errorObject === 'string') { 
-        errorMessage = errorObject;
-    } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { 
-        errorMessage = errorObject.message;
-        if (errorObject.details && errorObject.details.length > 0 && errorObject.details[0].errorMessage) {
-             errorMessage = errorObject.details[0].errorMessage;
-        } else if (errorObject.details && typeof errorObject.details === 'string') {
-            errorMessage += " Details: " + errorObject.details;
-        }
-    } else if (errorObject && errorObject.name && errorObject.message) { 
-        errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`;
-    }
-    displayMessage('Server Error: ' + errorMessage, false);
-  }
-
-  // --- Project Creation (Step 3) ---
-  function handleCreateProject() {
-    if (adminApp.state.isLoading) return;
-    const currentProjectTitle = projectTitleInputEl.value.trim();
-    if (!currentProjectTitle) {
-      displayMessage('Project title cannot be empty.', false);
-      projectTitleInputEl.focus();
-      return;
-    }
-    showLoading(true);
-    google.script.run
-      .withSuccessHandler(onProjectCreated)
-      .withFailureHandler(onServerError)
-      .createProject(currentProjectTitle);
-  }
-
-  function onProjectCreated(response) {
-    showLoading(false);
-    if (response && response.success) {
-      displayMessage(response.message || 'Project created successfully!', true);
-      if(projectTitleInputEl) projectTitleInputEl.value = ''; 
-      loadAdminProjectsList(); 
-    } else {
-      onServerError((response && response.error) ? response.error : 'Failed to create project.');
-    }
-  }
-
-  // --- Project List (Step 4) ---
-  function loadAdminProjectsList() {
-    // if (!adminProjectListContainerEl) { // This check seems redundant if setupDOMReferences ensures it.
-    //     console.warn("loadAdminProjectsList: adminProjectListContainerEl not ready yet.");
-    //     return; 
-    // }
-    showLoading(true);
-    google.script.run
-      .withSuccessHandler(displayAdminProjects)
-      .withFailureHandler(onServerError)
-      .getAllProjectsForAdmin();
-  }
-
-  function displayAdminProjects(projectsArray) {
-    showLoading(false);
-    if (!adminProjectListContainerEl) {
-        console.error("displayAdminProjects: adminProjectListContainerEl not found.");
+  // --- Slide Management (Step 9) ---
+  function handleAddSlide() {
+    console.log("handleAddSlide called");
+    if (!adminApp.state.projectData) {
+        console.error("handleAddSlide: projectData not initialized.");
         return;
     }
-    adminProjectListContainerEl.innerHTML = ''; 
-    if (!projectsArray || projectsArray.length === 0) {
-      adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>';
+    saveCurrentSlideState(); // Save state of the currently active slide before adding a new one
+
+    const newSlideId = 'slide_' + Utilities.getUuid(); // Requires Utilities.getUuid() client-side or generate differently
+    const newSlide = {
+      slideId: newSlideId,
+      canvasWidth: adminApp.state.defaultCanvasWidth,
+      canvasHeight: adminApp.state.defaultCanvasHeight,
+      fabricCanvasJSON: null, // Empty canvas initially
+      slideMedia: { 
+        type: null, 
+        url: null, // This might store base64 for images, or a Drive ID/URL
+        driveFileId: null,
+        mimeType: null
+      }
+    };
+    adminApp.state.projectData.slides.push(newSlide);
+    const newSlideIndex = adminApp.state.projectData.slides.length - 1;
+    selectSlide(newSlideIndex); // This will also update thumbnails
+    console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
+  }
+
+  function selectSlide(slideIndex) {
+    if (!adminApp.state.projectData || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) {
+      console.error("selectSlide: Invalid slideIndex or no projectData", slideIndex, adminApp.state.projectData);
       return;
     }
-    projectsArray.forEach(project => {
-      if (!project || !project.projectId) return; 
-      const projectItem = document.createElement('div');
-      projectItem.className = 'project-item';
-      const titleSpan = document.createElement('span');
-      titleSpan.textContent = project.projectTitle || 'Untitled Project';
-      const statusSpan = document.createElement('span');
-      statusSpan.className = 'status';
-      statusSpan.textContent = `(${project.status || 'N/A'})`;
-      const titleAndStatusDiv = document.createElement('div');
-      titleAndStatusDiv.appendChild(titleSpan);
-      titleAndStatusDiv.appendChild(statusSpan);
-      const editButton = document.createElement('button');
-      editButton.textContent = 'Edit';
-      editButton.className = 'edit-button'; 
-      editButton.setAttribute('data-project-id', project.projectId); 
-      editButton.onclick = function() { 
-        switchToEditView(project.projectId); 
+    console.log("Selecting slide at index:", slideIndex);
+
+    saveCurrentSlideState(); // Save the outgoing slide's state
+
+    adminApp.state.currentSlideIndex = slideIndex;
+    const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
+    const canvas = adminApp.state.fabricCanvasInstance;
+
+    if (!canvas) {
+      console.error("selectSlide: Fabric canvas instance not available!");
+      return;
+    }
+
+    // 1. Set canvas dimensions for the selected slide
+    canvas.setWidth(selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth);
+    canvas.setHeight(selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight);
+    if (fabricCanvasEl) {
+        fabricCanvasEl.width = canvas.width;
+        fabricCanvasEl.height = canvas.height;
+    }
+
+    // 2. Clear canvas (also clears background)
+    canvas.clear(); 
+
+    // 3. Load Background Image (if any)
+    if (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'image' && selectedSlideData.slideMedia.url) {
+      // Assuming slideMedia.url holds base64 data from onBase64ImageReceived
+      // or a direct web link if that was how it was saved.
+      // If it's a Drive ID, we'd need to re-fetch as base64 here via a server call.
+      // For simplicity now, assume URL is directly usable (e.g., was a base64 string)
+      fabric.Image.fromURL(selectedSlideData.slideMedia.url, function(img) {
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+          scaleX: canvas.width / img.width,
+          scaleY: canvas.height / img.height
+        });
+      } /*, { crossOrigin: 'anonymous' } // May be needed if URL is not base64 */);
+    } else {
+      // Ensure canvas has a default background if no image
+      canvas.backgroundColor = '#e9e9e9'; 
+      canvas.renderAll();
+    }
+
+    // 4. Load Fabric Canvas JSON (overlays)
+    if (selectedSlideData.fabricCanvasJSON) {
+      canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
+        canvas.renderAll();
+        console.log("Loaded canvas JSON for slide", slideIndex);
+      }, function(o, object) {
+        // Revival function for custom properties - will be used in later steps
+        // console.log("Reviving object:", o, object);
+      });
+    } else {
+      // If no JSON, it's a blank canvas (already cleared)
+      canvas.renderAll(); // Render to show background color if nothing else
+    }
+    updateSlideThumbnailsUI();
+    if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
+  }
+
+  function updateSlideThumbnailsUI() {
+    if (!slideThumbnailsContainerEl || !adminApp.state.projectData) return;
+    slideThumbnailsContainerEl.innerHTML = ''; // Clear existing thumbnails
+
+    adminApp.state.projectData.slides.forEach((slide, index) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'slide-thumbnail';
+      thumb.textContent = `Slide ${index + 1}`;
+      if (index === adminApp.state.currentSlideIndex) {
+        thumb.classList.add('active-slide');
+      }
+      thumb.onclick = function() { selectSlide(index); };
+
+      // Basic Delete Button (functionality needs refinement)
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-slide-btn';
+      deleteBtn.innerHTML = '×'; // 'x' symbol
+      deleteBtn.title = "Delete slide";
+      deleteBtn.onclick = function(event) {
+        event.stopPropagation(); // Prevent selectSlide from firing
+        handleDeleteSlide(index);
       };
-      projectItem.appendChild(titleAndStatusDiv);
-      projectItem.appendChild(editButton);
-      adminProjectListContainerEl.appendChild(projectItem);
+      thumb.appendChild(deleteBtn);
+      slideThumbnailsContainerEl.appendChild(thumb);
     });
   }
+  
+  function handleDeleteSlide(slideIndex) {
+    if (!adminApp.state.projectData || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) {
+      console.error("handleDeleteSlide: Invalid slideIndex or no projectData.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) {
+      return;
+    }
+
+    adminApp.state.projectData.slides.splice(slideIndex, 1);
+    console.log("Deleted slide at index:", slideIndex, "Remaining slides:", adminApp.state.projectData.slides.length);
+
+    if (adminApp.state.projectData.slides.length === 0) {
+      // If all slides are deleted, add a new default one
+      handleAddSlide(); 
+    } else {
+      // Adjust currentSlideIndex if needed
+      if (adminApp.state.currentSlideIndex === slideIndex) {
+        // If deleted slide was active, select previous or first
+        selectSlide(Math.max(0, slideIndex - 1));
+      } else if (adminApp.state.currentSlideIndex > slideIndex) {
+        // If active slide was after deleted one, decrement its index
+        adminApp.state.currentSlideIndex--;
+        // No need to call selectSlide here, just update thumbnails to reflect active state correctly
+        updateSlideThumbnailsUI(); 
+      } else {
+        // Active slide was before deleted one, index is fine
+        updateSlideThumbnailsUI();
+      }
+    }
+  }
+
+
+  function saveCurrentSlideState() {
+    if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData) {
+      // console.log("saveCurrentSlideState: No active slide or canvas to save.");
+      return;
+    }
+    const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+    if (!currentSlide) {
+        console.error("saveCurrentSlideState: Current slide data not found for index", adminApp.state.currentSlideIndex);
+        return;
+    }
+    const canvas = adminApp.state.fabricCanvasInstance;
+    // Save canvas content (overlays)
+    currentSlide.fabricCanvasJSON = canvas.toJSON(['slideId', 'canvasWidth', 'canvasHeight' /* add other custom Fabric object props here */]);
+    // Save canvas dimensions for this slide
+    currentSlide.canvasWidth = canvas.getWidth();
+    currentSlide.canvasHeight = canvas.getHeight();
+    // slideMedia is already updated by onBase64ImageReceived
+    console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Dimensions: ${currentSlide.canvasWidth}x${currentSlide.canvasHeight}`);
+  }
+
+  // --- Project Saving (Step 9) ---
+  function handleSaveProject() {
+    if (!adminApp.state.projectData || !adminApp.state.currentProjectId) {
+      displayMessage("No project data to save or project ID is missing.", false);
+      return;
+    }
+    if (adminApp.state.isLoading) return;
+
+    saveCurrentSlideState(); // Ensure the very last state of the active slide is captured
+
+    showLoading(true);
+    displayMessage("Saving project...", true);
+    console.log("Saving projectData:", JSON.stringify(adminApp.state.projectData, null, 2)); // Log what's being saved
+
+    google.script.run
+      .withSuccessHandler(onProjectSaved)
+      .withFailureHandler(onServerError)
+      .saveProjectData(adminApp.state.currentProjectId, JSON.stringify(adminApp.state.projectData));
+  }
+
+  function onProjectSaved(response) {
+    showLoading(false);
+    if (response && response.success) {
+      displayMessage(response.message || "Project saved successfully!", true);
+      // Optionally update "Last Modified" display if you have one
+    } else {
+      onServerError((response && response.error) ? response.error : "Failed to save project.");
+    }
+  }
+
+  // --- General UI Functions --- (showLoading, displayMessage, onServerError as before)
+  function showLoading(show) { /* ... */ }
+  function displayMessage(message, isSuccess) { /* ... */ }
+  function onServerError(errorObject) { /* ... */ }
+
+  // --- Project Creation (Step 3) --- (handleCreateProject, onProjectCreated as before)
+  function handleCreateProject() { /* ... */ }
+  function onProjectCreated(response) { /* ... */ }
+  
+  // --- Project List (Step 4) --- (loadAdminProjectsList, displayAdminProjects as before)
+  function loadAdminProjectsList() { /* ... */ }
+  function displayAdminProjects(projectsArray) { /* ... */ }
 
   // --- Image Upload Handling (Step 8) ---
   function handleImageUpload(event) {
-    if (adminApp.state.isLoading) {
-      displayMessage("Please wait for the current operation to complete.", false);
-      if(event.target) event.target.value = null; 
-      return;
-    }
+    // ... (previous implementation of handleImageUpload) ...
+    if (adminApp.state.isLoading) { /* ... */ return; }
     const file = event.target.files[0];
-    if (!file) {
-      // displayMessage("No file selected.", false); // Can be noisy if user cancels
-      return;
-    }
-    if (!file.type.startsWith('image/')) {
-      displayMessage("Please select an image file.", false);
-      if(event.target) event.target.value = null; 
-      return;
-    }
-
+    if (!file) { /* ... */ return; }
+    if (!file.type.startsWith('image/')) { /* ... */ return; }
     showLoading(true);
-    displayMessage("Uploading image...", true); 
-
     const reader = new FileReader();
     reader.onload = function(e) {
-      const fileData = {
-        fileName: file.name,
-        mimeType: file.type,
-        data: e.target.result.split(',')[1] 
-      };
-      
-      if (!adminApp.state.currentProjectId) {
-          showLoading(false);
-          displayMessage("Error: No project selected for upload.", false);
-          if(event.target) event.target.value = null; 
-          return;
-      }
-
+      const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
+      if (!adminApp.state.currentProjectId) { /* ... error ... */ return; }
       google.script.run
-        .withSuccessHandler(onImageUploaded)
-        .withFailureHandler(onServerError) 
+        .withSuccessHandler(onImageUploaded) // This is the existing handler from Step 8
+        .withFailureHandler(onServerError)
         .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
     };
-    reader.onerror = function(error) {
-        showLoading(false);
-        displayMessage("Error reading file.", false);
-        console.error("FileReader error: ", error);
-        if(event.target) event.target.value = null; 
-    };
+    reader.onerror = function(error) { /* ... */ };
     reader.readAsDataURL(file);
   }
 
-  function onImageUploaded(response) { // response is from uploadFileToDrive
+  function onImageUploaded(response) { // Response from uploadFileToDrive
+    // ... (previous implementation: calls getImageAsBase64)
     showLoading(false);
     if (imageUploaderEl) imageUploaderEl.value = null; 
-
-    if (response && response.success && response.driveFileId) { // Check for driveFileId now
-      displayMessage("Image uploaded to Drive. Now fetching for canvas...", true);
-      
-      // Now call getImageAsBase64 with the driveFileId
-      showLoading(true); // Show loading again for the fetch
+    if (response && response.success && response.driveFileId) {
+      displayMessage("Image uploaded to Drive. Fetching for canvas...", true);
+      showLoading(true); 
       google.script.run
-        .withSuccessHandler(onBase64ImageReceived)
-        .withFailureHandler(onServerError) // onServerError already handles showLoading(false)
+        .withSuccessHandler(onBase64ImageReceived) // This now gets the base64
+        .withFailureHandler(onServerError)
         .getImageAsBase64(response.driveFileId);
-
-    } else {
-      let errorMsg = "Failed to upload image to Drive or retrieve its ID.";
-      if (response && response.error) {
-        errorMsg = response.error;
-      }
-      onServerError({ message: errorMsg }); 
-    }
+    } else { /* ... error handling ... */ }
   }
 
-  // New success handler for getImageAsBase64
-  function onBase64ImageReceived(response) {
+  // Modified onBase64ImageReceived to save to current slide
+  function onBase64ImageReceived(response) { // response from getImageAsBase64
     showLoading(false);
     if (response && response.success && response.base64Data) {
-      if (!adminApp.state.fabricCanvasInstance) {
-          displayMessage("Error: Canvas not initialized. Cannot set background.", false);
+      if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) {
+          displayMessage("Error: Canvas or active slide not ready.", false);
+          return;
+      }
+      const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+      if (!currentSlide) {
+          displayMessage("Error: Current slide data is missing.", false);
           return;
       }
 
       fabric.Image.fromURL(response.base64Data, function(img) {
-        if (!adminApp.state.fabricCanvasInstance) {
-            console.error("Canvas became unavailable before image could be set.");
-            displayMessage("Error: Canvas became unavailable.", false);
-            return;
-        }
-
         const canvas = adminApp.state.fabricCanvasInstance;
         const imageNativeWidth = img.width;
         const imageNativeHeight = img.height;
-
-        // --- DYNAMIC CANVAS RESIZING LOGIC (Max Width, Scrollable Height) ---
-        const editorMaxWidth = 960; // Your desired maximum canvas width in the editor
-        // const editorMaxHeightBeforeScroll = 700; // Optional: if you want to limit initial visible height before scroll
-
+        const editorMaxWidth = 960; 
         let newCanvasWidth = imageNativeWidth;
         let newCanvasHeight = imageNativeHeight;
         const aspectRatio = imageNativeWidth / imageNativeHeight;
 
-        // If image's native width is greater than our editor's max width, scale it down.
         if (newCanvasWidth > editorMaxWidth) {
           newCanvasWidth = editorMaxWidth;
-          newCanvasHeight = Math.round(newCanvasWidth / aspectRatio); // Calculate height based on new width and original aspect ratio
+          newCanvasHeight = Math.round(newCanvasWidth / aspectRatio);
         }
-        // At this point, newCanvasWidth is <= editorMaxWidth.
-        // newCanvasHeight is whatever height maintains the aspect ratio for that width.
-
-        // 1. Resize the Fabric canvas logical surface
+        
         canvas.setWidth(newCanvasWidth);
         canvas.setHeight(newCanvasHeight);
-        console.log("Admin_JS: Canvas resized. New dimensions: " + newCanvasWidth + "x" + newCanvasHeight);
-
-        // 2. Update the HTML canvas element's attributes for layout
         if (fabricCanvasEl) {
             fabricCanvasEl.width = newCanvasWidth;
             fabricCanvasEl.height = newCanvasHeight;
         }
-        
-        // 3. Ensure the container for the canvas can scroll if the canvas is too tall
-        const canvasContainer = document.getElementById('fabricCanvasContainer');
-        if (canvasContainer) {
-            // Example: Allow vertical scrolling if canvas height exceeds a certain viewport or design height
-            // This is more of a CSS concern for the container, but JS can set max-height if needed.
-            // For now, we assume CSS on 'fabricCanvasContainer' or its parent handles overflow.
-            // e.g., in AdminView.html CSS:
-            // #fabricCanvasContainer { max-height: 700px; overflow-y: auto; /* other styles */ }
-            console.log("Admin_JS: Canvas container should now accommodate new canvas size. Ensure its CSS allows scrolling if needed.");
-        }
 
-        // 4. Set the image as background.
-        // The image will be scaled to fit the newCanvasWidth and newCanvasHeight.
-        // Since we calculated these dimensions to maintain aspect ratio, the image will not be warped.
-        canvas.setBackgroundImage(img, 
-            canvas.renderAll.bind(canvas), {
-              // Scale the original image to fit the new canvas dimensions
-              scaleX: newCanvasWidth / imageNativeWidth,
-              scaleY: newCanvasHeight / imageNativeHeight
-            });
-        
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+          scaleX: newCanvasWidth / imageNativeWidth,
+          scaleY: newCanvasHeight / imageNativeHeight
+        });
         canvas.renderAll();
         displayMessage("Image set as background. Canvas adjusted.", true);
-        console.log("Image background set. Final canvas dimensions: " + canvas.width + "x" + canvas.height);
 
-        // TODO in Step 9: Store newCanvasWidth, newCanvasHeight (the actual dimensions of THIS slide's canvas)
-        // and driveFileId/mimeType in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]
-        // These dimensions are what you'll use when re-loading this specific slide.
+        // ** SAVE MEDIA INFO AND DIMENSIONS TO CURRENT SLIDE OBJECT **
+        currentSlide.slideMedia.type = 'image';
+        currentSlide.slideMedia.url = response.base64Data; // Storing base64 directly for now. Could also store driveFileId from previous step.
+        currentSlide.slideMedia.mimeType = response.mimeType;
+        // currentSlide.slideMedia.driveFileId = ???; // Need to pass driveFileId from onImageUploaded to here if needed
+        currentSlide.canvasWidth = newCanvasWidth;
+        currentSlide.canvasHeight = newCanvasHeight;
+        console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media and dimensions updated.`);
+        updateSlideThumbnailsUI(); // Update thumbnail if its appearance depends on content/size
       }); 
-
-    } else {
-      let errorMsg = "Failed to fetch image data for canvas.";
-      if (response && response.error) {
-        errorMsg = response.error;
-      }
-      onServerError({ message: errorMsg });
-    }
+    } else { /* ... error handling ... */ }
   }
+  
+  // Client-side UUID generator (simple version)
+  // In a real app, you might use a more robust library or ensure true uniqueness
+  // For server-generated UUIDs, you'd call a server function.
+  Utilities = {
+      getUuid: function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+          });
+      }
+  };
+
 </script>

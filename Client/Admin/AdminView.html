@@ -3,7 +3,6 @@
   <head>
     <base target="_top">
     <title>Admin Dashboard</title>
-    <!-- ** IMPORTANT: Include Fabric.js library from CDN ** -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
@@ -15,6 +14,10 @@
       button:hover { background-color: #0056b3; }
       button.edit-button { background-color: #28a745; }
       button.edit-button:hover { background-color: #1e7e34; }
+      button.danger-button { background-color: #dc3545; }
+      button.danger-button:hover { background-color: #c82333; }
+
+
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
       .success { border-color: green; background-color: #d4edda; color: #155724; }
       .error { border-color: red; background-color: #f8d7da; color: #721c24; }
@@ -28,24 +31,6 @@
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-      /* Styles for Fabric.js Canvas */
-      #fabricCanvasContainer {
-        margin-top: 20px;
-        margin-bottom: 20px;
-        display: flex; 
-        justify-content: center;
-        /* --- For scrollable tall canvases --- */
-        max-height: 70vh; /* Example: max 70% of viewport height before scrollbar appears */
-        overflow-y: auto; /* Show vertical scrollbar if canvas content is taller */
-        overflow-x: hidden; /* Usually you don't want horizontal scroll on the container itself */
-        border: 1px dashed #ccc; /* Optional: to see the container bounds */
-        /* You might want to set a width on this container too, e.g., width: 100%; or width: editorMaxWidth + padding */
-      }
-      #fabricCanvasElement {
-        border: 1px solid #000;
-      }
-
-      /* Styling for controls within edit view */
       .edit-controls-group {
         margin-bottom: 20px;
         padding: 15px;
@@ -53,8 +38,76 @@
         border-radius: 5px;
         background-color: #f9f9f9;
       }
-      .edit-controls-group label {
-        margin-right: 10px;
+      .edit-controls-group label { margin-right: 10px; }
+
+      #fabricCanvasContainer {
+        margin-top: 10px; /* Reduced margin slightly */
+        margin-bottom: 10px;
+        display: flex; 
+        justify-content: center;
+        max-height: 70vh; 
+        overflow-y: auto; 
+        overflow-x: hidden; 
+        border: 1px dashed #ccc; 
+        min-height: 200px; /* Ensure container has some min height before canvas is sized */
+      }
+      #fabricCanvasElement { border: 1px solid #000; }
+
+      #slideManagementPanel {
+        margin-top: 20px;
+        padding: 10px;
+        background-color: #f0f8ff; /* AliceBlue */
+        border-radius: 5px;
+        border: 1px solid #d1e0ff;
+      }
+      #slideThumbnailsContainer {
+        display: flex;
+        flex-wrap: wrap; /* Allow thumbnails to wrap */
+        gap: 10px; /* Spacing between thumbnails */
+        margin-top: 10px;
+        min-height: 60px; /* So it doesn't collapse when empty */
+        padding: 5px;
+        border: 1px solid #b0c4de; /* LightSteelBlue */
+        background-color: #fff;
+      }
+      .slide-thumbnail {
+        width: 100px;
+        height: 75px; /* Maintain a rough aspect ratio */
+        border: 2px solid #778899; /* LightSlateGray */
+        background-color: #e6e6fa; /* Lavender */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        font-size: 0.8em;
+        text-align: center;
+        position: relative; /* For delete button */
+      }
+      .slide-thumbnail.active-slide {
+        border-color: #ff4500; /* OrangeRed */
+        box-shadow: 0 0 5px #ff4500;
+      }
+      .slide-thumbnail:hover {
+        border-color: #007bff;
+      }
+      .delete-slide-btn {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        line-height: 20px;
+        text-align: center;
+        cursor: pointer;
+        display: none; /* Initially hidden, show on hover or for active */
+      }
+      .slide-thumbnail:hover .delete-slide-btn {
+        display: block;
       }
     </style>
   </head>
@@ -69,45 +122,42 @@
           <input type="text" id="projectTitleInput" placeholder="Enter project title">
           <button id="createProjectButton">Create Project</button>
         </div>
-
         <div class="container" id="projectListSection">
             <h2>Existing Projects</h2>
-            <div id="adminProjectListContainer">
-                <!-- Projects will be dynamically inserted here -->
-            </div>
+            <div id="adminProjectListContainer"></div>
         </div>
     </div>
 
     <!-- View Container for Editing a Project -->
-    <div class="container" id="editViewContainer" style="display:none;"> <!-- Hidden by default -->
+    <div class="container" id="editViewContainer" style="display:none;">
         <button id="backToProjectsListButton">Back to Projects List</button>
-        <h2 id="editingProjectTitle">Editing Project: </h2> <!-- Title will be updated by JS -->
+        <h2 id="editingProjectTitle">Editing Project: </h2>
         
         <div class="edit-controls-group">
-            <h3>Slide Background</h3>
+            <h3>Current Slide Settings</h3>
             <label for="imageUploader">Upload Image Background:</label>
-            <!-- THIS LINE IS NOW UNCOMMENTED AND ACTIVE -->
             <input type="file" id="imageUploader" accept="image/*">
-            <!-- In later steps, controls for YouTube URL or Audio might go here too -->
         </div>
-
-        <!-- Canvas for Fabric.js (Phase 2) -->
+        
         <div id="fabricCanvasContainer">
           <canvas id="fabricCanvasElement"></canvas>
         </div>
+
+        <div id="slideManagementPanel">
+            <h3>Slides</h3>
+            <button id="addSlideButton">Add New Slide</button>
+            <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button> <!-- Added Save Project Button -->
+            <div id="slideThumbnailsContainer">
+                <!-- Slide thumbnails will be dynamically inserted here -->
+            </div>
+        </div>
         
-        <p><em>(Overlay controls and slide management will appear in later phases)</em></p>
-        <!-- Slide management UI (Phase 2) -->
-        <!-- <div id="slideThumbnailsContainer"></div> -->
-        <!-- <button id="addSlideButton">Add Slide</button> -->
+        <p><em>(Overlay controls will appear in later phases)</em></p>
     </div>
 
-    <div id="messageArea"></div> <!-- For success/error messages -->
+    <div id="messageArea"></div>
 
-    <!-- Include Loading Spinner (ensure Client/Shared/LoadingSpinner.html exists) -->
     <?!= include('Client/Shared/LoadingSpinner'); ?>
-
-    <!-- Client-side JavaScript (ensure Client/Admin/Admin_JS.html exists) -->
     <?!= include('Client/Admin/Admin_JS'); ?> 
   </body>
 </html>

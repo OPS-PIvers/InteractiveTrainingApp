@@ -34,6 +34,12 @@
         margin-bottom: 20px;
         display: flex; 
         justify-content: center;
+        /* --- For scrollable tall canvases --- */
+        max-height: 70vh; /* Example: max 70% of viewport height before scrollbar appears */
+        overflow-y: auto; /* Show vertical scrollbar if canvas content is taller */
+        overflow-x: hidden; /* Usually you don't want horizontal scroll on the container itself */
+        border: 1px dashed #ccc; /* Optional: to see the container bounds */
+        /* You might want to set a width on this container too, e.g., width: 100%; or width: editorMaxWidth + padding */
       }
       #fabricCanvasElement {
         border: 1px solid #000;

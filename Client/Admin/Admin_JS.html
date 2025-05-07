@@ -99,15 +99,17 @@
     adminApp.state.currentProjectId = projectIdToEdit; 
     
     if(listViewContainerEl) listViewContainerEl.style.display = 'none';
-    if(editViewContainerEl) editViewContainerEl.style.display = 'block'; // This makes imageUploaderEl visible
+    if(editViewContainerEl) editViewContainerEl.style.display = 'block'; 
     
     if(editingProjectTitleEl) {
         editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
     }
     
+    // Reset data that might be related to a previously edited project
     adminApp.state.projectData = null; 
-    adminApp.state.currentSlideIndex = -1; 
+    adminApp.state.currentSlideIndex = -1; // Will be important in Step 9
     
+    // Dispose previous canvas instance if it exists
     if (adminApp.state.fabricCanvasInstance) { 
       adminApp.state.fabricCanvasInstance.dispose();
       adminApp.state.fabricCanvasInstance = null;
@@ -120,23 +122,45 @@
         fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
     }
 
-    // imageUploaderEl should have been found and its listener attached by setupDOMReferences and attachEventListeners
-    // No need to re-reference or re-attach listener here.
-
+    // Initialize Fabric.js on the canvas
     if (typeof fabric !== 'undefined' && fabricCanvasEl) {
+      // Define default canvas dimensions (e.g., 16:9 aspect ratio)
+      const defaultCanvasWidth = 960;
+      const defaultCanvasHeight = Math.round(defaultCanvasWidth * (9 / 16)); // 540
+
       adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
-        width: 800, 
-        height: 600, 
-        backgroundColor: '#f0f0f0' 
+        width: defaultCanvasWidth, 
+        height: defaultCanvasHeight, 
+        backgroundColor: '#e9e9e9' // A slightly different default background
       });
-      console.log("Admin_JS: Fabric.js canvas initialized.", adminApp.state.fabricCanvasInstance);
+
+      // Update the HTML canvas element's attributes to match these default dimensions for layout
+      fabricCanvasEl.width = defaultCanvasWidth;
+      fabricCanvasEl.height = defaultCanvasHeight;
+      
+      // Optional: If you have a container and want to set its initial size too
+      // const canvasContainer = document.getElementById('fabricCanvasContainer');
+      // if (canvasContainer) {
+      //    canvasContainer.style.width = defaultCanvasWidth + 'px';
+      //    canvasContainer.style.height = defaultCanvasHeight + 'px';
+      // }
+
+      console.log("Admin_JS: Fabric.js canvas initialized with default dimensions: " + defaultCanvasWidth + "x" + defaultCanvasHeight, adminApp.state.fabricCanvasInstance);
     } else if (!fabricCanvasEl) {
       console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
       displayMessage("Error: Canvas element not found. Cannot initialize editor.", false);
     } else {
+      // Fabric.js library is not loaded
       console.error("Admin_JS: Fabric.js library (fabric) is not defined yet. Ensure AdminView.html includes the Fabric.js CDN script in the <head>.");
       displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check AdminView.html, your internet connection, ensure scripts are not blocked, and try refreshing.", false);
     }
+
+    // In Step 10, you will call: loadProjectForEditing(projectIdToEdit);
+    // This function (loadProjectForEditing) will then be responsible for:
+    // 1. Fetching project data.
+    // 2. If loading a slide with a saved custom canvas size (due to a background image), 
+    //    it will resize the canvas (using canvas.setWidth/setHeight and updating fabricCanvasEl.width/height)
+    //    to those saved dimensions BEFORE loading the slide's background and objects.
   }
 
   // --- General UI Functions ---
@@ -336,7 +360,7 @@
   }
 
   // New success handler for getImageAsBase64
-  function onBase64ImageReceived(response) { // response is from getImageAsBase64
+  function onBase64ImageReceived(response) {
     showLoading(false);
     if (response && response.success && response.base64Data) {
       if (!adminApp.state.fabricCanvasInstance) {
@@ -344,56 +368,72 @@
           return;
       }
 
-      fabric.Image.fromURL(response.base64Data, function(img) { // img is the fabric.Image object
-        if (!adminApp.state.fabricCanvasInstance) { 
+      fabric.Image.fromURL(response.base64Data, function(img) {
+        if (!adminApp.state.fabricCanvasInstance) {
             console.error("Canvas became unavailable before image could be set.");
             displayMessage("Error: Canvas became unavailable.", false);
             return;
         }
 
         const canvas = adminApp.state.fabricCanvasInstance;
-        const imageNativeWidth = img.width;  // Native width of the loaded image
-        const imageNativeHeight = img.height; // Native height of the loaded image
-        
-        // 1. Resize the canvas to the exact native dimensions of the image
-        canvas.setWidth(imageNativeWidth);
-        canvas.setHeight(imageNativeHeight);
-        console.log("Admin_JS: Canvas resized to image native dimensions: " + imageNativeWidth + "x" + imageNativeHeight);
+        const imageNativeWidth = img.width;
+        const imageNativeHeight = img.height;
 
-        // 2. Set the image as background. 
-        //    No explicit scaling options (scaleX, scaleY) are needed here in setBackgroundImage's options object,
-        //    because the canvas is now the same size as the image. Fabric.js will render it at its native size.
-        //    If you *did* provide scaling options, they would scale relative to the image's native size *within* the new canvas.
-        //    But since canvas W/H = image W/H, a scale of 1 is implicit.
-        canvas.setBackgroundImage(img, 
-            canvas.renderAll.bind(canvas), {
-              // Optional: Ensure it's positioned at top-left if there were any previous offsets
-              // originX: 'left', 
-              // originY: 'top',
-              // left: 0,
-              // top: 0
-            });
-        
-        // Ensure the canvas HTML element itself reflects the new size if CSS is restrictive
+        // --- DYNAMIC CANVAS RESIZING LOGIC (Max Width, Scrollable Height) ---
+        const editorMaxWidth = 960; // Your desired maximum canvas width in the editor
+        // const editorMaxHeightBeforeScroll = 700; // Optional: if you want to limit initial visible height before scroll
+
+        let newCanvasWidth = imageNativeWidth;
+        let newCanvasHeight = imageNativeHeight;
+        const aspectRatio = imageNativeWidth / imageNativeHeight;
+
+        // If image's native width is greater than our editor's max width, scale it down.
+        if (newCanvasWidth > editorMaxWidth) {
+          newCanvasWidth = editorMaxWidth;
+          newCanvasHeight = Math.round(newCanvasWidth / aspectRatio); // Calculate height based on new width and original aspect ratio
+        }
+        // At this point, newCanvasWidth is <= editorMaxWidth.
+        // newCanvasHeight is whatever height maintains the aspect ratio for that width.
+
+        // 1. Resize the Fabric canvas logical surface
+        canvas.setWidth(newCanvasWidth);
+        canvas.setHeight(newCanvasHeight);
+        console.log("Admin_JS: Canvas resized. New dimensions: " + newCanvasWidth + "x" + newCanvasHeight);
+
+        // 2. Update the HTML canvas element's attributes for layout
         if (fabricCanvasEl) {
-            fabricCanvasEl.width = imageNativeWidth;
-            fabricCanvasEl.height = imageNativeHeight;
-            // If you have a container, you might want to adjust its size too or let it flow
-            // const canvasContainer = document.getElementById('fabricCanvasContainer');
-            // if(canvasContainer) {
-            //   canvasContainer.style.width = imageNativeWidth + 'px';
-            //   canvasContainer.style.height = imageNativeHeight + 'px';
-            // }
+            fabricCanvasEl.width = newCanvasWidth;
+            fabricCanvasEl.height = newCanvasHeight;
         }
         
-        canvas.renderAll(); // Render once after setting dimensions and background
-        displayMessage("Image set as background. Canvas resized to image dimensions.", true);
+        // 3. Ensure the container for the canvas can scroll if the canvas is too tall
+        const canvasContainer = document.getElementById('fabricCanvasContainer');
+        if (canvasContainer) {
+            // Example: Allow vertical scrolling if canvas height exceeds a certain viewport or design height
+            // This is more of a CSS concern for the container, but JS can set max-height if needed.
+            // For now, we assume CSS on 'fabricCanvasContainer' or its parent handles overflow.
+            // e.g., in AdminView.html CSS:
+            // #fabricCanvasContainer { max-height: 700px; overflow-y: auto; /* other styles */ }
+            console.log("Admin_JS: Canvas container should now accommodate new canvas size. Ensure its CSS allows scrolling if needed.");
+        }
+
+        // 4. Set the image as background.
+        // The image will be scaled to fit the newCanvasWidth and newCanvasHeight.
+        // Since we calculated these dimensions to maintain aspect ratio, the image will not be warped.
+        canvas.setBackgroundImage(img, 
+            canvas.renderAll.bind(canvas), {
+              // Scale the original image to fit the new canvas dimensions
+              scaleX: newCanvasWidth / imageNativeWidth,
+              scaleY: newCanvasHeight / imageNativeHeight
+            });
+        
+        canvas.renderAll();
+        displayMessage("Image set as background. Canvas adjusted.", true);
         console.log("Image background set. Final canvas dimensions: " + canvas.width + "x" + canvas.height);
 
-        // TODO in Step 9: Store imageNativeWidth, imageNativeHeight, and driveFileId/mimeType
-        // in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]
-        // This is critical for restoring the correct canvas size when loading the slide later.
-
+        // TODO in Step 9: Store newCanvasWidth, newCanvasHeight (the actual dimensions of THIS slide's canvas)
+        // and driveFileId/mimeType in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]
+        // These dimensions are what you'll use when re-loading this specific slide.
       }); 
 
     } else {

@@ -3,6 +3,7 @@
   <head>
     <base target="_top">
     <title>Interactive Training Modules</title>
+    <?!= include('Client/Shared/Modal_CSS'); ?>
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
       .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
@@ -41,30 +42,65 @@
       }
 
       #messageAreaViewer { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
-      .success { border-color: green; background-color: #d4edda; color: #155724; } /* Reusing admin styles */
-      .error { border-color: red; background-color: #f8d7da; color: #721c24; } /* Reusing admin styles */
+      .success { border-color: green; background-color: #d4edda; color: #155724; } 
+      .error { border-color: red; background-color: #f8d7da; color: #721c24; } 
 
-      /* Spinner styles - assuming it's the same as admin's */
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #3498db; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+      /* Styles for Project View Mode */
+      #viewerProjectDisplayArea { display: none; /* Hidden initially */ }
+      #viewerCanvasContainer {
+        display: flex; 
+        justify-content: center;
+        align-items: flex-start; 
+        max-height: 80vh; /* Adjust as needed */
+        overflow: auto; 
+        border: 1px dashed #ccc; 
+        min-height: 300px; 
+        margin-top: 15px;
+        background-color: #e9e9e9; /* Default background if no image */
+      }
+      #viewerFabricCanvas { border: 1px solid #000; }
+      #viewerSlideNavigation { margin-top: 15px; text-align: center; }
+      #viewerSlideNavigation button { margin: 0 10px; }
+      #backToViewerListButton { margin-bottom: 15px; }
+
     </style>
   </head>
   <body>
-    <div class="container">
+    <div id="viewerListViewContainer" class="container">
       <h1>Available Training Modules</h1>
       <div id="viewerProjectListContainer">
-        <!-- Active projects will be dynamically inserted here -->
         <p>Loading projects...</p>
       </div>
     </div>
 
-    <div id="messageAreaViewer"></div> <!-- For success/error messages for viewer -->
+    <div id="viewerProjectDisplayArea" class="container">
+        <button id="backToViewerListButton">Back to Project List</button>
+        <h2 id="viewingProjectTitle"></h2>
+        <div id="viewerCanvasContainer">
+            <canvas id="viewerFabricCanvas"></canvas>
+        </div>
+        <div id="viewerSlideNavigation">
+            <button id="viewerPrevSlideButton" disabled>< Previous Slide</button>
+            <span id="viewerSlideIndicator">Slide 0 / 0</span>
+            <button id="viewerNextSlideButton" disabled>Next Slide ></button>
+        </div>
+    </div>
 
-    <!-- Include Loading Spinner (ensure Client/Shared/LoadingSpinner.html exists and is correct) -->
+    <div id="messageAreaViewer"></div> 
+
+    <!-- Modal Structure -->
+    <div id="viewerModal" class="modal-overlay">
+        <div class="modal-content">
+            <span id="viewerModalCloseButton" class="modal-close-button">×</span>
+            <div id="viewerModalBody"></div>
+        </div>
+    </div>
+
     <?!= include('Client/Shared/LoadingSpinner'); ?>
-
-    <!-- Client-side JavaScript for Viewer -->
     <?!= include('Client/Viewer/Viewer_JS'); ?> 
   </body>
 </html>

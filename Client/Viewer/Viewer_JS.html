@@ -1,148 +1,409 @@
 <script>
-    // Namespace for the viewer application
-    window.viewerApp = {};
-  
-    // --- Application State ---
-    viewerApp.state = {
-      isLoading: false
-    };
-  
-    // --- DOM Element References ---
-    let viewerProjectListContainerEl, messageAreaElViewer, loadingSpinnerElViewer; // Suffix with Viewer to avoid clashes if ever combined
-  
-    // --- Initialization ---
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log("Viewer_JS: DOMContentLoaded event fired!");
-      
-      viewerApp.setupDOMReferences();
-      // viewerApp.attachEventListeners(); // Placeholder for future event listeners
-      
-      loadViewerProjectsList(); // Fetch and display active projects
-      
-      console.log("Viewer_JS: Initialization complete.");
-    });
-  
-    /**
-     * Gets references to all necessary DOM elements from the page.
-     */
-    viewerApp.setupDOMReferences = function() {
-      viewerProjectListContainerEl = document.getElementById('viewerProjectListContainer');
-      messageAreaElViewer = document.getElementById('messageAreaViewer'); // Ensure this ID is unique if AdminView also has one
-      loadingSpinnerElViewer = document.getElementById('loadingSpinner'); // Assumes shared spinner ID
-  
-      if (!viewerProjectListContainerEl) {
-          console.error("CRITICAL: viewerProjectListContainerEl not found!");
-      }
-      console.log("Viewer_JS: DOM references set up.");
-    };
-  
-    // --- General UI Functions ---
-    function showLoadingViewer(show) {
-      viewerApp.state.isLoading = show;
-      if (loadingSpinnerElViewer) {
-        loadingSpinnerElViewer.style.display = show ? 'flex' : 'none';
-      } else if (show) { 
-          console.warn("showLoadingViewer(true) called but loadingSpinnerElViewer not yet available.");
-      }
-    }
-  
-    function displayMessageViewer(message, isSuccess) {
-      if (messageAreaElViewer) {
-        messageAreaElViewer.innerHTML = ''; 
-        const p = document.createElement('p');
-        p.textContent = message;
-        messageAreaElViewer.appendChild(p);
-        messageAreaElViewer.className = isSuccess ? 'success' : 'error'; // Assuming same CSS classes as Admin
-        setTimeout(() => {
-          if (messageAreaElViewer) {
-            messageAreaElViewer.innerHTML = '';
-            messageAreaElViewer.className = '';
-          }
-        }, 7000); 
-      } else {
-        console.warn("displayMessageViewer called but messageAreaElViewer not available. Message:", message);
-      }
-    }
+  // Namespace for the viewer application
+  window.viewerApp = {};
+
+  // --- Application State ---
+  viewerApp.state = {
+    isLoading: false,
+    currentProjectData: null, // Holds the parsed JSON for the currently viewed project
+    currentSlideIndex: 0,
+    viewerFabricCanvas: null,
+    // Default canvas dimensions, will be overridden by slide data
+    defaultCanvasWidth: 960, 
+    defaultCanvasHeight: 540
+  };
+
+  // --- DOM Element References ---
+  let viewerProjectListContainerEl, messageAreaElViewer, loadingSpinnerElViewer;
+  let viewerListViewContainerEl, viewerProjectDisplayAreaEl, viewingProjectTitleEl;
+  let viewerCanvasContainerEl, viewerFabricCanvasEl;
+  let viewerPrevSlideButtonEl, viewerNextSlideButtonEl, viewerSlideIndicatorEl, backToViewerListButtonEl;
+  let viewerModalEl, viewerModalCloseButtonEl, viewerModalBodyEl;
+
+  // --- Initialization ---
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("Viewer_JS: DOMContentLoaded event fired!");
     
-    function onServerErrorViewer(errorObject) {
-      showLoadingViewer(false);
-      console.error('Viewer Server Error Object:', errorObject);
-      let errorMessage = "An unknown error occurred on the server.";
-      if (typeof errorObject === 'string') { 
-          errorMessage = errorObject;
-      } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { 
-          errorMessage = errorObject.message;
-           if (errorObject.details && errorObject.details.length > 0 && errorObject.details[0].errorMessage) {
-               errorMessage = errorObject.details[0].errorMessage;
-          } else if (errorObject.details && typeof errorObject.details === 'string') {
-              errorMessage += " Details: " + errorObject.details;
-          }
-      } else if (errorObject && errorObject.name && errorObject.message) { 
-          errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`;
+    viewerApp.setupDOMReferences();
+    viewerApp.attachEventListeners(); 
+    
+    loadViewerProjectsList(); 
+    
+    console.log("Viewer_JS: Initialization complete.");
+  });
+
+  viewerApp.setupDOMReferences = function() {
+    viewerProjectListContainerEl = document.getElementById('viewerProjectListContainer');
+    messageAreaElViewer = document.getElementById('messageAreaViewer'); 
+    loadingSpinnerElViewer = document.getElementById('loadingSpinner'); 
+
+    viewerListViewContainerEl = document.getElementById('viewerListViewContainer');
+    viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
+    viewingProjectTitleEl = document.getElementById('viewingProjectTitle');
+    viewerCanvasContainerEl = document.getElementById('viewerCanvasContainer');
+    viewerFabricCanvasEl = document.getElementById('viewerFabricCanvas');
+    viewerPrevSlideButtonEl = document.getElementById('viewerPrevSlideButton');
+    viewerNextSlideButtonEl = document.getElementById('viewerNextSlideButton');
+    viewerSlideIndicatorEl = document.getElementById('viewerSlideIndicator');
+    backToViewerListButtonEl = document.getElementById('backToViewerListButton');
+
+    viewerModalEl = document.getElementById('viewerModal');
+    viewerModalCloseButtonEl = document.getElementById('viewerModalCloseButton');
+    viewerModalBodyEl = document.getElementById('viewerModalBody');
+
+    if (!viewerProjectListContainerEl) console.error("CRITICAL: viewerProjectListContainerEl not found!");
+    if (!viewerModalEl) console.error("CRITICAL: viewerModalEl not found!");
+    console.log("Viewer_JS: DOM references set up.");
+  };
+
+  viewerApp.attachEventListeners = function() {
+      if (backToViewerListButtonEl) backToViewerListButtonEl.addEventListener('click', showProjectListView);
+      if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.addEventListener('click', navigateToPrevSlide);
+      if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.addEventListener('click', navigateToNextSlide);
+      if (viewerModalCloseButtonEl) viewerModalCloseButtonEl.addEventListener('click', hideViewerModal);
+      if (viewerModalEl) { // Close modal if background is clicked
+          viewerModalEl.addEventListener('click', function(event) {
+              if (event.target === viewerModalEl) {
+                  hideViewerModal();
+              }
+          });
       }
-      displayMessageViewer('Server Error: ' + errorMessage, false);
+  };
+
+  function showLoadingViewer(show) {
+    viewerApp.state.isLoading = show;
+    if (loadingSpinnerElViewer) {
+      loadingSpinnerElViewer.style.display = show ? 'flex' : 'none';
+    } else if (show) { 
+        console.warn("showLoadingViewer(true) called but loadingSpinnerElViewer not yet available.");
     }
+  }
+
+  function displayMessageViewer(message, isSuccess) {
+    if (messageAreaElViewer) {
+      messageAreaElViewer.innerHTML = ''; 
+      const p = document.createElement('p');
+      p.textContent = message;
+      messageAreaElViewer.appendChild(p);
+      messageAreaElViewer.className = isSuccess ? 'success' : 'error'; 
+      setTimeout(() => {
+        if (messageAreaElViewer) {
+          messageAreaElViewer.innerHTML = '';
+          messageAreaElViewer.className = '';
+        }
+      }, 7000); 
+    } else {
+      console.warn("displayMessageViewer called but messageAreaElViewer not available. Message:", message);
+    }
+  }
   
-    // --- Project List ---
-    function loadViewerProjectsList() {
-      console.log("loadViewerProjectsList called");
-      if (!google || !google.script || !google.script.run) {
-        console.error("google.script.run is not available for loadViewerProjectsList!");
-        displayMessageViewer("Error: Client-server communication bridge unavailable.", false); return;
-      }
-      if (!viewerProjectListContainerEl) {
-          console.warn("loadViewerProjectsList: viewerProjectListContainerEl not ready yet.");
-          showLoadingViewer(false);
+  function onServerErrorViewer(errorObject) {
+    showLoadingViewer(false);
+    console.error('Viewer Server Error Object:', errorObject);
+    let errorMessage = "An unknown error occurred on the server.";
+    if (typeof errorObject === 'string') { 
+        errorMessage = errorObject;
+    } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { 
+        errorMessage = errorObject.message;
+    } else if (errorObject && errorObject.name && errorObject.message) { 
+        errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`;
+    } else if (errorObject && errorObject.error && typeof errorObject.error === 'string') { // Handle {success:false, error:"..."}
+        errorMessage = errorObject.error;
+    }
+    displayMessageViewer('Server Error: ' + errorMessage, false);
+  }
+
+  function loadViewerProjectsList() {
+    console.log("loadViewerProjectsList called");
+    if (!google || !google.script || !google.script.run) {
+      console.error("google.script.run is not available for loadViewerProjectsList!");
+      displayMessageViewer("Error: Client-server communication bridge unavailable.", false); return;
+    }
+    if (!viewerProjectListContainerEl) {
+        console.warn("loadViewerProjectsList: viewerProjectListContainerEl not ready yet.");
+        showLoadingViewer(false);
+        return; 
+    }
+    showLoadingViewer(true);
+    google.script.run
+      .withSuccessHandler(displayViewerProjects)
+      .withFailureHandler(onServerErrorViewer)
+      .getActiveProjectsList(); 
+  }
+
+  function displayViewerProjects(projectsArray) {
+    showLoadingViewer(false);
+    console.log("displayViewerProjects received:", projectsArray ? projectsArray.length : 0, "projects");
+    if (!viewerProjectListContainerEl) {
+        console.error("displayViewerProjects: viewerProjectListContainerEl is not found!");
+        return;
+    }
+    viewerProjectListContainerEl.innerHTML = ''; 
+    if (!projectsArray || projectsArray.length === 0) {
+      viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
+      return;
+    }
+
+    const ul = document.createElement('ul');
+    ul.className = 'project-list-viewer'; 
+
+    projectsArray.forEach(project => {
+      if (!project || !project.projectId) { 
+          console.warn("Skipping display of invalid project object:", project);
           return; 
       }
-      showLoadingViewer(true);
-      google.script.run
-        .withSuccessHandler(displayViewerProjects)
-        .withFailureHandler(onServerErrorViewer)
-        .getActiveProjectsList(); // Calling the function from ViewerController.gs
-    }
-  
-    function displayViewerProjects(projectsArray) {
-      showLoadingViewer(false);
-      console.log("displayViewerProjects received:", projectsArray ? projectsArray.length : 0, "projects");
-      if (!viewerProjectListContainerEl) {
-          console.error("displayViewerProjects: viewerProjectListContainerEl is not found!");
+      const listItem = document.createElement('li');
+      listItem.className = 'project-card-viewer'; 
+      
+      const titleHeader = document.createElement('h3');
+      titleHeader.textContent = project.projectTitle || 'Untitled Project';
+      
+      const viewButton = document.createElement('button');
+      viewButton.textContent = 'View Project';
+      viewButton.className = 'view-project-button'; 
+      viewButton.setAttribute('data-project-id', project.projectId); 
+      viewButton.onclick = function() { 
+        console.log("View Project button clicked for project ID:", project.projectId);
+        loadProjectForViewing(project.projectId);
+      };
+
+      listItem.appendChild(titleHeader);
+      listItem.appendChild(viewButton);
+      ul.appendChild(listItem);
+    });
+    viewerProjectListContainerEl.appendChild(ul);
+  }
+
+  function showProjectListView() {
+      if (viewerListViewContainerEl) viewerListViewContainerEl.style.display = 'block';
+      if (viewerProjectDisplayAreaEl) viewerProjectDisplayAreaEl.style.display = 'none';
+      if (viewerApp.state.viewerFabricCanvas) {
+          viewerApp.state.viewerFabricCanvas.dispose();
+          viewerApp.state.viewerFabricCanvas = null;
+      }
+      viewerApp.state.currentProjectData = null;
+      viewerApp.state.currentSlideIndex = 0;
+      loadViewerProjectsList(); // Refresh list in case status changed
+  }
+
+  function showProjectView() {
+      if (viewerListViewContainerEl) viewerListViewContainerEl.style.display = 'none';
+      if (viewerProjectDisplayAreaEl) viewerProjectDisplayAreaEl.style.display = 'block';
+  }
+
+  function loadProjectForViewing(projectId) {
+      if (!projectId) {
+          displayMessageViewer("Invalid project ID.", false);
           return;
       }
-      viewerProjectListContainerEl.innerHTML = ''; 
-      if (!projectsArray || projectsArray.length === 0) {
-        viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
-        return;
+      showLoadingViewer(true);
+      displayMessageViewer("Loading project...", true);
+      google.script.run
+          .withSuccessHandler(onProjectViewDataReceived)
+          .withFailureHandler(onServerErrorViewer)
+          .getProjectViewData(projectId);
+  }
+
+  function onProjectViewDataReceived(response) {
+      showLoadingViewer(false);
+      if (!response || !response.success || !response.data) {
+          onServerErrorViewer(response || { error: "Failed to load project data or project is not active." });
+          return;
       }
-  
-      const ul = document.createElement('ul');
-      ul.className = 'project-list-viewer'; // For styling
-  
-      projectsArray.forEach(project => {
-        if (!project || !project.projectId) { 
-            console.warn("Skipping display of invalid project object:", project);
-            return; 
-        }
-        const listItem = document.createElement('li');
-        listItem.className = 'project-card-viewer'; // For styling
-        
-        const titleHeader = document.createElement('h3');
-        titleHeader.textContent = project.projectTitle || 'Untitled Project';
-        
-        const viewButton = document.createElement('button');
-        viewButton.textContent = 'View Project';
-        viewButton.className = 'view-project-button'; 
-        viewButton.setAttribute('data-project-id', project.projectId); 
-        viewButton.onclick = function() { 
-          // In later phases, this will navigate to the project viewing interface
-          console.log("View Project button clicked for project ID:", project.projectId);
-          alert("Viewing project " + project.projectTitle + " (ID: " + project.projectId + ") - Functionality to be implemented in a later phase.");
-        };
-  
-        listItem.appendChild(titleHeader);
-        listItem.appendChild(viewButton);
-        ul.appendChild(listItem);
+      try {
+          viewerApp.state.currentProjectData = JSON.parse(response.data);
+          if (!viewerApp.state.currentProjectData || !viewerApp.state.currentProjectData.slides || viewerApp.state.currentProjectData.slides.length === 0) {
+              displayMessageViewer("Project data is empty or invalid.", false);
+              viewerApp.state.currentProjectData = null;
+              return;
+          }
+          console.log("Project for viewing loaded:", viewerApp.state.currentProjectData);
+          viewerApp.state.currentSlideIndex = 0;
+          showProjectView();
+          if (viewingProjectTitleEl) viewingProjectTitleEl.textContent = viewerApp.state.currentProjectData.title || "Untitled Project";
+          initializeViewerCanvas();
+          renderSlideForViewing(viewerApp.state.currentSlideIndex);
+          displayMessageViewer("Project loaded.", true);
+      } catch (e) {
+          console.error("Error parsing project data for viewing:", e);
+          displayMessageViewer("Error loading project: Invalid data format.", false);
+          viewerApp.state.currentProjectData = null;
+      }
+  }
+
+  function initializeViewerCanvas() {
+      if (viewerApp.state.viewerFabricCanvas) {
+          viewerApp.state.viewerFabricCanvas.dispose();
+      }
+      if (!viewerFabricCanvasEl) {
+          console.error("Viewer Fabric canvas element not found!");
+          return;
+      }
+      viewerApp.state.viewerFabricCanvas = new fabric.Canvas(viewerFabricCanvasEl, {
+          width: viewerApp.state.defaultCanvasWidth,
+          height: viewerApp.state.defaultCanvasHeight,
+          selection: false, // Objects are not selectable by default in viewer
+          hoverCursor: 'default', // Default cursor
+          backgroundColor: '#e9e9e9'
       });
-      viewerProjectListContainerEl.appendChild(ul);
-    }
-  </script>
+       // Make canvas non-interactive for drawing selection, etc.
+      viewerApp.state.viewerFabricCanvas.selection = false;
+      viewerApp.state.viewerFabricCanvas.forEachObject(function(obj) {
+          obj.selectable = false;
+          obj.evented = true; // IMPORTANT: Objects need to be evented to fire click/mouse events
+      });
+  }
+
+  function renderSlideForViewing(slideIndex) {
+      if (!viewerApp.state.currentProjectData || !viewerApp.state.viewerFabricCanvas) {
+          console.error("Cannot render slide: Project data or canvas not ready.");
+          return;
+      }
+      const slides = viewerApp.state.currentProjectData.slides;
+      if (slideIndex < 0 || slideIndex >= slides.length) {
+          console.error("Invalid slide index:", slideIndex);
+          return;
+      }
+      viewerApp.state.currentSlideIndex = slideIndex;
+      const slideData = slides[slideIndex];
+      const canvas = viewerApp.state.viewerFabricCanvas;
+
+      // Set canvas dimensions
+      const slideWidth = slideData.canvasWidth || viewerApp.state.defaultCanvasWidth;
+      const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
+      canvas.setWidth(slideWidth);
+      canvas.setHeight(slideHeight);
+      if (viewerFabricCanvasEl) { // Also set the HTML element's attributes
+          viewerFabricCanvasEl.width = slideWidth;
+          viewerFabricCanvasEl.height = slideHeight;
+      }
+      
+      canvas.clear(); // Clear previous slide content
+      canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); // Clear background
+      canvas.backgroundColor = '#e9e9e9'; // Default BG
+
+      // Load background media (image only for now, YouTube/Audio later)
+      const media = slideData.slideMedia;
+      if (media && media.type === 'image' && media.url) { // Assuming media.url holds base64
+          fabric.Image.fromURL(media.url, function(img) {
+              if (viewerApp.state.currentSlideIndex !== slideIndex) return; // Slide changed
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                  scaleX: canvas.width / img.width,
+                  scaleY: canvas.height / img.height
+              });
+          }, { crossOrigin: 'anonymous' });
+      }
+      
+      // Load Fabric objects (overlays)
+      if (slideData.fabricCanvasJSON) {
+          canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
+              if (viewerApp.state.currentSlideIndex !== slideIndex) return; // Slide changed
+              
+              canvas.forEachObject(function(obj) {
+                  obj.selectable = false; // Ensure not selectable
+                  obj.evented = true;    // Ensure it can fire events
+                  obj.hoverCursor = 'pointer'; // Default hover cursor for interactive items
+
+                  // Attach interaction listeners
+                  if (obj.customInteraction && obj.customInteraction.trigger) {
+                      if (obj.customInteraction.trigger === 'click') {
+                          obj.on('mousedown', function(options) { // 'mousedown' is often more reliable than 'click'
+                              // 'this' refers to the fabricObject
+                              if (this.customInteraction.trigger === 'click') {
+                                  handleOverlayInteraction(this, 'click');
+                                  if(options.e) options.e.stopPropagation(); // Prevent event bubbling if necessary
+                              }
+                          });
+                      } else if (obj.customInteraction.trigger === 'hover') {
+                          obj.on('mouseover', function() {
+                              if (this.customInteraction.trigger === 'hover') {
+                                  handleOverlayInteraction(this, 'hover');
+                              }
+                          });
+                          // Optionally, add 'mouseout' logic for hover if needed
+                      }
+                  }
+              });
+              canvas.renderAll();
+          });
+      } else {
+          canvas.renderAll(); // Render even if no objects
+      }
+      updateSlideNavigationUI();
+  }
+
+  function handleOverlayInteraction(fabricObject, eventType) {
+      if (!fabricObject.customInteraction) return;
+      const interaction = fabricObject.customInteraction;
+
+      // Ensure the trigger matches the event type that fired this
+      if (interaction.trigger !== eventType) return; 
+
+      console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
+
+      switch (interaction.action) {
+          case 'showModal':
+              if (interaction.modalContent) {
+                  showViewerModal(interaction.modalContent);
+              }
+              break;
+          case 'navigateToSlide':
+              const targetSlideId = interaction.navigateTo;
+              if (targetSlideId && viewerApp.state.currentProjectData && viewerApp.state.currentProjectData.slides) {
+                  const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
+                  if (targetSlideIndex !== -1) {
+                      renderSlideForViewing(targetSlideIndex);
+                  } else {
+                      console.warn("NavigateToSlide: Target slide ID not found:", targetSlideId);
+                      displayMessageViewer(`Navigation error: Slide '${targetSlideId}' not found.`, false);
+                  }
+              }
+              break;
+          case 'navigateToURL':
+              if (interaction.navigateTo) {
+                  // Basic URL validation (very simple)
+                  let url = interaction.navigateTo;
+                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                      url = 'http://' + url; // Attempt to make it a valid URL
+                  }
+                  window.open(url, '_blank');
+              }
+              break;
+          default:
+              console.log("Unknown or no action defined for this interaction.");
+      }
+  }
+
+  function showViewerModal(htmlContent) {
+      if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;
+      if (viewerModalEl) viewerModalEl.style.display = 'flex'; // Use flex for centering
+  }
+
+  function hideViewerModal() {
+      if (viewerModalEl) viewerModalEl.style.display = 'none';
+      if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = ''; // Clear content
+  }
+  
+  function updateSlideNavigationUI() {
+      if (!viewerApp.state.currentProjectData || !viewerApp.state.currentProjectData.slides) return;
+      const numSlides = viewerApp.state.currentProjectData.slides.length;
+      const currentIndex = viewerApp.state.currentSlideIndex;
+
+      if (viewerSlideIndicatorEl) viewerSlideIndicatorEl.textContent = `Slide ${currentIndex + 1} / ${numSlides}`;
+      if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = (currentIndex === 0);
+      if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.disabled = (currentIndex >= numSlides - 1);
+  }
+
+  function navigateToPrevSlide() {
+      if (viewerApp.state.currentSlideIndex > 0) {
+          renderSlideForViewing(viewerApp.state.currentSlideIndex - 1);
+      }
+  }
+
+  function navigateToNextSlide() {
+      if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) {
+          renderSlideForViewing(viewerApp.state.currentSlideIndex + 1);
+      }
+  }
+
+</script>

@@ -27,22 +27,14 @@ const PROJECT_DATA_FILENAME = 'project_data.json';
  * @param {Object} e The event parameter.
  * @return {HtmlOutput} The HTML output to serve.
  */
-// Server/Code.gs
-function doGet(e) { // 'e' is important here
+function doGet(e) {
   let htmlOutput;
-
-  // We no longer need to set template.MODE_FROM_SERVER or template.PROJECT_ID_FROM_SERVER here
-  // The client will fetch this data using getServerData()
 
   if (isAdminUser()) {
     const template = HtmlService.createTemplateFromFile('Client/Admin/AdminView.html');
-    // We can still determine title based on initial 'e' parameters if needed, or client can set it.
-    let title = 'Interactive Training App - Admin Dashboard';
-    if (e.parameter.page === 'edit' && e.parameter.projectId) {
-        title = 'Interactive Training App - Edit Project';
-    }
+    // No need to pass mode/projectId for view switching anymore
     htmlOutput = template.evaluate()
-        .setTitle(title)
+        .setTitle('Interactive Training App - Admin Dashboard')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else {
     const template = HtmlService.createTemplateFromFile('Client/Viewer/ViewerView.html');

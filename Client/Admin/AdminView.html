@@ -40,18 +40,24 @@
       }
       .edit-controls-group label { margin-right: 10px; }
 
+      /* This is the canvas *container* (the div wrapper), not the canvas element itself */
       #fabricCanvasContainer {
-        margin-top: 10px; /* Reduced margin slightly */
-        margin-bottom: 10px;
+        /* margin-top: 10px; /* Removed as it's inside flex now */
+        /* margin-bottom: 10px; /* Removed */
         display: flex; 
-        justify-content: center;
+        justify-content: center; /* Centers the canvas element if it's smaller than container */
+        align-items: flex-start; /* Aligns canvas to top if smaller */
         max-height: 70vh; 
-        overflow-y: auto; 
-        overflow-x: hidden; 
+        overflow: auto; /* Use auto for scrollbars only if needed */
         border: 1px dashed #ccc; 
-        min-height: 200px; /* Ensure container has some min height before canvas is sized */
+        min-height: 200px; 
       }
-      #fabricCanvasElement { border: 1px solid #000; }
+      /* This is the actual <canvas> element */
+      #fabricCanvasElement { 
+        border: 1px solid #000; 
+        /* Max width/height can be set here if you want to constrain the canvas element itself, 
+           but resizing is handled by JS and its container. */
+      }
 
       #slideManagementPanel {
         margin-top: 20px;
@@ -112,14 +118,9 @@
 
       /* Sidebar Styles */
       #overlaySidebar {
-        /* display: none; /* Initially hidden, controlled by JS */
-        /* width: 300px; /* Adjust as needed */
-        /* padding: 15px; */
-        /* border: 1px solid #ccc; */
-        /* background-color: #f9f9f9; */
-        /* border-radius: 5px; */
         max-height: 70vh; /* Match canvas container max-height */
         overflow-y: auto;
+        /* display:none; width: 300px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9; border-radius: 5px; */ /* Basic styles moved from inline to here */
       }
       .sidebar-section {
         margin-bottom: 15px;
@@ -137,15 +138,15 @@
         text-transform: uppercase;
       }
       #overlaySidebar label {
-        display: inline-block; /* Or block if you want them on separate lines */
+        display: inline-block; 
         margin-bottom: 3px;
         font-size: 0.9em;
-        width: 90px; /* Align labels nicely */
+        width: 90px; 
       }
       #overlaySidebar input[type="number"],
       #overlaySidebar input[type="color"],
       #overlaySidebar textarea {
-        width: calc(100% - 105px); /* Adjust based on label width */
+        width: calc(100% - 105px); 
         padding: 6px;
         margin-bottom: 8px;
         border: 1px solid #ddd;
@@ -154,13 +155,13 @@
         font-size: 0.9em;
       }
       #overlaySidebar input[type="range"] {
-        width: calc(100% - 105px); /* Adjust based on label width */
+        width: calc(100% - 105px); 
         margin-bottom: 8px;
       }
       #overlaySidebar textarea {
         min-height: 60px;
       }
-    </style>
+      /* There was an extra closing </style> tag here in your provided code, removing it */
     </style>
   </head>
   <body>
@@ -197,12 +198,18 @@
             <button id="addCircleButton">Add Circle</button>
             <button id="addTextboxButton">Add Text</button>
         </div>
-    
+        
+        <!-- THIS IS THE ORIGINAL CANVAS LOCATION - IT NEEDS TO BE REMOVED -->
+        <!-- 
+        <div id="fabricCanvasContainer"> 
+          <canvas id="fabricCanvasElement"></canvas>
+        </div>
+        -->
 
         <div id="slideManagementPanel">
             <h3>Slides</h3>
             <button id="addSlideButton">Add New Slide</button>
-            <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button> <!-- Added Save Project Button -->
+            <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button>
             <div id="slideThumbnailsContainer">
                 <!-- Slide thumbnails will be dynamically inserted here -->
             </div>
@@ -211,12 +218,12 @@
         <!-- Flex container for Canvas and Sidebar -->
         <div id="canvasAndSidebarContainer" style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">
             
-            <!-- Canvas Area (already exists, just wrapped) -->
-            <div id="fabricCanvasContainer" style="flex-grow: 1; /* allow canvas to take available space */">
-              <canvas id="fabricCanvasElement"></canvas>
+            <!-- CORRECTED: Canvas Area - THIS IS WHERE IT SHOULD BE -->
+            <div id="fabricCanvasContainer" style="flex-grow: 1;">
+              <canvas id="fabricCanvasElement"></canvas> <!-- The ONE AND ONLY canvas element -->
             </div>
 
-            <!-- NEW: Overlay Configuration Sidebar -->
+            <!-- Overlay Configuration Sidebar -->
             <div id="overlaySidebar" style="display:none; width: 300px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9; border-radius: 5px;">
                 <h3>Overlay Properties</h3>
                 <div class="sidebar-section">
@@ -252,8 +259,6 @@
             </div>
         </div>
         
-        <!-- Remove the old placeholder p tag -->
-        <!-- <p><em>(Overlay controls will appear in later phases)</em></p> --> 
     </div>
 
     <div id="messageArea"></div>

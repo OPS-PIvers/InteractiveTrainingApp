@@ -31,10 +31,11 @@
     adminApp.setupDOMReferences();
     adminApp.attachEventListeners();
     switchToListView(); 
-    loadAdminProjectsList(); 
+    loadAdminProjectsList(); // << Called here
     console.log("Admin_JS: Initialization complete.");
   });
 
+  // --- Setup and Listeners ---
   adminApp.setupDOMReferences = function() {
     messageAreaEl = document.getElementById('messageArea');
     loadingSpinnerEl = document.getElementById('loadingSpinner');
@@ -52,26 +53,36 @@
     slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
     saveProjectButtonEl = document.getElementById('saveProjectButton');
 
-    if (!addSlideButtonEl || !slideThumbnailsContainerEl || !saveProjectButtonEl) {
-        console.warn("Step 9 DOM elements (slide management/save) not all found. This is okay if not in edit view yet.");
-    }
+    // Added null checks for robustness during setup
+    if (!listViewContainerEl) console.error("CRITICAL: listViewContainerEl not found!");
+    if (!editViewContainerEl) console.error("CRITICAL: editViewContainerEl not found!");
+    // Non-critical warnings for elements only in edit view
+    if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
+    if (!slideThumbnailsContainerEl) console.warn("slideThumbnailsContainerEl not found during initial setup.");
+    if (!saveProjectButtonEl) console.warn("saveProjectButtonEl not found during initial setup.");
+    if (!imageUploaderEl) console.warn("imageUploaderEl not found during initial setup.");
+    if (!fabricCanvasEl) console.warn("fabricCanvasEl not found during initial setup.");
+
+
     console.log("Admin_JS: DOM references set up.");
   };
 
   adminApp.attachEventListeners = function() {
-    if (createProjectButtonEl) createProjectButtonEl.addEventListener('click', handleCreateProject);
-    if (backToProjectsListButtonEl) backToProjectsListButtonEl.addEventListener('click', switchToListView);
-    if (imageUploaderEl) imageUploaderEl.addEventListener('change', handleImageUpload);
-    
-    // Step 9 Event Listeners (ensure elements exist before adding, or add them in switchToEditView)
-    // These will be re-checked/added in switchToEditView if not found now.
-    if (addSlideButtonEl) {
-        addSlideButtonEl.addEventListener('click', handleAddSlide);
-    } else { console.warn("addSlideButtonEl not found on initial attach. Will try in switchToEditView.");}
-    
-    if (saveProjectButtonEl) {
-        saveProjectButtonEl.addEventListener('click', handleSaveProject);
-    } else { console.warn("saveProjectButtonEl not found on initial attach. Will try in switchToEditView."); }
+    // Use helper function to safely add listeners
+    const safelyAddListener = (element, eventType, handler, elementName) => {
+        if (element) {
+            element.addEventListener(eventType, handler);
+            // console.log(`Admin_JS: Listener added for ${eventType} on ${elementName}`);
+        } else {
+            console.warn(`Admin_JS: Could not attach ${eventType} listener - ${elementName} element not found initially.`);
+        }
+    };
+
+    safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
+    safelyAddListener(backToProjectsListButtonEl, 'click', switchToListView, 'backToProjectsListButtonEl');
+    safelyAddListener(imageUploaderEl, 'change', handleImageUpload, 'imageUploaderEl');
+    safelyAddListener(addSlideButtonEl, 'click', handleAddSlide, 'addSlideButtonEl');
+    safelyAddListener(saveProjectButtonEl, 'click', handleSaveProject, 'saveProjectButtonEl');
 
     console.log("Admin_JS: Event listeners attached.");
   };
@@ -81,11 +92,12 @@
     console.log("Switching to List View");
     adminApp.state.currentView = 'list';
     adminApp.state.currentProjectId = null; 
-    adminApp.state.projectData = { projectId: null, title: '', slides: [] }; // Reset project data
+    adminApp.state.projectData = { projectId: null, title: '', slides: [] }; 
     adminApp.state.currentSlideIndex = -1;
     if (adminApp.state.fabricCanvasInstance) {
         adminApp.state.fabricCanvasInstance.dispose();
         adminApp.state.fabricCanvasInstance = null;
+        console.log("Admin_JS: Disposed fabric canvas instance.");
     }
     if(listViewContainerEl) listViewContainerEl.style.display = 'block';
     if(editViewContainerEl) editViewContainerEl.style.display = 'none';
@@ -93,399 +105,322 @@
   }
 
   function switchToEditView(projectIdToEdit) {
-    console.log("Switching to Edit View for project ID:", projectIdToEdit);
-    adminApp.state.currentView = 'edit';
-    adminApp.state.currentProjectId = projectIdToEdit; 
-    
-    // Initialize projectData for the new project being edited
-    // In Step 10, this will be replaced by loading actual project data
-    adminApp.state.projectData = {
-      projectId: projectIdToEdit,
-      // Title will be fetched in Step 10, or use a placeholder
-      title: "Loading project...", // Placeholder
-      slides: [] 
-    };
-    adminApp.state.currentSlideIndex = -1;
-    
-    if(listViewContainerEl) listViewContainerEl.style.display = 'none';
-    if(editViewContainerEl) editViewContainerEl.style.display = 'block'; 
-    
-    if(editingProjectTitleEl) {
-        // For now, use the ID. In Step 10, projectData.title will be populated.
-        editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
-    }
-    
-    if (adminApp.state.fabricCanvasInstance) { 
-      adminApp.state.fabricCanvasInstance.dispose();
-      adminApp.state.fabricCanvasInstance = null;
-    }
-    if (messageAreaEl) messageAreaEl.innerHTML = ''; 
-
-    if (!fabricCanvasEl) fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
-    if (!imageUploaderEl) imageUploaderEl = document.getElementById('imageUploader');
-    if (!addSlideButtonEl) addSlideButtonEl = document.getElementById('addSlideButton');
-    if (!saveProjectButtonEl) saveProjectButtonEl = document.getElementById('saveProjectButton');
-    if (!slideThumbnailsContainerEl) slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
-
-
-    // Re-attach listeners for elements that might not have been available on DOMContentLoaded
-    // because their parent container was display:none
-    if (imageUploaderEl && !imageUploaderEl.hasAttribute('listener-attached')) {
-      imageUploaderEl.addEventListener('change', handleImageUpload);
-      imageUploaderEl.setAttribute('listener-attached', 'true');
-    }
-    if (addSlideButtonEl && !addSlideButtonEl.hasAttribute('listener-attached')) {
-      addSlideButtonEl.addEventListener('click', handleAddSlide);
-      addSlideButtonEl.setAttribute('listener-attached', 'true');
-    }
-    if (saveProjectButtonEl && !saveProjectButtonEl.hasAttribute('listener-attached')) {
-      saveProjectButtonEl.addEventListener('click', handleSaveProject);
-      saveProjectButtonEl.setAttribute('listener-attached', 'true');
-    }
-
-
-    if (typeof fabric !== 'undefined' && fabricCanvasEl) {
-      adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
-        width: adminApp.state.defaultCanvasWidth, 
-        height: adminApp.state.defaultCanvasHeight, 
-        backgroundColor: '#e9e9e9'
-      });
-      fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
-      fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
-      console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
-
-      // For a new project or if loaded data has no slides (Step 10 will handle loaded data)
-      if (adminApp.state.projectData.slides.length === 0) {
-        handleAddSlide(); // Add an initial slide
-      } else {
-        // If loading existing project (Step 10), select the first slide
-        // selectSlide(0); 
+      console.log("Switching to Edit View for project ID:", projectIdToEdit);
+      adminApp.state.currentView = 'edit';
+      adminApp.state.currentProjectId = projectIdToEdit; 
+      
+      // Initialize projectData - Step 10 will load real data
+      adminApp.state.projectData = { projectId: projectIdToEdit, title: "Loading project...", slides: [] };
+      adminApp.state.currentSlideIndex = -1;
+      
+      // Toggle View Visibility
+      if(listViewContainerEl) listViewContainerEl.style.display = 'none';
+      if(editViewContainerEl) editViewContainerEl.style.display = 'block'; 
+      
+      // Update Title Placeholder
+      if(editingProjectTitleEl) editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
+      
+      // Dispose previous canvas if exists
+      if (adminApp.state.fabricCanvasInstance) { 
+          adminApp.state.fabricCanvasInstance.dispose(); 
+          adminApp.state.fabricCanvasInstance = null; 
+          console.log("Admin_JS: Disposed previous Fabric canvas instance.");
       }
-      updateSlideThumbnailsUI();
+      if (messageAreaEl) messageAreaEl.innerHTML = ''; 
 
+      // Re-reference potentially hidden elements and attach listeners if needed
+      const safelyCheckAndAttachListener = (elementVar, id, eventType, handler) => {
+          if (!window[elementVar]) { // Use window[elementVar] to check if global variable holds the element
+              window[elementVar] = document.getElementById(id);
+          }
+          const element = window[elementVar]; // Get the element
+          if (element && !element.hasAttribute('listener-attached')) {
+              element.addEventListener(eventType, handler);
+              element.setAttribute('listener-attached', 'true');
+              console.log(`Admin_JS: Listener attached for ${eventType} on #${id} in switchToEditView.`);
+          } else if (!element) {
+              console.error(`CRITICAL: Element #${id} not found in switchToEditView!`);
+          }
+      };
 
-    } else { /* Error handling for fabric/canvas not ready */ 
-        console.error("Fabric.js or canvas element not ready.");
-        displayMessage("Critical error: Editor components not ready.", false);
-    }
-    // In Step 10, call: loadProjectForEditing(projectIdToEdit);
+      safelyCheckAndAttachListener('fabricCanvasEl', 'fabricCanvasElement', null, null); // Just ensure it's referenced
+      safelyCheckAndAttachListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload);
+      safelyCheckAndAttachListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide);
+      safelyCheckAndAttachListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject);
+      safelyCheckAndAttachListener('slideThumbnailsContainerEl', 'slideThumbnailsContainer', null, null); // Just ensure it's referenced
+
+      // Initialize Fabric Canvas
+      if (typeof fabric !== 'undefined' && fabricCanvasEl) {
+          adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', { 
+              width: adminApp.state.defaultCanvasWidth, 
+              height: adminApp.state.defaultCanvasHeight, 
+              backgroundColor: '#e9e9e9' 
+          });
+          fabricCanvasEl.width = adminApp.state.defaultCanvasWidth; 
+          fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
+          console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
+
+          // Setup initial slide if needed (Step 10 will handle loading data)
+          if (adminApp.state.projectData.slides.length === 0) { 
+              handleAddSlide(); 
+          } else { 
+              // When loading data in Step 10, uncomment this:
+              // selectSlide(0); 
+          }
+          updateSlideThumbnailsUI(); // Render thumbnails based on projectData.slides
+
+      } else { 
+          console.error("Fabric.js or canvas element not ready in switchToEditView."); 
+          displayMessage("Critical error: Editor components not ready.", false); 
+      }
+      // In Step 10, call: loadProjectForEditing(projectIdToEdit);
   }
 
-  // --- Slide Management (Step 9) ---
-  function handleAddSlide() {
-    console.log("handleAddSlide called");
-    if (!adminApp.state.projectData) {
-        console.error("handleAddSlide: projectData not initialized.");
-        return;
-    }
-    saveCurrentSlideState(); // Save state of the currently active slide before adding a new one
-
-    const newSlideId = 'slide_' + Utilities.getUuid(); // Requires Utilities.getUuid() client-side or generate differently
-    const newSlide = {
-      slideId: newSlideId,
-      canvasWidth: adminApp.state.defaultCanvasWidth,
-      canvasHeight: adminApp.state.defaultCanvasHeight,
-      fabricCanvasJSON: null, // Empty canvas initially
-      slideMedia: { 
-        type: null, 
-        url: null, // This might store base64 for images, or a Drive ID/URL
-        driveFileId: null,
-        mimeType: null
-      }
-    };
-    adminApp.state.projectData.slides.push(newSlide);
-    const newSlideIndex = adminApp.state.projectData.slides.length - 1;
-    selectSlide(newSlideIndex); // This will also update thumbnails
-    console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
+  // --- Slide Management (Step 9) --- 
+  function handleAddSlide() { 
+      console.log("handleAddSlide called");
+      if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
+      saveCurrentSlideState(); // Save state of the currently active slide before adding a new one
+      const newSlideId = 'slide_' + Utilities.getUuid(); 
+      const newSlide = { slideId: newSlideId, canvasWidth: adminApp.state.defaultCanvasWidth, canvasHeight: adminApp.state.defaultCanvasHeight, fabricCanvasJSON: null, slideMedia: { type: null, url: null, driveFileId: null, mimeType: null } };
+      adminApp.state.projectData.slides.push(newSlide);
+      const newSlideIndex = adminApp.state.projectData.slides.length - 1;
+      selectSlide(newSlideIndex); // This will also update thumbnails
+      console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
   }
 
   function selectSlide(slideIndex) {
-    if (!adminApp.state.projectData || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) {
-      console.error("selectSlide: Invalid slideIndex or no projectData", slideIndex, adminApp.state.projectData);
-      return;
-    }
-    console.log("Selecting slide at index:", slideIndex);
+      if (!adminApp.state.projectData || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid slideIndex or no projectData", slideIndex, adminApp.state.projectData); return; }
+      console.log("Selecting slide at index:", slideIndex);
+      saveCurrentSlideState(); // Save the outgoing slide's state
+      adminApp.state.currentSlideIndex = slideIndex;
+      const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
+      const canvas = adminApp.state.fabricCanvasInstance;
+      if (!canvas) { console.error("selectSlide: Fabric canvas instance not available!"); return; }
 
-    saveCurrentSlideState(); // Save the outgoing slide's state
+      // 1. Set canvas dimensions for the selected slide
+      canvas.setWidth(selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth);
+      canvas.setHeight(selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight);
+      if (fabricCanvasEl) { fabricCanvasEl.width = canvas.width; fabricCanvasEl.height = canvas.height; }
 
-    adminApp.state.currentSlideIndex = slideIndex;
-    const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
-    const canvas = adminApp.state.fabricCanvasInstance;
+      // 2. Clear canvas (also clears background)
+      canvas.clear(); 
 
-    if (!canvas) {
-      console.error("selectSlide: Fabric canvas instance not available!");
-      return;
-    }
-
-    // 1. Set canvas dimensions for the selected slide
-    canvas.setWidth(selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth);
-    canvas.setHeight(selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight);
-    if (fabricCanvasEl) {
-        fabricCanvasEl.width = canvas.width;
-        fabricCanvasEl.height = canvas.height;
-    }
-
-    // 2. Clear canvas (also clears background)
-    canvas.clear(); 
-
-    // 3. Load Background Image (if any)
-    if (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'image' && selectedSlideData.slideMedia.url) {
-      // Assuming slideMedia.url holds base64 data from onBase64ImageReceived
-      // or a direct web link if that was how it was saved.
-      // If it's a Drive ID, we'd need to re-fetch as base64 here via a server call.
-      // For simplicity now, assume URL is directly usable (e.g., was a base64 string)
-      fabric.Image.fromURL(selectedSlideData.slideMedia.url, function(img) {
-        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-          scaleX: canvas.width / img.width,
-          scaleY: canvas.height / img.height
-        });
-      } /*, { crossOrigin: 'anonymous' } // May be needed if URL is not base64 */);
-    } else {
-      // Ensure canvas has a default background if no image
-      canvas.backgroundColor = '#e9e9e9'; 
-      canvas.renderAll();
-    }
-
-    // 4. Load Fabric Canvas JSON (overlays)
-    if (selectedSlideData.fabricCanvasJSON) {
-      canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
-        canvas.renderAll();
-        console.log("Loaded canvas JSON for slide", slideIndex);
-      }, function(o, object) {
-        // Revival function for custom properties - will be used in later steps
-        // console.log("Reviving object:", o, object);
-      });
-    } else {
-      // If no JSON, it's a blank canvas (already cleared)
-      canvas.renderAll(); // Render to show background color if nothing else
-    }
-    updateSlideThumbnailsUI();
-    if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
-  }
-
-  function updateSlideThumbnailsUI() {
-    if (!slideThumbnailsContainerEl || !adminApp.state.projectData) return;
-    slideThumbnailsContainerEl.innerHTML = ''; // Clear existing thumbnails
-
-    adminApp.state.projectData.slides.forEach((slide, index) => {
-      const thumb = document.createElement('div');
-      thumb.className = 'slide-thumbnail';
-      thumb.textContent = `Slide ${index + 1}`;
-      if (index === adminApp.state.currentSlideIndex) {
-        thumb.classList.add('active-slide');
-      }
-      thumb.onclick = function() { selectSlide(index); };
-
-      // Basic Delete Button (functionality needs refinement)
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'delete-slide-btn';
-      deleteBtn.innerHTML = '×'; // 'x' symbol
-      deleteBtn.title = "Delete slide";
-      deleteBtn.onclick = function(event) {
-        event.stopPropagation(); // Prevent selectSlide from firing
-        handleDeleteSlide(index);
-      };
-      thumb.appendChild(deleteBtn);
-      slideThumbnailsContainerEl.appendChild(thumb);
-    });
-  }
-  
-  function handleDeleteSlide(slideIndex) {
-    if (!adminApp.state.projectData || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) {
-      console.error("handleDeleteSlide: Invalid slideIndex or no projectData.");
-      return;
-    }
-    if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) {
-      return;
-    }
-
-    adminApp.state.projectData.slides.splice(slideIndex, 1);
-    console.log("Deleted slide at index:", slideIndex, "Remaining slides:", adminApp.state.projectData.slides.length);
-
-    if (adminApp.state.projectData.slides.length === 0) {
-      // If all slides are deleted, add a new default one
-      handleAddSlide(); 
-    } else {
-      // Adjust currentSlideIndex if needed
-      if (adminApp.state.currentSlideIndex === slideIndex) {
-        // If deleted slide was active, select previous or first
-        selectSlide(Math.max(0, slideIndex - 1));
-      } else if (adminApp.state.currentSlideIndex > slideIndex) {
-        // If active slide was after deleted one, decrement its index
-        adminApp.state.currentSlideIndex--;
-        // No need to call selectSlide here, just update thumbnails to reflect active state correctly
-        updateSlideThumbnailsUI(); 
-      } else {
-        // Active slide was before deleted one, index is fine
-        updateSlideThumbnailsUI();
-      }
-    }
-  }
-
-
-  function saveCurrentSlideState() {
-    if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData) {
-      // console.log("saveCurrentSlideState: No active slide or canvas to save.");
-      return;
-    }
-    const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-    if (!currentSlide) {
-        console.error("saveCurrentSlideState: Current slide data not found for index", adminApp.state.currentSlideIndex);
-        return;
-    }
-    const canvas = adminApp.state.fabricCanvasInstance;
-    // Save canvas content (overlays)
-    currentSlide.fabricCanvasJSON = canvas.toJSON(['slideId', 'canvasWidth', 'canvasHeight' /* add other custom Fabric object props here */]);
-    // Save canvas dimensions for this slide
-    currentSlide.canvasWidth = canvas.getWidth();
-    currentSlide.canvasHeight = canvas.getHeight();
-    // slideMedia is already updated by onBase64ImageReceived
-    console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Dimensions: ${currentSlide.canvasWidth}x${currentSlide.canvasHeight}`);
-  }
-
-  // --- Project Saving (Step 9) ---
-  function handleSaveProject() {
-    if (!adminApp.state.projectData || !adminApp.state.currentProjectId) {
-      displayMessage("No project data to save or project ID is missing.", false);
-      return;
-    }
-    if (adminApp.state.isLoading) return;
-
-    saveCurrentSlideState(); // Ensure the very last state of the active slide is captured
-
-    showLoading(true);
-    displayMessage("Saving project...", true);
-    console.log("Saving projectData:", JSON.stringify(adminApp.state.projectData, null, 2)); // Log what's being saved
-
-    google.script.run
-      .withSuccessHandler(onProjectSaved)
-      .withFailureHandler(onServerError)
-      .saveProjectData(adminApp.state.currentProjectId, JSON.stringify(adminApp.state.projectData));
-  }
-
-  function onProjectSaved(response) {
-    showLoading(false);
-    if (response && response.success) {
-      displayMessage(response.message || "Project saved successfully!", true);
-      // Optionally update "Last Modified" display if you have one
-    } else {
-      onServerError((response && response.error) ? response.error : "Failed to save project.");
-    }
-  }
-
-  // --- General UI Functions --- (showLoading, displayMessage, onServerError as before)
-  function showLoading(show) { /* ... */ }
-  function displayMessage(message, isSuccess) { /* ... */ }
-  function onServerError(errorObject) { /* ... */ }
-
-  // --- Project Creation (Step 3) --- (handleCreateProject, onProjectCreated as before)
-  function handleCreateProject() { /* ... */ }
-  function onProjectCreated(response) { /* ... */ }
-  
-  // --- Project List (Step 4) --- (loadAdminProjectsList, displayAdminProjects as before)
-  function loadAdminProjectsList() { /* ... */ }
-  function displayAdminProjects(projectsArray) { /* ... */ }
-
-  // --- Image Upload Handling (Step 8) ---
-  function handleImageUpload(event) {
-    // ... (previous implementation of handleImageUpload) ...
-    if (adminApp.state.isLoading) { /* ... */ return; }
-    const file = event.target.files[0];
-    if (!file) { /* ... */ return; }
-    if (!file.type.startsWith('image/')) { /* ... */ return; }
-    showLoading(true);
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
-      if (!adminApp.state.currentProjectId) { /* ... error ... */ return; }
-      google.script.run
-        .withSuccessHandler(onImageUploaded) // This is the existing handler from Step 8
-        .withFailureHandler(onServerError)
-        .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
-    };
-    reader.onerror = function(error) { /* ... */ };
-    reader.readAsDataURL(file);
-  }
-
-  function onImageUploaded(response) { // Response from uploadFileToDrive
-    // ... (previous implementation: calls getImageAsBase64)
-    showLoading(false);
-    if (imageUploaderEl) imageUploaderEl.value = null; 
-    if (response && response.success && response.driveFileId) {
-      displayMessage("Image uploaded to Drive. Fetching for canvas...", true);
-      showLoading(true); 
-      google.script.run
-        .withSuccessHandler(onBase64ImageReceived) // This now gets the base64
-        .withFailureHandler(onServerError)
-        .getImageAsBase64(response.driveFileId);
-    } else { /* ... error handling ... */ }
-  }
-
-  // Modified onBase64ImageReceived to save to current slide
-  function onBase64ImageReceived(response) { // response from getImageAsBase64
-    showLoading(false);
-    if (response && response.success && response.base64Data) {
-      if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) {
-          displayMessage("Error: Canvas or active slide not ready.", false);
-          return;
-      }
-      const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-      if (!currentSlide) {
-          displayMessage("Error: Current slide data is missing.", false);
-          return;
-      }
-
-      fabric.Image.fromURL(response.base64Data, function(img) {
-        const canvas = adminApp.state.fabricCanvasInstance;
-        const imageNativeWidth = img.width;
-        const imageNativeHeight = img.height;
-        const editorMaxWidth = 960; 
-        let newCanvasWidth = imageNativeWidth;
-        let newCanvasHeight = imageNativeHeight;
-        const aspectRatio = imageNativeWidth / imageNativeHeight;
-
-        if (newCanvasWidth > editorMaxWidth) {
-          newCanvasWidth = editorMaxWidth;
-          newCanvasHeight = Math.round(newCanvasWidth / aspectRatio);
-        }
-        
-        canvas.setWidth(newCanvasWidth);
-        canvas.setHeight(newCanvasHeight);
-        if (fabricCanvasEl) {
-            fabricCanvasEl.width = newCanvasWidth;
-            fabricCanvasEl.height = newCanvasHeight;
-        }
-
-        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-          scaleX: newCanvasWidth / imageNativeWidth,
-          scaleY: newCanvasHeight / imageNativeHeight
-        });
-        canvas.renderAll();
-        displayMessage("Image set as background. Canvas adjusted.", true);
-
-        // ** SAVE MEDIA INFO AND DIMENSIONS TO CURRENT SLIDE OBJECT **
-        currentSlide.slideMedia.type = 'image';
-        currentSlide.slideMedia.url = response.base64Data; // Storing base64 directly for now. Could also store driveFileId from previous step.
-        currentSlide.slideMedia.mimeType = response.mimeType;
-        // currentSlide.slideMedia.driveFileId = ???; // Need to pass driveFileId from onImageUploaded to here if needed
-        currentSlide.canvasWidth = newCanvasWidth;
-        currentSlide.canvasHeight = newCanvasHeight;
-        console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media and dimensions updated.`);
-        updateSlideThumbnailsUI(); // Update thumbnail if its appearance depends on content/size
-      }); 
-    } else { /* ... error handling ... */ }
-  }
-  
-  // Client-side UUID generator (simple version)
-  // In a real app, you might use a more robust library or ensure true uniqueness
-  // For server-generated UUIDs, you'd call a server function.
-  Utilities = {
-      getUuid: function() {
-          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-              var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-              return v.toString(16);
+      // 3. Load Background Image (if any) - Simplified for now
+      if (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'image' && selectedSlideData.slideMedia.url) {
+          fabric.Image.fromURL(selectedSlideData.slideMedia.url, function(img) {
+              if (!adminApp.state.fabricCanvasInstance) return; // Check again in async callback
+              adminApp.state.fabricCanvasInstance.setBackgroundImage(img, 
+                  adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance), {
+                  scaleX: canvas.width / img.width,
+                  scaleY: canvas.height / img.height
+              });
           });
+      } else { canvas.backgroundColor = '#e9e9e9'; canvas.renderAll(); }
+
+      // 4. Load Fabric Canvas JSON (overlays)
+      if (selectedSlideData.fabricCanvasJSON) {
+          canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
+              if (!adminApp.state.fabricCanvasInstance) return;
+              adminApp.state.fabricCanvasInstance.renderAll();
+              console.log("Loaded canvas JSON for slide", slideIndex);
+          }, function(o, object) { /* Revival */ });
+      } else { canvas.renderAll(); } // Render to show background if no JSON
+
+      updateSlideThumbnailsUI(); // Highlight the correct thumbnail
+      if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
+  }
+
+  function updateSlideThumbnailsUI() { 
+      if (!slideThumbnailsContainerEl || !adminApp.state.projectData) return;
+      slideThumbnailsContainerEl.innerHTML = ''; 
+      adminApp.state.projectData.slides.forEach((slide, index) => {
+          const thumb = document.createElement('div');
+          thumb.className = 'slide-thumbnail';
+          thumb.textContent = `Slide ${index + 1}`;
+          thumb.title = `Select Slide ${index + 1}`; // Add tooltip
+          if (index === adminApp.state.currentSlideIndex) thumb.classList.add('active-slide');
+          thumb.onclick = function() { selectSlide(index); };
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '×'; deleteBtn.title = "Delete slide";
+          deleteBtn.onclick = function(event) { event.stopPropagation(); handleDeleteSlide(index); };
+          thumb.appendChild(deleteBtn);
+          slideThumbnailsContainerEl.appendChild(thumb);
+      });
+  }
+  
+  function handleDeleteSlide(slideIndex) { 
+      if (!adminApp.state.projectData || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("handleDeleteSlide: Invalid slideIndex."); return; }
+      if (adminApp.state.projectData.slides.length <= 1) { displayMessage("Cannot delete the last slide.", false); return; } // Prevent deleting the last slide
+      if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) return;
+
+      adminApp.state.projectData.slides.splice(slideIndex, 1);
+      console.log("Deleted slide at index:", slideIndex, "Remaining:", adminApp.state.projectData.slides.length);
+
+      // Adjust currentSlideIndex and select a new slide
+      if (adminApp.state.currentSlideIndex === slideIndex) {
+          selectSlide(Math.max(0, slideIndex - 1)); // Select previous or first
+      } else if (adminApp.state.currentSlideIndex > slideIndex) {
+          adminApp.state.currentSlideIndex--; // Adjust index
+          updateSlideThumbnailsUI(); // Update highlighting
+      } else {
+          updateSlideThumbnailsUI(); // Just update highlighting
       }
-  };
+  }
+
+  function saveCurrentSlideState() { 
+      if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData || !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) { return; }
+      const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+      const canvas = adminApp.state.fabricCanvasInstance;
+      const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight']; // Add custom properties used on objects later
+      currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
+      currentSlide.canvasWidth = canvas.getWidth(); 
+      currentSlide.canvasHeight = canvas.getHeight();
+      console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Dimensions: ${currentSlide.canvasWidth}x${currentSlide.canvasHeight}`);
+  }
+
+  // --- Project Saving (Step 9) --- 
+  function handleSaveProject() { 
+      if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
+      if (adminApp.state.isLoading) return;
+      saveCurrentSlideState(); 
+      showLoading(true); displayMessage("Saving project...", true); 
+      console.log("Saving projectData:", JSON.stringify(adminApp.state.projectData, null, 2)); 
+      google.script.run
+          .withSuccessHandler(onProjectSaved)
+          .withFailureHandler(onServerError)
+          .saveProjectData(adminApp.state.currentProjectId, JSON.stringify(adminApp.state.projectData));
+  }
+
+  function onProjectSaved(response) { 
+      showLoading(false);
+      if (response && response.success) { displayMessage(response.message || "Project saved successfully!", true); } 
+      else { onServerError((response && response.error) ? response.error : "Failed to save project."); }
+  }
+
+  // --- General UI Functions --- 
+  function showLoading(show) {
+    adminApp.state.isLoading = show;
+    if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+    else if (show) console.warn("showLoading(true) called but loadingSpinnerEl not available.");
+  }
+  function displayMessage(message, isSuccess) { 
+      if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage called but messageAreaEl not available. Message:", message); }
+  }
+  
+  // MODIFIED onServerError for better tracing
+  function onServerError(errorObject) {
+    console.error("onServerError triggered:", errorObject); // <<< Log entry
+    showLoading(false);
+    let errorMessage = "An unknown error occurred.";
+    if (typeof errorObject === 'string') { errorMessage = errorObject; } 
+    else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { 
+        errorMessage = errorObject.message;
+        if (errorObject.details && errorObject.details.length > 0 && errorObject.details[0].errorMessage) { errorMessage = errorObject.details[0].errorMessage; } 
+        else if (errorObject.details && typeof errorObject.details === 'string') { errorMessage += " Details: " + errorObject.details; }
+    } else if (errorObject && errorObject.name && errorObject.message) { errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`; }
+    console.error('Formatted Server Error Message:', errorMessage); // <<< Log formatted message
+    displayMessage('Server Error: ' + errorMessage, false);
+  }
+
+  // --- Project Creation (Step 3) --- 
+  function handleCreateProject() {
+      if (adminApp.state.isLoading) return;
+      const currentProjectTitle = projectTitleInputEl.value.trim();
+      if (!currentProjectTitle) { displayMessage('Project title cannot be empty.', false); projectTitleInputEl.focus(); return; }
+      showLoading(true);
+      google.script.run.withSuccessHandler(onProjectCreated).withFailureHandler(onServerError).createProject(currentProjectTitle);
+  }
+  function onProjectCreated(response) { 
+      showLoading(false);
+      if (response && response.success) { displayMessage(response.message || 'Project created!', true); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); } 
+      else { onServerError((response && response.error) ? response.error : 'Failed to create project.'); }
+  }
+  
+  // --- Project List (Step 4) --- 
+  // MODIFIED loadAdminProjectsList for better tracing
+  function loadAdminProjectsList() { 
+    console.log("loadAdminProjectsList: Function called."); // <<< Log entry
+    if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found, cannot display list."); showLoading(false); return; }
+    if (!google || !google.script || !google.script.run) { console.error("loadAdminProjectsList: google.script.run is not available!"); displayMessage("Error: Client-server bridge unavailable.", false); return; }
+
+    showLoading(true);
+    console.log("loadAdminProjectsList: Calling google.script.run.getAllProjectsForAdmin..."); // <<< Log before call
+    google.script.run
+      .withSuccessHandler(displayAdminProjects) // Will log entry inside this function now
+      .withFailureHandler(onServerError) // Will log entry inside this function now
+      .getAllProjectsForAdmin();
+     console.log("loadAdminProjectsList: google.script.run.getAllProjectsForAdmin call initiated."); // <<< Log after call initiated
+  }
+
+  // MODIFIED displayAdminProjects for better tracing
+  function displayAdminProjects(projectsArray) { 
+    console.log("displayAdminProjects (Success Handler) received data:", projectsArray); // <<< Log entry
+    showLoading(false);
+    if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found when trying to display."); return; }
+    adminProjectListContainerEl.innerHTML = ''; 
+    if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
+    projectsArray.forEach(project => { 
+        if (!project || !project.projectId) { console.warn("Skipping display of invalid project:", project); return; } 
+        const projectItem = document.createElement('div'); projectItem.className = 'project-item'; 
+        const titleSpan = document.createElement('span'); titleSpan.textContent = project.projectTitle || 'Untitled Project'; 
+        const statusSpan = document.createElement('span'); statusSpan.className = 'status'; statusSpan.textContent = `(${project.status || 'N/A'})`; 
+        const titleAndStatusDiv = document.createElement('div'); titleAndStatusDiv.appendChild(titleSpan); titleAndStatusDiv.appendChild(statusSpan); 
+        const editButton = document.createElement('button'); editButton.textContent = 'Edit'; editButton.className = 'edit-button'; editButton.setAttribute('data-project-id', project.projectId); 
+        editButton.onclick = function() { console.log("Edit button clicked for project ID:", project.projectId); switchToEditView(project.projectId); }; 
+        projectItem.appendChild(titleAndStatusDiv); projectItem.appendChild(editButton); 
+        adminProjectListContainerEl.appendChild(projectItem); 
+    });
+    console.log("displayAdminProjects: Finished rendering project list."); // <<< Log finish
+  }
+
+  // --- Image Upload Handling (Step 8) --- 
+  function handleImageUpload(event) {
+      if (adminApp.state.isLoading) { displayMessage("Please wait...", false); if(event.target) event.target.value = null; return; }
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) { displayMessage("Please select an image file.", false); if(event.target) event.target.value = null; return; }
+      showLoading(true); displayMessage("Uploading image...", true); 
+      const reader = new FileReader();
+      reader.onload = function(e) {
+          const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
+          if (!adminApp.state.currentProjectId) { showLoading(false); displayMessage("Error: No project selected.", false); if(event.target) event.target.value = null; return; }
+          google.script.run.withSuccessHandler(onImageUploaded).withFailureHandler(onServerError).uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
+      };
+      reader.onerror = function(error) { showLoading(false); displayMessage("Error reading file.", false); console.error("FileReader error: ", error); if(event.target) event.target.value = null; };
+      reader.readAsDataURL(file);
+  }
+  function onImageUploaded(response) { 
+      showLoading(false); if (imageUploaderEl) imageUploaderEl.value = null; 
+      if (response && response.success && response.driveFileId) {
+          displayMessage("Image uploaded. Fetching for canvas...", true); showLoading(true); 
+          google.script.run.withSuccessHandler(onBase64ImageReceived).withFailureHandler(onServerError).getImageAsBase64(response.driveFileId);
+      } else { onServerError({ message: (response && response.error) ? response.error : "Failed to upload or get file ID." }); }
+  }
+  function onBase64ImageReceived(response) { 
+      showLoading(false);
+      if (response && response.success && response.base64Data) {
+          if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas or active slide not ready.", false); return; }
+          const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+          if (!currentSlide) { displayMessage("Error: Current slide data missing.", false); return; }
+          fabric.Image.fromURL(response.base64Data, function(img) {
+              if (!adminApp.state.fabricCanvasInstance) return;
+              const canvas = adminApp.state.fabricCanvasInstance; const imageNativeWidth = img.width; const imageNativeHeight = img.height; const editorMaxWidth = 960; 
+              let newCanvasWidth = imageNativeWidth; let newCanvasHeight = imageNativeHeight; const aspectRatio = imageNativeWidth / imageNativeHeight;
+              if (newCanvasWidth > editorMaxWidth) { newCanvasWidth = editorMaxWidth; newCanvasHeight = Math.round(newCanvasWidth / aspectRatio); }
+              canvas.setWidth(newCanvasWidth); canvas.setHeight(newCanvasHeight);
+              if (fabricCanvasEl) { fabricCanvasEl.width = newCanvasWidth; fabricCanvasEl.height = newCanvasHeight; }
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: newCanvasWidth / imageNativeWidth, scaleY: newCanvasHeight / imageNativeHeight });
+              canvas.renderAll(); displayMessage("Image set as background. Canvas adjusted.", true);
+              currentSlide.slideMedia.type = 'image'; currentSlide.slideMedia.url = response.base64Data; currentSlide.slideMedia.mimeType = response.mimeType;
+              currentSlide.canvasWidth = newCanvasWidth; currentSlide.canvasHeight = newCanvasHeight;
+              console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media and dimensions updated.`);
+              updateSlideThumbnailsUI(); 
+          }); 
+      } else { onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." }); }
+  }
+  
+  // Client-side UUID generator 
+  Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
 
 </script>

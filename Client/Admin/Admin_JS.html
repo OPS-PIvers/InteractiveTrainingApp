@@ -365,24 +365,47 @@
         }
   
         if (selectedSlideData.fabricCanvasJSON) {
-            console.log("Loading fabricCanvasJSON for slide", slideIndex);
-            canvas.renderAll(); 
-            canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
-                if (!adminApp.state.fabricCanvasInstance) return;
-                if (adminApp.state.currentSlideIndex !== slideIndex) {
-                    console.log("Slide changed before overlays loaded for index", slideIndex);
-                    return;
-                }
-                adminApp.state.fabricCanvasInstance.renderAll();
-                console.log("Finished loading canvas JSON for slide", slideIndex);
-            }, function(o, object) { /* Revival */ });
-        } else {
-             console.log("No fabricCanvasJSON to load for slide", slideIndex);
+          console.log("Loading fabricCanvasJSON for slide", slideIndex);
+          // Ensure canvas background is set before loading JSON which might rely on dimensions/state
+          // canvas.renderAll(); // Render background first - this might be redundant if loadFromJSON also renders.
+          
+          canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
+              // This callback is executed after all objects are loaded and rendered.
+              if (!adminApp.state.fabricCanvasInstance) return; // Safety check
+
+              // Check if we are still on the same slide index in case of async operations
+              if (adminApp.state.currentSlideIndex !== slideIndex) {
+                  console.log("Slide changed before overlays loaded for index", slideIndex);
+                  return;
+              }
+              
+              adminApp.state.fabricCanvasInstance.renderAll(); // Ensure final render
+              console.log("Finished loading canvas JSON for slide", slideIndex);
+
+              // After loading, check if an object is active (Fabric might not auto-select)
+              // For now, we'll just ensure the toolbar reflects no selection.
+              // A more advanced approach could be to re-select the last active object if its ID was saved.
+              const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
+              populateToolbar(activeObj); // Update toolbar based on current selection (likely null)
+            }, function(o, object) { 
+                /* 
+                  Revival function for custom properties (o is the object data, object is the Fabric object instance)
+                  This is where you would re-initialize any complex custom object logic or non-standard properties
+                  if they weren't simple data types that Fabric handles automatically.
+                  For now, our customInteraction, customAnimation, sequenceOrder are simple objects/primitives
+                  and should be revived correctly by Fabric if they are direct properties of the fabric object.
+                */
+                // Example: if (o.customType === 'mySpecialObject') { object.myCustomMethod(); }
+            });
+            } else { // This 'else' is for: if (!selectedSlideData.fabricCanvasJSON)
+            console.log("No fabricCanvasJSON to load for slide", slideIndex);
+            canvas.renderAll(); // Ensure canvas is rendered even if empty
+            populateToolbar(null); // Ensure toolbar is cleared if no JSON to load
         }
-  
-        updateSlideThumbnailsUI(); 
-        if (imageUploaderEl) imageUploaderEl.value = null; 
-        populateToolbar(null); // Using correct function name
+
+        updateSlideThumbnailsUI(); // Highlight active thumbnail
+        if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
+        // The populateToolbar(null) that was here is now handled within the if/else for fabricCanvasJSON
     }
   
     function updateSlideThumbnailsUI() {

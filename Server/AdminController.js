@@ -127,6 +127,114 @@ function createProject(projectTitle) {
     }
   }
   
+    /**
+   * Helper function to get ProjectFolderID from the ProjectIndex sheet using ProjectID.
+   * @param {string} projectId The ID of the project.
+   * @return {string|null} The ProjectFolderID if found, otherwise null.
+   */
+  function getProjectFolderIdFromSheet(projectId) {
+    // This helper reuses logic that might be similar to parts of getAllProjectsForAdmin
+    // or requires findRowIndexByValue and getSheetRowData.
+    // For simplicity, let's iterate through all projects data.
+    // In a very large sheet, findRowIndexByValue + getSheetRowData would be more performant.
+    const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
+    if (!allProjects || !Array.isArray(allProjects)) {
+      Logger.log(`getProjectFolderIdFromSheet: Could not retrieve project list for projectId "${projectId}".`);
+      return null;
+    }
+
+    for (let i = 0; i < allProjects.length; i++) {
+      const project = allProjects[i];
+      const currentProjectId = project['ProjectID'] || (project[COL_PROJECT_ID - 1]);
+      if (currentProjectId === projectId) {
+        const folderId = project['ProjectFolderID'] || (project[COL_PROJECT_FOLDER_ID - 1]);
+        Logger.log(`getProjectFolderIdFromSheet: Found folderId "${folderId}" for projectId "${projectId}".`);
+        return folderId;
+      }
+    }
+    Logger.log(`getProjectFolderIdFromSheet: ProjectId "${projectId}" not found in sheet.`);
+    return null;
+  }
+
+  /**
+   * Uploads a file (image, audio, etc.) to the specified project's folder in Google Drive.
+   * @param {Object} fileData An object containing { fileName, mimeType, data (base64 string) }.
+   * @param {string} projectId The ID of the project to associate the file with.
+   * @param {string} mediaType A string descriptor like 'image' or 'audio' (for logging/future use).
+   * @return {Object} An object like { success: true, driveFileId: '...', webContentLink: '...' } or { success: false, error: '...' }.
+   */
+  function uploadFileToDrive(fileData, projectId, mediaType) {
+    try {
+      Logger.log(`uploadFileToDrive: Starting upload for projectId: ${projectId}, mediaType: ${mediaType}, fileName: ${fileData.fileName}`);
+
+      if (!fileData || !fileData.data || !fileData.fileName || !fileData.mimeType) {
+        Logger.log("uploadFileToDrive: Invalid fileData received.");
+        return { success: false, error: "Invalid file data provided." };
+      }
+      if (!projectId) {
+        Logger.log("uploadFileToDrive: ProjectID is missing.");
+        return { success: false, error: "Project ID is required." };
+      }
+
+      const projectFolderId = getProjectFolderIdFromSheet(projectId);
+      if (!projectFolderId) {
+        Logger.log(`uploadFileToDrive: Could not find ProjectFolderID for projectId "${projectId}".`);
+        return { success: false, error: `Project folder not found for project ID: ${projectId}.` };
+      }
+
+      const decodedData = Utilities.base64Decode(fileData.data);
+      const blob = Utilities.newBlob(decodedData, fileData.mimeType, fileData.fileName);
+      
+      // createFileInDriveFromBlob is from DriveService.gs
+      const driveFile = createFileInDriveFromBlob(blob, fileData.fileName, projectFolderId);
+      if (!driveFile || !driveFile.getId) { // Check if driveFile is a valid File object
+          Logger.log(`uploadFileToDrive: Failed to create file in Drive. createFileInDriveFromBlob returned invalid response for ${fileData.fileName}`);
+          return { success: false, error: "Failed to create file in Google Drive." };
+      }
+      
+      driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      Logger.log(`uploadFileToDrive: File "${driveFile.getName()}" (ID: ${driveFile.getId()}) shared as ANYONE_WITH_LINK.`);
+      
+      // Attempt to get webContentLink, fallback to downloadUrl
+      // getWebContentLink() is preferred as it's designed for embedding.
+      // It might be null for non-Google native files if "Allow users to publish files on the web" is disabled domain-wide.
+      // Note: For images on Drive, sometimes direct links don't work well as src for fabric.Image
+      // without 'anonymous' crossOrigin and if the link isn't a direct image serving link.
+      // The link format `https://drive.google.com/uc?export=view&id=FILE_ID` often works for images.
+      let webContentLink = driveFile.getWebContentLink();
+      if (!webContentLink) {
+          // Fallback for non-Google files or if webContentLink is null
+          webContentLink = driveFile.getDownloadUrl().replace("&export=download", "&export=view"); 
+          // Using "&export=view" might be better for direct browser viewing than "&export=download"
+          // For images, a more direct link might be needed.
+          // A common pattern for direct image serving from Drive is:
+          // 'https://drive.google.com/uc?export=view&id=' + driveFile.getId();
+          // Let's use this one specifically for images if webContentLink is null.
+          if (mediaType === 'image') {
+            webContentLink = 'https://drive.google.com/uc?export=view&id=' + driveFile.getId();
+          }
+      }
+
+
+      Logger.log(`uploadFileToDrive: File uploaded successfully. ID: ${driveFile.getId()}, WebContentLink: ${webContentLink}`);
+      return {
+        success: true,
+        driveFileId: driveFile.getId(),
+        webContentLink: webContentLink,
+        fileName: driveFile.getName()
+      };
+
+    } catch (e) {
+      Logger.log(`Error in uploadFileToDrive: ${e.toString()} - ProjectID: ${projectId}, FileName: ${fileData ? fileData.fileName : 'N/A'} \nStack: ${e.stack}`);
+      return { success: false, error: `Failed to upload file: ${e.message}` };
+    }
+  }
+  
+  function saveProjectData(projectId, projectDataJSON) {
+    Logger.log(`saveProjectData called for ${projectId}, but not yet implemented.`);
+    return { success: false, message: "Not implemented yet."};
+  }
+
   function saveProjectData(projectId, projectDataJSON) {
     Logger.log(`saveProjectData called for ${projectId}, but not yet implemented.`);
     return { success: false, message: "Not implemented yet."};

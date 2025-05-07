@@ -8,15 +8,16 @@
     currentProjectId: null, // ID of the project currently being "edited"
     currentView: 'list',    // Tracks the current visible view: 'list' or 'edit'
     projectData: null,      // Will hold the full data for the project being edited (from Step 10)
-    currentSlideIndex: -1,  // For slide management (from Step 9)
+    currentSlideIndex: -1,  // For slide management (from Step 9) - Will be properly used soon
     fabricCanvasInstance: null // For Fabric.js canvas (from Step 7)
   };
 
   // --- DOM Element References ---
   // Will be populated by adminApp.setupDOMReferences
   let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
-  let listViewContainerEl, adminProjectListContainerEl; // createProjectSection and projectListSection are within listViewContainer
+  let listViewContainerEl, adminProjectListContainerEl;
   let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
+  let imageUploaderEl; // Added for Step 8
 
   // --- Initialization ---
   document.addEventListener('DOMContentLoaded', function() {
@@ -25,9 +26,8 @@
     adminApp.setupDOMReferences();
     adminApp.attachEventListeners();
     
-    // Default view on application load
     switchToListView(); 
-    loadAdminProjectsList(); // Fetch and display projects
+    loadAdminProjectsList(); 
     
     console.log("Admin_JS: Initialization complete. Default view: 'list'");
   });
@@ -47,14 +47,11 @@
     editViewContainerEl = document.getElementById('editViewContainer');
     editingProjectTitleEl = document.getElementById('editingProjectTitle');
     backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
-    fabricCanvasEl = document.getElementById('fabricCanvasElement'); // Added for Fabric.js
+    fabricCanvasEl = document.getElementById('fabricCanvasElement');
+    imageUploaderEl = document.getElementById('imageUploader'); // Added for Step 8
 
-    // Verify elements are found
     if (!listViewContainerEl || !editViewContainerEl) {
         console.error("CRITICAL: Main view containers not found!");
-    }
-    if (!fabricCanvasEl && adminApp.state.currentView === 'edit') { // Only critical if supposed to be in edit view
-        // console.warn("Admin_JS: fabricCanvasEl not found during setupDOMReferences. Will attempt to init later if view switches to edit.");
     }
     console.log("Admin_JS: DOM references set up.");
   };
@@ -68,8 +65,15 @@
     } else { console.error("createProjectButtonEl was not found during attachEventListeners!"); }
 
     if (backToProjectsListButtonEl) {
-        backToProjectsListButtonEl.addEventListener('click', switchToListView); // Changed from navigateToProjectList
+        backToProjectsListButtonEl.addEventListener('click', switchToListView);
     } else { console.error("backToProjectsListButtonEl was not found during attachEventListeners!"); }
+
+    if (imageUploaderEl) { // Added for Step 8
+        imageUploaderEl.addEventListener('change', handleImageUpload);
+    } else {
+        // This might log if Admin_JS loads before editViewContainer is visible, which is expected.
+        // console.warn("imageUploaderEl not found during initial attachEventListeners. Will be available in edit view.");
+    }
     console.log("Admin_JS: Event listeners attached.");
   };
   
@@ -77,14 +81,12 @@
   function switchToListView() {
     console.log("Switching to List View");
     adminApp.state.currentView = 'list';
-    adminApp.state.currentProjectId = null; // Clear project ID when not in edit mode
+    adminApp.state.currentProjectId = null; 
     
     if(listViewContainerEl) listViewContainerEl.style.display = 'block';
     if(editViewContainerEl) editViewContainerEl.style.display = 'none';
     
-    if (messageAreaEl) messageAreaEl.innerHTML = ''; // Clear any persistent messages
-    // Optionally, reload the project list if returning from an edit might have changed something
-    // loadAdminProjectsList(); 
+    if (messageAreaEl) messageAreaEl.innerHTML = ''; 
   }
 
   function switchToEditView(projectIdToEdit) {
@@ -100,7 +102,7 @@
     }
     
     adminApp.state.projectData = null; 
-    adminApp.state.currentSlideIndex = -1;
+    adminApp.state.currentSlideIndex = -1; 
     
     if (adminApp.state.fabricCanvasInstance) { 
       adminApp.state.fabricCanvasInstance.dispose();
@@ -109,12 +111,19 @@
     }
     if (messageAreaEl) messageAreaEl.innerHTML = ''; 
 
-    // Ensure fabricCanvasEl is freshly referenced
     if (!fabricCanvasEl) {
         fabricCanvasEl = document.getElementById('fabricCanvasElement');
     }
+    if (!imageUploaderEl) { // Also ensure imageUploaderEl is available when switching to edit view
+        imageUploaderEl = document.getElementById('imageUploader');
+        if (imageUploaderEl) { // Re-attach listener if element was found now
+             imageUploaderEl.addEventListener('change', handleImageUpload);
+        } else {
+            console.error("CRITICAL: imageUploaderEl still not found in edit view!");
+        }
+    }
 
-    // Check if Fabric.js is loaded
+
     if (typeof fabric !== 'undefined' && fabricCanvasEl) {
       adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
         width: 800, 
@@ -129,9 +138,8 @@
       console.error("Admin_JS: Fabric.js library (fabric) is not defined yet. Ensure AdminView.html includes the Fabric.js CDN script in the <head>.");
       displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check AdminView.html, your internet connection, ensure scripts are not blocked, and try refreshing.", false);
     }
-
-    // In Step 10, you will call: loadProjectForEditing(projectIdToEdit);
   }
+
   // --- General UI Functions ---
   function showLoading(show) {
     adminApp.state.isLoading = show;
@@ -181,16 +189,7 @@
 
   // --- Project Creation (Step 3) ---
   function handleCreateProject() {
-    console.log("handleCreateProject called");
-    if (!google || !google.script || !google.script.run) {
-      console.error("google.script.run is not available for handleCreateProject!");
-      displayMessage("Error: Client-server communication bridge unavailable.", false); return;
-    }
-    if (adminApp.state.isLoading) { console.log("handleCreateProject: Already loading."); return; }
-    if (!projectTitleInputEl) {
-        console.error("projectTitleInputEl not found in handleCreateProject.");
-        displayMessage("Error: Project title input missing.", false); return;
-    }
+    if (adminApp.state.isLoading) return;
     const currentProjectTitle = projectTitleInputEl.value.trim();
     if (!currentProjectTitle) {
       displayMessage('Project title cannot be empty.', false);
@@ -206,27 +205,19 @@
 
   function onProjectCreated(response) {
     showLoading(false);
-    console.log("onProjectCreated response:", response);
     if (response && response.success) {
       displayMessage(response.message || 'Project created successfully!', true);
       if(projectTitleInputEl) projectTitleInputEl.value = ''; 
-      loadAdminProjectsList(); // Refresh the list to show the new project
+      loadAdminProjectsList(); 
     } else {
-      let serverError = (response && response.error) ? response.error : { message: 'Failed to create project. Server provided no specific error.' };
-      onServerError(serverError);
+      onServerError((response && response.error) ? response.error : 'Failed to create project.');
     }
   }
 
   // --- Project List (Step 4) ---
   function loadAdminProjectsList() {
-    console.log("loadAdminProjectsList called");
-    if (!google || !google.script || !google.script.run) {
-      console.error("google.script.run is not available for loadAdminProjectsList!");
-      displayMessage("Error: Client-server communication bridge unavailable.", false); return;
-    }
     if (!adminProjectListContainerEl) {
         console.warn("loadAdminProjectsList: adminProjectListContainerEl not ready yet.");
-        showLoading(false); // Ensure spinner isn't stuck if called too early
         return; 
     }
     showLoading(true);
@@ -238,48 +229,134 @@
 
   function displayAdminProjects(projectsArray) {
     showLoading(false);
-    console.log("displayAdminProjects received:", projectsArray ? projectsArray.length : 0, "projects");
-    if (!adminProjectListContainerEl) {
-        console.error("displayAdminProjects: adminProjectListContainerEl is not found!");
-        return;
-    }
+    if (!adminProjectListContainerEl) return;
     adminProjectListContainerEl.innerHTML = ''; 
     if (!projectsArray || projectsArray.length === 0) {
       adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>';
       return;
     }
     projectsArray.forEach(project => {
-      if (!project || !project.projectId) { 
-          console.warn("Skipping display of invalid project object:", project);
-          return; 
-      }
+      if (!project || !project.projectId) return; 
       const projectItem = document.createElement('div');
       projectItem.className = 'project-item';
-      
+      // ... (rest of project item creation as before) ...
       const titleSpan = document.createElement('span');
       titleSpan.textContent = project.projectTitle || 'Untitled Project';
-      
       const statusSpan = document.createElement('span');
       statusSpan.className = 'status';
       statusSpan.textContent = `(${project.status || 'N/A'})`;
-
       const titleAndStatusDiv = document.createElement('div');
       titleAndStatusDiv.appendChild(titleSpan);
       titleAndStatusDiv.appendChild(statusSpan);
-
       const editButton = document.createElement('button');
       editButton.textContent = 'Edit';
       editButton.className = 'edit-button'; 
       editButton.setAttribute('data-project-id', project.projectId); 
-      // This now directly calls the client-side view switching function
       editButton.onclick = function() { 
-        console.log("Edit button clicked for project ID from list:", project.projectId);
         switchToEditView(project.projectId); 
       };
-
       projectItem.appendChild(titleAndStatusDiv);
       projectItem.appendChild(editButton);
       adminProjectListContainerEl.appendChild(projectItem);
     });
   }
+
+  // --- Image Upload Handling (Step 8) ---
+  function handleImageUpload(event) {
+    if (adminApp.state.isLoading) {
+      displayMessage("Please wait for the current operation to complete.", false);
+      event.target.value = null; // Reset file input
+      return;
+    }
+    const file = event.target.files[0];
+    if (!file) {
+      displayMessage("No file selected.", false);
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      displayMessage("Please select an image file.", false);
+      event.target.value = null; // Reset file input
+      return;
+    }
+    // Max file size (e.g., 5MB) - optional client-side check
+    // const maxSize = 5 * 1024 * 1024; 
+    // if (file.size > maxSize) {
+    //   displayMessage("File is too large. Maximum size is 5MB.", false);
+    //   event.target.value = null; // Reset file input
+    //   return;
+    // }
+
+    showLoading(true);
+    displayMessage("Uploading image...", true); // Temporary message
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileData = {
+        fileName: file.name,
+        mimeType: file.type,
+        data: e.target.result.split(',')[1] // Get base64 part
+      };
+      
+      if (!adminApp.state.currentProjectId) {
+          showLoading(false);
+          displayMessage("Error: No project selected for upload.", false);
+          event.target.value = null; // Reset file input
+          return;
+      }
+
+      google.script.run
+        .withSuccessHandler(onImageUploaded)
+        .withFailureHandler(onServerError) // onServerError already handles showLoading(false)
+        .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
+    };
+    reader.onerror = function(error) {
+        showLoading(false);
+        displayMessage("Error reading file.", false);
+        console.error("FileReader error: ", error);
+        event.target.value = null; // Reset file input
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function onImageUploaded(response) {
+    showLoading(false);
+    if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
+
+    if (response && response.success && response.webContentLink) {
+      displayMessage("Image uploaded successfully! Setting as background...", true);
+      
+      if (!adminApp.state.fabricCanvasInstance) {
+          displayMessage("Error: Canvas not initialized. Cannot set background.", false);
+          return;
+      }
+
+      fabric.Image.fromURL(response.webContentLink, function(img) {
+        if (!adminApp.state.fabricCanvasInstance) { // Double check in case of async issues
+            console.error("Canvas became unavailable before image could be set.");
+            displayMessage("Error: Canvas became unavailable.", false);
+            return;
+        }
+        adminApp.state.fabricCanvasInstance.setBackgroundImage(img, 
+            adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance), {
+          // Scale options to fit the image to the canvas dimensions
+          scaleX: adminApp.state.fabricCanvasInstance.width / img.width,
+          scaleY: adminApp.state.fabricCanvasInstance.height / img.height
+        });
+        displayMessage("Image set as background.", true);
+        // TODO in Step 9: Store response.webContentLink and response.driveFileId 
+        // in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex].slideMedia
+        // For now, it's just visual.
+        console.log("Image background set. DriveFileID:", response.driveFileId, "WebContentLink:", response.webContentLink);
+
+      }, { crossOrigin: 'anonymous' }); // Add crossOrigin for images from other domains (like Google Drive)
+
+    } else {
+      let errorMsg = "Failed to upload image or retrieve link.";
+      if (response && response.error) {
+        errorMsg = response.error;
+      }
+      onServerError({ message: errorMsg }); // Use onServerError for consistent error display
+    }
+  }
+
 </script>

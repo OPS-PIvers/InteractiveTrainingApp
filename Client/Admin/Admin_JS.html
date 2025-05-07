@@ -50,6 +50,9 @@
   adminApp.setupDOMReferences = function() {
     messageAreaEl = document.getElementById('messageArea');
     loadingSpinnerEl = document.getElementById('loadingSpinner');
+    if (!loadingSpinnerEl) {
+        console.error("CRITICAL: loadingSpinnerEl not found!");
+    }
     
     listViewContainerEl = document.getElementById('listViewContainer');
     projectTitleInputEl = document.getElementById('projectTitleInput');
@@ -103,48 +106,27 @@
   // --- Navigation Functions ---
   // In Client/Admin/Admin_JS.html
   function navigateToEditView(projectId) {
-      if (adminApp.state.isLoading) { // Check app state
-          console.log("navigateToEditView: isLoading is true, aborting navigation.");
-          return;
-      }
-      console.log(`navigateToEditView: Requesting to navigate to edit project ID: ${projectId}`); // <--- EXISTING LOG
-      showLoading(true); 
+      // Temporarily remove isLoading check for this specific test
+      // if (adminApp.state.isLoading) {
+      //     console.log("navigateToEditView: isLoading is true, aborting navigation.");
+      //     return;
+      // }
+      console.log(`navigateToEditView (SIMPLIFIED TEST): Requesting for project ID: ${projectId}`); 
       
-      // Try direct navigation first for simplicity to see if this part works
-      // Comment out the google.script.run block for a moment
+      // Temporarily remove showLoading from here
+      // showLoading(true); 
+      
       const targetUrl = '?page=edit&projectId=' + projectId;
-      console.log("navigateToEditView: Attempting to set window.location.href to:", targetUrl); // <--- ADD THIS LOG
+      console.log("navigateToEditView (SIMPLIFIED TEST): Target URL is:", targetUrl);
+      
       try {
+          console.log("navigateToEditView (SIMPLIFIED TEST): ABOUT TO SET window.location.href");
           window.location.href = targetUrl;
-          // If the above line executes, the page should try to reload.
-          // The showLoading(false) might not be reached if navigation is successful.
-          // If navigation fails for some reason (e.g. popup blocker, though unlikely for same-origin),
-          // then the code below might execute.
-          // No need for showLoading(false) here as the page will reload.
+          console.log("navigateToEditView (SIMPLIFIED TEST): AFTER setting window.location.href (may not be seen if nav successful)");
       } catch (e) {
-          console.error("navigateToEditView: Error during window.location.href assignment:", e);
-          showLoading(false); // Hide spinner if direct navigation fails with an error
+          console.error("navigateToEditView (SIMPLIFIED TEST): Error during window.location.href assignment:", e);
+          // showLoading(false); // If showLoading was used
       }
-
-      // --- Temporarily comment out the getWebAppUrl part for testing direct navigation ---
-      /*
-      google.script.run
-          .withSuccessHandler(function(webAppUrl) {
-              console.log("navigateToEditView: getWebAppUrl success. Base URL:", webAppUrl);
-              const fullTargetUrl = webAppUrl + '?page=edit&projectId=' + projectId;
-              console.log("navigateToEditView: Setting window.location.href to full URL:", fullTargetUrl);
-              window.location.href = fullTargetUrl;
-              // showLoading(false); // Page will reload, so spinner will vanish
-          })
-          .withFailureHandler(function(err) {
-              console.error("navigateToEditView: Could not get webapp URL from server, using relative path. Error:", err);
-              const fallbackTargetUrl = '?page=edit&projectId=' + projectId;
-              console.log("navigateToEditView: Setting window.location.href to fallback URL:", fallbackTargetUrl);
-              window.location.href = fallbackTargetUrl; 
-              // showLoading(false); // Might not be reached if navigation happens
-          })
-          .getWebAppUrl();
-      */
   }
   
   function navigateToProjectList() {
@@ -168,10 +150,10 @@
   // --- General UI Functions ---
   function showLoading(show) {
     adminApp.state.isLoading = show;
-    if (loadingSpinnerEl) {
-      loadingSpinnerEl.style.display = show ? 'flex' : 'none';
-    } else if (adminApp.state.isLoading) { // If called before DOM fully ready
-        console.warn("showLoading called but loadingSpinnerEl not yet available.");
+    if (loadingSpinnerEl) { // Check if it exists before trying to use it
+        loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+    } else {
+        console.warn("showLoading: loadingSpinnerEl is not available. isLoading set to:", show);
     }
   }
 

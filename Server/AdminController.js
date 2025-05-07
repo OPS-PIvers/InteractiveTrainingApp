@@ -336,7 +336,56 @@ function deleteProject(projectId) {
   return { success: false, message: "Not implemented yet."};
 }
 
-function getProjectDataForEditing(projectId) {
-  Logger.log(`getProjectDataForEditing called for ${projectId}, but not yet implemented.`);
-  return null; 
-}
+  /**
+   * Retrieves the project's data JSON string from its file in Google Drive.
+   * @param {string} projectId The ID of the project.
+   * @return {string|null} The JSON string content of the project data file, 
+   *                      or null if the project or file is not found or an error occurs.
+   */
+  function getProjectDataForEditing(projectId) {
+    try {
+      Logger.log(`getProjectDataForEditing: Attempting to load data for projectId: ${projectId}`);
+      if (!projectId) {
+        Logger.log("getProjectDataForEditing: ProjectID is missing.");
+        // Returning null, client-side needs to handle this gracefully
+        return null; 
+      }
+
+      // Find the ProjectDataFileID from the ProjectIndex sheet
+      const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
+      let projectEntry = null;
+      if (allProjects && Array.isArray(allProjects)) {
+        projectEntry = allProjects.find(p => (p['ProjectID'] || p[COL_PROJECT_ID - 1]) === projectId);
+      }
+
+      if (!projectEntry) {
+        Logger.log(`getProjectDataForEditing: Project with ID "${projectId}" not found in ProjectIndex.`);
+        return null; 
+      }
+
+      const projectDataFileId = projectEntry['ProjectDataFileID'] || projectEntry[COL_PROJECT_DATA_FILE_ID - 1];
+
+      if (!projectDataFileId) {
+        Logger.log(`getProjectDataForEditing: ProjectDataFileID is missing for project "${projectId}".`);
+        // Maybe return a default structure or null? Returning null is simpler for client to check.
+        return null; 
+      }
+      Logger.log(`getProjectDataForEditing: Found ProjectDataFileID: ${projectDataFileId} for project ${projectId}.`);
+
+      // Read the file content using DriveService
+      // readDriveFileContent is from DriveService.gs
+      const jsonContent = readDriveFileContent(projectDataFileId);
+
+      // jsonContent could be empty string if file is empty, but should generally be JSON
+      Logger.log(`getProjectDataForEditing: Successfully read content for file ID ${projectDataFileId}. Content length: ${jsonContent ? jsonContent.length : 0}`);
+      
+      // Return the raw JSON string. Client will parse it.
+      return jsonContent; 
+
+    } catch (e) {
+      // Log the specific error (e.g., file not found by readDriveFileContent)
+      Logger.log(`Error in getProjectDataForEditing for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
+      // Return null in case of any error during fetch
+      return null; 
+    }
+  }

@@ -68,7 +68,8 @@ function createDriveFolder(folderName, parentFolderId) {
       return content;
     } catch (e) {
       Logger.log(`Error in readDriveFileContent: ${e.toString()} - FileID: ${fileId}`);
-      throw new Error(`Failed to read file content: ${e.message}`);
+      // Throw error so the calling function (getProjectDataForEditing) can catch it
+      throw new Error(`Failed to read file content: ${e.message}`); 
     }
   }
   

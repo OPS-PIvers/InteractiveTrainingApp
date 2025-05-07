@@ -164,6 +164,20 @@ function uploadFileToDrive(fileData, projectId, mediaType) { // THIS IS THE CORR
     const blob = Utilities.newBlob(decodedData, fileData.mimeType, fileData.fileName);
     
     const driveFile = createFileInDriveFromBlob(blob, fileData.fileName, projectFolderId);
+      
+    // MORE DETAILED LOGGING FOR driveFile
+    Logger.log(`uploadFileToDrive: Type of driveFile: ${typeof driveFile}`);
+    if (driveFile) {
+      Logger.log(`uploadFileToDrive: driveFile.getId() exists? ${typeof driveFile.getId === 'function'}`);
+      Logger.log(`uploadFileToDrive: driveFile.getName() exists? ${typeof driveFile.getName === 'function'}`);
+      Logger.log(`uploadFileToDrive: driveFile.getWebContentLink exists? ${typeof driveFile.getWebContentLink === 'function'}`); // This is the key check
+      Logger.log(`uploadFileToDrive: driveFile.getDownloadUrl exists? ${typeof driveFile.getDownloadUrl === 'function'}`);
+      Logger.log(`uploadFileToDrive: driveFile properties: ${JSON.stringify(Object.keys(driveFile))}`); // See what methods/props it reports
+    } else {
+      Logger.log("uploadFileToDrive: driveFile is null or undefined after creation attempt.");
+    }
+    // END DETAILED LOGGING
+
     if (!driveFile || !driveFile.getId) { 
         Logger.log(`uploadFileToDrive: Failed to create file in Drive. createFileInDriveFromBlob returned invalid response for ${fileData.fileName}`);
         return { success: false, error: "Failed to create file in Google Drive." };

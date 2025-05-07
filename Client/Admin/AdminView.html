@@ -17,7 +17,6 @@
       button.danger-button { background-color: #dc3545; }
       button.danger-button:hover { background-color: #c82333; }
 
-
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
       .success { border-color: green; background-color: #d4edda; color: #155724; }
       .error { border-color: red; background-color: #f8d7da; color: #721c24; }
@@ -40,57 +39,52 @@
       }
       .edit-controls-group label { margin-right: 10px; }
 
-      /* This is the canvas *container* (the div wrapper), not the canvas element itself */
       #fabricCanvasContainer {
-        /* margin-top: 10px; /* Removed as it's inside flex now */
-        /* margin-bottom: 10px; /* Removed */
         display: flex; 
-        justify-content: center; /* Centers the canvas element if it's smaller than container */
-        align-items: flex-start; /* Aligns canvas to top if smaller */
+        justify-content: center;
+        align-items: flex-start; 
         max-height: 70vh; 
-        overflow: auto; /* Use auto for scrollbars only if needed */
+        overflow: auto; 
         border: 1px dashed #ccc; 
-        min-height: 200px; 
+        min-height: 300px; /* Increased min-height for better canvas visibility */
+        margin-top: 15px; /* Added margin top for spacing from toolbar */
       }
-      /* This is the actual <canvas> element */
       #fabricCanvasElement { 
         border: 1px solid #000; 
-        /* Max width/height can be set here if you want to constrain the canvas element itself, 
-           but resizing is handled by JS and its container. */
       }
 
       #slideManagementPanel {
         margin-top: 20px;
         padding: 10px;
-        background-color: #f0f8ff; /* AliceBlue */
+        background-color: #f0f8ff;
         border-radius: 5px;
         border: 1px solid #d1e0ff;
       }
       #slideThumbnailsContainer {
         display: flex;
-        flex-wrap: wrap; /* Allow thumbnails to wrap */
-        gap: 10px; /* Spacing between thumbnails */
+        flex-wrap: wrap;
+        gap: 10px;
         margin-top: 10px;
-        min-height: 60px; /* So it doesn't collapse when empty */
+        min-height: 60px;
         padding: 5px;
-        border: 1px solid #b0c4de; /* LightSteelBlue */
+        border: 1px solid #b0c4de;
         background-color: #fff;
       }
       .slide-thumbnail {
         width: 100px;
-        height: 75px; /* Maintain a rough aspect ratio */
-        border: 2px solid #778899; /* LightSlateGray */
-        background-color: #e6e6fa; /* Lavender */
+        height: 75px;
+        border: 2px solid #778899;
+        background-color: #e6e6fa;
         display: flex;
         justify-content: center;
         align-items: center;
         cursor: pointer;
         font-size: 0.8em;
         text-align: center;
-        position: relative; /* For delete button */
+        position: relative;
       }
       .slide-thumbnail.active-slide {
-        border-color: #ff4500; /* OrangeRed */
+        border-color: #ff4500;
         box-shadow: 0 0 5px #ff4500;
       }
       .slide-thumbnail:hover {
@@ -110,43 +104,60 @@
         line-height: 20px;
         text-align: center;
         cursor: pointer;
-        display: none; /* Initially hidden, show on hover or for active */
+        display: none;
       }
       .slide-thumbnail:hover .delete-slide-btn {
         display: block;
       }
 
-      /* Sidebar Styles */
-      #overlaySidebar {
-        max-height: 70vh; /* Match canvas container max-height */
-        overflow-y: auto;
-        /* display:none; width: 300px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9; border-radius: 5px; */ /* Basic styles moved from inline to here */
+      /* Styles for Overlay Properties Toolbar */
+      #overlayPropertiesToolbar {
+        padding: 15px;
+        border: 1px solid #ccc;
+        background-color: #f9f9f9;
+        border-radius: 5px;
+        margin-bottom: 15px; /* Space between toolbar and canvas */
+        /* display: none; /* Controlled by JS */
       }
-      .sidebar-section {
-        margin-bottom: 15px;
+      #overlayPropertiesToolbar h3 {
+          margin-top: 0;
+          margin-bottom: 15px;
+          border-bottom: 1px solid #e0e0e0;
+          padding-bottom: 10px;
+      }
+      .toolbar-sections-container { /* New wrapper for responsive sections */
+        display: flex;
+        flex-wrap: wrap; /* Allow sections to wrap on smaller screens */
+        gap: 20px; /* Spacing between sections */
+      }
+      .toolbar-section { /* Renamed from sidebar-section */
+        /* Sections will stack by default or flex based on toolbar-sections-container */
+        /* min-width: 250px; /* Optional: give sections a min-width if they are to flex side-by-side */
+        /* flex-grow: 1; /* Optional: allow sections to grow */
         padding-bottom: 10px;
-        border-bottom: 1px solid #eee;
+        /* border-bottom: 1px solid #eee; /* Remove individual bottom borders if using gap */
       }
-      .sidebar-section:last-child {
+      .toolbar-section:last-child {
         border-bottom: none;
       }
-      .sidebar-section h4 {
+      .toolbar-section h4 {
         margin-top: 0;
         margin-bottom: 10px;
         color: #555;
         font-size: 0.9em;
         text-transform: uppercase;
       }
-      #overlaySidebar label {
+      #overlayPropertiesToolbar label { /* Changed from #overlaySidebar */
         display: inline-block; 
         margin-bottom: 3px;
         font-size: 0.9em;
         width: 90px; 
       }
-      #overlaySidebar input[type="number"],
-      #overlaySidebar input[type="color"],
-      #overlaySidebar textarea {
-        width: calc(100% - 105px); 
+      #overlayPropertiesToolbar input[type="number"], /* Changed from #overlaySidebar */
+      #overlayPropertiesToolbar input[type="color"],
+      #overlayPropertiesToolbar textarea {
+        width: calc(100% - 105px); /* Max width within its section */
+        max-width: 180px; /* Prevent inputs from becoming too wide */
         padding: 6px;
         margin-bottom: 8px;
         border: 1px solid #ddd;
@@ -154,14 +165,16 @@
         box-sizing: border-box;
         font-size: 0.9em;
       }
-      #overlaySidebar input[type="range"] {
-        width: calc(100% - 105px); 
+      #overlayPropertiesToolbar input[type="range"] { /* Changed from #overlaySidebar */
+        width: calc(100% - 105px);
+        max-width: 180px; 
         margin-bottom: 8px;
       }
-      #overlaySidebar textarea {
+      #overlayPropertiesToolbar textarea { /* Changed from #overlaySidebar */
         min-height: 60px;
+        width: calc(100% - 105px); /* Ensure textarea uses available space minus label */
+        max-width: 220px; /* Or a suitable max width */
       }
-      /* There was an extra closing </style> tag here in your provided code, removing it */
     </style>
   </head>
   <body>
@@ -199,34 +212,11 @@
             <button id="addTextboxButton">Add Text</button>
         </div>
         
-        <!-- THIS IS THE ORIGINAL CANVAS LOCATION - IT NEEDS TO BE REMOVED -->
-        <!-- 
-        <div id="fabricCanvasContainer"> 
-          <canvas id="fabricCanvasElement"></canvas>
-        </div>
-        -->
-
-        <div id="slideManagementPanel">
-            <h3>Slides</h3>
-            <button id="addSlideButton">Add New Slide</button>
-            <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button>
-            <div id="slideThumbnailsContainer">
-                <!-- Slide thumbnails will be dynamically inserted here -->
-            </div>
-        </div>
-
-        <!-- Flex container for Canvas and Sidebar -->
-        <div id="canvasAndSidebarContainer" style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 20px;">
-            
-            <!-- CORRECTED: Canvas Area - THIS IS WHERE IT SHOULD BE -->
-            <div id="fabricCanvasContainer" style="flex-grow: 1;">
-              <canvas id="fabricCanvasElement"></canvas> <!-- The ONE AND ONLY canvas element -->
-            </div>
-
-            <!-- Overlay Configuration Sidebar -->
-            <div id="overlaySidebar" style="display:none; width: 300px; padding: 15px; border: 1px solid #ccc; background-color: #f9f9f9; border-radius: 5px;">
-                <h3>Overlay Properties</h3>
-                <div class="sidebar-section">
+        <!-- NEW: Overlay Properties Toolbar (replaces sidebar) -->
+        <div id="overlayPropertiesToolbar" style="display:none;">
+            <h3>Overlay Properties</h3>
+            <div class="toolbar-sections-container"> {/* Wrapper for sections */}
+                <div class="toolbar-section"> {/* Renamed from sidebar-section */}
                     <h4>Position & Size</h4>
                     <label for="objX">X:</label> <input type="number" id="objX" class="sidebar-input">
                     <label for="objY">Y:</label> <input type="number" id="objY" class="sidebar-input"><br>
@@ -235,7 +225,7 @@
                     <label for="objAngle">Angle:</label> <input type="number" id="objAngle" class="sidebar-input">
                 </div>
 
-                <div class="sidebar-section">
+                <div class="toolbar-section"> {/* Renamed from sidebar-section */}
                     <h4>Appearance</h4>
                     <label for="objFill">Fill Color:</label> <input type="color" id="objFill" class="sidebar-input" value="#ff0000"><br>
                     <label for="objStrokeColor">Stroke Color:</label> <input type="color" id="objStrokeColor" class="sidebar-input" value="#000000"><br>
@@ -243,19 +233,33 @@
                     <label for="objOpacity">Opacity:</label> <input type="range" id="objOpacity" min="0" max="1" step="0.01" class="sidebar-input" value="1.0">
                 </div>
                 
-                <div class="sidebar-section" id="textSpecificControls" style="display:none;">
+                <div class="toolbar-section" id="textSpecificControls" style="display:none;"> {/* Renamed from sidebar-section */}
                     <h4>Text</h4>
                     <label for="objTextContent">Content:</label><br>
-                    <textarea id="objTextContent" rows="3" style="width: 95%;" class="sidebar-input"></textarea>
+                    <textarea id="objTextContent" rows="3" class="sidebar-input"></textarea> {/* Removed inline style, rely on CSS */}
                 </div>
 
-                <div class="sidebar-section">
+                <div class="toolbar-section"> {/* Renamed from sidebar-section */}
                     <h4>Shadow</h4>
                     <label for="objShadowColor">Color:</label> <input type="color" id="objShadowColor" class="sidebar-input" value="#000000"><br>
                     <label for="objShadowBlur">Blur:</label> <input type="range" id="objShadowBlur" min="0" max="50" step="1" class="sidebar-input" value="0"><br>
                     <label for="objShadowOffsetX">Offset X:</label> <input type="number" id="objShadowOffsetX" class="sidebar-input" value="0"><br>
                     <label for="objShadowOffsetY">Offset Y:</label> <input type="number" id="objShadowOffsetY" class="sidebar-input" value="0">
                 </div>
+            </div>
+        </div>
+
+        <!-- Canvas Area - now directly under toolbar -->
+        <div id="fabricCanvasContainer">
+          <canvas id="fabricCanvasElement"></canvas>
+        </div>
+
+        <div id="slideManagementPanel">
+            <h3>Slides</h3>
+            <button id="addSlideButton">Add New Slide</button>
+            <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button>
+            <div id="slideThumbnailsContainer">
+                <!-- Slide thumbnails will be dynamically inserted here -->
             </div>
         </div>
         

@@ -114,36 +114,24 @@
         fabricCanvasEl = document.getElementById('fabricCanvasElement');
     }
 
-    // Function to initialize Fabric.js
-    function initializeFabric() {
-      if (typeof fabric !== 'undefined' && fabricCanvasEl) {
-        adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
-          width: 800,
-          height: 600,
-          backgroundColor: '#f0f0f0'
-        });
-        console.log("Admin_JS: Fabric.js canvas initialized.", adminApp.state.fabricCanvasInstance);
-      } else if (!fabricCanvasEl) {
-        console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
-        displayMessage("Error: Canvas element not found. Cannot initialize editor.", false);
-      } else {
-        console.error("Admin_JS: Fabric.js library (fabric) is not defined. Further attempts needed or script loading issue.");
-        displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check your internet connection, ensure scripts are not blocked, and try refreshing the page.", false);
-      }
-    }
-
-    // Try to initialize Fabric.js. If it's not ready, try again after a short delay.
-    // This is a workaround for potential script loading race conditions.
-    if (typeof fabric !== 'undefined') {
-      initializeFabric();
+    // Check if Fabric.js is loaded
+    if (typeof fabric !== 'undefined' && fabricCanvasEl) {
+      adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
+        width: 800, 
+        height: 600, 
+        backgroundColor: '#f0f0f0' 
+      });
+      console.log("Admin_JS: Fabric.js canvas initialized.", adminApp.state.fabricCanvasInstance);
+    } else if (!fabricCanvasEl) {
+      console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
+      displayMessage("Error: Canvas element not found. Cannot initialize editor.", false);
     } else {
-      console.warn("Admin_JS: Fabric.js not immediately available. Delaying initialization attempt.");
-      setTimeout(initializeFabric, 500); // Wait 500ms and try again
+      console.error("Admin_JS: Fabric.js library (fabric) is not defined yet. Ensure AdminView.html includes the Fabric.js CDN script in the <head>.");
+      displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check AdminView.html, your internet connection, ensure scripts are not blocked, and try refreshing.", false);
     }
 
     // In Step 10, you will call: loadProjectForEditing(projectIdToEdit);
   }
-
   // --- General UI Functions ---
   function showLoading(show) {
     adminApp.state.isLoading = show;

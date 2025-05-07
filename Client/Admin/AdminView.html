@@ -10,7 +10,7 @@
       .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
       h1, h2 { color: #333; }
       label { display: inline-block; margin-bottom: 5px; font-weight: bold;}
-      input[type="text"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+      input[type="text"], input[type="file"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
       button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; margin-right: 5px; }
       button:hover { background-color: #0056b3; }
       button.edit-button { background-color: #28a745; }
@@ -29,15 +29,26 @@
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
       /* Styles for Fabric.js Canvas */
-      #fabricCanvasContainer { /* Optional container for styling/positioning */
+      #fabricCanvasContainer {
         margin-top: 20px;
         margin-bottom: 20px;
-        display: flex; /* For centering the canvas if needed */
-        justify-content: center; /* For centering the canvas if needed */
+        display: flex; 
+        justify-content: center;
       }
       #fabricCanvasElement {
         border: 1px solid #000;
-        /* Dimensions will be set by Fabric.js or can be set here if static */
+      }
+
+      /* Styling for controls within edit view */
+      .edit-controls-group {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #eee;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+      }
+      .edit-controls-group label {
+        margin-right: 10px;
       }
     </style>
   </head>
@@ -65,18 +76,24 @@
     <div class="container" id="editViewContainer" style="display:none;"> <!-- Hidden by default -->
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2> <!-- Title will be updated by JS -->
-        <p><em>Project editing controls, canvas, and slide management will appear here.</em></p>
         
+        <div class="edit-controls-group">
+            <h3>Slide Background</h3>
+            <label for="imageUploader">Upload Image Background:</label>
+            <!-- THIS LINE IS NOW UNCOMMENTED AND ACTIVE -->
+            <input type="file" id="imageUploader" accept="image/*">
+            <!-- In later steps, controls for YouTube URL or Audio might go here too -->
+        </div>
+
         <!-- Canvas for Fabric.js (Phase 2) -->
         <div id="fabricCanvasContainer">
           <canvas id="fabricCanvasElement"></canvas>
         </div>
         
+        <p><em>(Overlay controls and slide management will appear in later phases)</em></p>
         <!-- Slide management UI (Phase 2) -->
         <!-- <div id="slideThumbnailsContainer"></div> -->
         <!-- <button id="addSlideButton">Add Slide</button> -->
-        <!-- Media upload controls (Phase 2) -->
-        <!-- <input type="file" id="imageUploader" accept="image/*"> -->
     </div>
 
     <div id="messageArea"></div> <!-- For success/error messages -->

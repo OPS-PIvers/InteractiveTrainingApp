@@ -96,11 +96,9 @@
     if(editViewContainerEl) editViewContainerEl.style.display = 'block';
     
     if(editingProjectTitleEl) {
-        // In Step 10, we'll fetch project details and set a proper title
         editingProjectTitleEl.textContent = `Editing Project (ID: ${projectIdToEdit})`; 
     }
     
-    // Reset data that might be related to a previously edited project
     adminApp.state.projectData = null; 
     adminApp.state.currentSlideIndex = -1;
     
@@ -111,27 +109,36 @@
     }
     if (messageAreaEl) messageAreaEl.innerHTML = ''; 
 
-    // Initialize Fabric.js on the canvas
-    // Ensure fabricCanvasEl is freshly referenced if setupDOMReferences ran before edit view was visible
+    // Ensure fabricCanvasEl is freshly referenced
     if (!fabricCanvasEl) {
         fabricCanvasEl = document.getElementById('fabricCanvasElement');
     }
 
-    // Check if Fabric.js is loaded
-    if (typeof fabric !== 'undefined' && fabricCanvasEl) {
-      adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
-        width: 800, // Default width
-        height: 600, // Default height
-        backgroundColor: '#f0f0f0' // A light grey background to see the canvas area
-      });
-      console.log("Admin_JS: Fabric.js canvas initialized.", adminApp.state.fabricCanvasInstance);
-    } else if (!fabricCanvasEl) {
-      console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
-      displayMessage("Error: Canvas element not found. Cannot initialize editor.", false);
+    // Function to initialize Fabric.js
+    function initializeFabric() {
+      if (typeof fabric !== 'undefined' && fabricCanvasEl) {
+        adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
+          width: 800,
+          height: 600,
+          backgroundColor: '#f0f0f0'
+        });
+        console.log("Admin_JS: Fabric.js canvas initialized.", adminApp.state.fabricCanvasInstance);
+      } else if (!fabricCanvasEl) {
+        console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
+        displayMessage("Error: Canvas element not found. Cannot initialize editor.", false);
+      } else {
+        console.error("Admin_JS: Fabric.js library (fabric) is not defined. Further attempts needed or script loading issue.");
+        displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check your internet connection, ensure scripts are not blocked, and try refreshing the page.", false);
+      }
+    }
+
+    // Try to initialize Fabric.js. If it's not ready, try again after a short delay.
+    // This is a workaround for potential script loading race conditions.
+    if (typeof fabric !== 'undefined') {
+      initializeFabric();
     } else {
-      // Fabric.js is not loaded yet.
-      console.error("Admin_JS: Fabric.js library (fabric) is not defined yet. This might be due to a slow network or if the CDN link is blocked.");
-      displayMessage("Error: Canvas library (Fabric.js) could not be loaded. Please check your internet connection, ensure scripts are not blocked, and try refreshing the page.", false);
+      console.warn("Admin_JS: Fabric.js not immediately available. Delaying initialization attempt.");
+      setTimeout(initializeFabric, 500); // Wait 500ms and try again
     }
 
     // In Step 10, you will call: loadProjectForEditing(projectIdToEdit);

@@ -32,7 +32,7 @@ function createProject(projectTitle) {
     const initialJsonContent = {
       projectId: projectId,
       title: projectTitle,
-      status: "Draft", 
+      status: "Draft", // Default status for new projects
       slides: [],
       createdDate: new Date().toISOString(),
       lastModified: new Date().toISOString()
@@ -54,10 +54,10 @@ function createProject(projectTitle) {
       projectId,              
       projectTitle,           
       projectFolderId,        
-      "Draft",                
+      initialJsonContent.status, // Use status from initialJsonContent
       projectDataFileId,      
-      new Date().toISOString(), 
-      new Date().toISOString()  
+      initialJsonContent.lastModified, 
+      initialJsonContent.createdDate  
     ];
 
     appendRowToSheet(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, newRowData);
@@ -68,7 +68,8 @@ function createProject(projectTitle) {
       message: "Project created successfully!",
       projectId: projectId,
       projectFolderId: projectFolderId,
-      projectDataFileId: projectDataFileId
+      projectDataFileId: projectDataFileId,
+      status: initialJsonContent.status // Return initial status
     };
 
   } catch (e) {
@@ -91,14 +92,23 @@ function getAllProjectsForAdmin() {
     }
     
     const formattedProjects = projectsData.map(rowObject => {
+      // Ensure all expected columns are present in rowObject or fallback to array indices
+      const projectId = rowObject['ProjectID'] || (rowObject[COL_PROJECT_ID - 1] ? rowObject[COL_PROJECT_ID - 1] : null);
+      const projectTitle = rowObject['ProjectTitle'] || (rowObject[COL_PROJECT_TITLE - 1] ? rowObject[COL_PROJECT_TITLE - 1] : null);
+      const status = rowObject['Status'] || (rowObject[COL_STATUS - 1] ? rowObject[COL_STATUS - 1] : null);
+      const projectFolderId = rowObject['ProjectFolderID'] || (rowObject[COL_PROJECT_FOLDER_ID -1] ? rowObject[COL_PROJECT_FOLDER_ID -1] : null);
+      const projectDataFileId = rowObject['ProjectDataFileID'] || (rowObject[COL_PROJECT_DATA_FILE_ID -1] ? rowObject[COL_PROJECT_DATA_FILE_ID -1] : null);
+      
+      if (!projectId) return null; // Skip if no projectId
+
       return {
-        projectId: rowObject['ProjectID'] || rowObject[COL_PROJECT_ID - 1], 
-        projectTitle: rowObject['ProjectTitle'] || rowObject[COL_PROJECT_TITLE - 1],
-        status: rowObject['Status'] || rowObject[COL_STATUS - 1],
-        projectFolderId: rowObject['ProjectFolderID'] || rowObject[COL_PROJECT_FOLDER_ID -1], 
-        projectDataFileId: rowObject['ProjectDataFileID'] || rowObject[COL_PROJECT_DATA_FILE_ID -1] 
+        projectId: projectId, 
+        projectTitle: projectTitle,
+        status: status,
+        projectFolderId: projectFolderId, 
+        projectDataFileId: projectDataFileId 
       };
-    }).filter(p => p.projectId); 
+    }).filter(p => p !== null); // Remove null entries from map if projectId was missing
 
     Logger.log(`getAllProjectsForAdmin: Retrieved ${formattedProjects.length} projects.`);
     return formattedProjects;
@@ -141,7 +151,7 @@ function getProjectFolderIdFromSheet(projectId) {
  * @param {string} mediaType A string descriptor like 'image' or 'audio' (for logging/future use).
  * @return {Object} An object like { success: true, driveFileId: '...', webContentLink: '...' } or { success: false, error: '...' }.
  */
-function uploadFileToDrive(fileData, projectId, mediaType) { // THIS IS THE CORRECT IMPLEMENTATION
+function uploadFileToDrive(fileData, projectId, mediaType) { 
   try {
     Logger.log(`uploadFileToDrive: Starting upload for projectId: ${projectId}, mediaType: ${mediaType}, fileName: ${fileData.fileName}`);
 
@@ -165,18 +175,16 @@ function uploadFileToDrive(fileData, projectId, mediaType) { // THIS IS THE CORR
     
     const driveFile = createFileInDriveFromBlob(blob, fileData.fileName, projectFolderId);
       
-    // MORE DETAILED LOGGING FOR driveFile
     Logger.log(`uploadFileToDrive: Type of driveFile: ${typeof driveFile}`);
     if (driveFile) {
       Logger.log(`uploadFileToDrive: driveFile.getId() exists? ${typeof driveFile.getId === 'function'}`);
       Logger.log(`uploadFileToDrive: driveFile.getName() exists? ${typeof driveFile.getName === 'function'}`);
-      Logger.log(`uploadFileToDrive: driveFile.getWebContentLink exists? ${typeof driveFile.getWebContentLink === 'function'}`); // This is the key check
+      Logger.log(`uploadFileToDrive: driveFile.getWebContentLink exists? ${typeof driveFile.getWebContentLink === 'function'}`); 
       Logger.log(`uploadFileToDrive: driveFile.getDownloadUrl exists? ${typeof driveFile.getDownloadUrl === 'function'}`);
-      Logger.log(`uploadFileToDrive: driveFile properties: ${JSON.stringify(Object.keys(driveFile))}`); // See what methods/props it reports
+      Logger.log(`uploadFileToDrive: driveFile properties: ${JSON.stringify(Object.keys(driveFile))}`); 
     } else {
       Logger.log("uploadFileToDrive: driveFile is null or undefined after creation attempt.");
     }
-    // END DETAILED LOGGING
 
     if (!driveFile || !driveFile.getId) { 
         Logger.log(`uploadFileToDrive: Failed to create file in Drive. createFileInDriveFromBlob returned invalid response for ${fileData.fileName}`);
@@ -186,22 +194,23 @@ function uploadFileToDrive(fileData, projectId, mediaType) { // THIS IS THE CORR
     driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     Logger.log(`uploadFileToDrive: File "${driveFile.getName()}" (ID: ${driveFile.getId()}) shared as ANYONE_WITH_LINK.`);
     
-    let webContentLink = null; // Initialize to null
+    let webContentLink = null; 
 
-    // Check if getWebContentLink method exists AND IS A FUNCTION on the driveFile object
     if (driveFile && typeof driveFile.getWebContentLink === 'function') {
-      webContentLink = driveFile.getWebContentLink(); // Call it only if it exists as a function
+      webContentLink = driveFile.getWebContentLink(); 
       Logger.log(`uploadFileToDrive: Called driveFile.getWebContentLink(), result: ${webContentLink}`);
     } else {
       Logger.log(`uploadFileToDrive: driveFile.getWebContentLink is not available or not a function. Object keys: ${JSON.stringify(Object.keys(driveFile || {}))}`);
     }
 
-    if (!webContentLink) { // If it was null from the call, or the function didn't exist/wasn't callable
+    if (!webContentLink) { 
         Logger.log(`uploadFileToDrive: webContentLink is null or method was not callable. Using fallback for file ID: ${driveFile.getId()}`);
         if (mediaType === 'image') {
           webContentLink = 'https://drive.google.com/uc?export=view&id=' + driveFile.getId();
         } else {
-           webContentLink = driveFile.getDownloadUrl().replace("&export=download", "&export=view");
+           // Fallback for non-image types, might need adjustments based on specific needs
+           const downloadUrl = driveFile.getDownloadUrl();
+           webContentLink = downloadUrl ? downloadUrl.replace("&export=download", "&export=view") : 'https://drive.google.com/uc?id=' + driveFile.getId();
         }
     }
 
@@ -219,7 +228,6 @@ function uploadFileToDrive(fileData, projectId, mediaType) { // THIS IS THE CORR
   }
 }
 
-// ... (can be placed after uploadFileToDrive or with other utility-like functions)
 
 /**
  * Retrieves a file from Drive as a base64 data URI.
@@ -249,6 +257,7 @@ function getImageAsBase64(driveFileId) {
 /**
  * Saves the project's data (slides, overlays, media links, canvas dimensions) to its JSON file in Drive.
  * Updates the LastModified timestamp in the ProjectIndex sheet.
+ * Also ensures the project's status in the sheet matches the status in the projectData.
  * @param {string} projectId The ID of the project.
  * @param {string} projectDataJSON A JSON string representing the entire project data.
  * @return {object} An object indicating success or failure.
@@ -261,15 +270,45 @@ function saveProjectData(projectId, projectDataJSON) {
       return { success: false, error: "Project ID and data are required." };
     }
 
-    // 1. Find ProjectFolderID and ProjectDataFileID from the ProjectIndex sheet
-    // We can adapt the getProjectFolderIdFromSheet or make a more general "getProjectIndexEntry"
+    let projectDataParsed;
+    try {
+        projectDataParsed = JSON.parse(projectDataJSON);
+    } catch (parseError) {
+        Logger.log(`saveProjectData: Error parsing projectDataJSON for projectId ${projectId}: ${parseError.toString()}`);
+        return { success: false, error: "Invalid project data format. Could not parse JSON." };
+    }
+    
+    const currentStatusInJson = projectDataParsed.status || "Draft"; // Default if status missing in JSON
+
     const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
     let projectEntry = null;
+    let projectRowIndex = -1;
+
     if (allProjects && Array.isArray(allProjects)) {
-      projectEntry = allProjects.find(p => (p['ProjectID'] || p[COL_PROJECT_ID - 1]) === projectId);
+      for (let i = 0; i < allProjects.length; i++) {
+        const p = allProjects[i];
+        if ((p['ProjectID'] || p[COL_PROJECT_ID - 1]) === projectId) {
+          projectEntry = p;
+          projectRowIndex = i + (getAllSheetData.returnedHeaders ? 2 : 1); // +1 for 0-index, +1 if headers were returned and skipped
+          // A more robust way to get rowIndex is to use findRowIndexByValue if getAllSheetData returns objects
+          break;
+        }
+      }
+    }
+     if (!projectEntry) { // If still not found, try findRowIndexByValue
+        projectRowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
+        if(projectRowIndex){
+             // If found by index, we need to get the row data to form projectEntry
+             const rowValues = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, projectRowIndex);
+             // Assuming getAllSheetData headers if available, otherwise map by column consts
+             const headers = (Array.isArray(allProjects[0]) && typeof allProjects[0][0] === 'string') ? allProjects[0] : ['ProjectID', 'ProjectTitle', 'ProjectFolderID', 'Status', 'ProjectDataFileID', 'LastModified', 'CreatedDate']; // Fallback headers
+             projectEntry = {};
+             headers.forEach((header, idx) => projectEntry[header] = rowValues[idx]);
+        }
     }
 
-    if (!projectEntry) {
+
+    if (!projectEntry || projectRowIndex === -1) {
       Logger.log(`saveProjectData: Project with ID "${projectId}" not found in ProjectIndex.`);
       return { success: false, error: `Project metadata not found for ID: ${projectId}. Cannot save.` };
     }
@@ -283,14 +322,11 @@ function saveProjectData(projectId, projectDataJSON) {
     }
     Logger.log(`saveProjectData: Found FolderID: ${projectFolderId}, DataFileID to overwrite: ${projectDataFileIdToOverwrite} for project ${projectId}.`);
 
-    // 2. Save/Overwrite the JSON file in Drive
-    // saveJsonToDriveFile is from DriveService.gs
-    // PROJECT_DATA_FILENAME is a constant from Code.gs (e.g., "project_data.json")
     const savedFileId = saveJsonToDriveFile(
       PROJECT_DATA_FILENAME,
-      projectDataJSON, // Already a string
+      projectDataJSON, 
       projectFolderId,
-      projectDataFileIdToOverwrite // Pass the ID of the file to overwrite
+      projectDataFileIdToOverwrite 
     );
 
     if (!savedFileId) {
@@ -299,23 +335,19 @@ function saveProjectData(projectId, projectDataJSON) {
     }
     Logger.log(`saveProjectData: JSON data saved to file ID: ${savedFileId} for project ${projectId}.`);
 
-    // 3. Update the LastModified timestamp in the ProjectIndex sheet
-    const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
-    if (rowIndex) {
-      // Get current row data to only update the LastModified column
-      // This assumes getSheetRowData returns a 0-indexed array for the row
-      let rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
-      if (rowData) {
-          // COL_LAST_MODIFIED is 1-based index from Code.gs
-          rowData[COL_LAST_MODIFIED - 1] = new Date().toISOString(); 
-          updateSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex, rowData);
-          Logger.log(`saveProjectData: Updated LastModified timestamp for project ${projectId} at row ${rowIndex}.`);
+    // Update LastModified and ensure Status is also current in the sheet
+    if (projectRowIndex) {
+      let rowDataArray = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, projectRowIndex);
+      if (rowDataArray) {
+          rowDataArray[COL_LAST_MODIFIED - 1] = new Date().toISOString(); 
+          rowDataArray[COL_STATUS - 1] = currentStatusInJson; // Sync status from JSON
+          updateSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, projectRowIndex, rowDataArray);
+          Logger.log(`saveProjectData: Updated LastModified and Status ("${currentStatusInJson}") for project ${projectId} at row ${projectRowIndex}.`);
       } else {
-            Logger.log(`saveProjectData: Could not retrieve row data for project ${projectId} to update LastModified. Row ${rowIndex} might be empty or an error occurred.`);
+            Logger.log(`saveProjectData: Could not retrieve row data for project ${projectId} to update sheet. Row ${projectRowIndex} might be empty or error.`);
       }
     } else {
-      Logger.log(`saveProjectData: Could not find row for project ${projectId} to update LastModified timestamp.`);
-      // Not a fatal error for the save itself, but good to log.
+      Logger.log(`saveProjectData: Could not find row for project ${projectId} to update sheet.`);
     }
 
     return { success: true, message: "Project data saved successfully." };
@@ -326,9 +358,82 @@ function saveProjectData(projectId, projectDataJSON) {
   }
 }
 
+/**
+ * Updates the status of a project in the "ProjectIndex" sheet.
+ * Also updates the "LastModified" timestamp.
+ * @param {string} projectId The ID of the project to update.
+ * @param {string} newStatus The new status (e.g., "Active", "Inactive", "Draft").
+ * @return {object} An object indicating success or failure.
+ */
 function updateProjectStatus(projectId, newStatus) {
-  Logger.log(`updateProjectStatus called for ${projectId} to ${newStatus}, but not yet implemented.`);
-  return { success: false, message: "Not implemented yet."};
+  try {
+    Logger.log(`updateProjectStatus: Attempting to update status for projectId: ${projectId} to "${newStatus}"`);
+    if (!projectId || !newStatus) {
+      Logger.log("updateProjectStatus: Missing projectId or newStatus.");
+      return { success: false, error: "Project ID and new status are required." };
+    }
+
+    const validStatuses = ["Draft", "Active", "Inactive"];
+    if (validStatuses.indexOf(newStatus) === -1) {
+        Logger.log(`updateProjectStatus: Invalid status value "${newStatus}" for projectId: ${projectId}`);
+        return { success: false, error: `Invalid status value: ${newStatus}. Must be one of ${validStatuses.join(', ')}.` };
+    }
+
+    // Find the row index for the given projectId
+    // COL_PROJECT_ID is a 1-based constant from Code.gs
+    const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
+
+    if (!rowIndex) {
+      Logger.log(`updateProjectStatus: Project with ID "${projectId}" not found in ProjectIndex.`);
+      return { success: false, error: `Project not found for ID: ${projectId}. Cannot update status.` };
+    }
+
+    // Get the current row data to preserve other column values
+    let rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
+    if (!rowData) {
+        Logger.log(`updateProjectStatus: Could not retrieve current row data for project ${projectId} at row ${rowIndex}.`);
+        return { success: false, error: "Could not retrieve project data to update status."};
+    }
+    
+    // Update only the Status and LastModified columns
+    // COL_STATUS and COL_LAST_MODIFIED are 1-based constants from Code.gs
+    rowData[COL_STATUS - 1] = newStatus;
+    rowData[COL_LAST_MODIFIED - 1] = new Date().toISOString();
+
+    updateSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex, rowData);
+    Logger.log(`updateProjectStatus: Status for project ${projectId} (row ${rowIndex}) updated to "${newStatus}". LastModified also updated.`);
+
+    // Also update the status in the project_data.json file
+    const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
+    let projectEntry = null;
+     if (allProjects && Array.isArray(allProjects)) {
+        projectEntry = allProjects.find(p => (p['ProjectID'] || p[COL_PROJECT_ID - 1]) === projectId);
+    }
+    if(projectEntry){
+        const projectDataFileId = projectEntry['ProjectDataFileID'] || projectEntry[COL_PROJECT_DATA_FILE_ID -1];
+        const projectFolderId = projectEntry['ProjectFolderID'] || projectEntry[COL_PROJECT_FOLDER_ID -1];
+        if(projectDataFileId && projectFolderId){
+            try {
+                let projectJsonContent = readDriveFileContent(projectDataFileId);
+                let projectJson = JSON.parse(projectJsonContent);
+                projectJson.status = newStatus;
+                projectJson.lastModified = new Date().toISOString();
+                saveJsonToDriveFile(PROJECT_DATA_FILENAME, JSON.stringify(projectJson, null, 2), projectFolderId, projectDataFileId);
+                Logger.log(`updateProjectStatus: Status in project_data.json for ${projectId} also updated to "${newStatus}".`);
+            } catch (e) {
+                Logger.log(`updateProjectStatus: Failed to update status in project_data.json for ${projectId}. Error: ${e.toString()}`);
+                // Non-fatal for the sheet update, but log it.
+            }
+        }
+    }
+
+
+    return { success: true, message: `Project status successfully updated to ${newStatus}.` };
+
+  } catch (e) {
+    Logger.log(`Error in updateProjectStatus for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
+    return { success: false, error: `Failed to update project status: ${e.message}` };
+  }
 }
 
 function deleteProject(projectId) {
@@ -347,11 +452,9 @@ function deleteProject(projectId) {
       Logger.log(`getProjectDataForEditing: Attempting to load data for projectId: ${projectId}`);
       if (!projectId) {
         Logger.log("getProjectDataForEditing: ProjectID is missing.");
-        // Returning null, client-side needs to handle this gracefully
         return null; 
       }
 
-      // Find the ProjectDataFileID from the ProjectIndex sheet
       const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
       let projectEntry = null;
       if (allProjects && Array.isArray(allProjects)) {
@@ -367,25 +470,17 @@ function deleteProject(projectId) {
 
       if (!projectDataFileId) {
         Logger.log(`getProjectDataForEditing: ProjectDataFileID is missing for project "${projectId}".`);
-        // Maybe return a default structure or null? Returning null is simpler for client to check.
         return null; 
       }
       Logger.log(`getProjectDataForEditing: Found ProjectDataFileID: ${projectDataFileId} for project ${projectId}.`);
 
-      // Read the file content using DriveService
-      // readDriveFileContent is from DriveService.gs
       const jsonContent = readDriveFileContent(projectDataFileId);
 
-      // jsonContent could be empty string if file is empty, but should generally be JSON
       Logger.log(`getProjectDataForEditing: Successfully read content for file ID ${projectDataFileId}. Content length: ${jsonContent ? jsonContent.length : 0}`);
-      
-      // Return the raw JSON string. Client will parse it.
       return jsonContent; 
 
     } catch (e) {
-      // Log the specific error (e.g., file not found by readDriveFileContent)
       Logger.log(`Error in getProjectDataForEditing for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-      // Return null in case of any error during fetch
       return null; 
     }
   }

@@ -24,11 +24,9 @@
   let addTextboxButtonEl; 
 
   let overlayPropertiesToolbarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
-      // Interaction property elements
       objInteractionTriggerEl, objInteractionActionEl, 
       modalContentConfigEl, objModalContentEl,
       navigateToConfigEl, objNavigateToEl,
-      // Existing elements
       objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
       textSpecificControlsEl, objTextContentEl,
       objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
@@ -81,7 +79,6 @@
     objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
     objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
 
-    // New Interaction elements
     objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
     objInteractionActionEl = document.getElementById('objInteractionAction');
     modalContentConfigEl = document.getElementById('modalContentConfig');
@@ -435,6 +432,12 @@
       saveCurrentSlideState();
       showLoading(true); displayMessage("Saving project...", true);
       try {
+          // If on edit page, update projectData.status from potential status selector on edit page
+          // For now, this is not implemented on edit page, so status is only changed from list view.
+          // if (adminApp.state.currentView === 'edit' && projectStatusSelectorOnEditPage) {
+          //    adminApp.state.projectData.status = projectStatusSelectorOnEditPage.value;
+          // }
+
           const jsonDataString = JSON.stringify(adminApp.state.projectData);
           console.log("Saving projectData string length:", jsonDataString.length); 
           google.script.run
@@ -462,12 +465,56 @@
   function displayMessage(message, isSuccess) {
       if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage messageAreaEl not found. Message:", message); }
   }
+  
+  function handleProjectStatusChange(projectId, newStatus, selectElement) {
+      console.log(`Attempting to update status for project ${projectId} to ${newStatus}`);
+      showLoading(true);
+      google.script.run
+          .withSuccessHandler(function(response) { onProjectStatusUpdated(response, selectElement); })
+          .withFailureHandler(function(error) { 
+              onServerError(error);
+              // Revert dropdown on error
+              if (selectElement) {
+                  const projects = adminApp.state.projectListCache; // Assuming you cache the list
+                  const project = projects.find(p => p.projectId === projectId);
+                  if (project) selectElement.value = project.status; 
+              }
+          })
+          .updateProjectStatus(projectId, newStatus);
+  }
+
+  function onProjectStatusUpdated(response, selectElement) {
+      showLoading(false);
+      if (response && response.success) {
+          displayMessage(response.message || "Project status updated successfully!", true);
+          // Optionally, update a cached project list's status if you maintain one client-side
+          // For now, simply reloading the list will reflect the change.
+          // If the change was made from the edit view, update adminApp.state.projectData.status
+          if (adminApp.state.currentView === 'edit' && adminApp.state.projectData && selectElement) {
+              adminApp.state.projectData.status = selectElement.value;
+          } else {
+               // If on list view, find the project in the list and update its visual status
+              const statusSpan = selectElement.closest('.project-item').querySelector('.status-text');
+              if(statusSpan) statusSpan.textContent = `(${selectElement.value})`;
+          }
+          // No full list reload here to prevent jarring UI shift if status changed for one item.
+          // The visual status text next to the dropdown is updated.
+      } else {
+          onServerError((response && response.error) ? response.error : "Failed to update status.");
+          if (selectElement) { // Revert dropdown on server-side failure reported as success:false
+              // This part of reverting might be complex if not caching original status
+              // For now, rely on onServerError's revert for actual network/script errors
+          }
+      }
+  }
+
   function onServerError(errorObject) {
     console.error("onServerError triggered:", errorObject);
     showLoading(false);
     let errorMessage = "An unknown server error occurred.";
      if (typeof errorObject === 'string') { errorMessage = errorObject; }
      else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
+     else if (errorObject && errorObject.error && typeof errorObject.error === 'string') { errorMessage = errorObject.error; }
     console.error('Formatted Server Error Message:', errorMessage);
     displayMessage('Server Error: ' + errorMessage, false);
   }
@@ -503,8 +550,72 @@
     if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found."); return; }
     adminProjectListContainerEl.innerHTML = '';
     if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
+    
+    adminApp.state.projectListCache = projectsArray; // Cache for reverting dropdown
+
     projectsArray.forEach(project => { 
-        if (!project || !project.projectId) return; const projectItem = document.createElement('div'); projectItem.className = 'project-item'; const titleSpan = document.createElement('span'); titleSpan.textContent = project.projectTitle || 'Untitled Project'; const statusSpan = document.createElement('span'); statusSpan.className = 'status'; statusSpan.textContent = `(${project.status || 'N/A'})`; const titleAndStatusDiv = document.createElement('div'); titleAndStatusDiv.appendChild(titleSpan); titleAndStatusDiv.appendChild(statusSpan); const editButton = document.createElement('button'); editButton.textContent = 'Edit'; editButton.className = 'edit-button'; editButton.setAttribute('data-project-id', project.projectId); editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; projectItem.appendChild(titleAndStatusDiv); projectItem.appendChild(editButton); adminProjectListContainerEl.appendChild(projectItem);
+        if (!project || !project.projectId) return; 
+        const projectItem = document.createElement('div'); 
+        projectItem.className = 'project-item'; 
+        
+        const titleAndStatusDiv = document.createElement('div');
+        titleAndStatusDiv.style.display = 'flex';
+        titleAndStatusDiv.style.flexDirection = 'column'; // Stack title and status text
+
+        const titleSpan = document.createElement('span'); 
+        titleSpan.textContent = project.projectTitle || 'Untitled Project'; 
+        titleSpan.style.fontWeight = 'bold';
+        
+        const statusTextSpan = document.createElement('span'); 
+        statusTextSpan.className = 'status-text'; // Added class for easier selection
+        statusTextSpan.textContent = `(${project.status || 'N/A'})`; 
+        statusTextSpan.style.fontSize = '0.9em';
+        statusTextSpan.style.fontStyle = 'italic';
+        statusTextSpan.style.color = '#555';
+        
+        titleAndStatusDiv.appendChild(titleSpan);
+        titleAndStatusDiv.appendChild(statusTextSpan);
+
+        const controlsDiv = document.createElement('div'); // For status select and edit button
+        controlsDiv.style.display = 'flex';
+        controlsDiv.style.alignItems = 'center';
+
+        // Status Dropdown
+        const statusSelect = document.createElement('select');
+        statusSelect.className = 'project-status-select';
+        statusSelect.setAttribute('data-project-id', project.projectId);
+        ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
+            const option = document.createElement('option');
+            option.value = statusValue;
+            option.textContent = statusValue;
+            if (project.status === statusValue) {
+                option.selected = true;
+            }
+            statusSelect.appendChild(option);
+        });
+        statusSelect.onchange = function() {
+            handleProjectStatusChange(project.projectId, this.value, this);
+        };
+        // Basic styling for select in list
+        statusSelect.style.padding = '5px';
+        statusSelect.style.marginRight = '10px';
+        statusSelect.style.fontSize = '0.9em';
+        statusSelect.style.border = '1px solid #ccc';
+        statusSelect.style.borderRadius = '3px';
+
+
+        const editButton = document.createElement('button'); 
+        editButton.textContent = 'Edit'; 
+        editButton.className = 'edit-button'; 
+        editButton.setAttribute('data-project-id', project.projectId); 
+        editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; 
+        
+        controlsDiv.appendChild(statusSelect);
+        controlsDiv.appendChild(editButton);
+        
+        projectItem.appendChild(titleAndStatusDiv); 
+        projectItem.appendChild(controlsDiv); 
+        adminProjectListContainerEl.appendChild(projectItem);
      });
     console.log("displayAdminProjects: Finished rendering project list.");
   }
@@ -626,7 +737,6 @@
       }
     });
 
-    // Listeners for Interaction Controls
     if (objInteractionTriggerEl) objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
     if (objInteractionActionEl) objInteractionActionEl.addEventListener('change', handleInteractionChange);
     if (objModalContentEl) objModalContentEl.addEventListener('input', handleInteractionChange);
@@ -667,18 +777,15 @@
     if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
     if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
 
-    // Populate Interaction Controls
     const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
     if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
     if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
     if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
     if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
     
-    // Show/hide conditional interaction config sections
     updateInteractionConfigVisibility(interaction.action);
   }
 
-  // Handles changes from any interaction control to update the fabric object
   function handleInteractionChange() {
       const canvas = adminApp.state.fabricCanvasInstance;
       if (!canvas) return;
@@ -696,11 +803,8 @@
 
       updateInteractionConfigVisibility(activeObject.customInteraction.action);
       console.log("Interaction data updated for object:", activeObject.customInteraction);
-      // No canvas.renderAll() needed here as these are data-only properties.
-      // Changes will be saved when saveCurrentSlideState() or saveProject() is called.
   }
 
-  // Helper to show/hide interaction specific config sections
   function updateInteractionConfigVisibility(action) {
       if (modalContentConfigEl) modalContentConfigEl.style.display = (action === 'showModal') ? 'block' : 'none';
       if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
@@ -737,8 +841,7 @@
       shadowOptions.color = objShadowColorEl.value || '#000000';
       activeObject.set('shadow', new fabric.Shadow(shadowOptions));
     } else {
-      // Check if propertyName is an interaction property (handled by handleInteractionChange)
-      if (!propertyName.startsWith('interaction.')) { // Avoid double-handling
+      if (!propertyName.startsWith('interaction.')) { 
           activeObject.set(propertyName, parsedValue);
       }
     }

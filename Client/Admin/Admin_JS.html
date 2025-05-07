@@ -106,26 +106,37 @@
   // --- Navigation Functions ---
   // In Client/Admin/Admin_JS.html
   function navigateToEditView(projectId) {
-      // Temporarily remove isLoading check for this specific test
-      // if (adminApp.state.isLoading) {
-      //     console.log("navigateToEditView: isLoading is true, aborting navigation.");
-      //     return;
-      // }
-      console.log(`navigateToEditView (SIMPLIFIED TEST): Requesting for project ID: ${projectId}`); 
-      
-      // Temporarily remove showLoading from here
-      // showLoading(true); 
+      console.log(`navigateToEditView (ATTEMPT 2): Requesting for project ID: ${projectId}`); 
       
       const targetUrl = '?page=edit&projectId=' + projectId;
-      console.log("navigateToEditView (SIMPLIFIED TEST): Target URL is:", targetUrl);
+      console.log("navigateToEditView (ATTEMPT 2): Target URL is:", targetUrl);
       
       try {
-          console.log("navigateToEditView (SIMPLIFIED TEST): ABOUT TO SET window.location.href");
-          window.location.href = targetUrl;
-          console.log("navigateToEditView (SIMPLIFIED TEST): AFTER setting window.location.href (may not be seen if nav successful)");
+          console.log("navigateToEditView (ATTEMPT 2): ABOUT TO SET window.location.href");
+          
+          // Try to force navigation to the top window context if sandboxed
+          // window.top.location.href = targetUrl; // Option 1 (might be blocked by cross-origin if /macros/s/ is different from userCodeAppPanel)
+          
+          // More common/direct way
+          window.location.assign(targetUrl); // Option 2: assign() is another way
+          // window.location.replace(targetUrl); // Option 3: replace() prevents going back in history
+
+          // If we reach here immediately, navigation likely hasn't "taken" yet or was blocked silently.
+          console.log("navigateToEditView (ATTEMPT 2): AFTER attempting navigation call.");
+
+          // As a fallback or additional measure, if the above doesn't work,
+          // try creating and clicking a link programmatically. This is less clean.
+          // const link = document.createElement('a');
+          // link.href = targetUrl;
+          // // link.target = '_top'; // May be necessary
+          // document.body.appendChild(link); // Link must be in the document to be clicked
+          // link.click();
+          // document.body.removeChild(link); // Clean up
+          // console.log("navigateToEditView (ATTEMPT 2): Programmatic link click attempted.");
+
       } catch (e) {
-          console.error("navigateToEditView (SIMPLIFIED TEST): Error during window.location.href assignment:", e);
-          // showLoading(false); // If showLoading was used
+          console.error("navigateToEditView (ATTEMPT 2): Error during navigation attempt:", e);
+          // If you had showLoading(true) earlier, you'd call showLoading(false) here.
       }
   }
   

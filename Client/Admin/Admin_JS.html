@@ -101,23 +101,50 @@
   }
 
   // --- Navigation Functions ---
+  // In Client/Admin/Admin_JS.html
   function navigateToEditView(projectId) {
-    if (adminApp.state.isLoading) return;
-    console.log(`Requesting to navigate to edit project: ${projectId}`);
-    showLoading(true);
-    
-    google.script.run
-        .withSuccessHandler(function(webAppUrl) {
-            // Ensure spinner is hidden before navigation which might take time
-            // showLoading(false); // Or let the page reload handle it
-            window.location.href = webAppUrl + '?page=edit&projectId=' + projectId;
-        })
-        .withFailureHandler(function(err) {
-            console.error("Could not get webapp URL from server for edit nav, using relative path. Error:", err);
-            showLoading(false);
-            window.location.href = '?page=edit&projectId=' + projectId;
-        })
-        .getWebAppUrl();
+      if (adminApp.state.isLoading) { // Check app state
+          console.log("navigateToEditView: isLoading is true, aborting navigation.");
+          return;
+      }
+      console.log(`navigateToEditView: Requesting to navigate to edit project ID: ${projectId}`); // <--- EXISTING LOG
+      showLoading(true); 
+      
+      // Try direct navigation first for simplicity to see if this part works
+      // Comment out the google.script.run block for a moment
+      const targetUrl = '?page=edit&projectId=' + projectId;
+      console.log("navigateToEditView: Attempting to set window.location.href to:", targetUrl); // <--- ADD THIS LOG
+      try {
+          window.location.href = targetUrl;
+          // If the above line executes, the page should try to reload.
+          // The showLoading(false) might not be reached if navigation is successful.
+          // If navigation fails for some reason (e.g. popup blocker, though unlikely for same-origin),
+          // then the code below might execute.
+          // No need for showLoading(false) here as the page will reload.
+      } catch (e) {
+          console.error("navigateToEditView: Error during window.location.href assignment:", e);
+          showLoading(false); // Hide spinner if direct navigation fails with an error
+      }
+
+      // --- Temporarily comment out the getWebAppUrl part for testing direct navigation ---
+      /*
+      google.script.run
+          .withSuccessHandler(function(webAppUrl) {
+              console.log("navigateToEditView: getWebAppUrl success. Base URL:", webAppUrl);
+              const fullTargetUrl = webAppUrl + '?page=edit&projectId=' + projectId;
+              console.log("navigateToEditView: Setting window.location.href to full URL:", fullTargetUrl);
+              window.location.href = fullTargetUrl;
+              // showLoading(false); // Page will reload, so spinner will vanish
+          })
+          .withFailureHandler(function(err) {
+              console.error("navigateToEditView: Could not get webapp URL from server, using relative path. Error:", err);
+              const fallbackTargetUrl = '?page=edit&projectId=' + projectId;
+              console.log("navigateToEditView: Setting window.location.href to fallback URL:", fallbackTargetUrl);
+              window.location.href = fallbackTargetUrl; 
+              // showLoading(false); // Might not be reached if navigation happens
+          })
+          .getWebAppUrl();
+      */
   }
   
   function navigateToProjectList() {

@@ -9,52 +9,64 @@
       h1, h2 { color: #333; }
       label { display: inline-block; margin-bottom: 5px; font-weight: bold;}
       input[type="text"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-      button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; margin-right: 5px; /* Added margin for spacing */ }
+      button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; margin-right: 5px; }
       button:hover { background-color: #0056b3; }
-      button.edit-button { background-color: #28a745; } /* No margin-left needed if general button has margin-right */
+      button.edit-button { background-color: #28a745; }
       button.edit-button:hover { background-color: #1e7e34; }
-      #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; /* Ensure space even when empty */ }
+      #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
       .success { border-color: green; background-color: #d4edda; color: #155724; }
       .error { border-color: red; background-color: #f8d7da; color: #721c24; }
       
-      /* Styles for project list */
       #adminProjectListContainer { margin-top: 15px; }
       .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
       .project-item span { font-size: 1.1em; }
       .project-item .status { font-style: italic; color: #555; margin-left: 15px; font-size: 0.9em;}
 
-      /* Styles for loading spinner */
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
-    <!-- Sections to be toggled -->
-    <div id="listViewContainer"> <!-- This will be visible by default -->
-      <div class="container" id="createProjectSection">
-        <h2>Create New Project</h2>
-        <!-- ... input and button ... -->
-      </div>
+    <h1>Admin Dashboard</h1>
 
-      <div class="container" id="projectListSection">
-          <h2>Existing Projects</h2>
-          <div id="adminProjectListContainer"></div>
-      </div>
-  </div>
+    <!-- View Container for List/Create -->
+    <div id="listViewContainer">
+        <div class="container" id="createProjectSection">
+          <h2>Create New Project</h2>
+          <label for="projectTitleInput">Project Title:</label>
+          <input type="text" id="projectTitleInput" placeholder="Enter project title">
+          <button id="createProjectButton">Create Project</button>
+        </div>
 
-  <div class="container" id="editViewContainer" style="display:none;"> <!-- Hidden by default -->
-      <button id="backToProjectsListButton">Back to Projects List</button>
-      <h2 id="editingProjectTitle">Editing Project: </h2>
-      <p><em>(Project editing controls and canvas will appear here in later phases)</em></p>
-  </div>
+        <div class="container" id="projectListSection">
+            <h2>Existing Projects</h2>
+            <div id="adminProjectListContainer">
+                <!-- Projects will be dynamically inserted here -->
+            </div>
+        </div>
+    </div>
 
-  <div id="messageArea"></div>
+    <!-- View Container for Editing a Project -->
+    <div class="container" id="editViewContainer" style="display:none;"> <!-- Hidden by default -->
+        <button id="backToProjectsListButton">Back to Projects List</button>
+        <h2 id="editingProjectTitle">Editing Project: </h2> <!-- Title will be updated by JS -->
+        <p><em>(Project editing controls, canvas, and slide management will appear here in later phases)</em></p>
+        <!-- Canvas for Fabric.js (Phase 2) -->
+        <!-- <canvas id="fabricCanvasElement"></canvas> -->
+        <!-- Slide management UI (Phase 2) -->
+        <!-- <div id="slideThumbnailsContainer"></div> -->
+        <!-- <button id="addSlideButton">Add Slide</button> -->
+        <!-- Media upload controls (Phase 2) -->
+        <!-- <input type="file" id="imageUploader" accept="image/*"> -->
+    </div>
 
-  <!-- Include Loading Spinner -->
-  <?!= include('Client/Shared/LoadingSpinner'); ?>
+    <div id="messageArea"></div> <!-- For success/error messages -->
 
-  <!-- Client-side JavaScript - NO MORE SCRIPT BLOCK BEFORE THIS FOR getServerData -->
-  <?!= include('Client/Admin/Admin_JS'); ?> 
+    <!-- Include Loading Spinner (ensure Client/Shared/LoadingSpinner.html exists) -->
+    <?!= include('Client/Shared/LoadingSpinner'); ?>
+
+    <!-- Client-side JavaScript (ensure Client/Admin/Admin_JS.html exists) -->
+    <?!= include('Client/Admin/Admin_JS'); ?> 
   </body>
 </html>

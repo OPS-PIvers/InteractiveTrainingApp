@@ -8,8 +8,8 @@
     currentProjectId: null, // ID of the project currently being "edited"
     currentView: 'list',    // Tracks the current visible view: 'list' or 'edit'
     projectData: null,      // Will hold the full data for the project being edited (from Step 10)
-    currentSlideIndex: -1   // For slide management (from Step 9)
-    // fabricCanvasInstance: null // For Fabric.js canvas (from Step 7)
+    currentSlideIndex: -1,   // For slide management (from Step 9)
+      fabricCanvasInstance: null // For Fabric.js canvas (from Step 7)
   };
 
   // --- DOM Element References ---
@@ -47,6 +47,7 @@
     editViewContainerEl = document.getElementById('editViewContainer');
     editingProjectTitleEl = document.getElementById('editingProjectTitle');
     backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
+    fabricCanvasEl = document.getElementById('fabricCanvasElement'); // Added for Fabric.js
 
     // Verify elements are found
     if (!listViewContainerEl || !editViewContainerEl) {
@@ -99,8 +100,26 @@
     // Reset data that might be related to a previously edited project
     adminApp.state.projectData = null; 
     adminApp.state.currentSlideIndex = -1;
-    // if (adminApp.state.fabricCanvasInstance) { /* clear canvas in later step */ }
+    if (adminApp.state.fabricCanvasInstance) { 
+      // If a canvas instance already exists, dispose of it to prevent memory leaks
+      // This is important if switching between projects without full page reload
+      adminApp.state.fabricCanvasInstance.dispose();
+      adminApp.state.fabricCanvasInstance = null;
+      console.log("Admin_JS: Disposed previous Fabric canvas instance.");
+    }
     if (messageAreaEl) messageAreaEl.innerHTML = ''; 
+
+    // Initialize Fabric.js on the canvas
+    if (fabricCanvasEl) {
+      adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
+        width: 800, // Default width
+        height: 600, // Default height
+        backgroundColor: '#f0f0f0' // A light grey background to see the canvas area
+      });
+      console.log("Admin_JS: Fabric.js canvas initialized.", adminApp.state.fabricCanvasInstance);
+    } else {
+      console.error("Admin_JS: fabricCanvasEl not found! Cannot initialize Fabric.js.");
+    }
 
     // In Step 10, you will call: loadProjectForEditing(projectIdToEdit);
     // For now, this just shows the placeholder edit view.

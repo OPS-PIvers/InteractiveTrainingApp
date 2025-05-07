@@ -25,6 +25,18 @@
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+      /* Styles for Fabric.js Canvas */
+      #fabricCanvasContainer { /* Optional container for styling/positioning */
+        margin-top: 20px;
+        margin-bottom: 20px;
+        display: flex; /* For centering the canvas if needed */
+        justify-content: center; /* For centering the canvas if needed */
+      }
+      #fabricCanvasElement {
+        border: 1px solid #000;
+        /* Dimensions will be set by Fabric.js or can be set here if static */
+      }
     </style>
   </head>
   <body>
@@ -51,9 +63,14 @@
     <div class="container" id="editViewContainer" style="display:none;"> <!-- Hidden by default -->
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2> <!-- Title will be updated by JS -->
-        <p><em>(Project editing controls, canvas, and slide management will appear here in later phases)</em></p>
+        <p><em>Project editing controls, canvas, and slide management will appear here.</em></p>
+        
         <!-- Canvas for Fabric.js (Phase 2) -->
-        <!-- <canvas id="fabricCanvasElement"></canvas> -->
+        <div id="fabricCanvasContainer">
+          <canvas id="fabricCanvasElement"></canvas>
+        </div>
+        
+        <!-- Slide management UI (Phase 2) -->
         <!-- Slide management UI (Phase 2) -->
         <!-- <div id="slideThumbnailsContainer"></div> -->
         <!-- <button id="addSlideButton">Add Slide</button> -->

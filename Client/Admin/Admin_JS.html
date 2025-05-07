@@ -344,24 +344,56 @@
           return;
       }
 
-      fabric.Image.fromURL(response.base64Data, function(img) { // Use base64Data
+      fabric.Image.fromURL(response.base64Data, function(img) { // img is the fabric.Image object
         if (!adminApp.state.fabricCanvasInstance) { 
             console.error("Canvas became unavailable before image could be set.");
             displayMessage("Error: Canvas became unavailable.", false);
             return;
         }
-        adminApp.state.fabricCanvasInstance.setBackgroundImage(img, 
-            adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance), {
-          scaleX: adminApp.state.fabricCanvasInstance.width / img.width,
-          scaleY: adminApp.state.fabricCanvasInstance.height / img.height
-        });
-        displayMessage("Image set as background.", true);
-        // TODO in Step 9: Store response.driveFileId (from the *original* onImageUploaded response if needed, not from this one)
-        // and perhaps the mimeType (response.mimeType from onBase64ImageReceived)
-        // in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex].slideMedia
-        console.log("Image background set using base64 data. MimeType:", response.mimeType);
 
-      } /*, { crossOrigin: 'anonymous' } */); // crossOrigin not needed for base64 data URIs
+        // --- DYNAMIC CANVAS RESIZING LOGIC ---
+        const canvas = adminApp.state.fabricCanvasInstance;
+        const originalImageWidth = img.width;
+        const originalImageHeight = img.height;
+        
+        // Option A: Resize canvas to exact image dimensions
+        // canvas.setWidth(originalImageWidth);
+        // canvas.setHeight(originalImageHeight);
+
+        // Option B: Resize canvas to fit image within a max area, maintaining aspect ratio
+        const maxWidth = 800; // Define your max desired canvas width
+        const maxHeight = 600; // Define your max desired canvas height
+        let newCanvasWidth = originalImageWidth;
+        let newCanvasHeight = originalImageHeight;
+
+        if (newCanvasWidth > maxWidth) {
+          const ratio = maxWidth / newCanvasWidth;
+          newCanvasWidth = maxWidth;
+          newCanvasHeight = newCanvasHeight * ratio;
+        }
+        if (newCanvasHeight > maxHeight) {
+          const ratio = maxHeight / newCanvasHeight;
+          newCanvasHeight = maxHeight;
+          newCanvasWidth = newCanvasWidth * ratio;
+        }
+        
+        // Apply the new dimensions to the canvas
+        canvas.setWidth(Math.round(newCanvasWidth));
+        canvas.setHeight(Math.round(newCanvasHeight));
+        // --- END DYNAMIC CANVAS RESIZING LOGIC ---
+
+        // Now set the background image, scaled to the NEW canvas dimensions
+        canvas.setBackgroundImage(img, 
+            canvas.renderAll.bind(canvas), { // Use the new canvas dimensions for scaling
+          scaleX: canvas.width / originalImageWidth, // Scale factor based on original image width
+          scaleY: canvas.height / originalImageHeight // Scale factor based on original image height
+        });
+        
+        canvas.renderAll(); // Render once after setting dimensions and background
+        displayMessage("Image set as background. Canvas resized.", true);
+        console.log("Image background set using base64 data. New canvas dimensions: " + canvas.width + "x" + canvas.height);
+
+      }); 
 
     } else {
       let errorMsg = "Failed to fetch image data for canvas.";

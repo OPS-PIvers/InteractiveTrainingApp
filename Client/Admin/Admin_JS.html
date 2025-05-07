@@ -11,7 +11,8 @@
     currentSlideIndex: -1, 
     fabricCanvasInstance: null,
     defaultCanvasWidth: 960, 
-    defaultCanvasHeight: 540 
+    defaultCanvasHeight: 540,
+    projectListCache: [] // Added to cache project list for status updates/reverts
   };
 
   // --- DOM Element References ---
@@ -432,12 +433,6 @@
       saveCurrentSlideState();
       showLoading(true); displayMessage("Saving project...", true);
       try {
-          // If on edit page, update projectData.status from potential status selector on edit page
-          // For now, this is not implemented on edit page, so status is only changed from list view.
-          // if (adminApp.state.currentView === 'edit' && projectStatusSelectorOnEditPage) {
-          //    adminApp.state.projectData.status = projectStatusSelectorOnEditPage.value;
-          // }
-
           const jsonDataString = JSON.stringify(adminApp.state.projectData);
           console.log("Saving projectData string length:", jsonDataString.length); 
           google.script.run
@@ -469,42 +464,78 @@
   function handleProjectStatusChange(projectId, newStatus, selectElement) {
       console.log(`Attempting to update status for project ${projectId} to ${newStatus}`);
       showLoading(true);
+      // Store original value in case of failure
+      const originalStatus = selectElement.getAttribute('data-original-status') || 
+                             (adminApp.state.projectListCache.find(p => p.projectId === projectId) || {}).status;
+      selectElement.setAttribute('data-original-status', originalStatus);
+
+
       google.script.run
-          .withSuccessHandler(function(response) { onProjectStatusUpdated(response, selectElement); })
+          .withSuccessHandler(function(response) { onProjectStatusUpdated(response, projectId, newStatus, selectElement); })
           .withFailureHandler(function(error) { 
               onServerError(error);
-              // Revert dropdown on error
-              if (selectElement) {
-                  const projects = adminApp.state.projectListCache; // Assuming you cache the list
-                  const project = projects.find(p => p.projectId === projectId);
-                  if (project) selectElement.value = project.status; 
+              if (selectElement) { // Revert dropdown on actual network/script errors
+                  console.log("Reverting status dropdown due to server error for project:", projectId);
+                  selectElement.value = originalStatus; 
               }
           })
           .updateProjectStatus(projectId, newStatus);
   }
 
-  function onProjectStatusUpdated(response, selectElement) {
+  function onProjectStatusUpdated(response, projectId, newStatus, selectElement) {
       showLoading(false);
       if (response && response.success) {
           displayMessage(response.message || "Project status updated successfully!", true);
-          // Optionally, update a cached project list's status if you maintain one client-side
-          // For now, simply reloading the list will reflect the change.
-          // If the change was made from the edit view, update adminApp.state.projectData.status
-          if (adminApp.state.currentView === 'edit' && adminApp.state.projectData && selectElement) {
-              adminApp.state.projectData.status = selectElement.value;
-          } else {
-               // If on list view, find the project in the list and update its visual status
-              const statusSpan = selectElement.closest('.project-item').querySelector('.status-text');
-              if(statusSpan) statusSpan.textContent = `(${selectElement.value})`;
+          
+          // Update cache
+          const projectInCache = adminApp.state.projectListCache.find(p => p.projectId === projectId);
+          if (projectInCache) projectInCache.status = newStatus;
+          selectElement.removeAttribute('data-original-status'); // Clear original status on success
+
+          // Update visual status text in the list
+          const statusSpan = selectElement.closest('.project-item').querySelector('.status-text');
+          if(statusSpan) statusSpan.textContent = `(${newStatus})`;
+          
+          // If this project is currently being edited, update its status in projectData
+          if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === projectId && adminApp.state.projectData) {
+              adminApp.state.projectData.status = newStatus;
+              // If there's a status selector on the edit page, update it too (future enhancement)
+              // const editPageStatusSelector = document.getElementById('projectStatusSelectorOnEditPage');
+              // if (editPageStatusSelector) editPageStatusSelector.value = newStatus;
           }
-          // No full list reload here to prevent jarring UI shift if status changed for one item.
-          // The visual status text next to the dropdown is updated.
       } else {
           onServerError((response && response.error) ? response.error : "Failed to update status.");
           if (selectElement) { // Revert dropdown on server-side failure reported as success:false
-              // This part of reverting might be complex if not caching original status
-              // For now, rely on onServerError's revert for actual network/script errors
+               console.log("Reverting status dropdown due to server failure for project:", projectId);
+               selectElement.value = selectElement.getAttribute('data-original-status') || projectInCache.status; // Fallback to cache if attr cleared
           }
+      }
+  }
+
+  function handleDeleteProject(projectId, projectTitle) {
+      if (!confirm(`Are you sure you want to delete the project "${projectTitle}" (ID: ${projectId})? This action cannot be undone.`)) {
+          return;
+      }
+      console.log(`Attempting to delete project ${projectId}`);
+      showLoading(true);
+      google.script.run
+          .withSuccessHandler(onProjectDeleted)
+          .withFailureHandler(onServerError)
+          .deleteProject(projectId);
+  }
+
+  function onProjectDeleted(response) {
+      showLoading(false);
+      if (response && response.success) {
+          displayMessage(response.message || "Project deleted successfully!", true);
+          // If the deleted project was being edited, switch to list view
+          if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === response.deletedProjectId) {
+              switchToListView(); // This will also call loadAdminProjectsList
+          } else {
+              loadAdminProjectsList(); // Refresh the list
+          }
+      } else {
+          onServerError((response && response.error) ? response.error : "Failed to delete project.");
       }
   }
 
@@ -551,7 +582,7 @@
     adminProjectListContainerEl.innerHTML = '';
     if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
     
-    adminApp.state.projectListCache = projectsArray; // Cache for reverting dropdown
+    adminApp.state.projectListCache = projectsArray; 
 
     projectsArray.forEach(project => { 
         if (!project || !project.projectId) return; 
@@ -560,14 +591,14 @@
         
         const titleAndStatusDiv = document.createElement('div');
         titleAndStatusDiv.style.display = 'flex';
-        titleAndStatusDiv.style.flexDirection = 'column'; // Stack title and status text
+        titleAndStatusDiv.style.flexDirection = 'column'; 
 
         const titleSpan = document.createElement('span'); 
         titleSpan.textContent = project.projectTitle || 'Untitled Project'; 
         titleSpan.style.fontWeight = 'bold';
         
         const statusTextSpan = document.createElement('span'); 
-        statusTextSpan.className = 'status-text'; // Added class for easier selection
+        statusTextSpan.className = 'status-text'; 
         statusTextSpan.textContent = `(${project.status || 'N/A'})`; 
         statusTextSpan.style.fontSize = '0.9em';
         statusTextSpan.style.fontStyle = 'italic';
@@ -576,14 +607,15 @@
         titleAndStatusDiv.appendChild(titleSpan);
         titleAndStatusDiv.appendChild(statusTextSpan);
 
-        const controlsDiv = document.createElement('div'); // For status select and edit button
+        const controlsDiv = document.createElement('div'); 
         controlsDiv.style.display = 'flex';
         controlsDiv.style.alignItems = 'center';
 
-        // Status Dropdown
         const statusSelect = document.createElement('select');
         statusSelect.className = 'project-status-select';
         statusSelect.setAttribute('data-project-id', project.projectId);
+        // Store original status for potential revert
+        statusSelect.setAttribute('data-original-status', project.status || "Draft"); 
         ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
             const option = document.createElement('option');
             option.value = statusValue;
@@ -596,13 +628,11 @@
         statusSelect.onchange = function() {
             handleProjectStatusChange(project.projectId, this.value, this);
         };
-        // Basic styling for select in list
         statusSelect.style.padding = '5px';
         statusSelect.style.marginRight = '10px';
         statusSelect.style.fontSize = '0.9em';
         statusSelect.style.border = '1px solid #ccc';
         statusSelect.style.borderRadius = '3px';
-
 
         const editButton = document.createElement('button'); 
         editButton.textContent = 'Edit'; 
@@ -610,8 +640,19 @@
         editButton.setAttribute('data-project-id', project.projectId); 
         editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; 
         
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.className = 'danger-button'; // Use existing style for danger buttons
+        deleteButton.setAttribute('data-project-id', project.projectId);
+        deleteButton.setAttribute('data-project-title', project.projectTitle || 'Untitled Project');
+        deleteButton.style.marginLeft = '5px';
+        deleteButton.onclick = function() {
+            handleDeleteProject(project.projectId, project.projectTitle || 'Untitled Project');
+        };
+
         controlsDiv.appendChild(statusSelect);
         controlsDiv.appendChild(editButton);
+        controlsDiv.appendChild(deleteButton); // Add delete button
         
         projectItem.appendChild(titleAndStatusDiv); 
         projectItem.appendChild(controlsDiv); 

@@ -289,6 +289,7 @@
       editButton.className = 'edit-button'; 
       editButton.setAttribute('data-project-id', project.projectId); 
       editButton.onclick = function() { 
+        console.log("Edit button clicked for project ID:", project.projectId); // <--- ADD THIS LOG
         navigateToEditView(project.projectId); 
       };
 

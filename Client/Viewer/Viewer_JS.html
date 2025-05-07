@@ -1,0 +1,148 @@
+<script>
+    // Namespace for the viewer application
+    window.viewerApp = {};
+  
+    // --- Application State ---
+    viewerApp.state = {
+      isLoading: false
+    };
+  
+    // --- DOM Element References ---
+    let viewerProjectListContainerEl, messageAreaElViewer, loadingSpinnerElViewer; // Suffix with Viewer to avoid clashes if ever combined
+  
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("Viewer_JS: DOMContentLoaded event fired!");
+      
+      viewerApp.setupDOMReferences();
+      // viewerApp.attachEventListeners(); // Placeholder for future event listeners
+      
+      loadViewerProjectsList(); // Fetch and display active projects
+      
+      console.log("Viewer_JS: Initialization complete.");
+    });
+  
+    /**
+     * Gets references to all necessary DOM elements from the page.
+     */
+    viewerApp.setupDOMReferences = function() {
+      viewerProjectListContainerEl = document.getElementById('viewerProjectListContainer');
+      messageAreaElViewer = document.getElementById('messageAreaViewer'); // Ensure this ID is unique if AdminView also has one
+      loadingSpinnerElViewer = document.getElementById('loadingSpinner'); // Assumes shared spinner ID
+  
+      if (!viewerProjectListContainerEl) {
+          console.error("CRITICAL: viewerProjectListContainerEl not found!");
+      }
+      console.log("Viewer_JS: DOM references set up.");
+    };
+  
+    // --- General UI Functions ---
+    function showLoadingViewer(show) {
+      viewerApp.state.isLoading = show;
+      if (loadingSpinnerElViewer) {
+        loadingSpinnerElViewer.style.display = show ? 'flex' : 'none';
+      } else if (show) { 
+          console.warn("showLoadingViewer(true) called but loadingSpinnerElViewer not yet available.");
+      }
+    }
+  
+    function displayMessageViewer(message, isSuccess) {
+      if (messageAreaElViewer) {
+        messageAreaElViewer.innerHTML = ''; 
+        const p = document.createElement('p');
+        p.textContent = message;
+        messageAreaElViewer.appendChild(p);
+        messageAreaElViewer.className = isSuccess ? 'success' : 'error'; // Assuming same CSS classes as Admin
+        setTimeout(() => {
+          if (messageAreaElViewer) {
+            messageAreaElViewer.innerHTML = '';
+            messageAreaElViewer.className = '';
+          }
+        }, 7000); 
+      } else {
+        console.warn("displayMessageViewer called but messageAreaElViewer not available. Message:", message);
+      }
+    }
+    
+    function onServerErrorViewer(errorObject) {
+      showLoadingViewer(false);
+      console.error('Viewer Server Error Object:', errorObject);
+      let errorMessage = "An unknown error occurred on the server.";
+      if (typeof errorObject === 'string') { 
+          errorMessage = errorObject;
+      } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { 
+          errorMessage = errorObject.message;
+           if (errorObject.details && errorObject.details.length > 0 && errorObject.details[0].errorMessage) {
+               errorMessage = errorObject.details[0].errorMessage;
+          } else if (errorObject.details && typeof errorObject.details === 'string') {
+              errorMessage += " Details: " + errorObject.details;
+          }
+      } else if (errorObject && errorObject.name && errorObject.message) { 
+          errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`;
+      }
+      displayMessageViewer('Server Error: ' + errorMessage, false);
+    }
+  
+    // --- Project List ---
+    function loadViewerProjectsList() {
+      console.log("loadViewerProjectsList called");
+      if (!google || !google.script || !google.script.run) {
+        console.error("google.script.run is not available for loadViewerProjectsList!");
+        displayMessageViewer("Error: Client-server communication bridge unavailable.", false); return;
+      }
+      if (!viewerProjectListContainerEl) {
+          console.warn("loadViewerProjectsList: viewerProjectListContainerEl not ready yet.");
+          showLoadingViewer(false);
+          return; 
+      }
+      showLoadingViewer(true);
+      google.script.run
+        .withSuccessHandler(displayViewerProjects)
+        .withFailureHandler(onServerErrorViewer)
+        .getActiveProjectsList(); // Calling the function from ViewerController.gs
+    }
+  
+    function displayViewerProjects(projectsArray) {
+      showLoadingViewer(false);
+      console.log("displayViewerProjects received:", projectsArray ? projectsArray.length : 0, "projects");
+      if (!viewerProjectListContainerEl) {
+          console.error("displayViewerProjects: viewerProjectListContainerEl is not found!");
+          return;
+      }
+      viewerProjectListContainerEl.innerHTML = ''; 
+      if (!projectsArray || projectsArray.length === 0) {
+        viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
+        return;
+      }
+  
+      const ul = document.createElement('ul');
+      ul.className = 'project-list-viewer'; // For styling
+  
+      projectsArray.forEach(project => {
+        if (!project || !project.projectId) { 
+            console.warn("Skipping display of invalid project object:", project);
+            return; 
+        }
+        const listItem = document.createElement('li');
+        listItem.className = 'project-card-viewer'; // For styling
+        
+        const titleHeader = document.createElement('h3');
+        titleHeader.textContent = project.projectTitle || 'Untitled Project';
+        
+        const viewButton = document.createElement('button');
+        viewButton.textContent = 'View Project';
+        viewButton.className = 'view-project-button'; 
+        viewButton.setAttribute('data-project-id', project.projectId); 
+        viewButton.onclick = function() { 
+          // In later phases, this will navigate to the project viewing interface
+          console.log("View Project button clicked for project ID:", project.projectId);
+          alert("Viewing project " + project.projectTitle + " (ID: " + project.projectId + ") - Functionality to be implemented in a later phase.");
+        };
+  
+        listItem.appendChild(titleHeader);
+        listItem.appendChild(viewButton);
+        ul.appendChild(listItem);
+      });
+      viewerProjectListContainerEl.appendChild(ul);
+    }
+  </script>

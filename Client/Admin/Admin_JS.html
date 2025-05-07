@@ -312,19 +312,39 @@
     reader.readAsDataURL(file);
   }
 
-  function onImageUploaded(response) {
+  function onImageUploaded(response) { // response is from uploadFileToDrive
     showLoading(false);
     if (imageUploaderEl) imageUploaderEl.value = null; 
 
-    if (response && response.success && response.webContentLink) {
-      displayMessage("Image uploaded successfully! Setting as background...", true);
+    if (response && response.success && response.driveFileId) { // Check for driveFileId now
+      displayMessage("Image uploaded to Drive. Now fetching for canvas...", true);
       
+      // Now call getImageAsBase64 with the driveFileId
+      showLoading(true); // Show loading again for the fetch
+      google.script.run
+        .withSuccessHandler(onBase64ImageReceived)
+        .withFailureHandler(onServerError) // onServerError already handles showLoading(false)
+        .getImageAsBase64(response.driveFileId);
+
+    } else {
+      let errorMsg = "Failed to upload image to Drive or retrieve its ID.";
+      if (response && response.error) {
+        errorMsg = response.error;
+      }
+      onServerError({ message: errorMsg }); 
+    }
+  }
+
+  // New success handler for getImageAsBase64
+  function onBase64ImageReceived(response) { // response is from getImageAsBase64
+    showLoading(false);
+    if (response && response.success && response.base64Data) {
       if (!adminApp.state.fabricCanvasInstance) {
           displayMessage("Error: Canvas not initialized. Cannot set background.", false);
           return;
       }
 
-      fabric.Image.fromURL(response.webContentLink, function(img) {
+      fabric.Image.fromURL(response.base64Data, function(img) { // Use base64Data
         if (!adminApp.state.fabricCanvasInstance) { 
             console.error("Canvas became unavailable before image could be set.");
             displayMessage("Error: Canvas became unavailable.", false);
@@ -336,16 +356,19 @@
           scaleY: adminApp.state.fabricCanvasInstance.height / img.height
         });
         displayMessage("Image set as background.", true);
-        console.log("Image background set. DriveFileID:", response.driveFileId, "WebContentLink:", response.webContentLink);
+        // TODO in Step 9: Store response.driveFileId (from the *original* onImageUploaded response if needed, not from this one)
+        // and perhaps the mimeType (response.mimeType from onBase64ImageReceived)
+        // in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex].slideMedia
+        console.log("Image background set using base64 data. MimeType:", response.mimeType);
 
-      }, { crossOrigin: 'anonymous' }); 
+      } /*, { crossOrigin: 'anonymous' } */); // crossOrigin not needed for base64 data URIs
 
     } else {
-      let errorMsg = "Failed to upload image or retrieve link.";
+      let errorMsg = "Failed to fetch image data for canvas.";
       if (response && response.error) {
         errorMsg = response.error;
       }
-      onServerError({ message: errorMsg }); 
+      onServerError({ message: errorMsg });
     }
   }
 </script>

@@ -219,6 +219,33 @@ function uploadFileToDrive(fileData, projectId, mediaType) { // THIS IS THE CORR
   }
 }
 
+// ... (can be placed after uploadFileToDrive or with other utility-like functions)
+
+/**
+ * Retrieves a file from Drive as a base64 data URI.
+ * @param {string} driveFileId The ID of the file in Google Drive.
+ * @return {object} An object like { success: true, base64Data: 'data:mime/type;base64,...' } or { success: false, error: '...' }.
+ */
+function getImageAsBase64(driveFileId) {
+  try {
+    if (!driveFileId) {
+      return { success: false, error: "Drive File ID is required." };
+    }
+    const file = DriveApp.getFileById(driveFileId);
+    const blob = file.getBlob();
+    const mimeType = blob.getContentType();
+    const base64Data = Utilities.base64Encode(blob.getBytes());
+    const dataURI = 'data:' + mimeType + ';base64,' + base64Data;
+    
+    Logger.log(`getImageAsBase64: Successfully retrieved and encoded file ID: ${driveFileId}. MimeType: ${mimeType}. DataURI length: ${dataURI.length}`);
+    return { success: true, base64Data: dataURI, mimeType: mimeType };
+
+  } catch (e) {
+    Logger.log(`Error in getImageAsBase64 for file ID ${driveFileId}: ${e.toString()} \nStack: ${e.stack}`);
+    return { success: false, error: `Failed to retrieve image as base64: ${e.message}` };
+  }
+}
+
 // --- Placeholder functions for later steps ---
 function saveProjectData(projectId, projectDataJSON) {
   Logger.log(`saveProjectData called for ${projectId}, but not yet implemented.`);

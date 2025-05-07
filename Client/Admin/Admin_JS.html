@@ -23,6 +23,12 @@
   let addRectangleButtonEl, addCircleButtonEl; // Step 11
   let addTextboxButtonEl; // Step 12
 
+  // Sidebar Element References (Step 13)
+  let overlaySidebarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
+      objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
+      textSpecificControlsEl, objTextContentEl,
+      objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
+
   // --- Initialization ---
   document.addEventListener('DOMContentLoaded', function() {
     console.log("Admin_JS: DOMContentLoaded event fired!");
@@ -55,6 +61,24 @@
     addCircleButtonEl = document.getElementById('addCircleButton');
     // Step 12: Textbox button
     addTextboxButtonEl = document.getElementById('addTextboxButton');
+
+    // Step 13: Sidebar elements
+    overlaySidebarEl = document.getElementById('overlaySidebar');
+    objXEl = document.getElementById('objX');
+    objYEl = document.getElementById('objY');
+    objWidthEl = document.getElementById('objWidth');
+    objHeightEl = document.getElementById('objHeight');
+    objAngleEl = document.getElementById('objAngle');
+    objFillEl = document.getElementById('objFill');
+    objStrokeColorEl = document.getElementById('objStrokeColor');
+    objStrokeWidthEl = document.getElementById('objStrokeWidth');
+    objOpacityEl = document.getElementById('objOpacity');
+    textSpecificControlsEl = document.getElementById('textSpecificControls');
+    objTextContentEl = document.getElementById('objTextContent');
+    objShadowColorEl = document.getElementById('objShadowColor');
+    objShadowBlurEl = document.getElementById('objShadowBlur');
+    objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
+    objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
 
     // Add warnings for elements only expected in edit view
     if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
@@ -161,6 +185,24 @@
           fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
           fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
           console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
+
+          // Step 13: Initialize sidebar and canvas event listeners
+          initSidebar(); // Setup listeners for sidebar inputs
+          
+          adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
+            if (e.target) populateSidebar(e.target);
+          });
+          adminApp.state.fabricCanvasInstance.on('selection:created', (e) => { // When a new selection is made
+            if (e.selected && e.selected.length > 0) populateSidebar(e.selected[0]); // Fabric 5.x sends e.selected
+          });
+          adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => { // When an existing selection is changed
+             if (e.selected && e.selected.length > 0) populateSidebar(e.selected[0]);
+          });
+          adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
+            populateSidebar(null);
+          });
+          // Initially hide sidebar
+          if(overlaySidebarEl) overlaySidebarEl.style.display = 'none';
 
           // ** NOW CALL LOAD PROJECT DATA **
           loadProjectForEditing(projectIdToEdit); // Load the actual project data
@@ -353,6 +395,7 @@
 
       updateSlideThumbnailsUI(); // Highlight active thumbnail
       if (imageUploaderEl) imageUploaderEl.value = null; // Reset file input
+        populateSidebar(null); // Step 13: Clear/hide sidebar when slide changes
   }
 
   function updateSlideThumbnailsUI() {
@@ -643,8 +686,141 @@
                         canvas.renderAll();
                         // Textbox often benefits from being brought to front if other elements exist
                         canvas.bringToFront(textbox); 
-                        console.log("Textbox added to canvas:", textbox);
-                    }
+                            console.log("Textbox added to canvas:", textbox);
+                        }
+
+                        // --- Sidebar Management Functions (Step 13) ---
+                        function initSidebar() {
+                            console.log("initSidebar: Attaching listeners to sidebar inputs.");
+                            const inputs = [
+                            {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
+                            {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, // Width/Height also affect scale for some objects
+                            {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
+                            {el: objAngleEl, prop: 'angle', type: 'number'},
+                            {el: objFillEl, prop: 'fill', type: 'color'},
+                            {el: objStrokeColorEl, prop: 'stroke', type: 'color'},
+                            {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
+                            {el: objOpacityEl, prop: 'opacity', type: 'range'},
+                            {el: objTextContentEl, prop: 'text', type: 'textarea'},
+                            // Shadow inputs
+                            {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
+                            {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'},
+                            {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
+                            {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'}
+                            ];
+
+                            inputs.forEach(inputConfig => {
+                            if (inputConfig.el) {
+                                // Remove existing listener before adding, to prevent duplicates if initSidebar is ever called multiple times
+                                // A more robust way would be to use a flag or ensure initSidebar is truly called only once per canvas instance.
+                                // For now, a simple named function approach for removal might be too complex.
+                                // Let's rely on ensureEditViewListener for buttons and assume initSidebar called once per edit view setup.
+                                inputConfig.el.addEventListener('input', (e) => { // 'input' for live updates, 'change' for color pickers might be better after selection
+                                updateFabricObjectFromSidebar(inputConfig.prop, e.target.value, inputConfig.type);
+                                });
+                                if (inputConfig.el.type === 'color') { // Color pickers update on 'change' typically
+                                    inputConfig.el.addEventListener('change', (e) => {
+                                        updateFabricObjectFromSidebar(inputConfig.prop, e.target.value, inputConfig.type);
+                                    });
+                                }
+                            } else {
+                                console.warn(`initSidebar: Element for property "${inputConfig.prop}" not found.`);
+                            }
+                            });
+                        }
+
+                        function populateSidebar(activeObject) {
+                            if (!overlaySidebarEl) { console.error("populateSidebar: overlaySidebarEl not found."); return; }
+
+                            if (!activeObject) {
+                            overlaySidebarEl.style.display = 'none';
+                            return;
+                            }
+                            overlaySidebarEl.style.display = 'block';
+
+                            // General Properties
+                            if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
+                            if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
+                            // For width/height, consider object's scale. Fabric's width/height are unscaled.
+                            // We'll set the visual width/height.
+                            if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
+                            if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
+                            if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
+
+                            if (objFillEl) objFillEl.value = activeObject.fill || '#ffffff';
+                            if (objStrokeColorEl) objStrokeColorEl.value = activeObject.stroke || '#000000';
+                            if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth || 0;
+                            if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
+
+                            // Text Specific
+                            if (textSpecificControlsEl) {
+                            if (activeObject.type === 'textbox' || activeObject.type === 'i-text') { // i-text is interactive text
+                                textSpecificControlsEl.style.display = 'block';
+                                if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
+                            } else {
+                                textSpecificControlsEl.style.display = 'none';
+                            }
+                            }
+                            
+                            // Shadow
+                            const shadow = activeObject.shadow;
+                            if (objShadowColorEl) objShadowColorEl.value = shadow ? shadow.color : '#000000';
+                            if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
+                            if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
+                            if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
+                        }
+
+                        function updateFabricObjectFromSidebar(propertyName, value, inputType) {
+                            const canvas = adminApp.state.fabricCanvasInstance;
+                            if (!canvas) return;
+                            const activeObject = canvas.getActiveObject();
+                            if (!activeObject) return;
+
+                            let parsedValue = value;
+                            if (inputType === 'number' || inputType === 'range') {
+                            parsedValue = inputType === 'range' ? parseFloat(value) : parseInt(value, 10);
+                            if (isNaN(parsedValue)) {
+                                // For properties like strokeWidth, 0 is valid, but NaN isn't
+                                if (propertyName === 'strokeWidth' && value === '') parsedValue = 0;
+                                else if (value === '') return; // Don't update if number input is cleared, wait for valid number
+                                else return; // Or handle as 0 if preferred: parsedValue = 0;
+                            }
+                            }
+                            
+                            // Special handling for width/height to adjust scale
+                            if (propertyName === 'width') {
+                                activeObject.scaleX = parsedValue / activeObject.width;
+                            } else if (propertyName === 'height') {
+                                activeObject.scaleY = parsedValue / activeObject.height;
+                            } else if (propertyName.startsWith('shadow.')) {
+                            const shadowProp = propertyName.split('.')[1];
+                            let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
+                            shadowOptions[shadowProp] = parsedValue;
+                            // Ensure blur, offsetX, offsetY are numbers
+                            shadowOptions.blur = parseInt(objShadowBlurEl.value, 10) || 0;
+                            shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
+                            shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
+                            shadowOptions.color = objShadowColorEl.value || '#000000';
+
+                            activeObject.set('shadow', new fabric.Shadow(shadowOptions));
+                            } else {
+                            activeObject.set(propertyName, parsedValue);
+                            }
+
+                            // If it's a textbox and content changed, fabric might need a nudge for width/height recalculation
+                            if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && propertyName === 'text') {
+                                activeObject.initDimensions(); // Recalculate dimensions if text content changes
+                            }
+
+                            activeObject.setCoords(); // Update controls position
+                            canvas.renderAll();
+                            // After updating from sidebar, re-populate to ensure consistency (e.g. for scaled width/height)
+                            // This can cause an infinite loop if not careful, especially with 'input' event.
+                            // Consider calling populateSidebar only on 'change' or deferring it slightly.
+                            // For now, let's see if this is problematic.
+                            // populateSidebar(activeObject); 
+                        }
+
 
   // Client-side UUID generator
   Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };

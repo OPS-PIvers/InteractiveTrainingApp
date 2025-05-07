@@ -21,6 +21,7 @@
   let imageUploaderEl;
   let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; // Step 9
   let addRectangleButtonEl, addCircleButtonEl; // Step 11
+  let addTextboxButtonEl; // Step 12
 
   // --- Initialization ---
   document.addEventListener('DOMContentLoaded', function() {
@@ -52,6 +53,8 @@
     // Step 11: Overlay tool buttons
     addRectangleButtonEl = document.getElementById('addRectangleButton');
     addCircleButtonEl = document.getElementById('addCircleButton');
+    // Step 12: Textbox button
+    addTextboxButtonEl = document.getElementById('addTextboxButton');
 
     // Add warnings for elements only expected in edit view
     if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
@@ -144,6 +147,8 @@
       // Step 11: Listeners for overlay tools
       ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle);
       ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle);
+      // Step 12: Listener for textbox tool
+      ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox);
 
 
       // Initialize Fabric Canvas with defaults
@@ -608,10 +613,38 @@
                     });
 
                     canvas.add(circle);
-                    canvas.setActiveObject(circle); // Make the new circle active
-                    canvas.renderAll();
-                    console.log("Circle added to canvas:", circle);
-                }
+                        canvas.setActiveObject(circle); // Make the new circle active
+                        canvas.renderAll();
+                        console.log("Circle added to canvas:", circle);
+                    }
+
+                    function addTextbox() {
+                        if (!adminApp.state.fabricCanvasInstance) {
+                        console.error("addTextbox: Fabric canvas not initialized.");
+                        displayMessage("Error: Canvas not ready to add text.", false);
+                        return;
+                        }
+                        const canvas = adminApp.state.fabricCanvasInstance;
+
+                        const textbox = new fabric.Textbox('Editable Text', {
+                        left: 100,
+                        top: 100,
+                        width: 200, // Initial width for the textbox
+                        fontSize: 24,
+                        fill: '#000000', // Default black text
+                        // Custom properties initialization
+                        customInteraction: { trigger: null, action: null, modalContent: "", navigateTo: "" },
+                        customAnimation: { type: null, duration: 500, strength: 5, trigger: null },
+                        sequenceOrder: null
+                        });
+
+                        canvas.add(textbox);
+                        canvas.setActiveObject(textbox); // Make the new textbox active
+                        canvas.renderAll();
+                        // Textbox often benefits from being brought to front if other elements exist
+                        canvas.bringToFront(textbox); 
+                        console.log("Textbox added to canvas:", textbox);
+                    }
 
   // Client-side UUID generator
   Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };

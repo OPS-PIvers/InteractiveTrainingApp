@@ -2,6 +2,9 @@
   // Namespace for the admin application
   window.adminApp = {};
 
+  // --- Constants ---
+  const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"]; // Add more as needed
+
   // --- Application State ---
   adminApp.state = {
     isLoading: false,
@@ -12,7 +15,7 @@
     fabricCanvasInstance: null,
     defaultCanvasWidth: 960, 
     defaultCanvasHeight: 540,
-    projectListCache: [] // Added to cache project list for status updates/reverts
+    projectListCache: [] 
   };
 
   // --- DOM Element References ---
@@ -28,6 +31,11 @@
       objInteractionTriggerEl, objInteractionActionEl, 
       modalContentConfigEl, objModalContentEl,
       navigateToConfigEl, objNavigateToEl,
+      // Advanced Text Properties
+      objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl,
+      // Shadow Checkboxes
+      objShadowAffectStrokeEl, objShadowNonScalingEl,
+      // Existing properties
       objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
       textSpecificControlsEl, objTextContentEl,
       objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
@@ -73,7 +81,7 @@
     objStrokeColorEl = document.getElementById('objStrokeColor');
     objStrokeWidthEl = document.getElementById('objStrokeWidth');
     objOpacityEl = document.getElementById('objOpacity');
-    textSpecificControlsEl = document.getElementById('textSpecificControls');
+    textSpecificControlsEl = document.getElementById('textSpecificControls'); // This is the whole section div
     objTextContentEl = document.getElementById('objTextContent');
     objShadowColorEl = document.getElementById('objShadowColor');
     objShadowBlurEl = document.getElementById('objShadowBlur');
@@ -86,6 +94,17 @@
     objModalContentEl = document.getElementById('objModalContent');
     navigateToConfigEl = document.getElementById('navigateToConfig');
     objNavigateToEl = document.getElementById('objNavigateTo');
+
+    // New Step 19 elements
+    objFontFamilyEl = document.getElementById('objFontFamily');
+    objFontSizeEl = document.getElementById('objFontSize');
+    objFontWeightEl = document.getElementById('objFontWeight');
+    objFontStyleEl = document.getElementById('objFontStyle');
+    objTextAlignEl = document.getElementById('objTextAlign');
+    objLineHeightEl = document.getElementById('objLineHeight');
+    objCharSpacingEl = document.getElementById('objCharSpacing');
+    objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
+    objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
 
     if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
     if (!slideThumbnailsContainerEl) console.warn("slideThumbnailsContainerEl not found during initial setup.");
@@ -464,17 +483,15 @@
   function handleProjectStatusChange(projectId, newStatus, selectElement) {
       console.log(`Attempting to update status for project ${projectId} to ${newStatus}`);
       showLoading(true);
-      // Store original value in case of failure
       const originalStatus = selectElement.getAttribute('data-original-status') || 
                              (adminApp.state.projectListCache.find(p => p.projectId === projectId) || {}).status;
-      selectElement.setAttribute('data-original-status', originalStatus);
-
+      selectElement.setAttribute('data-original-status', originalStatus); // Store before call
 
       google.script.run
           .withSuccessHandler(function(response) { onProjectStatusUpdated(response, projectId, newStatus, selectElement); })
           .withFailureHandler(function(error) { 
               onServerError(error);
-              if (selectElement) { // Revert dropdown on actual network/script errors
+              if (selectElement) { 
                   console.log("Reverting status dropdown due to server error for project:", projectId);
                   selectElement.value = originalStatus; 
               }
@@ -487,27 +504,23 @@
       if (response && response.success) {
           displayMessage(response.message || "Project status updated successfully!", true);
           
-          // Update cache
           const projectInCache = adminApp.state.projectListCache.find(p => p.projectId === projectId);
           if (projectInCache) projectInCache.status = newStatus;
-          selectElement.removeAttribute('data-original-status'); // Clear original status on success
+          selectElement.removeAttribute('data-original-status'); 
 
-          // Update visual status text in the list
           const statusSpan = selectElement.closest('.project-item').querySelector('.status-text');
           if(statusSpan) statusSpan.textContent = `(${newStatus})`;
           
-          // If this project is currently being edited, update its status in projectData
           if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === projectId && adminApp.state.projectData) {
               adminApp.state.projectData.status = newStatus;
-              // If there's a status selector on the edit page, update it too (future enhancement)
-              // const editPageStatusSelector = document.getElementById('projectStatusSelectorOnEditPage');
-              // if (editPageStatusSelector) editPageStatusSelector.value = newStatus;
           }
       } else {
           onServerError((response && response.error) ? response.error : "Failed to update status.");
-          if (selectElement) { // Revert dropdown on server-side failure reported as success:false
+          if (selectElement) { 
                console.log("Reverting status dropdown due to server failure for project:", projectId);
-               selectElement.value = selectElement.getAttribute('data-original-status') || projectInCache.status; // Fallback to cache if attr cleared
+               const originalStatus = selectElement.getAttribute('data-original-status');
+               if(originalStatus) selectElement.value = originalStatus; 
+               // Maybe remove attribute here too, or leave it for next attempt? Leave it for now.
           }
       }
   }
@@ -590,8 +603,8 @@
         projectItem.className = 'project-item'; 
         
         const titleAndStatusDiv = document.createElement('div');
-        titleAndStatusDiv.style.display = 'flex';
-        titleAndStatusDiv.style.flexDirection = 'column'; 
+        // titleAndStatusDiv.style.display = 'flex'; // Removed for default block stacking
+        // titleAndStatusDiv.style.flexDirection = 'column'; 
 
         const titleSpan = document.createElement('span'); 
         titleSpan.textContent = project.projectTitle || 'Untitled Project'; 
@@ -600,21 +613,20 @@
         const statusTextSpan = document.createElement('span'); 
         statusTextSpan.className = 'status-text'; 
         statusTextSpan.textContent = `(${project.status || 'N/A'})`; 
-        statusTextSpan.style.fontSize = '0.9em';
-        statusTextSpan.style.fontStyle = 'italic';
-        statusTextSpan.style.color = '#555';
+        // statusTextSpan.style.fontSize = '0.9em'; // Defined in CSS
+        // statusTextSpan.style.fontStyle = 'italic';
+        // statusTextSpan.style.color = '#555';
         
         titleAndStatusDiv.appendChild(titleSpan);
         titleAndStatusDiv.appendChild(statusTextSpan);
 
         const controlsDiv = document.createElement('div'); 
-        controlsDiv.style.display = 'flex';
-        controlsDiv.style.alignItems = 'center';
+        // controlsDiv.style.display = 'flex'; // Defined in CSS
+        // controlsDiv.style.alignItems = 'center';
 
         const statusSelect = document.createElement('select');
         statusSelect.className = 'project-status-select';
         statusSelect.setAttribute('data-project-id', project.projectId);
-        // Store original status for potential revert
         statusSelect.setAttribute('data-original-status', project.status || "Draft"); 
         ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
             const option = document.createElement('option');
@@ -628,11 +640,11 @@
         statusSelect.onchange = function() {
             handleProjectStatusChange(project.projectId, this.value, this);
         };
-        statusSelect.style.padding = '5px';
-        statusSelect.style.marginRight = '10px';
-        statusSelect.style.fontSize = '0.9em';
-        statusSelect.style.border = '1px solid #ccc';
-        statusSelect.style.borderRadius = '3px';
+        // statusSelect.style.padding = '5px'; // Defined in CSS
+        // statusSelect.style.marginRight = '10px';
+        // statusSelect.style.fontSize = '0.9em';
+        // statusSelect.style.border = '1px solid #ccc';
+        // statusSelect.style.borderRadius = '3px';
 
         const editButton = document.createElement('button'); 
         editButton.textContent = 'Edit'; 
@@ -642,7 +654,7 @@
         
         const deleteButton = document.createElement('button');
         deleteButton.textContent = 'Delete';
-        deleteButton.className = 'danger-button'; // Use existing style for danger buttons
+        deleteButton.className = 'danger-button'; 
         deleteButton.setAttribute('data-project-id', project.projectId);
         deleteButton.setAttribute('data-project-title', project.projectTitle || 'Untitled Project');
         deleteButton.style.marginLeft = '5px';
@@ -652,7 +664,7 @@
 
         controlsDiv.appendChild(statusSelect);
         controlsDiv.appendChild(editButton);
-        controlsDiv.appendChild(deleteButton); // Add delete button
+        controlsDiv.appendChild(deleteButton); 
         
         projectItem.appendChild(titleAndStatusDiv); 
         projectItem.appendChild(controlsDiv); 
@@ -729,16 +741,32 @@
   function addTextbox() {
     if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add text.", false); return; }
     const canvas = adminApp.state.fabricCanvasInstance;
-    const textbox = new fabric.Textbox('Editable Text', { left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000', customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
+    // Set some default text properties for new textboxes
+    const textbox = new fabric.Textbox('Editable Text', { 
+        left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000', 
+        fontFamily: 'Arial', // Default font
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        textAlign: 'left',
+        lineHeight: 1.16, // Fabric default
+        charSpacing: 0,
+        customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, 
+        customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, 
+        sequenceOrder: null 
+    });
     canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
   }
   
   function toHexColor(fabricColor) {
     if (!fabricColor) return '#000000'; 
     try {
-      const colorInstance = new fabric.Color(fabricColor);
-      const hex = colorInstance.toHex();
-      return '#' + hex;
+      // Handle gradients or patterns if necessary, though input type=color needs hex
+      if (typeof fabricColor === 'string') {
+          const colorInstance = new fabric.Color(fabricColor);
+          const hex = colorInstance.toHex();
+          return '#' + hex;
+      }
+      return '#000000'; // Fallback if it's complex (gradient etc)
     } catch (e) {
       console.warn("Could not convert color to HEX:", fabricColor, e);
       return '#000000'; 
@@ -747,32 +775,57 @@
 
   function initToolbar() { 
     console.log("initToolbar: Attaching listeners to toolbar inputs."); 
+    
+    // Populate Font Family Dropdown
+    if(objFontFamilyEl) {
+        FONT_FAMILIES.forEach(font => {
+            const option = document.createElement('option');
+            option.value = font;
+            option.textContent = font;
+            objFontFamilyEl.appendChild(option);
+        });
+    } else {
+        console.warn("initToolbar: objFontFamilyEl not found, cannot populate fonts.");
+    }
+
     const inputs = [
+      // Position & Size
       {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
       {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, 
       {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
       {el: objAngleEl, prop: 'angle', type: 'number'},
+      // Appearance
       {el: objFillEl, prop: 'fill', type: 'color'},
       {el: objStrokeColorEl, prop: 'stroke', type: 'color'},
       {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
       {el: objOpacityEl, prop: 'opacity', type: 'range'},
+      // Text Base
       {el: objTextContentEl, prop: 'text', type: 'textarea'},
+      // Advanced Text
+      {el: objFontFamilyEl, prop: 'fontFamily', type: 'select'},
+      {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
+      {el: objFontWeightEl, prop: 'fontWeight', type: 'select'},
+      {el: objFontStyleEl, prop: 'fontStyle', type: 'select'},
+      {el: objTextAlignEl, prop: 'textAlign', type: 'select'},
+      {el: objLineHeightEl, prop: 'lineHeight', type: 'number'},
+      {el: objCharSpacingEl, prop: 'charSpacing', type: 'number'},
+      // Shadow Base
       {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
       {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'},
       {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
-      {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'}
+      {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'},
+      // Advanced Shadow
+      {el: objShadowAffectStrokeEl, prop: 'shadow.affectStroke', type: 'checkbox'},
+      {el: objShadowNonScalingEl, prop: 'shadow.nonScaling', type: 'checkbox'}
     ];
 
     inputs.forEach(inputConfig => {
       if (inputConfig.el) {
-        inputConfig.el.addEventListener('input', (e) => { 
-          updateFabricObjectFromToolbar(inputConfig.prop, e.target.value, inputConfig.type); 
-        });
-        if (inputConfig.el.type === 'color' || inputConfig.el.tagName === 'SELECT') { 
-             inputConfig.el.addEventListener('change', (e) => {
-                updateFabricObjectFromToolbar(inputConfig.prop, e.target.value, inputConfig.type); 
-            });
-        }
+          const eventType = (inputConfig.el.tagName === 'SELECT' || inputConfig.el.type === 'color' || inputConfig.el.type === 'checkbox') ? 'change' : 'input';
+          inputConfig.el.addEventListener(eventType, (e) => { 
+              const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
+              updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type); 
+          });
       } else {
         console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); 
       }
@@ -792,38 +845,48 @@
     }
     overlayPropertiesToolbarEl.style.display = 'block'; 
 
+    // --- Basic Properties ---
     if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
     if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
     if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
     if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
     if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
-
     if (objFillEl) objFillEl.value = toHexColor(activeObject.fill); 
     if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke); 
     if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth; 
     if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; 
 
+    // --- Text Properties (Conditional Display) ---
+    const isTextObject = activeObject.type === 'textbox' || activeObject.type === 'i-text';
     if (textSpecificControlsEl) {
-      if (activeObject.type === 'textbox' || activeObject.type === 'i-text') { 
-        textSpecificControlsEl.style.display = 'block'; 
-        if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
-      } else {
-        textSpecificControlsEl.style.display = 'none';
-      }
+        textSpecificControlsEl.style.display = isTextObject ? 'block' : 'none';
+        if (isTextObject) {
+            if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
+            if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial';
+            if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
+            if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
+            if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
+            if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
+            if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight || 1.16;
+            if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing || 0;
+        }
     }
     
+    // --- Shadow Properties ---
     const shadow = activeObject.shadow;
     if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; 
     if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
     if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
     if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
+    if (objShadowAffectStrokeEl) objShadowAffectStrokeEl.checked = shadow ? !!shadow.affectStroke : false;
+    if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
 
+    // --- Interaction Properties ---
     const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
     if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
     if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
     if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
     if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
-    
     updateInteractionConfigVisibility(interaction.action);
   }
 
@@ -851,7 +914,6 @@
       if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
   }
 
-
   function updateFabricObjectFromToolbar(propertyName, value, inputType) { 
     const canvas = adminApp.state.fabricCanvasInstance;
     if (!canvas) return;
@@ -860,34 +922,64 @@
 
     let parsedValue = value;
     if (inputType === 'number' || inputType === 'range') {
-      parsedValue = inputType === 'range' ? parseFloat(value) : parseInt(value, 10);
-      if (isNaN(parsedValue)) {
-          if (propertyName === 'strokeWidth' && value === '') parsedValue = 0;
-          else if (value === '') return; 
-          else return; 
-      }
+        if (propertyName === 'lineHeight') { // Allow float for line height
+           parsedValue = parseFloat(value);
+        } else {
+           parsedValue = parseInt(value, 10);
+        }
+        // Handle potential NaN
+        if (isNaN(parsedValue)) {
+            // Allow clearing strokeWidth, default to 0
+            if (propertyName === 'strokeWidth' && value === '') parsedValue = 0; 
+            // Allow clearing charSpacing, default to 0? Fabric might default differently.
+            else if (propertyName === 'charSpacing' && value === '') parsedValue = 0; 
+            // For other number inputs, maybe revert or ignore if empty/invalid
+            else if (value === '') return; // Ignore empty numeric input for now
+            else return; // Ignore NaN
+        }
+    } else if (inputType === 'checkbox') {
+        parsedValue = !!value; // Convert checkbox value to boolean
     }
     
+    // Special handling for width/height via scaling
     if (propertyName === 'width') {
       activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001);
     } else if (propertyName === 'height') {
       activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001);
-    } else if (propertyName.startsWith('shadow.')) {
+    } 
+    // Special handling for shadow properties (update whole shadow object)
+    else if (propertyName.startsWith('shadow.')) {
       const shadowProp = propertyName.split('.')[1];
       let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
+      
+      // Update the specific property being changed
       shadowOptions[shadowProp] = parsedValue;
+
+      // Re-read other shadow properties from toolbar to ensure consistency
+      shadowOptions.color = objShadowColorEl.value || '#000000';
       shadowOptions.blur = parseInt(objShadowBlurEl.value, 10) || 0;
       shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
       shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
-      shadowOptions.color = objShadowColorEl.value || '#000000';
-      activeObject.set('shadow', new fabric.Shadow(shadowOptions));
-    } else {
-      if (!propertyName.startsWith('interaction.')) { 
+      shadowOptions.affectStroke = objShadowAffectStrokeEl.checked;
+      shadowOptions.nonScaling = objShadowNonScalingEl.checked;
+      
+      // Only create shadow if there's blur or offset, otherwise clear it
+      if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0) {
+           activeObject.set('shadow', new fabric.Shadow(shadowOptions));
+      } else {
+           activeObject.set('shadow', null); // Clear shadow if no blur/offset
+      }
+    } 
+    // Handle standard properties
+    else {
+      if (!propertyName.startsWith('interaction.')) { // Avoid double-handling interactions
           activeObject.set(propertyName, parsedValue);
       }
     }
 
-    if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && propertyName === 'text') {
+    // Text objects might need dimensions recalculated after property changes
+    if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && 
+        ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'width'].includes(propertyName)) {
         activeObject.initDimensions(); 
     }
 

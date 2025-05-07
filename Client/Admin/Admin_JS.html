@@ -292,10 +292,14 @@
           .saveProjectData(adminApp.state.currentProjectId, JSON.stringify(adminApp.state.projectData));
   }
 
-  function onProjectSaved(response) { 
-      showLoading(false);
-      if (response && response.success) { displayMessage(response.message || "Project saved successfully!", true); } 
-      else { onServerError((response && response.error) ? response.error : "Failed to save project."); }
+  function onProjectSaved(response) {
+    console.log("onProjectSaved received response:", response); // <<< ADD THIS LINE
+    showLoading(false);
+    if (response && response.success) {
+      displayMessage(response.message || "Project saved successfully!", true);
+    } else {
+      onServerError((response && response.error) ? response.error : "Failed to save project.");
+    }
   }
 
   // --- General UI Functions --- 

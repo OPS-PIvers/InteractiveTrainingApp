@@ -20,6 +20,7 @@
   let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
   let imageUploaderEl;
   let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; // Step 9
+  let addRectangleButtonEl, addCircleButtonEl; // Step 11
 
   // --- Initialization ---
   document.addEventListener('DOMContentLoaded', function() {
@@ -47,6 +48,11 @@
     addSlideButtonEl = document.getElementById('addSlideButton');
     slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
     saveProjectButtonEl = document.getElementById('saveProjectButton');
+    
+    // Step 11: Overlay tool buttons
+    addRectangleButtonEl = document.getElementById('addRectangleButton');
+    addCircleButtonEl = document.getElementById('addCircleButton');
+
     // Add warnings for elements only expected in edit view
     if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
     if (!slideThumbnailsContainerEl) console.warn("slideThumbnailsContainerEl not found during initial setup.");
@@ -135,6 +141,9 @@
       ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload);
       ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide);
       ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject);
+      // Step 11: Listeners for overlay tools
+      ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle);
+      ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle);
 
 
       // Initialize Fabric Canvas with defaults
@@ -544,9 +553,65 @@
               console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated.`);
               updateSlideThumbnailsUI();
               delete adminApp.state.lastUploadedDriveId; // Clean up temp state
-          });
-      } else { onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image." }); }
-  }
+                        });
+                    } else { onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image." }); }
+                }
+
+                // --- Overlay Creation Functions (Step 11) ---
+                function addRectangle() {
+                    if (!adminApp.state.fabricCanvasInstance) {
+                    console.error("addRectangle: Fabric canvas not initialized.");
+                    displayMessage("Error: Canvas not ready to add shapes.", false);
+                    return;
+                    }
+                    const canvas = adminApp.state.fabricCanvasInstance;
+
+                    const rect = new fabric.Rect({
+                    left: 50,
+                    top: 50,
+                    fill: 'rgba(255,0,0,0.7)', // Default red with some transparency
+                    width: 150,
+                    height: 100,
+                    stroke: 'black',
+                    strokeWidth: 1,
+                    // Custom properties initialization as per plan
+                    customInteraction: { trigger: null, action: null, modalContent: "", navigateTo: "" },
+                    customAnimation: { type: null, duration: 500, strength: 5, trigger: null },
+                    sequenceOrder: null 
+                    });
+
+                    canvas.add(rect);
+                    canvas.setActiveObject(rect); // Make the new rectangle active
+                    canvas.renderAll();
+                    console.log("Rectangle added to canvas:", rect);
+                }
+
+                function addCircle() {
+                    if (!adminApp.state.fabricCanvasInstance) {
+                    console.error("addCircle: Fabric canvas not initialized.");
+                    displayMessage("Error: Canvas not ready to add shapes.", false);
+                    return;
+                    }
+                    const canvas = adminApp.state.fabricCanvasInstance;
+
+                    const circle = new fabric.Circle({
+                    left: 150,
+                    top: 150,
+                    radius: 50,
+                    fill: 'rgba(0,0,255,0.7)', // Default blue with some transparency
+                    stroke: 'black',
+                    strokeWidth: 1,
+                    // Custom properties initialization as per plan
+                    customInteraction: { trigger: null, action: null, modalContent: "", navigateTo: "" },
+                    customAnimation: { type: null, duration: 500, strength: 5, trigger: null },
+                    sequenceOrder: null
+                    });
+
+                    canvas.add(circle);
+                    canvas.setActiveObject(circle); // Make the new circle active
+                    canvas.renderAll();
+                    console.log("Circle added to canvas:", circle);
+                }
 
   // Client-side UUID generator
   Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };

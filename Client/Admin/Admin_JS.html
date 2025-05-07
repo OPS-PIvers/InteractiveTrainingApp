@@ -351,47 +351,48 @@
             return;
         }
 
-        // --- DYNAMIC CANVAS RESIZING LOGIC ---
         const canvas = adminApp.state.fabricCanvasInstance;
-        const originalImageWidth = img.width;
-        const originalImageHeight = img.height;
+        const imageNativeWidth = img.width;  // Native width of the loaded image
+        const imageNativeHeight = img.height; // Native height of the loaded image
         
-        // Option A: Resize canvas to exact image dimensions
-        // canvas.setWidth(originalImageWidth);
-        // canvas.setHeight(originalImageHeight);
+        // 1. Resize the canvas to the exact native dimensions of the image
+        canvas.setWidth(imageNativeWidth);
+        canvas.setHeight(imageNativeHeight);
+        console.log("Admin_JS: Canvas resized to image native dimensions: " + imageNativeWidth + "x" + imageNativeHeight);
 
-        // Option B: Resize canvas to fit image within a max area, maintaining aspect ratio
-        const maxWidth = 800; // Define your max desired canvas width
-        const maxHeight = 600; // Define your max desired canvas height
-        let newCanvasWidth = originalImageWidth;
-        let newCanvasHeight = originalImageHeight;
-
-        if (newCanvasWidth > maxWidth) {
-          const ratio = maxWidth / newCanvasWidth;
-          newCanvasWidth = maxWidth;
-          newCanvasHeight = newCanvasHeight * ratio;
-        }
-        if (newCanvasHeight > maxHeight) {
-          const ratio = maxHeight / newCanvasHeight;
-          newCanvasHeight = maxHeight;
-          newCanvasWidth = newCanvasWidth * ratio;
-        }
-        
-        // Apply the new dimensions to the canvas
-        canvas.setWidth(Math.round(newCanvasWidth));
-        canvas.setHeight(Math.round(newCanvasHeight));
-        // --- END DYNAMIC CANVAS RESIZING LOGIC ---
-
-        // Now set the background image, scaled to the NEW canvas dimensions
+        // 2. Set the image as background. 
+        //    No explicit scaling options (scaleX, scaleY) are needed here in setBackgroundImage's options object,
+        //    because the canvas is now the same size as the image. Fabric.js will render it at its native size.
+        //    If you *did* provide scaling options, they would scale relative to the image's native size *within* the new canvas.
+        //    But since canvas W/H = image W/H, a scale of 1 is implicit.
         canvas.setBackgroundImage(img, 
-            canvas.renderAll.bind(canvas), { // Use the new canvas dimensions for scaling
-          scaleX: canvas.width / originalImageWidth, // Scale factor based on original image width
-          scaleY: canvas.height / originalImageHeight // Scale factor based on original image height
-        });
+            canvas.renderAll.bind(canvas), {
+              // Optional: Ensure it's positioned at top-left if there were any previous offsets
+              // originX: 'left', 
+              // originY: 'top',
+              // left: 0,
+              // top: 0
+            });
+        
+        // Ensure the canvas HTML element itself reflects the new size if CSS is restrictive
+        if (fabricCanvasEl) {
+            fabricCanvasEl.width = imageNativeWidth;
+            fabricCanvasEl.height = imageNativeHeight;
+            // If you have a container, you might want to adjust its size too or let it flow
+            // const canvasContainer = document.getElementById('fabricCanvasContainer');
+            // if(canvasContainer) {
+            //   canvasContainer.style.width = imageNativeWidth + 'px';
+            //   canvasContainer.style.height = imageNativeHeight + 'px';
+            // }
+        }
         
         canvas.renderAll(); // Render once after setting dimensions and background
-        displayMessage("Image set as background. Canvas resized.", true);
-        console.log("Image background set using base64 data. New canvas dimensions: " + canvas.width + "x" + canvas.height);
+        displayMessage("Image set as background. Canvas resized to image dimensions.", true);
+        console.log("Image background set. Final canvas dimensions: " + canvas.width + "x" + canvas.height);
+
+        // TODO in Step 9: Store imageNativeWidth, imageNativeHeight, and driveFileId/mimeType
+        // in adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]
+        // This is critical for restoring the correct canvas size when loading the slide later.
 
       }); 
 

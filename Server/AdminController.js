@@ -246,10 +246,84 @@ function getImageAsBase64(driveFileId) {
   }
 }
 
-// --- Placeholder functions for later steps ---
+/**
+ * Saves the project's data (slides, overlays, media links, canvas dimensions) to its JSON file in Drive.
+ * Updates the LastModified timestamp in the ProjectIndex sheet.
+ * @param {string} projectId The ID of the project.
+ * @param {string} projectDataJSON A JSON string representing the entire project data.
+ * @return {object} An object indicating success or failure.
+ */
 function saveProjectData(projectId, projectDataJSON) {
-  Logger.log(`saveProjectData called for ${projectId}, but not yet implemented.`);
-  return { success: false, message: "Not implemented yet."};
+  try {
+    Logger.log(`saveProjectData: Attempting to save data for projectId: ${projectId}`);
+    if (!projectId || !projectDataJSON) {
+      Logger.log("saveProjectData: Missing projectId or projectDataJSON.");
+      return { success: false, error: "Project ID and data are required." };
+    }
+
+    // 1. Find ProjectFolderID and ProjectDataFileID from the ProjectIndex sheet
+    // We can adapt the getProjectFolderIdFromSheet or make a more general "getProjectIndexEntry"
+    const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
+    let projectEntry = null;
+    if (allProjects && Array.isArray(allProjects)) {
+      projectEntry = allProjects.find(p => (p['ProjectID'] || p[COL_PROJECT_ID - 1]) === projectId);
+    }
+
+    if (!projectEntry) {
+      Logger.log(`saveProjectData: Project with ID "${projectId}" not found in ProjectIndex.`);
+      return { success: false, error: `Project metadata not found for ID: ${projectId}. Cannot save.` };
+    }
+
+    const projectFolderId = projectEntry['ProjectFolderID'] || projectEntry[COL_PROJECT_FOLDER_ID - 1];
+    const projectDataFileIdToOverwrite = projectEntry['ProjectDataFileID'] || projectEntry[COL_PROJECT_DATA_FILE_ID - 1];
+
+    if (!projectFolderId || !projectDataFileIdToOverwrite) {
+      Logger.log(`saveProjectData: Missing FolderID or DataFileID for project "${projectId}". FolderID: ${projectFolderId}, FileID: ${projectDataFileIdToOverwrite}`);
+      return { success: false, error: "Project folder or data file reference is missing. Cannot save." };
+    }
+    Logger.log(`saveProjectData: Found FolderID: ${projectFolderId}, DataFileID to overwrite: ${projectDataFileIdToOverwrite} for project ${projectId}.`);
+
+    // 2. Save/Overwrite the JSON file in Drive
+    // saveJsonToDriveFile is from DriveService.gs
+    // PROJECT_DATA_FILENAME is a constant from Code.gs (e.g., "project_data.json")
+    const savedFileId = saveJsonToDriveFile(
+      PROJECT_DATA_FILENAME,
+      projectDataJSON, // Already a string
+      projectFolderId,
+      projectDataFileIdToOverwrite // Pass the ID of the file to overwrite
+    );
+
+    if (!savedFileId) {
+      Logger.log(`saveProjectData: Failed to save JSON file to Drive for project ${projectId}. saveJsonToDriveFile returned falsy.`);
+      return { success: false, error: "Failed to save project data to Google Drive." };
+    }
+    Logger.log(`saveProjectData: JSON data saved to file ID: ${savedFileId} for project ${projectId}.`);
+
+    // 3. Update the LastModified timestamp in the ProjectIndex sheet
+    const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
+    if (rowIndex) {
+      // Get current row data to only update the LastModified column
+      // This assumes getSheetRowData returns a 0-indexed array for the row
+      let rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
+      if (rowData) {
+          // COL_LAST_MODIFIED is 1-based index from Code.gs
+          rowData[COL_LAST_MODIFIED - 1] = new Date().toISOString(); 
+          updateSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex, rowData);
+          Logger.log(`saveProjectData: Updated LastModified timestamp for project ${projectId} at row ${rowIndex}.`);
+      } else {
+            Logger.log(`saveProjectData: Could not retrieve row data for project ${projectId} to update LastModified. Row ${rowIndex} might be empty or an error occurred.`);
+      }
+    } else {
+      Logger.log(`saveProjectData: Could not find row for project ${projectId} to update LastModified timestamp.`);
+      // Not a fatal error for the save itself, but good to log.
+    }
+
+    return { success: true, message: "Project data saved successfully." };
+
+  } catch (e) {
+    Logger.log(`Error in saveProjectData for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
+    return { success: false, error: `Failed to save project data: ${e.message}` };
+  }
 }
 
 function updateProjectStatus(projectId, newStatus) {

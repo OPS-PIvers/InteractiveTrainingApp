@@ -689,6 +689,22 @@
                             console.log("Textbox added to canvas:", textbox);
                         }
 
+                        // Helper function to convert fabric color to HEX for color input
+                        function toHexColor(fabricColor) {
+                            if (!fabricColor) return '#000000'; // Default to black if no color
+                            try {
+                            // fabric.Color.sourceFromRgb needs a string like 'rgb(r,g,b)'
+                            // If it's already hex, or a name, fabric.Color can often parse it directly
+                            // but to be safe, we convert to RGB first, then to HEX.
+                            const colorInstance = new fabric.Color(fabricColor);
+                            const hex = colorInstance.toHex();
+                            return '#' + hex;
+                            } catch (e) {
+                            console.warn("Could not convert color to HEX:", fabricColor, e);
+                            return '#000000'; // Fallback
+                            }
+                        }
+
                         // --- Sidebar Management Functions (Step 13) ---
                         function initSidebar() {
                             console.log("initSidebar: Attaching listeners to sidebar inputs.");
@@ -747,10 +763,10 @@
                             if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
                             if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
 
-                            if (objFillEl) objFillEl.value = activeObject.fill || '#ffffff';
-                            if (objStrokeColorEl) objStrokeColorEl.value = activeObject.stroke || '#000000';
-                            if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth || 0;
-                            if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
+                            if (objFillEl) objFillEl.value = toHexColor(activeObject.fill); // Use helper
+                            if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke); // Use helper
+                            if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth; // Ensure 0 if undefined
+                            if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; // Ensure 1 if undefined
 
                             // Text Specific
                             if (textSpecificControlsEl) {
@@ -764,7 +780,7 @@
                             
                             // Shadow
                             const shadow = activeObject.shadow;
-                            if (objShadowColorEl) objShadowColorEl.value = shadow ? shadow.color : '#000000';
+                            if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; // Use helper
                             if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
                             if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
                             if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;

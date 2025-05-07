@@ -84,7 +84,7 @@ function createDriveFolder(folderName, parentFolderId) {
       const folder = DriveApp.getFolderById(folderId);
       const file = folder.createFile(blob.setName(fileName)); // setName ensures the desired filename
       Logger.log(`File "${fileName}" created from blob in folder ID: ${folderId}. File ID: ${file.getId()}`);
-      return file;
+      return file; // 'file' here *should* be a DriveApp.File
     } catch (e) {
       Logger.log(`Error in createFileInDriveFromBlob: ${e.toString()} - FileName: ${fileName}, FolderID: ${folderId}`);
       throw new Error(`Failed to create file from blob: ${e.message}`);

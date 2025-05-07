@@ -186,17 +186,26 @@ function uploadFileToDrive(fileData, projectId, mediaType) { // THIS IS THE CORR
     driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     Logger.log(`uploadFileToDrive: File "${driveFile.getName()}" (ID: ${driveFile.getId()}) shared as ANYONE_WITH_LINK.`);
     
-    let webContentLink = driveFile.getWebContentLink();
-    if (!webContentLink) {
+    let webContentLink = null; // Initialize to null
+
+    // Check if getWebContentLink method exists AND IS A FUNCTION on the driveFile object
+    if (driveFile && typeof driveFile.getWebContentLink === 'function') {
+      webContentLink = driveFile.getWebContentLink(); // Call it only if it exists as a function
+      Logger.log(`uploadFileToDrive: Called driveFile.getWebContentLink(), result: ${webContentLink}`);
+    } else {
+      Logger.log(`uploadFileToDrive: driveFile.getWebContentLink is not available or not a function. Object keys: ${JSON.stringify(Object.keys(driveFile || {}))}`);
+    }
+
+    if (!webContentLink) { // If it was null from the call, or the function didn't exist/wasn't callable
+        Logger.log(`uploadFileToDrive: webContentLink is null or method was not callable. Using fallback for file ID: ${driveFile.getId()}`);
         if (mediaType === 'image') {
           webContentLink = 'https://drive.google.com/uc?export=view&id=' + driveFile.getId();
         } else {
-          // For other types, use download URL with view parameter if webContentLink is null
            webContentLink = driveFile.getDownloadUrl().replace("&export=download", "&export=view");
         }
     }
 
-    Logger.log(`uploadFileToDrive: File uploaded successfully. ID: ${driveFile.getId()}, WebContentLink: ${webContentLink}`);
+    Logger.log(`uploadFileToDrive: File uploaded successfully. ID: ${driveFile.getId()}, Final WebContentLink: ${webContentLink}`);
     return {
       success: true,
       driveFileId: driveFile.getId(),

@@ -116,7 +116,7 @@
            display: none; /* Hidden by default */
        }
 
-       /* Modal Navigation Buttons */
+       /* Modal Navigation Buttons (from Step 21) */
         .modal-navigation {
             margin-top: 20px;
             padding-top: 15px;
@@ -129,6 +129,7 @@
              cursor: pointer;
              border-radius: 4px;
              border: 1px solid #ccc;
+             font-size: 0.9em;
          }
           .modal-navigation button:disabled {
               cursor: not-allowed;
@@ -136,7 +137,6 @@
           }
          #modalPrevButton { background-color: #f0f0f0; }
          #modalNextButton { background-color: #007bff; color: white; border-color: #007bff;}
-
 
     </style>
   </head>
@@ -181,7 +181,7 @@
         <div class="modal-content">
             <span id="viewerModalCloseButton" class="modal-close-button">×</span>
             <div id="viewerModalBody"></div>
-            <!-- Modal Navigation Buttons -->
+            <!-- Modal Navigation Buttons (Step 21) -->
             <div class="modal-navigation">
                 <button id="modalPrevButton" style="display: none;">< Previous</button>
                 <button id="modalNextButton" style="display: none;">Next ></button>

@@ -1184,11 +1184,17 @@
             displayMessage("Invalid media type for Picker.", false); return;
         }
         
+        // ---> FIX: Get the current origin dynamically <---
+        const currentOrigin = window.location.origin;
+        console.log("Setting Picker origin to:", currentOrigin); 
+
         const picker = new google.picker.PickerBuilder()
             .addView(view)
             .setOAuthToken(token)
             .setDeveloperKey(adminApp.state.developerApiKey)
             .setCallback(pickerCallback)
+            // ---> FIX: Add the setOrigin call <---
+            .setOrigin(currentOrigin) 
             .build();
         picker.setVisible(true);
         console.log("Drive Picker is now visible.");
@@ -1240,7 +1246,6 @@
         }
         adminApp.state.currentPickerMediaType = null; // Reset picker context
     }
-
 
     // --- Overlay Creation & Toolbar ---
     function addRectangle() {

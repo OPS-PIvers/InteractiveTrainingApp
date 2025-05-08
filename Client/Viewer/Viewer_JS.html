@@ -584,16 +584,16 @@
                 height: '100%', 
                 width: '100%', 
                 videoId: videoId,
-                playerVars: { // More restrictive player vars
-                    'autoplay': 0,       // Keep autoplay off
-                    'controls': 0,       // Keep controls on
-                    'rel': 0,            // Keep off
-                    'showinfo': 0,       // Keep off (though deprecated)
-                    'modestbranding': 1, // Keep on
-                    'iv_load_policy': 3, // Keep annotations off
-                    'fs': 0,             // **** Disable fullscreen button ****
-                    'disablekb': 1,      // **** Disable keyboard controls ****
-                    'playsinline': 1     // Keep playsinline
+                playerVars: { // More restrictive player vars matching working example
+                    'autoplay': 0,        // Keep autoplay off (Essential)
+                    'controls': 0,        // **** Disable default controls ****
+                    'rel': 0,             // Keep off
+                    'showinfo': 0,        // Keep off
+                    'modestbranding': 1,  // Keep on
+                    'iv_load_policy': 3,  // Keep annotations off
+                    'fs': 0,              // **** Keep fullscreen disabled ****
+                    'disablekb': 1,       // **** Keep keyboard disabled ****
+                    'playsinline': 1      // Keep playsinline
                 },
                 events: {
                     'onReady': onPlayerReady,
@@ -612,7 +612,22 @@
     function onPlayerReady(event) {
         // Autoplay is off, so just log readiness. User needs to click play.
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
-        // event.target.playVideo(); // Do not autoplay
+        // Since default controls are off, we might need custom play button or start video programmatically on first interaction
+        // For now, user cannot play it easily. We need custom controls or different playerVars.
+        // Let's try playing it here to see if the permissions issue is gone, even if controls are hidden
+        // event.target.playVideo(); // Try playing it now that it's ready
+        
+         // Add an event listener to the container to play on click as substitute for controls
+         if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
+             youtubePlayerContainerEl.addEventListener('click', function() {
+                 if (ytPlayer && typeof ytPlayer.playVideo === 'function' && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+                     ytPlayer.playVideo();
+                 }
+             });
+             youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
+         }
+
+
     }
 
     function onPlayerStateChange(event) {
@@ -653,10 +668,12 @@
         } catch (e) {
             console.error("Error stopping/destroying YouTube player:", e);
         } finally {
-             // Always try to hide the container
+             // Always try to hide the container and remove click listener
              if (youtubePlayerContainerEl) {
                  youtubePlayerContainerEl.innerHTML = ''; 
                  youtubePlayerContainerEl.style.display = 'none';
+                 youtubePlayerContainerEl.removeAttribute('click-listener-added'); // Clean up listener flag
+                 // Consider explicitly removing the listener if needed, although removing innerHTML might suffice
              }
         }
     }

@@ -9,20 +9,21 @@
     // --- Application State ---
     viewerApp.state = {
       isLoading: false,
-      currentProjectData: null, 
+      currentProjectData: null,
       currentSlideIndex: 0, // Default to 0, will be updated
       viewerFabricCanvas: null,
-      defaultCanvasWidth: 960, 
+      defaultCanvasWidth: 960,
       defaultCanvasHeight: 540,
       currentAudioElement: null, // Reference to the currently playing audio element
       // State for Modal Sequencing (Step 21)
       currentModalOverlay: null, // The Fabric object that triggered the current modal sequence
       modalSequence: [],         // Array of Fabric objects in the current sequence on the slide
       currentModalSequenceIndex: -1, // Index within modalSequence being displayed
+      // --- FIX: Add comma after the previous line ---
       isSpotlightActive: false, // NEW: Track if spotlight effect is on
       spotlightOriginalOpacities: new Map() // NEW: Store original opacities
     };
-  
+
     // --- DOM Element References ---
     let viewerProjectListContainerEl, messageAreaElViewer, loadingSpinnerElViewer;
     let viewerListViewContainerEl, viewerProjectDisplayAreaEl, viewingProjectTitleEl;
@@ -32,33 +33,33 @@
     let viewerModalEl, viewerModalCloseButtonEl, viewerModalBodyEl,
         modalPrevButtonEl, modalNextButtonEl; // Modal Nav Buttons (Step 21)
     let viewerAudioPlayerEl; // Ref for the audio element
-  
+
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
       console.log("Viewer_JS: DOMContentLoaded event fired!");
-      
+
       viewerApp.setupDOMReferences();
-      viewerApp.attachEventListeners(); 
-      
-      loadViewerProjectsList(); 
-      
+      viewerApp.attachEventListeners();
+
+      loadViewerProjectsList();
+
       console.log("Viewer_JS: Initialization complete.");
     });
-  
+
     viewerApp.setupDOMReferences = function() {
       viewerProjectListContainerEl = document.getElementById('viewerProjectListContainer');
-      messageAreaElViewer = document.getElementById('messageAreaViewer'); 
-      loadingSpinnerElViewer = document.getElementById('loadingSpinner'); 
+      messageAreaElViewer = document.getElementById('messageAreaViewer');
+      loadingSpinnerElViewer = document.getElementById('loadingSpinner');
 
       viewerListViewContainerEl = document.getElementById('viewerListViewContainer');
       viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
       viewingProjectTitleEl = document.getElementById('viewingProjectTitle');
-      
-      viewerMediaContainerEl = document.getElementById('viewerMediaContainer'); 
-      youtubePlayerContainerEl = document.getElementById('youtubePlayerContainer'); 
+
+      viewerMediaContainerEl = document.getElementById('viewerMediaContainer');
+      youtubePlayerContainerEl = document.getElementById('youtubePlayerContainer');
       viewerCanvasContainerEl = document.getElementById('viewerCanvasContainer'); // Container for the canvas
       viewerFabricCanvasEl = document.getElementById('viewerFabricCanvas'); // The actual canvas element
-      
+
       viewerPrevSlideButtonEl = document.getElementById('viewerPrevSlideButton');
       viewerNextSlideButtonEl = document.getElementById('viewerNextSlideButton');
       viewerSlideIndicatorEl = document.getElementById('viewerSlideIndicator');
@@ -70,14 +71,16 @@
       modalPrevButtonEl = document.getElementById('modalPrevButton'); // Step 21
       modalNextButtonEl = document.getElementById('modalNextButton'); // Step 21
 
-      viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer'); 
-      viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
-  
+      viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer');
+
       if (!viewerProjectListContainerEl) console.error("CRITICAL: viewerProjectListContainerEl not found!");
       if (!viewerModalEl) console.error("CRITICAL: viewerModalEl not found!");
       if (!viewerAudioPlayerEl) console.error("CRITICAL: viewerAudioPlayerEl not found!");
       if (!modalPrevButtonEl || !modalNextButtonEl) console.error("CRITICAL: Modal navigation buttons not found!"); // Step 21 Check
-      if (!viewerProjectDisplayAreaEl) console.error("CRITICAL: viewerProjectDisplayAreaEl not found!"); // Step 22 check
+      // NEW: Get reference to the main display area for click-off listener
+      viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
+      if (!viewerProjectDisplayAreaEl) console.error("CRITICAL: viewerProjectDisplayAreaEl not found!"); // Add check
+
       console.log("Viewer_JS: DOM references set up.");
     };
 
@@ -96,9 +99,10 @@
         // Step 21: Attach listeners for modal navigation buttons
         if (modalPrevButtonEl) modalPrevButtonEl.addEventListener('click', navigateModalPrevious);
         if (modalNextButtonEl) modalNextButtonEl.addEventListener('click', navigateModalNext);
-            // NEW: Listener to remove spotlight when clicking outside spotlighted object
+
+        // NEW: Listener to remove spotlight when clicking outside spotlighted object
         if (viewerProjectDisplayAreaEl) {
-            viewerProjectDisplayAreaEl.addEventListener('click', function(event) {
+             viewerProjectDisplayAreaEl.addEventListener('click', function(event) {
                 // Check if spotlight is active and the click wasn't on the canvas itself
                 // (or more accurately, not handled by a fabric object mousedown)
                 // This simple check works if fabric events stop propagation.
@@ -109,54 +113,54 @@
                     console.log("Viewer area click detected while spotlight active, removing effect.");
                     removeSpotlightEffect();
                 }
-            }, true); // Use capture phase to potentially catch clicks before they bubble? Or just bubble phase (false)? Let's try bubble (default/false).
+             }, false); // Use bubble phase (default)
         }
     };
-  
+
     // --- UI Utils & Server Error Handling ---
     function showLoadingViewer(show) {
       viewerApp.state.isLoading = show;
       if (loadingSpinnerElViewer) {
         loadingSpinnerElViewer.style.display = show ? 'flex' : 'none';
-      } else if (show) { 
+      } else if (show) {
           console.warn("showLoadingViewer(true) called but loadingSpinnerElViewer not yet available.");
       }
     }
-  
+
     function displayMessageViewer(message, isSuccess) {
       if (messageAreaElViewer) {
-        messageAreaElViewer.innerHTML = ''; 
+        messageAreaElViewer.innerHTML = '';
         const p = document.createElement('p');
         p.textContent = message;
         messageAreaElViewer.appendChild(p);
-        messageAreaElViewer.className = isSuccess ? 'success' : 'error'; 
+        messageAreaElViewer.className = isSuccess ? 'success' : 'error';
         setTimeout(() => {
           if (messageAreaElViewer) {
             messageAreaElViewer.innerHTML = '';
             messageAreaElViewer.className = '';
           }
-        }, 7000); 
+        }, 7000);
       } else {
         console.warn("displayMessageViewer called but messageAreaElViewer not available. Message:", message);
       }
     }
-    
+
     function onServerErrorViewer(errorObject) {
       showLoadingViewer(false);
       console.error('Viewer Server Error Object:', errorObject);
       let errorMessage = "An unknown error occurred on the server.";
-      if (typeof errorObject === 'string') { 
+      if (typeof errorObject === 'string') {
           errorMessage = errorObject;
-      } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') { 
+      } else if (errorObject && errorObject.message && typeof errorObject.message === 'string') {
           errorMessage = errorObject.message;
-      } else if (errorObject && errorObject.name && errorObject.message) { 
+      } else if (errorObject && errorObject.name && errorObject.message) {
           errorMessage = `Error: ${errorObject.name} - ${errorObject.message}`;
       } else if (errorObject && errorObject.error && typeof errorObject.error === 'string') { // Handle {success:false, error:"..."}
           errorMessage = errorObject.error;
       }
       displayMessageViewer('Server Error: ' + errorMessage, false);
     }
-  
+
     // --- Project List Loading/Display ---
     function loadViewerProjectsList() {
       console.log("loadViewerProjectsList called");
@@ -167,15 +171,15 @@
       if (!viewerProjectListContainerEl) {
           console.warn("loadViewerProjectsList: viewerProjectListContainerEl not ready yet.");
           showLoadingViewer(false);
-          return; 
+          return;
       }
       showLoadingViewer(true);
       google.script.run
         .withSuccessHandler(displayViewerProjects)
         .withFailureHandler(onServerErrorViewer)
-        .getActiveProjectsList(); 
+        .getActiveProjectsList();
     }
-  
+
     function displayViewerProjects(projectsArray) {
       showLoadingViewer(false);
       console.log("displayViewerProjects received:", projectsArray ? projectsArray.length : 0, "projects");
@@ -183,35 +187,35 @@
           console.error("displayViewerProjects: viewerProjectListContainerEl is not found!");
           return;
       }
-      viewerProjectListContainerEl.innerHTML = ''; 
+      viewerProjectListContainerEl.innerHTML = '';
       if (!projectsArray || projectsArray.length === 0) {
         viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
         return;
       }
-  
+
       const ul = document.createElement('ul');
-      ul.className = 'project-list-viewer'; 
-  
+      ul.className = 'project-list-viewer';
+
       projectsArray.forEach(project => {
-        if (!project || !project.projectId) { 
+        if (!project || !project.projectId) {
             console.warn("Skipping display of invalid project object:", project);
-            return; 
+            return;
         }
         const listItem = document.createElement('li');
-        listItem.className = 'project-card-viewer'; 
-        
+        listItem.className = 'project-card-viewer';
+
         const titleHeader = document.createElement('h3');
         titleHeader.textContent = project.projectTitle || 'Untitled Project';
-        
+
         const viewButton = document.createElement('button');
         viewButton.textContent = 'View Project';
-        viewButton.className = 'view-project-button'; 
-        viewButton.setAttribute('data-project-id', project.projectId); 
-        viewButton.onclick = function() { 
+        viewButton.className = 'view-project-button';
+        viewButton.setAttribute('data-project-id', project.projectId);
+        viewButton.onclick = function() {
           console.log("View Project button clicked for project ID:", project.projectId);
           loadProjectForViewing(project.projectId);
         };
-  
+
         listItem.appendChild(titleHeader);
         listItem.appendChild(viewButton);
         ul.appendChild(listItem);
@@ -223,7 +227,7 @@
     function showProjectListView() {
         if (viewerListViewContainerEl) viewerListViewContainerEl.style.display = 'block';
         if (viewerProjectDisplayAreaEl) viewerProjectDisplayAreaEl.style.display = 'none';
-        
+
         // Cleanup media players
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
@@ -234,7 +238,7 @@
         }
         viewerApp.state.currentProjectData = null;
         viewerApp.state.currentSlideIndex = 0;
-        loadViewerProjectsList(); 
+        loadViewerProjectsList();
     }
 
     function showProjectView() {
@@ -283,8 +287,8 @@
             }
 
             console.log("Project for viewing loaded:", viewerApp.state.currentProjectData);
-            console.log("Number of slides loaded:", viewerApp.state.currentProjectData.slides.length); 
-            
+            console.log("Number of slides loaded:", viewerApp.state.currentProjectData.slides.length);
+
             viewerApp.state.currentSlideIndex = 0; // Reset to first slide
             showProjectView();
             if (viewingProjectTitleEl) viewingProjectTitleEl.textContent = viewerApp.state.currentProjectData.title || "Untitled Project";
@@ -313,7 +317,7 @@
             viewerApp.state.viewerFabricCanvas = new fabric.Canvas(viewerFabricCanvasEl, {
                 width: viewerApp.state.defaultCanvasWidth,
                 height: viewerApp.state.defaultCanvasHeight,
-                selection: false, 
+                selection: false,
                 hoverCursor: 'default',
                 backgroundColor: 'transparent' // Default to transparent for layering
             });
@@ -335,10 +339,14 @@
         if (slideIndex < 0 || slideIndex >= slides.length) {
             console.error("Invalid slide index:", slideIndex); return;
         }
-        
+
         // --- Cleanup Previous Slide Media FIRST ---
-        stopAndDestroyYouTubePlayer(); 
+        stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
+        // Also remove any lingering spotlight effect from previous slide
+        if (viewerApp.state.isSpotlightActive) {
+            removeSpotlightEffect(); // Ensure clean state between slides
+        }
 
         viewerApp.state.currentSlideIndex = slideIndex; // Update state *before* using it
         const slideData = slides[slideIndex];
@@ -352,27 +360,27 @@
         // Set canvas dimensions and container dimensions
         const slideWidth = slideData.canvasWidth || viewerApp.state.defaultCanvasWidth;
         const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
-        const media = slideData.slideMedia; 
+        const media = slideData.slideMedia;
         let mediaType = (media && media.type) ? media.type : 'none';
-        
+
         // Set canvas element size regardless of media type now
         canvas.setWidth(slideWidth);
         canvas.setHeight(slideHeight);
-        if (viewerFabricCanvasEl) { 
+        if (viewerFabricCanvasEl) {
             viewerFabricCanvasEl.width = slideWidth;
             viewerFabricCanvasEl.height = slideHeight;
         }
-        // Adjust media container size 
+        // Adjust media container size
         if (viewerMediaContainerEl) {
             viewerMediaContainerEl.style.width = slideWidth + 'px';
-            viewerMediaContainerEl.style.height = slideHeight + 'px'; 
+            viewerMediaContainerEl.style.height = slideHeight + 'px';
         }
-        
+
         // Clear canvas objects and background image
-        canvas.clear(); 
-        canvas.setBackgroundImage(null, () => { canvas.renderAll(); }); 
-        canvas.backgroundColor = 'transparent'; 
-        
+        canvas.clear();
+        canvas.setBackgroundImage(null, () => { canvas.renderAll(); });
+        canvas.backgroundColor = 'transparent';
+
         // Hide/show containers based on media type
         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = (mediaType === 'youtube') ? 'block' : 'none';
         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = (mediaType === 'youtube') ? 'none' : 'flex'; // Show unless YT
@@ -384,15 +392,15 @@
             case 'image':
                 if (media.url && media.url.startsWith('data:image')) {
                     fabric.Image.fromURL(media.url, function(img) {
-                        if (!viewerApp.state.viewerFabricCanvas || viewerApp.state.currentSlideIndex !== slideIndex) return; 
+                        if (!viewerApp.state.viewerFabricCanvas || viewerApp.state.currentSlideIndex !== slideIndex) return;
                         canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
                             scaleX: canvas.width / img.width, scaleY: canvas.height / img.height
                         });
                     }, { crossOrigin: 'anonymous' });
                 } else {
                      console.warn("Image media present but URL is missing or not base64:", media.url);
-                     canvas.backgroundColor = '#e9e9e9'; 
-                     canvas.renderAll(); 
+                     canvas.backgroundColor = '#e9e9e9';
+                     canvas.renderAll();
                 }
                 break;
 
@@ -402,7 +410,7 @@
                     if (videoId) {
                         // Canvas container is already hidden
                         if (isYouTubeApiReady) {
-                             setupYouTubePlayer(videoId); 
+                             setupYouTubePlayer(videoId);
                         } else {
                              console.warn("YouTube API not ready yet when trying to render slide.");
                         }
@@ -411,68 +419,68 @@
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
                          // Show canvas container with error BG if YT fails
                          if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
-                         canvas.backgroundColor = '#555'; 
-                         canvas.renderAll(); 
+                         canvas.backgroundColor = '#555';
+                         canvas.renderAll();
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
                       if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas
-                     canvas.backgroundColor = '#e9e9e9'; 
-                     canvas.renderAll(); 
+                     canvas.backgroundColor = '#e9e9e9';
+                     canvas.renderAll();
                 }
                 break;
 
             case 'audio':
                  // Canvas container is already visible
-                 if (media.driveFileId) { 
+                 if (media.driveFileId) {
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
-                     showLoadingViewer(true); 
+                     showLoadingViewer(true);
                      google.script.run
                          .withSuccessHandler(function(audioResponse) {
                              showLoadingViewer(false);
-                             if (viewerApp.state.currentSlideIndex !== slideIndex) return; 
+                             if (viewerApp.state.currentSlideIndex !== slideIndex) return;
                              if (audioResponse && audioResponse.success && audioResponse.base64Data) {
-                                 setupAudioPlayer(audioResponse.base64Data); 
-                                 if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block'; 
-                                 canvas.backgroundColor = '#e0e0e0'; 
-                                 canvas.renderAll(); 
+                                 setupAudioPlayer(audioResponse.base64Data);
+                                 if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block';
+                                 canvas.backgroundColor = '#e0e0e0';
+                                 canvas.renderAll();
                              } else {
                                  console.error("Failed to fetch audio base64 data:", audioResponse);
                                  onServerErrorViewer(audioResponse || {error: "Failed to load audio data."});
-                                 canvas.backgroundColor = '#e9e9e9'; 
-                                 canvas.renderAll(); 
+                                 canvas.backgroundColor = '#e9e9e9';
+                                 canvas.renderAll();
                              }
                          })
-                         .withFailureHandler(function(error) { 
+                         .withFailureHandler(function(error) {
                              showLoadingViewer(false);
                              onServerErrorViewer(error);
-                             canvas.backgroundColor = '#e9e9e9'; 
-                             canvas.renderAll(); 
+                             canvas.backgroundColor = '#e9e9e9';
+                             canvas.renderAll();
                          })
                          .getAudioAsBase64(media.driveFileId);
                  } else {
                      console.warn("Audio media type set but driveFileId is missing.");
-                     canvas.backgroundColor = '#e9e9e9'; 
-                     canvas.renderAll(); 
+                     canvas.backgroundColor = '#e9e9e9';
+                     canvas.renderAll();
                  }
                  break;
 
             default: // 'none' or unknown
                  // Canvas container is already visible
-                 canvas.backgroundColor = '#e9e9e9'; 
-                 canvas.renderAll(); 
+                 canvas.backgroundColor = '#e9e9e9';
+                 canvas.renderAll();
                  break;
         }
-        
+
         // Load Fabric objects (overlays) ONLY if canvas container is visible
         if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none' && slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
-                if (viewerApp.state.currentSlideIndex !== slideIndex) return; 
-                
+                if (viewerApp.state.currentSlideIndex !== slideIndex) return;
+
                 canvas.forEachObject(function(obj) {
-                    obj.selectable = false; 
-                    obj.evented = true; // Canvas container is visible, so events should work   
-                    obj.hoverCursor = 'pointer'; 
+                    obj.selectable = false;
+                    obj.evented = true; // Canvas container is visible, so events should work
+                    obj.hoverCursor = 'pointer';
 
                     obj.off('mousedown'); // Remove previous listeners
                     obj.off('mouseover');
@@ -480,10 +488,10 @@
                     // Attach interaction listeners
                     if (obj.customInteraction && obj.customInteraction.trigger) {
                         if (obj.customInteraction.trigger === 'click') {
-                            obj.on('mousedown', function(options) { 
+                            obj.on('mousedown', function(options) {
                                 if (this.customInteraction.trigger === 'click') {
                                     handleOverlayInteraction(this, 'click');
-                                    if(options.e) options.e.stopPropagation(); 
+                                    if(options.e) options.e.stopPropagation();
                                 }
                             });
                         } else if (obj.customInteraction.trigger === 'hover') {
@@ -495,7 +503,7 @@
                         }
                     }
                 });
-                canvas.renderAll(); 
+                canvas.renderAll();
             });
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
              // Render canvas background if no JSON but canvas is visible
@@ -510,35 +518,39 @@
     function handleOverlayInteraction(fabricObject, eventType) {
         if (!fabricObject.customInteraction) return;
         const interaction = fabricObject.customInteraction;
+
+        // Log initial state for debugging
+        console.log(`Interaction Triggered: type=${eventType}, action=${interaction.action}, object=${fabricObject.type}, currentOpacity=${fabricObject.opacity}`);
+
         // If spotlight is active, remove it before processing new interaction,
         // unless the click was ON the currently spotlighted object (which we don't track easily here)
         // Simplification: Any interaction click removes existing spotlight.
-        if (viewerApp.state.isSpotlightActive) {
-            removeSpotlightEffect();
-            // If the action was JUST spotlight, don't proceed to do it again immediately
-            if (interaction.action === 'spotlight') return;
+        if (viewerApp.state.isSpotlightActive && interaction.action !== 'spotlight') { // Don't remove if clicking the same spotlight object again
+             console.log("Removing existing spotlight before handling new interaction.");
+             removeSpotlightEffect();
         }
 
-        if (interaction.trigger !== eventType) return; 
+
+        if (interaction.trigger !== eventType) return;
 
         console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
 
         switch (interaction.action) {
             case 'showModal':
-                // Check if the clicked object itself has modal content
+                // ... (existing modal logic remains the same) ...
                 if (fabricObject.customInteraction && fabricObject.customInteraction.modalContent) {
                     // --- Step 21: Modal Sequence Logic ---
                     const canvas = viewerApp.state.viewerFabricCanvas;
-                    if (!canvas) break; 
-                    
+                    if (!canvas) break;
+
                     // Find all modal objects on the current canvas with sequence order
                     const allObjects = canvas.getObjects();
-                    viewerApp.state.modalSequence = allObjects.filter(obj => 
-                        obj.customInteraction && 
-                        obj.customInteraction.action === 'showModal' && 
-                        typeof obj.sequenceOrder === 'number' && 
-                        !isNaN(obj.sequenceOrder) 
-                    ).sort((a, b) => a.sequenceOrder - b.sequenceOrder); 
+                    viewerApp.state.modalSequence = allObjects.filter(obj =>
+                        obj.customInteraction &&
+                        obj.customInteraction.action === 'showModal' &&
+                        typeof obj.sequenceOrder === 'number' &&
+                        !isNaN(obj.sequenceOrder)
+                    ).sort((a, b) => a.sequenceOrder - b.sequenceOrder);
 
                     // Find the index of the clicked object in the sequence
                     viewerApp.state.currentModalSequenceIndex = viewerApp.state.modalSequence.findIndex(obj => obj === fabricObject);
@@ -550,13 +562,13 @@
                         viewerApp.state.currentModalSequenceIndex = 0;
                     }
 
-                    viewerApp.state.currentModalOverlay = fabricObject; 
-                    
+                    viewerApp.state.currentModalOverlay = fabricObject;
+
                     showViewerModal(interaction.modalContent); // Show initial content
                     updateModalNavigationButtons(); // Update button visibility/state
                     // --- End Step 21 Logic ---
 
-                } else { 
+                } else {
                      console.warn("Show Modal action triggered, but modalContent is missing on the object.");
                      // Hide nav buttons if no content
                      if(modalPrevButtonEl) modalPrevButtonEl.style.display = 'none';
@@ -564,6 +576,7 @@
                 }
                 break;
             case 'navigateToSlide':
+                // ... (existing logic) ...
                 const targetSlideId = interaction.navigateTo;
                 if (targetSlideId && viewerApp.state.currentProjectData && viewerApp.state.currentProjectData.slides) {
                     const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
@@ -576,6 +589,7 @@
                 }
                 break;
             case 'navigateToURL':
+                // ... (existing logic) ...
                 if (interaction.navigateTo) {
                     let url = interaction.navigateTo;
                     if (!url.startsWith('http://') && !url.startsWith('https://')) {
@@ -594,27 +608,49 @@
                 break;
             // --- NEW Cases for Step 23 ---
             case 'spotlight':
-                applySpotlightEffect(fabricObject);
-                break;
+                 // Check if already spotlighted - if so, remove it. Otherwise apply.
+                 if (viewerApp.state.isSpotlightActive) {
+                      console.log("Spotlight clicked while active, removing.");
+                      removeSpotlightEffect();
+                 } else {
+                      applySpotlightEffect(fabricObject);
+                 }
+                 break;
             case 'reveal':
-                // Implement reveal logic here in next phase
-                console.log("Reveal action triggered for:", fabricObject);
-                // Simple reveal: Animate opacity to 1
-                if (fabricObject) {
-                    fabricObject.animate('opacity', 1, {
-                        duration: 500, // Adjust duration as needed
-                        onChange: viewerApp.state.viewerFabricCanvas.renderAll.bind(viewerApp.state.viewerFabricCanvas),
-                        onComplete: function() {
-                            console.log("Reveal animation complete.");
-                        }
-                    });
-                }
-                break;
+                 console.log("Handling interaction: reveal for object:", fabricObject);
+                 // Simple reveal: Animate opacity to 1
+                 if (fabricObject && viewerApp.state.viewerFabricCanvas) { // Added canvas check
+                      console.log(`Reveal: Animating opacity from ${fabricObject.opacity} to 1.`);
+                      fabricObject.animate('opacity', 1, {
+                          duration: 500, // Adjust duration as needed
+                          onChange: function() { // Use function() to access canvas easily
+                               // console.log("Reveal onChange"); // DEBUG - can be noisy
+                               if (viewerApp.state.viewerFabricCanvas) {
+                                   viewerApp.state.viewerFabricCanvas.renderAll();
+                               }
+                           },
+                          onComplete: function() {
+                              console.log("Reveal animation complete. Final opacity:", fabricObject.opacity);
+                              if (viewerApp.state.viewerFabricCanvas) {
+                                  viewerApp.state.viewerFabricCanvas.renderAll(); // Ensure final render
+                              }
+                          },
+                          abort: function() {
+                               console.log("Reveal animation aborted.");
+                               // Basic abort check - might need refinement if objects move between slides
+                               // For now, let it run even if slide changes, complexity vs benefit
+                               return false; // Return true to abort if needed
+                           }
+                      });
+                 } else {
+                      console.error("Reveal: Target object or canvas not available.");
+                 }
+                 break;
             /* // Add later
             case 'panZoom':
-                console.log("Pan/Zoom action triggered for:", fabricObject);
-                // Implement pan/zoom logic here
-                break;
+                 console.log("Pan/Zoom action triggered for:", fabricObject);
+                 // Implement pan/zoom logic here
+                 break;
             */
             default:
                 console.log("Unknown or no action defined for this interaction.");
@@ -623,13 +659,13 @@
 
     function showViewerModal(htmlContent) {
         if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;
-        if (viewerModalEl) viewerModalEl.style.display = 'flex'; 
+        if (viewerModalEl) viewerModalEl.style.display = 'flex';
         // Note: updateModalNavigationButtons is called by handleOverlayInteraction now
     }
 
     function hideViewerModal() {
         if (viewerModalEl) viewerModalEl.style.display = 'none';
-        if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = ''; 
+        if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = '';
         // Step 21: Reset modal sequence state
         viewerApp.state.currentModalOverlay = null;
         viewerApp.state.modalSequence = [];
@@ -638,7 +674,7 @@
         if(modalPrevButtonEl) modalPrevButtonEl.style.display = 'none';
         if(modalNextButtonEl) modalNextButtonEl.style.display = 'none';
     }
-    
+
      // --- Step 21: Modal Navigation Functions ---
     function updateModalNavigationButtons() {
          if (!modalPrevButtonEl || !modalNextButtonEl) return;
@@ -740,72 +776,21 @@
         }
     }
 
-    // --- NEW Spotlight Functions (Step 23) ---
-    function applySpotlightEffect(targetObject) {
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas || viewerApp.state.isSpotlightActive) return; // Don't apply if already active
-
-        console.log("Applying spotlight effect to:", targetObject);
-        viewerApp.state.isSpotlightActive = true;
-        viewerApp.state.spotlightOriginalOpacities.clear(); // Clear previous opacities
-
-        const spotlightOpacity = 0.2; // How much to dim other objects
-
-        canvas.forEachObject(function(obj) {
-            if (obj !== targetObject) {
-                // Store original opacity, handling undefined (treat as 1)
-                const originalOpacity = obj.opacity === undefined ? 1 : obj.opacity;
-                viewerApp.state.spotlightOriginalOpacities.set(obj, originalOpacity);
-                // Apply spotlight dimming
-                obj.set('opacity', spotlightOpacity);
-                obj.set('evented', false); // Make dimmed objects non-interactive
-            } else {
-                // Ensure the target object remains interactive
-                obj.set('evented', true);
-            }
-        });
-
-        canvas.renderAll();
-        displayMessageViewer("Spotlight active. Click outside the object to remove.", true); // Inform user
-    }
-
-    function removeSpotlightEffect() {
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas || !viewerApp.state.isSpotlightActive) return; // Only remove if active
-
-        console.log("Removing spotlight effect.");
-
-        canvas.forEachObject(function(obj) {
-            // Restore original opacity if it was stored
-            if (viewerApp.state.spotlightOriginalOpacities.has(obj)) {
-                obj.set('opacity', viewerApp.state.spotlightOriginalOpacities.get(obj));
-            }
-            // Restore interactivity for all objects (simplest approach)
-            obj.set('evented', true);
-        });
-
-        viewerApp.state.isSpotlightActive = false;
-        viewerApp.state.spotlightOriginalOpacities.clear();
-        canvas.renderAll();
-        // Clear the message or let it timeout
-        // displayMessageViewer("", true); // Optionally clear message immediately
-    }
-    // --- End NEW Spotlight Functions ---
 
     // --- YouTube Player API Functions ---
     function onYouTubeIframeAPIReady() {
         console.log("YouTube IFrame API Ready (called by external script).");
-        isYouTubeApiReady = true; 
+        isYouTubeApiReady = true;
     }
 
     function setupYouTubePlayer(videoId) {
         if (!youtubePlayerContainerEl) {
             console.error("YouTube player container element not found."); return;
         }
-        youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>'; 
+        youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>';
         youtubePlayerContainerEl.style.display = 'block';
         console.log("Setting up YouTube player for video ID:", videoId);
-        
+
         if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
             console.error("YT object or YT.Player is not available or API not ready.");
             displayMessageViewer("YouTube Player API not ready. Please wait or reload.", false);
@@ -820,37 +805,37 @@
              }
              console.log("Creating new YT.Player instance.");
              ytPlayer = new YT.Player('youtube-player-div', {
-                height: '100%', 
-                width: '100%', 
+                height: '100%',
+                width: '100%',
                 videoId: videoId,
-                playerVars: { 
-                    'autoplay': 0,       
+                playerVars: {
+                    'autoplay': 0,
                     'controls': 0, // Keep controls off
-                    'rel': 0,            
-                    'showinfo': 0,       
-                    'modestbranding': 1, 
-                    'iv_load_policy': 3, 
-                    'fs': 0,             
-                    'disablekb': 1,      
-                    'playsinline': 1     
+                    'rel': 0,
+                    'showinfo': 0,
+                    'modestbranding': 1,
+                    'iv_load_policy': 3,
+                    'fs': 0,
+                    'disablekb': 1,
+                    'playsinline': 1
                 },
                 events: {
                     'onReady': onPlayerReady,
                     'onStateChange': onPlayerStateChange,
-                    'onError': onPlayerError 
+                    'onError': onPlayerError
                 }
             });
              console.log("YT.Player instance potentially created (check console for errors/readiness).");
         } catch (e) {
             console.error("Error creating YouTube player instance:", e);
             displayMessageViewer(`Error initializing YouTube player: ${e.message}`, false);
-             if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'none'; 
+             if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'none';
         }
     }
 
     function onPlayerReady(event) {
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
-        
+
          // Add click listener to the CONTAINER div now
          if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
              console.log("Adding click-to-play listener to YT player container.");
@@ -863,7 +848,7 @@
                          ytPlayer.playVideo();
                      } else {
                          console.log("Calling pauseVideo().");
-                         ytPlayer.pauseVideo(); 
+                         ytPlayer.pauseVideo();
                      }
                  } else {
                      console.warn("Cannot play/pause: Player or methods not available.");
@@ -884,7 +869,7 @@
             case 2: errorMsg += "Invalid video ID."; break;
             case 5: errorMsg += "HTML5 player error."; break;
             case 100: errorMsg += "Video not found or private."; break;
-            case 101: 
+            case 101:
             case 150: errorMsg += "Playback forbidden by owner."; break;
             default: errorMsg += "Unknown error."; break;
         }
@@ -901,13 +886,13 @@
                 ytPlayer.destroy();
                  console.log("YouTube Player Destroyed.");
             }
-             ytPlayer = null; 
+             ytPlayer = null;
         } catch (e) {
             console.error("Error stopping/destroying YouTube player:", e);
         } finally {
              if (youtubePlayerContainerEl) {
-                 youtubePlayerContainerEl.removeAttribute('click-listener-added'); 
-                 youtubePlayerContainerEl.innerHTML = ''; 
+                 youtubePlayerContainerEl.removeAttribute('click-listener-added');
+                 youtubePlayerContainerEl.innerHTML = '';
                  youtubePlayerContainerEl.style.display = 'none';
              }
         }
@@ -934,16 +919,16 @@
         console.log("Setting up audio player with base64 data URI.");
         try {
              viewerAudioPlayerEl.src = audioDataURI;
-             viewerAudioPlayerEl.load(); 
+             viewerAudioPlayerEl.load();
              const playPromise = viewerAudioPlayerEl.play();
              if (playPromise !== undefined) {
                  playPromise.then(() => {
                      console.log("Audio playback started.");
-                 }).catch(error => { 
+                 }).catch(error => {
                      console.error("Audio playback failed (likely autoplay blocked):", error);
-                  }); 
+                  });
              }
-             viewerAudioPlayerEl.style.display = 'block'; 
+             viewerAudioPlayerEl.style.display = 'block';
              viewerApp.state.currentAudioElement = viewerAudioPlayerEl; // Store ref
         } catch (e) {
              console.error("Error setting up audio player:", e);
@@ -958,9 +943,9 @@
                  if (!audioPlayer.paused) {
                      audioPlayer.pause();
                  }
-                 audioPlayer.removeAttribute('src'); 
-                 audioPlayer.load(); 
-                 audioPlayer.style.display = 'none'; 
+                 audioPlayer.removeAttribute('src');
+                 audioPlayer.load();
+                 audioPlayer.style.display = 'none';
                  console.log("Audio Player Stopped and Cleared.");
              } catch (e) {
                   console.error("Error stopping/clearing audio player:", e);
@@ -968,5 +953,75 @@
         }
          viewerApp.state.currentAudioElement = null; // Clear ref
     }
+
+    // --- NEW Spotlight Functions (Step 23) ---
+    function applySpotlightEffect(targetObject) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || viewerApp.state.isSpotlightActive) {
+             console.log(`Spotlight not applied: canvas=${!!canvas}, isSpotlightActive=${viewerApp.state.isSpotlightActive}`);
+             return;
+        }
+
+        console.log("Applying spotlight effect to:", targetObject);
+        viewerApp.state.isSpotlightActive = true;
+        viewerApp.state.spotlightOriginalOpacities.clear(); // Clear previous opacities
+
+        const spotlightOpacity = 0.15; // Make it more noticeable
+        let objectsDimmed = 0;
+
+        canvas.forEachObject(function(obj) {
+            if (obj !== targetObject) {
+                // Store original opacity, handling undefined (treat as 1)
+                const originalOpacity = obj.opacity === undefined ? 1 : obj.opacity;
+                viewerApp.state.spotlightOriginalOpacities.set(obj, originalOpacity);
+                // Apply spotlight dimming
+                console.log(`  Dimming object ${obj.type}: opacity ${originalOpacity} -> ${spotlightOpacity}`);
+                obj.set('opacity', spotlightOpacity);
+                obj.set('evented', false); // Make dimmed objects non-interactive
+                objectsDimmed++;
+            } else {
+                 console.log(`  Target object ${obj.type}: opacity ${obj.opacity} (unchanged), evented=true`);
+                 // Ensure the target object remains interactive
+                 obj.set('evented', true);
+            }
+        });
+
+        console.log(`Spotlight applied. ${objectsDimmed} objects dimmed.`);
+        canvas.renderAll();
+        displayMessageViewer("Spotlight active. Click outside the object to remove.", true); // Inform user
+    }
+
+    function removeSpotlightEffect() {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || !viewerApp.state.isSpotlightActive) {
+            console.log(`Spotlight not removed: canvas=${!!canvas}, isSpotlightActive=${viewerApp.state.isSpotlightActive}`);
+            return;
+        }
+
+        console.log("Removing spotlight effect.");
+        let objectsRestored = 0;
+
+        canvas.forEachObject(function(obj) {
+            // Restore original opacity if it was stored
+            if (viewerApp.state.spotlightOriginalOpacities.has(obj)) {
+                const originalOpacity = viewerApp.state.spotlightOriginalOpacities.get(obj);
+                console.log(`  Restoring object ${obj.type}: opacity ${obj.opacity} -> ${originalOpacity}`);
+                obj.set('opacity', originalOpacity);
+                objectsRestored++;
+            } else {
+                 console.log(`  Object ${obj.type} not in original opacity map (likely target).`);
+            }
+            // Restore interactivity for all objects (simplest approach)
+             obj.set('evented', true);
+        });
+
+        viewerApp.state.isSpotlightActive = false;
+        viewerApp.state.spotlightOriginalOpacities.clear();
+        console.log(`Spotlight removed. ${objectsRestored} objects restored.`);
+        canvas.renderAll();
+         // Clear the message or let it timeout
+        // displayMessageViewer("", true); // Optionally clear message immediately
+    }
+    // --- End NEW Spotlight Functions ---
 
   </script>

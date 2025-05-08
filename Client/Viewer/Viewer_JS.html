@@ -229,6 +229,7 @@
         showLoadingViewer(false);
         if (!response || !response.success || !response.data) {
             onServerErrorViewer(response || { error: "Failed to load project data or project is not active." });
+             showProjectListView(); // Go back to list on error
             return;
         }
         try {
@@ -457,8 +458,8 @@
                 canvas.renderAll(); 
             });
         } else {
-             // Ensure canvas renders even if no objects AND background was set
-            // canvas.renderAll(); // Already called after setting BG color/media
+             // Canvas background/color already rendered in switch statement
+             // canvas.renderAll(); // Might be redundant
         }
         updateSlideNavigationUI();
     }
@@ -534,13 +535,12 @@
     }
 
     function navigateToPrevSlide() {
-        if (viewerApp.state.currentSlideIndex > 0) {
+         if (viewerApp.state.currentSlideIndex > 0) {
             renderSlideForViewing(viewerApp.state.currentSlideIndex - 1);
         }
     }
-
     function navigateToNextSlide() {
-        if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) {
+         if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) {
             renderSlideForViewing(viewerApp.state.currentSlideIndex + 1);
         }
     }
@@ -566,6 +566,7 @@
         // Check if YT object and Player constructor are available
         if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
             console.error("YT object or YT.Player is not available. API might not be fully loaded yet.");
+            displayMessageViewer("YouTube Player API not ready. Please wait and try again.", false);
             // Optionally, retry after a short delay
             // setTimeout(() => setupYouTubePlayer(videoId), 500); 
             return;
@@ -574,17 +575,19 @@
         try {
              // Ensure previous player is destroyed if somehow it exists
              if(ytPlayer && typeof ytPlayer.destroy === 'function') {
+                 console.log("Destroying previous YT player instance.");
                  ytPlayer.destroy();
                  ytPlayer = null;
              }
+             console.log("Creating new YT.Player instance.");
              ytPlayer = new YT.Player('youtube-player-div', {
                 height: '100%', 
                 width: '100%', 
                 videoId: videoId,
                 playerVars: {
                     'playsinline': 1, 
-                    'autoplay': 1,    
-                    'controls': 0,    
+                    'autoplay': 0,    // **** CHANGED TO 0 ****
+                    'controls': 1,    // **** CHANGED TO 1 **** Show controls so user can play
                     'rel': 0,         
                     'showinfo': 0,     
                     'modestbranding': 1, 
@@ -596,37 +599,53 @@
                     'onError': onPlayerError // Add error handler
                 }
             });
+             console.log("YT.Player instance potentially created (check console for errors/readiness).");
         } catch (e) {
             console.error("Error creating YouTube player instance:", e);
-            displayMessageViewer("Error initializing YouTube player.", false);
+            displayMessageViewer(`Error initializing YouTube player: ${e.message}`, false);
+             if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'none'; // Hide container on error
         }
     }
 
     function onPlayerReady(event) {
-        console.log("YouTube Player Ready. Attempting to play video:", event.target.getVideoData().video_id);
-        event.target.playVideo();
-        // event.target.mute(); // Mute might be required for autoplay in some browsers
+        // Autoplay is off, so just log readiness. User needs to click play.
+        console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
+        // event.target.playVideo(); // Do not autoplay
     }
 
     function onPlayerStateChange(event) {
-        console.log("YouTube Player State Change:", event.data);
-        // if (event.data == YT.PlayerState.ENDED) { ytPlayer.seekTo(0); } // Example: Loop
+        console.log("YouTube Player State Change:", event.data, "(Playing:", YT.PlayerState.PLAYING, "Paused:", YT.PlayerState.PAUSED, "Ended:", YT.PlayerState.ENDED, ")");
     }
 
     function onPlayerError(event) {
-        console.error("YouTube Player Error:", event.data);
-        // Map error codes to messages if needed: https://developers.google.com/youtube/iframe_api_reference#onError
-        displayMessageViewer(`YouTube Player Error: Code ${event.data}. Video might be private, removed, or blocked.`, false);
+        console.error("YouTube Player Error Code:", event.data);
+        let errorMsg = `YouTube Player Error: Code ${event.data}. `;
+        // Provide more context based on common error codes
+        switch (event.data) {
+            case 2: errorMsg += "Invalid video ID."; break;
+            case 5: errorMsg += "HTML5 player error."; break;
+            case 100: errorMsg += "Video not found or private."; break;
+            case 101: 
+            case 150: errorMsg += "Playback forbidden by owner."; break;
+            default: errorMsg += "Unknown error."; break;
+        }
+        displayMessageViewer(errorMsg, false);
     }
 
     function stopAndDestroyYouTubePlayer() {
         try {
+            // Check if ytPlayer exists and has the necessary methods before calling them
             if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
                 ytPlayer.stopVideo();
+                console.log("Called ytPlayer.stopVideo()");
+            } else {
+                 // console.log("ytPlayer.stopVideo not available or ytPlayer is null.");
             }
             if (ytPlayer && typeof ytPlayer.destroy === 'function') {
                 ytPlayer.destroy();
-                 console.log("YouTube Player Stopped and Destroyed.");
+                 console.log("YouTube Player Destroyed.");
+            } else {
+                 // console.log("ytPlayer.destroy not available or ytPlayer is null.");
             }
              ytPlayer = null; // Clear the global reference
         } catch (e) {
@@ -644,6 +663,7 @@
         if (!url) return null;
         let videoId = null;
         try {
+            // Handle various YouTube URL formats
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             videoId = (match && match[2].length === 11) ? match[2] : null;
@@ -666,14 +686,13 @@
              if (playPromise !== undefined) {
                  playPromise.then(() => {
                      console.log("Audio playback started.");
-                     // viewerAudioPlayerEl.style.display = 'block'; // Controls shown below
                  }).catch(error => { 
                      console.error("Audio playback failed (likely autoplay blocked):", error);
-                     displayMessageViewer("Audio couldn't autoplay. Use controls.", false); 
-                     // viewerAudioPlayerEl.style.display = 'block'; // Ensure controls are visible if autoplay fails
+                     // Don't show confusing message if source loaded fine but autoplay blocked
+                     // displayMessageViewer("Audio couldn't autoplay. Use controls.", false); 
                   }); 
              }
-             // Always show controls for audio for now
+             // Always show controls for audio
              viewerAudioPlayerEl.style.display = 'block'; 
              viewerApp.state.currentAudioElement = viewerAudioPlayerEl; // Store ref
         } catch (e) {

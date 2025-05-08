@@ -49,8 +49,8 @@
       
       viewerMediaContainerEl = document.getElementById('viewerMediaContainer'); // New
       youtubePlayerContainerEl = document.getElementById('youtubePlayerContainer'); // New
-      viewerCanvasContainerEl = document.getElementById('viewerCanvasContainer');
-      viewerFabricCanvasEl = document.getElementById('viewerFabricCanvas');
+      viewerCanvasContainerEl = document.getElementById('viewerCanvasContainer'); // Container for the canvas
+      viewerFabricCanvasEl = document.getElementById('viewerFabricCanvas'); // The actual canvas element
       
       viewerPrevSlideButtonEl = document.getElementById('viewerPrevSlideButton');
       viewerNextSlideButtonEl = document.getElementById('viewerNextSlideButton');
@@ -336,6 +336,10 @@
         canvas.clear(); 
         canvas.setBackgroundImage(null, () => { canvas.renderAll(); }); // Ensure BG cleared before loading new one
         canvas.backgroundColor = 'transparent'; // Default transparent for layering
+        
+        // **** Default: Make canvas interactive ****
+        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto'; 
+        canvas.evented = true; // Make fabric canvas itself evented by default
 
         // Load Media based on type
         const media = slideData.slideMedia;
@@ -348,7 +352,6 @@
 
         switch(mediaType) {
             case 'image':
-                // Assuming URL is base64 for images loaded via admin interface
                 if (media.url && media.url.startsWith('data:image')) {
                     fabric.Image.fromURL(media.url, function(img) {
                         if (!viewerApp.state.viewerFabricCanvas || viewerApp.state.currentSlideIndex !== slideIndex) return; 
@@ -358,8 +361,8 @@
                     }, { crossOrigin: 'anonymous' });
                 } else {
                      console.warn("Image media present but URL is missing or not base64:", media.url);
-                     canvas.backgroundColor = '#e9e9e9'; // Fallback BG
-                     canvas.renderAll(); // Render fallback immediately
+                     canvas.backgroundColor = '#e9e9e9'; 
+                     canvas.renderAll(); 
                 }
                 break;
 
@@ -368,65 +371,65 @@
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
                         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'block';
-                        // *** Ensure API is ready before calling setup ***
                         if (isYouTubeApiReady) {
                              setupYouTubePlayer(videoId); 
                         } else {
                              console.warn("YouTube API not ready yet when trying to render slide. Waiting for onYouTubeIframeAPIReady.");
-                             // We might need a mechanism here to queue the player setup 
-                             // if onYouTubeIframeAPIReady hasn't fired yet. For now, just log.
                         }
-                         canvas.backgroundColor = 'transparent'; // Ensure canvas overlay is transparent
-                         canvas.renderAll(); // Re-render canvas to ensure transparency
+                         canvas.backgroundColor = 'transparent'; 
+                         // **** Make canvas non-interactive for YouTube ****
+                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none'; 
+                         canvas.evented = false; // Disable fabric canvas events
+                         canvas.renderAll(); 
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
-                         canvas.backgroundColor = '#555'; // Error state background
-                         canvas.renderAll(); // Render error background
+                         canvas.backgroundColor = '#555'; 
+                         canvas.renderAll(); 
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
-                     canvas.backgroundColor = '#e9e9e9'; // Fallback BG
-                     canvas.renderAll(); // Render fallback
+                     canvas.backgroundColor = '#e9e9e9'; 
+                     canvas.renderAll(); 
                 }
                 break;
 
             case 'audio':
-                 if (media.driveFileId) { // Use Drive File ID to fetch base64 data
+                 if (media.driveFileId) { 
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
-                     showLoadingViewer(true); // Show spinner while fetching audio data
+                     showLoadingViewer(true); 
                      google.script.run
                          .withSuccessHandler(function(audioResponse) {
                              showLoadingViewer(false);
-                             if (viewerApp.state.currentSlideIndex !== slideIndex) return; // Slide changed
+                             if (viewerApp.state.currentSlideIndex !== slideIndex) return; 
                              if (audioResponse && audioResponse.success && audioResponse.base64Data) {
-                                 setupAudioPlayer(audioResponse.base64Data); // Use base64 data URI
-                                 if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block'; // Show controls
-                                 canvas.backgroundColor = '#e0e0e0'; // Neutral background for audio slides
-                                 canvas.renderAll(); // Render BG change
+                                 setupAudioPlayer(audioResponse.base64Data); 
+                                 if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block'; 
+                                 canvas.backgroundColor = '#e0e0e0'; 
+                                 canvas.renderAll(); 
                              } else {
                                  console.error("Failed to fetch audio base64 data:", audioResponse);
                                  onServerErrorViewer(audioResponse || {error: "Failed to load audio data."});
-                                 canvas.backgroundColor = '#e9e9e9'; // Fallback BG
-                                 canvas.renderAll(); // Render fallback
+                                 canvas.backgroundColor = '#e9e9e9'; 
+                                 canvas.renderAll(); 
                              }
                          })
-                         .withFailureHandler(function(error) { // Separate failure handler for audio fetch
+                         .withFailureHandler(function(error) { 
                              showLoadingViewer(false);
                              onServerErrorViewer(error);
-                             canvas.backgroundColor = '#e9e9e9'; // Fallback BG
-                             canvas.renderAll(); // Render fallback
+                             canvas.backgroundColor = '#e9e9e9'; 
+                             canvas.renderAll(); 
                          })
                          .getAudioAsBase64(media.driveFileId);
                  } else {
                      console.warn("Audio media type set but driveFileId is missing.");
-                     canvas.backgroundColor = '#e9e9e9'; // Fallback BG
-                     canvas.renderAll(); // Render fallback BG immediately
+                     canvas.backgroundColor = '#e9e9e9'; 
+                     canvas.renderAll(); 
                  }
                  break;
 
             default: // 'none' or unknown
-                 canvas.backgroundColor = '#e9e9e9'; // Standard empty background
-                 canvas.renderAll(); // Render background
+                 canvas.backgroundColor = '#e9e9e9'; 
+                 canvas.renderAll(); 
                  break;
         }
         
@@ -437,15 +440,17 @@
                 
                 canvas.forEachObject(function(obj) {
                     obj.selectable = false; 
-                    obj.evented = true;    
-                    obj.hoverCursor = 'pointer'; 
+                    // Make objects non-evented if canvas is non-evented (YouTube BG)
+                    // Otherwise, make them evented for interactions
+                    obj.evented = (mediaType !== 'youtube'); 
+                    obj.hoverCursor = (mediaType !== 'youtube') ? 'pointer' : 'default'; 
 
                     // Remove potentially duplicated listeners first
                     obj.off('mousedown');
                     obj.off('mouseover');
 
-                    // Attach interaction listeners
-                    if (obj.customInteraction && obj.customInteraction.trigger) {
+                    // Attach interaction listeners ONLY if canvas is evented
+                    if (obj.evented && obj.customInteraction && obj.customInteraction.trigger) {
                         if (obj.customInteraction.trigger === 'click') {
                             obj.on('mousedown', function(options) { 
                                 if (this.customInteraction.trigger === 'click') {
@@ -467,7 +472,6 @@
             });
         } else {
              // Canvas background/color already rendered in switch statement
-             // canvas.renderAll(); // Might be redundant
         }
         updateSlideNavigationUI();
     }
@@ -555,11 +559,9 @@
 
 
     // --- YouTube Player API Functions ---
-    // This global function MUST exist for the API script to call
     function onYouTubeIframeAPIReady() {
         console.log("YouTube IFrame API Ready (called by external script).");
         isYouTubeApiReady = true; // Set the flag
-        // If a player setup was pending, trigger it now? Or rely on renderSlide to call setup again.
     }
 
     function setupYouTubePlayer(videoId) {
@@ -576,8 +578,6 @@
         if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
             console.error("YT object or YT.Player is not available or API not ready.");
             displayMessageViewer("YouTube Player API not ready. Please wait or reload.", false);
-            // Optionally retry, but might indicate a loading issue with the API script itself
-            // setTimeout(() => { if(viewerApp.state.currentProjectData) setupYouTubePlayer(videoId); }, 1000); 
             return;
         }
 
@@ -595,7 +595,7 @@
                 videoId: videoId,
                 playerVars: { 
                     'autoplay': 0,       
-                    'controls': 0,       // Turn controls off again based on working example 
+                    'controls': 0, // Turn controls off again 
                     'rel': 0,            
                     'showinfo': 0,       
                     'modestbranding': 1, 
@@ -621,28 +621,33 @@
     function onPlayerReady(event) {
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
         
-         // Add an event listener to the container to play on click (since controls=0)
-         const playerDiv = document.getElementById('youtube-player-div'); // Get the inner div
-         if(playerDiv && !playerDiv.hasAttribute('click-listener-added')){
-             console.log("Adding click-to-play listener to YT player div.");
-             playerDiv.addEventListener('click', function() {
-                 console.log("Player div clicked.");
-                 if (ytPlayer && typeof ytPlayer.playVideo === 'function' && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-                     console.log("Calling playVideo().");
-                     ytPlayer.playVideo();
-                 } else if (ytPlayer && typeof ytPlayer.pauseVideo === 'function' && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
-                     console.log("Calling pauseVideo().");
-                     ytPlayer.pauseVideo(); // Allow clicking to pause too
+         // Add an event listener to the container to play/pause on click (since controls=0)
+         // Using the outer container which should be easier to click reliably
+         if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
+             console.log("Adding click-to-play listener to YT player container.");
+             youtubePlayerContainerEl.addEventListener('click', function() {
+                 console.log("Player container clicked.");
+                 if (ytPlayer && typeof ytPlayer.playVideo === 'function' && typeof ytPlayer.pauseVideo === 'function' && typeof ytPlayer.getPlayerState === 'function') {
+                     const state = ytPlayer.getPlayerState();
+                     if (state !== YT.PlayerState.PLAYING) {
+                         console.log("Calling playVideo().");
+                         ytPlayer.playVideo();
+                     } else {
+                         console.log("Calling pauseVideo().");
+                         ytPlayer.pauseVideo(); 
+                     }
+                 } else {
+                     console.warn("Cannot play/pause: Player or methods not available.");
                  }
              });
-             playerDiv.setAttribute('click-listener-added', 'true');
+             youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
          }
-         // Try playing immediately after adding listener, maybe it works now?
-         // event.target.playVideo();
+         // Do NOT autoplay: event.target.playVideo();
     }
 
     function onPlayerStateChange(event) {
         console.log("YouTube Player State Change:", event.data, "(Playing:", YT.PlayerState.PLAYING, "Paused:", YT.PlayerState.PAUSED, "Ended:", YT.PlayerState.ENDED, ")");
+        // Potentially add logic here if needed based on state changes
     }
 
     function onPlayerError(event) {
@@ -674,9 +679,10 @@
             console.error("Error stopping/destroying YouTube player:", e);
         } finally {
              if (youtubePlayerContainerEl) {
+                 // Remove click listener before clearing innerHTML? Maybe not necessary.
+                 youtubePlayerContainerEl.removeAttribute('click-listener-added'); 
                  youtubePlayerContainerEl.innerHTML = ''; 
                  youtubePlayerContainerEl.style.display = 'none';
-                 // No need to remove attribute here as container is cleared
              }
         }
     }
@@ -685,6 +691,7 @@
         if (!url) return null;
         let videoId = null;
         try {
+            // Handle various YouTube URL formats
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             videoId = (match && match[2].length === 11) ? match[2] : null;
@@ -709,8 +716,10 @@
                      console.log("Audio playback started.");
                  }).catch(error => { 
                      console.error("Audio playback failed (likely autoplay blocked):", error);
+                     // displayMessageViewer("Audio couldn't autoplay. Use controls.", false); 
                   }); 
              }
+             // Always show controls for audio
              viewerAudioPlayerEl.style.display = 'block'; 
              viewerApp.state.currentAudioElement = viewerAudioPlayerEl; // Store ref
         } catch (e) {

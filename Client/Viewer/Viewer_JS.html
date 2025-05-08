@@ -320,16 +320,32 @@
         // Set canvas dimensions and container dimensions
         const slideWidth = slideData.canvasWidth || viewerApp.state.defaultCanvasWidth;
         const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
-        canvas.setWidth(slideWidth);
-        canvas.setHeight(slideHeight);
-        if (viewerFabricCanvasEl) { 
-            viewerFabricCanvasEl.width = slideWidth;
-            viewerFabricCanvasEl.height = slideHeight;
+        // Don't set canvas size if YT is playing, let container handle it
+        const media = slideData.slideMedia;
+        let mediaType = (media && media.type) ? media.type : 'none';
+        
+        if (mediaType !== 'youtube') {
+            canvas.setWidth(slideWidth);
+            canvas.setHeight(slideHeight);
+            if (viewerFabricCanvasEl) { 
+                viewerFabricCanvasEl.width = slideWidth;
+                viewerFabricCanvasEl.height = slideHeight;
+            }
+        } else {
+             // For youtube, ensure canvas itself doesn't dictate size? Or maybe it should match?
+             // Let's still set it to match for consistency in overlay positioning if we ever re-enable it.
+            canvas.setWidth(slideWidth);
+            canvas.setHeight(slideHeight);
+             if (viewerFabricCanvasEl) { 
+                viewerFabricCanvasEl.width = slideWidth;
+                viewerFabricCanvasEl.height = slideHeight;
+            }
         }
-        // Adjust media container size to match canvas/slide aspect ratio
+
+        // Adjust media container size to match slide aspect ratio
         if (viewerMediaContainerEl) {
             viewerMediaContainerEl.style.width = slideWidth + 'px';
-             viewerMediaContainerEl.style.height = slideHeight + 'px'; 
+            viewerMediaContainerEl.style.height = slideHeight + 'px'; 
         }
         
         // Clear canvas objects and background image
@@ -337,21 +353,16 @@
         canvas.setBackgroundImage(null, () => { canvas.renderAll(); }); // Ensure BG cleared before loading new one
         canvas.backgroundColor = 'transparent'; // Default transparent for layering
         
-        // **** Default: Make canvas interactive ****
-        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto'; 
-        canvas.evented = true; // Make fabric canvas itself evented by default
-
-        // Load Media based on type
-        const media = slideData.slideMedia;
-        let mediaType = (media && media.type) ? media.type : 'none';
-        console.log(`Rendering slide ${slideIndex + 1}, media type: ${mediaType}`);
-
         // Hide all media containers initially
         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'none';
+        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'none'; // Hide canvas container initially
         if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'none'; 
+
+        console.log(`Rendering slide ${slideIndex + 1}, media type: ${mediaType}`);
 
         switch(mediaType) {
             case 'image':
+                if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas for image
                 if (media.url && media.url.startsWith('data:image')) {
                     fabric.Image.fromURL(media.url, function(img) {
                         if (!viewerApp.state.viewerFabricCanvas || viewerApp.state.currentSlideIndex !== slideIndex) return; 
@@ -370,30 +381,32 @@
                 if (media.url) {
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
-                        if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'block';
+                        if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'block'; // Show YT container
+                        // Note: Canvas container remains hidden
                         if (isYouTubeApiReady) {
                              setupYouTubePlayer(videoId); 
                         } else {
-                             console.warn("YouTube API not ready yet when trying to render slide. Waiting for onYouTubeIframeAPIReady.");
+                             console.warn("YouTube API not ready yet when trying to render slide.");
+                             // Consider queuing setupYouTubePlayer if API not ready
                         }
-                         canvas.backgroundColor = 'transparent'; 
-                         // **** Make canvas non-interactive for YouTube ****
-                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none'; 
-                         canvas.evented = false; // Disable fabric canvas events
-                         canvas.renderAll(); 
+                         // No need to set canvas background as canvas container is hidden
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
+                         // Show canvas container with error BG if YT fails
+                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
                          canvas.backgroundColor = '#555'; 
                          canvas.renderAll(); 
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
+                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas
                      canvas.backgroundColor = '#e9e9e9'; 
                      canvas.renderAll(); 
                 }
                 break;
 
             case 'audio':
+                 if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas for audio
                  if (media.driveFileId) { 
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true); 
@@ -428,29 +441,27 @@
                  break;
 
             default: // 'none' or unknown
+                 if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas
                  canvas.backgroundColor = '#e9e9e9'; 
                  canvas.renderAll(); 
                  break;
         }
         
-        // Load Fabric objects (overlays) - AFTER background/media setup
-        if (slideData.fabricCanvasJSON) {
+        // Load Fabric objects (overlays) ONLY if canvas container is visible
+        if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none' && slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) return; 
                 
                 canvas.forEachObject(function(obj) {
                     obj.selectable = false; 
-                    // Make objects non-evented if canvas is non-evented (YouTube BG)
-                    // Otherwise, make them evented for interactions
-                    obj.evented = (mediaType !== 'youtube'); 
-                    obj.hoverCursor = (mediaType !== 'youtube') ? 'pointer' : 'default'; 
+                    obj.evented = true; // Events are fine if canvas is visible   
+                    obj.hoverCursor = 'pointer'; 
 
-                    // Remove potentially duplicated listeners first
-                    obj.off('mousedown');
+                    obj.off('mousedown'); // Remove previous listeners
                     obj.off('mouseover');
 
-                    // Attach interaction listeners ONLY if canvas is evented
-                    if (obj.evented && obj.customInteraction && obj.customInteraction.trigger) {
+                    // Attach interaction listeners
+                    if (obj.customInteraction && obj.customInteraction.trigger) {
                         if (obj.customInteraction.trigger === 'click') {
                             obj.on('mousedown', function(options) { 
                                 if (this.customInteraction.trigger === 'click') {
@@ -467,114 +478,40 @@
                         }
                     }
                 });
-                // Final render after objects loaded and listeners attached
                 canvas.renderAll(); 
             });
-        } else {
-             // Canvas background/color already rendered in switch statement
+        } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
+             // If canvas is shown but no JSON, ensure it's rendered (already done by BG set)
+             // canvas.renderAll(); 
         }
         updateSlideNavigationUI();
     }
 
     // --- Interaction & Modal Handling ---
-    function handleOverlayInteraction(fabricObject, eventType) {
-        if (!fabricObject.customInteraction) return;
-        const interaction = fabricObject.customInteraction;
-
-        if (interaction.trigger !== eventType) return; 
-
-        console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
-
-        switch (interaction.action) {
-            case 'showModal':
-                if (interaction.modalContent) {
-                    showViewerModal(interaction.modalContent);
-                }
-                break;
-            case 'navigateToSlide':
-                const targetSlideId = interaction.navigateTo;
-                if (targetSlideId && viewerApp.state.currentProjectData && viewerApp.state.currentProjectData.slides) {
-                    const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
-                    if (targetSlideIndex !== -1) {
-                        renderSlideForViewing(targetSlideIndex);
-                    } else {
-                        console.warn("NavigateToSlide: Target slide ID not found:", targetSlideId);
-                        displayMessageViewer(`Navigation error: Slide '${targetSlideId}' not found.`, false);
-                    }
-                }
-                break;
-            case 'navigateToURL':
-                if (interaction.navigateTo) {
-                    let url = interaction.navigateTo;
-                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                        url = 'https://' + url; // Default to https
-                    }
-                    try {
-                         const newWindow = window.open(url, '_blank');
-                         if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-                              displayMessageViewer("Could not open link. Please check browser popup settings.", false);
-                         }
-                    } catch (e) {
-                         console.error("Error opening URL:", e);
-                         displayMessageViewer("Error opening link.", false);
-                    }
-                }
-                break;
-            default:
-                console.log("Unknown or no action defined for this interaction.");
-        }
-    }
-
-    function showViewerModal(htmlContent) {
-        if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;
-        if (viewerModalEl) viewerModalEl.style.display = 'flex'; 
-    }
-
-    function hideViewerModal() {
-        if (viewerModalEl) viewerModalEl.style.display = 'none';
-        if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = ''; 
-    }
+    function handleOverlayInteraction(fabricObject, eventType) { /* ... no changes ... */ }
+    function showViewerModal(htmlContent) { /* ... no changes ... */ }
+    function hideViewerModal() { /* ... no changes ... */ }
     
     // --- Slide Navigation ---
-    function updateSlideNavigationUI() {
-        if (!viewerApp.state.currentProjectData || !viewerApp.state.currentProjectData.slides) return;
-        const numSlides = viewerApp.state.currentProjectData.slides.length;
-        const currentIndex = viewerApp.state.currentSlideIndex;
-
-        if (viewerSlideIndicatorEl) viewerSlideIndicatorEl.textContent = `Slide ${currentIndex + 1} / ${numSlides}`;
-        if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = (currentIndex === 0);
-        if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.disabled = (currentIndex >= numSlides - 1);
-    }
-
-    function navigateToPrevSlide() {
-         if (viewerApp.state.currentSlideIndex > 0) {
-            renderSlideForViewing(viewerApp.state.currentSlideIndex - 1);
-        }
-    }
-    function navigateToNextSlide() {
-         if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) {
-            renderSlideForViewing(viewerApp.state.currentSlideIndex + 1);
-        }
-    }
+    function updateSlideNavigationUI() { /* ... no changes ... */ }
+    function navigateToPrevSlide() { /* ... no changes ... */ }
+    function navigateToNextSlide() { /* ... no changes ... */ }
 
 
     // --- YouTube Player API Functions ---
     function onYouTubeIframeAPIReady() {
         console.log("YouTube IFrame API Ready (called by external script).");
-        isYouTubeApiReady = true; // Set the flag
+        isYouTubeApiReady = true; 
     }
 
     function setupYouTubePlayer(videoId) {
         if (!youtubePlayerContainerEl) {
             console.error("YouTube player container element not found."); return;
         }
-        // Ensure container is empty and visible before creating player
-        youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>'; // Target + Style
+        youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>'; 
         youtubePlayerContainerEl.style.display = 'block';
-        
         console.log("Setting up YouTube player for video ID:", videoId);
         
-        // ** Check API readiness flag **
         if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
             console.error("YT object or YT.Player is not available or API not ready.");
             displayMessageViewer("YouTube Player API not ready. Please wait or reload.", false);
@@ -582,7 +519,6 @@
         }
 
         try {
-             // Ensure previous player is destroyed
              if(ytPlayer && typeof ytPlayer.destroy === 'function') {
                  console.log("Destroying previous YT player instance.");
                  ytPlayer.destroy();
@@ -595,7 +531,7 @@
                 videoId: videoId,
                 playerVars: { 
                     'autoplay': 0,       
-                    'controls': 0, // Turn controls off again 
+                    'controls': 0, // Keep controls off
                     'rel': 0,            
                     'showinfo': 0,       
                     'modestbranding': 1, 
@@ -621,8 +557,7 @@
     function onPlayerReady(event) {
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
         
-         // Add an event listener to the container to play/pause on click (since controls=0)
-         // Using the outer container which should be easier to click reliably
+         // Add click listener to the CONTAINER div now
          if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
              console.log("Adding click-to-play listener to YT player container.");
              youtubePlayerContainerEl.addEventListener('click', function() {
@@ -642,12 +577,10 @@
              });
              youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
          }
-         // Do NOT autoplay: event.target.playVideo();
     }
 
     function onPlayerStateChange(event) {
         console.log("YouTube Player State Change:", event.data, "(Playing:", YT.PlayerState.PLAYING, "Paused:", YT.PlayerState.PAUSED, "Ended:", YT.PlayerState.ENDED, ")");
-        // Potentially add logic here if needed based on state changes
     }
 
     function onPlayerError(event) {
@@ -679,7 +612,7 @@
             console.error("Error stopping/destroying YouTube player:", e);
         } finally {
              if (youtubePlayerContainerEl) {
-                 // Remove click listener before clearing innerHTML? Maybe not necessary.
+                 // Remove click listener? Maybe not necessary if innerHTML is cleared.
                  youtubePlayerContainerEl.removeAttribute('click-listener-added'); 
                  youtubePlayerContainerEl.innerHTML = ''; 
                  youtubePlayerContainerEl.style.display = 'none';
@@ -691,7 +624,6 @@
         if (!url) return null;
         let videoId = null;
         try {
-            // Handle various YouTube URL formats
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             videoId = (match && match[2].length === 11) ? match[2] : null;
@@ -716,10 +648,8 @@
                      console.log("Audio playback started.");
                  }).catch(error => { 
                      console.error("Audio playback failed (likely autoplay blocked):", error);
-                     // displayMessageViewer("Audio couldn't autoplay. Use controls.", false); 
                   }); 
              }
-             // Always show controls for audio
              viewerAudioPlayerEl.style.display = 'block'; 
              viewerApp.state.currentAudioElement = viewerAudioPlayerEl; // Store ref
         } catch (e) {

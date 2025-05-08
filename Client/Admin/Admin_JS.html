@@ -1184,17 +1184,17 @@
             displayMessage("Invalid media type for Picker.", false); return;
         }
         
-        // ---> FIX: Get the current origin dynamically <---
-        const currentOrigin = window.location.origin;
-        console.log("Setting Picker origin to:", currentOrigin); 
+        // ---> FIX #2: Hardcode the *expected* origin by the Picker's check <---
+        const expectedOrigin = "https://script.google.com"; 
+        console.log("Setting Picker origin to (EXPECTED):", expectedOrigin); 
 
         const picker = new google.picker.PickerBuilder()
             .addView(view)
             .setOAuthToken(token)
             .setDeveloperKey(adminApp.state.developerApiKey)
             .setCallback(pickerCallback)
-            // ---> FIX: Add the setOrigin call <---
-            .setOrigin(currentOrigin) 
+            // ---> FIX #2: Use the hardcoded expected origin <---
+            .setOrigin(expectedOrigin) 
             .build();
         picker.setVisible(true);
         console.log("Drive Picker is now visible.");

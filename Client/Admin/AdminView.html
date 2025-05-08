@@ -4,6 +4,8 @@
     <base target="_top">
     <title>Admin Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <!-- Add YouTube Player API script -->
+    <script src="https://www.youtube.com/iframe_api"></script>
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
       .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -26,10 +28,10 @@
       #adminProjectListContainer { margin-top: 15px; }
       .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;} /* Allow wrap */
       .project-item > div:first-child { flex-basis: 60%; min-width: 200px;} /* Title/Status area */
-      .project-item > div:last-child { flex-basis: 35%; min-width: 200px; display: flex; justify-content: flex-end; } /* Controls area */
+      .project-item > div:last-child { flex-basis: 35%; min-width: 200px; display: flex; justify-content: flex-end; align-items: center;} /* Controls area */
       .project-item span { font-size: 1.1em; display: block; } /* Make title/status block */
       .project-item .status-text { font-style: italic; color: #555; font-size: 0.9em;}
-      .project-item .project-status-select { font-size: 0.9em; padding: 5px; margin-right: 10px; }
+      .project-item .project-status-select { font-size: 0.9em; padding: 5px; margin-right: 10px; border: 1px solid #ccc; border-radius: 3px; } /* Added specific styles */
 
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
@@ -42,8 +44,22 @@
         border-radius: 5px;
         background-color: #f9f9f9;
       }
-      .edit-controls-group label { margin-right: 10px; }
-      .edit-controls-group input[type="file"] { width: auto; } /* Adjust file input width */
+      .edit-controls-group label { 
+          margin-right: 10px; 
+          display: block; /* Make labels block for better spacing */
+          margin-bottom: 5px;
+      }
+      .edit-controls-group input[type="text"],
+      .edit-controls-group input[type="file"] {
+          display: block; /* Make inputs block */
+          width: calc(100% - 22px); /* Full width within padding */
+          margin-bottom: 15px; /* More space between items */
+      }
+       .edit-controls-group button {
+           margin-top: -5px; /* Adjust button spacing relative to input */
+           margin-bottom: 15px;
+       }
+
 
       #fabricCanvasContainer {
         display: flex; 
@@ -54,10 +70,25 @@
         border: 1px dashed #ccc; 
         min-height: 300px; 
         margin-top: 15px; 
+        position: relative; /* Needed for absolute positioning of placeholder */
       }
       #fabricCanvasElement { 
         border: 1px solid #000; 
       }
+
+       /* Style for media placeholder on admin canvas */
+       .media-placeholder {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          background-color: rgba(0, 0, 0, 0.7);
+          color: white;
+          padding: 5px 10px;
+          font-size: 0.9em;
+          border-radius: 3px;
+          pointer-events: none; /* Don't interfere with canvas interaction */
+          z-index: 5; /* Above background, below fabric objects */
+       }
 
       #slideManagementPanel {
         margin-top: 20px;
@@ -136,12 +167,11 @@
       }
       .toolbar-section { 
         padding-bottom: 10px;
-        /* display: flex; flex-direction: column; */ /* Arrange items vertically */
       }
        .toolbar-section label {
-          display: inline-block; /* Keep label and input on same line if space */
-          width: 110px; /* Consistent label width */
-          margin-bottom: 8px; /* Spacing below label/input pair */
+          display: inline-block; 
+          width: 110px; 
+          margin-bottom: 8px; 
           vertical-align: middle;
       }
        .toolbar-section input[type="number"],
@@ -149,8 +179,8 @@
        .toolbar-section input[type="text"],
        .toolbar-section select,
        .toolbar-section textarea {
-          display: inline-block; /* Keep label and input on same line */
-          width: 150px; /* Consistent input width */
+          display: inline-block; 
+          width: 150px; 
           max-width: 180px;
           padding: 6px;
           margin-bottom: 8px;
@@ -168,17 +198,18 @@
       }
       .toolbar-section textarea { 
         min-height: 60px;
-        width: 200px; /* Wider text area */
-        vertical-align: top; /* Align label with top */
+        width: 200px; 
+        vertical-align: top; 
       }
        .toolbar-section input[type="checkbox"] {
-            width: auto; /* Checkbox sizes itself */
+            width: auto; 
             vertical-align: middle;
-            margin-left: 5px; /* Space after label */
+            margin-left: 5px; 
        }
-        .toolbar-section .checkbox-label { /* Specific class for checkbox labels */
-           width: auto; /* Let checkbox labels size naturally */
+        .toolbar-section .checkbox-label { 
+           width: auto; 
            margin-left: 5px;
+           font-weight: normal; /* Make checkbox labels normal weight */
        }
 
       .toolbar-section h4 {
@@ -187,16 +218,16 @@
         color: #555;
         font-size: 0.9em;
         text-transform: uppercase;
-        width: 100%; /* Make header span full width */
+        width: 100%; 
       }
-      .config-section { /* For conditional display of interaction parameters */
+      .config-section { 
         margin-top: 10px;
         padding-left: 10px; 
         border-left: 2px solid #007bff;
-        width: 100%; /* Make config section span full width */
+        width: 100%; 
       }
-       .config-section label { width: 110px; } /* Keep label width consistent */
-       .config-section input, .config-section textarea { width: 200px; } /* Consistent width */
+       .config-section label { width: 110px; } 
+       .config-section input, .config-section textarea { width: 200px; } 
     </style>
   </head>
   <body>
@@ -212,7 +243,9 @@
         </div>
         <div class="container" id="projectListSection">
             <h2>Existing Projects</h2>
-            <div id="adminProjectListContainer"></div>
+            <div id="adminProjectListContainer">
+                 <!-- Dynamically populated -->
+            </div>
         </div>
     </div>
 
@@ -221,11 +254,30 @@
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
       
+        <!-- Updated Slide Settings Group -->
         <div class="edit-controls-group">
-            <h3>Current Slide Settings</h3>
-            <label for="imageUploader">Upload Image Background:</label>
+            <h3>Current Slide Settings / Media</h3>
+            
+            <label for="imageUploader">Image Background:</label>
             <input type="file" id="imageUploader" accept="image/*">
-             <!-- Add YouTube/Audio Inputs Here Later (Step 20) -->
+            <!-- Optional: Add button if not auto-applying on upload -->
+            <!-- <button id="setImageBackgroundButton">Set Image BG</button> -->
+
+            <hr style="margin: 20px 0;">
+
+            <label for="youtubeUrlInput">YouTube URL Background:</label>
+            <input type="text" id="youtubeUrlInput" placeholder="Paste YouTube video URL here">
+            <button id="setYoutubeBackgroundButton">Set YouTube BG</button>
+
+            <hr style="margin: 20px 0;">
+
+            <label for="audioUploader">Attach Slide Audio:</label>
+            <input type="file" id="audioUploader" accept="audio/*">
+            <!-- Removed Attach button - will trigger on file selection -->
+            <!-- <button id="attachAudioButton">Attach Audio File</button>  -->
+            <span id="attachedAudioName" style="margin-left: 10px; font-style: italic;"></span>
+            <button id="removeAudioButton" style="display:none; margin-left: 5px; background-color: #ffc107; color: black; padding: 5px 8px; font-size: 0.8em;">Remove Audio</button>
+
         </div>
 
         <div class="edit-controls-group">
@@ -255,7 +307,6 @@
                     <label for="objOpacity">Opacity:</label> <input type="range" id="objOpacity" min="0" max="1" step="0.01" class="sidebar-input" value="1.0">
                 </div>
                 
-                <!-- Updated Text Section -->
                 <div class="toolbar-section" id="textSpecificControls" style="display:none;">
                     <h4>Text Styling</h4>
                     <label for="objTextContent">Content:</label><br>
@@ -294,7 +345,6 @@
                     <input type="number" id="objCharSpacing" class="sidebar-input">
                 </div>
 
-                <!-- Updated Shadow Section -->
                 <div class="toolbar-section"> 
                     <h4>Shadow</h4>
                     <label for="objShadowColor">Color:</label> <input type="color" id="objShadowColor" class="sidebar-input" value="#000000"><br>
@@ -302,7 +352,6 @@
                     <label for="objShadowOffsetX">Offset X:</label> <input type="number" id="objShadowOffsetX" class="sidebar-input" value="0"><br>
                     <label for="objShadowOffsetY">Offset Y:</label> <input type="number" id="objShadowOffsetY" class="sidebar-input" value="0"><br>
                     
-                    <!-- New Shadow Checkboxes -->
                     <input type="checkbox" id="objShadowAffectStroke" class="sidebar-input">
                     <label for="objShadowAffectStroke" class="checkbox-label">Affects Stroke</label><br>
 
@@ -341,15 +390,19 @@
             </div>
         </div>
 
+        <!-- Updated Canvas Container to hold placeholder -->
         <div id="fabricCanvasContainer">
-          <canvas id="fabricCanvasElement"></canvas>
+            <div id="adminMediaPlaceholder" class="media-placeholder" style="display: none;"></div>
+            <canvas id="fabricCanvasElement"></canvas>
         </div>
+
 
         <div id="slideManagementPanel">
             <h3>Slides</h3>
             <button id="addSlideButton">Add New Slide</button>
             <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button>
             <div id="slideThumbnailsContainer">
+                 <!-- Dynamically populated -->
             </div>
         </div>
         

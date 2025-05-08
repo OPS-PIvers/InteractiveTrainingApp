@@ -1,992 +1,1153 @@
 <script>
-  // Namespace for the admin application
-  window.adminApp = {};
+    // Namespace for the admin application
+    window.adminApp = {};
 
-  // --- Constants ---
-  const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"]; // Add more as needed
+    // --- Constants ---
+    const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"]; 
 
-  // --- Application State ---
-  adminApp.state = {
-    isLoading: false,
-    currentProjectId: null,
-    currentView: 'list',
-    projectData: null, 
-    currentSlideIndex: -1, 
-    fabricCanvasInstance: null,
-    defaultCanvasWidth: 960, 
-    defaultCanvasHeight: 540,
-    projectListCache: [] 
-  };
-
-  // --- DOM Element References ---
-  let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
-  let listViewContainerEl, adminProjectListContainerEl;
-  let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
-  let imageUploaderEl;
-  let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; 
-  let addRectangleButtonEl, addCircleButtonEl; 
-  let addTextboxButtonEl; 
-
-  let overlayPropertiesToolbarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
-      objInteractionTriggerEl, objInteractionActionEl, 
-      modalContentConfigEl, objModalContentEl,
-      navigateToConfigEl, objNavigateToEl,
-      // Advanced Text Properties
-      objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl,
-      // Shadow Checkboxes
-      objShadowAffectStrokeEl, objShadowNonScalingEl,
-      // Existing properties
-      objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
-      textSpecificControlsEl, objTextContentEl,
-      objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
-
-  // --- Initialization ---
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log("Admin_JS: DOMContentLoaded event fired!");
-    adminApp.setupDOMReferences();
-    adminApp.attachEventListeners();
-    switchToListView();
-    loadAdminProjectsList(); 
-    console.log("Admin_JS: Initialization complete.");
-  });
-
-  // --- Setup and Listeners ---
-  adminApp.setupDOMReferences = function() {
-    messageAreaEl = document.getElementById('messageArea');
-    loadingSpinnerEl = document.getElementById('loadingSpinner');
-    listViewContainerEl = document.getElementById('listViewContainer');
-    projectTitleInputEl = document.getElementById('projectTitleInput');
-    createProjectButtonEl = document.getElementById('createProjectButton');
-    adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
-    editViewContainerEl = document.getElementById('editViewContainer');
-    editingProjectTitleEl = document.getElementById('editingProjectTitle');
-    backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
-    fabricCanvasEl = document.getElementById('fabricCanvasElement');
-    imageUploaderEl = document.getElementById('imageUploader');
-    addSlideButtonEl = document.getElementById('addSlideButton');
-    slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
-    saveProjectButtonEl = document.getElementById('saveProjectButton');
-    
-    addRectangleButtonEl = document.getElementById('addRectangleButton');
-    addCircleButtonEl = document.getElementById('addCircleButton');
-    addTextboxButtonEl = document.getElementById('addTextboxButton');
-
-    overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar'); 
-    objXEl = document.getElementById('objX');
-    objYEl = document.getElementById('objY');
-    objWidthEl = document.getElementById('objWidth');
-    objHeightEl = document.getElementById('objHeight');
-    objAngleEl = document.getElementById('objAngle');
-    objFillEl = document.getElementById('objFill');
-    objStrokeColorEl = document.getElementById('objStrokeColor');
-    objStrokeWidthEl = document.getElementById('objStrokeWidth');
-    objOpacityEl = document.getElementById('objOpacity');
-    textSpecificControlsEl = document.getElementById('textSpecificControls'); // This is the whole section div
-    objTextContentEl = document.getElementById('objTextContent');
-    objShadowColorEl = document.getElementById('objShadowColor');
-    objShadowBlurEl = document.getElementById('objShadowBlur');
-    objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
-    objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
-
-    objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
-    objInteractionActionEl = document.getElementById('objInteractionAction');
-    modalContentConfigEl = document.getElementById('modalContentConfig');
-    objModalContentEl = document.getElementById('objModalContent');
-    navigateToConfigEl = document.getElementById('navigateToConfig');
-    objNavigateToEl = document.getElementById('objNavigateTo');
-
-    // New Step 19 elements
-    objFontFamilyEl = document.getElementById('objFontFamily');
-    objFontSizeEl = document.getElementById('objFontSize');
-    objFontWeightEl = document.getElementById('objFontWeight');
-    objFontStyleEl = document.getElementById('objFontStyle');
-    objTextAlignEl = document.getElementById('objTextAlign');
-    objLineHeightEl = document.getElementById('objLineHeight');
-    objCharSpacingEl = document.getElementById('objCharSpacing');
-    objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
-    objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
-
-    if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
-    if (!slideThumbnailsContainerEl) console.warn("slideThumbnailsContainerEl not found during initial setup.");
-    if (!saveProjectButtonEl) console.warn("saveProjectButtonEl not found during initial setup.");
-    if (!imageUploaderEl) console.warn("imageUploaderEl not found during initial setup.");
-    if (!fabricCanvasEl) console.warn("fabricCanvasEl not found during initial setup.");
-    console.log("Admin_JS: DOM references set up.");
-  };
-
-  adminApp.attachEventListeners = function() {
-    const safelyAddListener = (element, eventType, handler, elementName) => {
-        if (element) {
-            element.addEventListener(eventType, handler);
-        } else {
-            if (elementName === 'createProjectButtonEl') console.warn(`Could not attach listener - ${elementName} not found initially.`);
-        }
+    // --- Application State ---
+    adminApp.state = {
+      isLoading: false,
+      currentProjectId: null,
+      currentView: 'list',
+      projectData: null, 
+      currentSlideIndex: -1, 
+      fabricCanvasInstance: null,
+      defaultCanvasWidth: 960, 
+      defaultCanvasHeight: 540,
+      projectListCache: [] 
     };
-    safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
-    console.log("Admin_JS: Initial event listeners attached.");
-  };
+  
+    // --- DOM Element References ---
+    let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
+    let listViewContainerEl, adminProjectListContainerEl;
+    let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
+    let imageUploaderEl;
+    let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; 
+    let addRectangleButtonEl, addCircleButtonEl; 
+    let addTextboxButtonEl; 
+  
+    let overlayPropertiesToolbarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
+        objInteractionTriggerEl, objInteractionActionEl, 
+        modalContentConfigEl, objModalContentEl,
+        navigateToConfigEl, objNavigateToEl,
+        objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl,
+        objShadowAffectStrokeEl, objShadowNonScalingEl,
+        // Step 20 Media Elements
+        youtubeUrlInputEl, setYoutubeBackgroundButtonEl,
+        audioUploaderEl, /* attachAudioButtonEl, */ attachedAudioNameEl, removeAudioButtonEl, // Removed attachAudioButtonEl reference as we trigger on change
+        adminMediaPlaceholderEl,
+        // Existing properties
+        objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
+        textSpecificControlsEl, objTextContentEl,
+        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
+  
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log("Admin_JS: DOMContentLoaded event fired!");
+      adminApp.setupDOMReferences();
+      adminApp.attachEventListeners();
+      switchToListView();
+      loadAdminProjectsList(); 
+      console.log("Admin_JS: Initialization complete.");
+    });
+  
+    // --- Setup and Listeners ---
+    adminApp.setupDOMReferences = function() {
+      messageAreaEl = document.getElementById('messageArea');
+      loadingSpinnerEl = document.getElementById('loadingSpinner');
+      listViewContainerEl = document.getElementById('listViewContainer');
+      projectTitleInputEl = document.getElementById('projectTitleInput');
+      createProjectButtonEl = document.getElementById('createProjectButton');
+      adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+      editViewContainerEl = document.getElementById('editViewContainer');
+      editingProjectTitleEl = document.getElementById('editingProjectTitle');
+      backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
+      fabricCanvasEl = document.getElementById('fabricCanvasElement');
+      imageUploaderEl = document.getElementById('imageUploader');
+      addSlideButtonEl = document.getElementById('addSlideButton');
+      slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
+      saveProjectButtonEl = document.getElementById('saveProjectButton');
+      
+      addRectangleButtonEl = document.getElementById('addRectangleButton');
+      addCircleButtonEl = document.getElementById('addCircleButton');
+      addTextboxButtonEl = document.getElementById('addTextboxButton');
+  
+      overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar'); 
+      objXEl = document.getElementById('objX');
+      objYEl = document.getElementById('objY');
+      objWidthEl = document.getElementById('objWidth');
+      objHeightEl = document.getElementById('objHeight');
+      objAngleEl = document.getElementById('objAngle');
+      objFillEl = document.getElementById('objFill');
+      objStrokeColorEl = document.getElementById('objStrokeColor');
+      objStrokeWidthEl = document.getElementById('objStrokeWidth');
+      objOpacityEl = document.getElementById('objOpacity');
+      textSpecificControlsEl = document.getElementById('textSpecificControls'); 
+      objTextContentEl = document.getElementById('objTextContent');
+      objShadowColorEl = document.getElementById('objShadowColor');
+      objShadowBlurEl = document.getElementById('objShadowBlur');
+      objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
+      objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
 
-  // --- UI View Management ---
-  function switchToListView() {
-    console.log("Switching to List View");
-    adminApp.state.currentView = 'list';
-    adminApp.state.currentProjectId = null;
-    adminApp.state.projectData = null; 
-    adminApp.state.currentSlideIndex = -1;
-    if (adminApp.state.fabricCanvasInstance) {
-        adminApp.state.fabricCanvasInstance.dispose();
-        adminApp.state.fabricCanvasInstance = null;
-        console.log("Admin_JS: Disposed fabric canvas instance.");
-    }
-    if(listViewContainerEl) listViewContainerEl.style.display = 'block';
-    if(editViewContainerEl) editViewContainerEl.style.display = 'none';
-    if (messageAreaEl) messageAreaEl.innerHTML = '';
-    loadAdminProjectsList();
-  }
+      objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
+      objInteractionActionEl = document.getElementById('objInteractionAction');
+      modalContentConfigEl = document.getElementById('modalContentConfig');
+      objModalContentEl = document.getElementById('objModalContent');
+      navigateToConfigEl = document.getElementById('navigateToConfig');
+      objNavigateToEl = document.getElementById('objNavigateTo');
 
-  function switchToEditView(projectIdToEdit) {
-      console.log("Switching to Edit View for project ID:", projectIdToEdit);
-      adminApp.state.currentView = 'edit';
-      adminApp.state.currentProjectId = projectIdToEdit;
-      adminApp.state.projectData = null;
+      objFontFamilyEl = document.getElementById('objFontFamily');
+      objFontSizeEl = document.getElementById('objFontSize');
+      objFontWeightEl = document.getElementById('objFontWeight');
+      objFontStyleEl = document.getElementById('objFontStyle');
+      objTextAlignEl = document.getElementById('objTextAlign');
+      objLineHeightEl = document.getElementById('objLineHeight');
+      objCharSpacingEl = document.getElementById('objCharSpacing');
+      objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
+      objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
+
+      // Step 20 Elements
+      youtubeUrlInputEl = document.getElementById('youtubeUrlInput');
+      setYoutubeBackgroundButtonEl = document.getElementById('setYoutubeBackgroundButton');
+      audioUploaderEl = document.getElementById('audioUploader');
+      // attachAudioButtonEl = document.getElementById('attachAudioButton'); // Removed
+      attachedAudioNameEl = document.getElementById('attachedAudioName');
+      removeAudioButtonEl = document.getElementById('removeAudioButton');
+      adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
+  
+      if (!addSlideButtonEl) console.warn("addSlideButtonEl not found during initial setup.");
+      if (!slideThumbnailsContainerEl) console.warn("slideThumbnailsContainerEl not found during initial setup.");
+      if (!saveProjectButtonEl) console.warn("saveProjectButtonEl not found during initial setup.");
+      if (!imageUploaderEl) console.warn("imageUploaderEl not found during initial setup.");
+      if (!fabricCanvasEl) console.warn("fabricCanvasEl not found during initial setup.");
+      console.log("Admin_JS: DOM references set up.");
+    };
+  
+    adminApp.attachEventListeners = function() {
+      const safelyAddListener = (element, eventType, handler, elementName) => {
+          if (element) {
+              element.addEventListener(eventType, handler);
+          } else {
+              if (elementName === 'createProjectButtonEl') console.warn(`Could not attach listener - ${elementName} not found initially.`);
+          }
+      };
+      safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
+      console.log("Admin_JS: Initial event listeners attached.");
+    };
+  
+    // --- UI View Management ---
+    function switchToListView() {
+      console.log("Switching to List View");
+      adminApp.state.currentView = 'list';
+      adminApp.state.currentProjectId = null;
+      adminApp.state.projectData = null; 
       adminApp.state.currentSlideIndex = -1;
-
-      if(listViewContainerEl) listViewContainerEl.style.display = 'none';
-      if(editViewContainerEl) editViewContainerEl.style.display = 'block';
-
-      if(editingProjectTitleEl) { 
-          editingProjectTitleEl.textContent = `Loading Project (ID: ${projectIdToEdit})...`;
-      }
-
       if (adminApp.state.fabricCanvasInstance) {
           adminApp.state.fabricCanvasInstance.dispose();
           adminApp.state.fabricCanvasInstance = null;
+          console.log("Admin_JS: Disposed fabric canvas instance.");
       }
+      if(listViewContainerEl) listViewContainerEl.style.display = 'block';
+      if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
-      if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; 
-
-      const ensureEditViewListener = (elementVar, id, eventType, handler) => {
-          if (!window[elementVar]) { 
-              window[elementVar] = document.getElementById(id);
-          }
-          const element = window[elementVar];
-          if (element && !element.hasAttribute('listener-attached')) {
-              element.addEventListener(eventType, handler);
-              element.setAttribute('listener-attached', 'true'); 
-              console.log(`Listener attached for ${eventType} on #${id} in switchToEditView.`);
-          } else if (!element) {
-              console.error(`CRITICAL: Element #${id} not found in switchToEditView!`);
-          }
-      };
-
-      fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
-      slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer'); 
-
-      ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView);
-      ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload);
-      ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide);
-      ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject);
-      ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle);
-      ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle);
-      ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox);
-
-      if (typeof fabric !== 'undefined' && fabricCanvasEl) {
-          adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
-              width: adminApp.state.defaultCanvasWidth,
-              height: adminApp.state.defaultCanvasHeight,
-              backgroundColor: '#e9e9e9'
-          });
-          fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
-          fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
-          console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
-
-          initToolbar(); 
-          
-          adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
-            if (e.target) populateToolbar(e.target);
-          });
-          adminApp.state.fabricCanvasInstance.on('selection:created', (e) => { 
-            if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]); 
-          });
-          adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => { 
-             if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]);
-          });
-          adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
-            populateToolbar(null);
-          });
-          if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none'; 
-
-          loadProjectForEditing(projectIdToEdit); 
-
-      } else { 
-          console.error("Fabric.js or canvas element not ready in switchToEditView.");
-          displayMessage("Critical error: Editor components not ready.", false);
-          showLoading(false);
-      }
-  }
-
-  function loadProjectForEditing(projectId) {
-    console.log(`loadProjectForEditing: Called for projectId: ${projectId}`);
-    if (!projectId) { console.error("loadProjectForEditing: No projectId."); displayMessage("Error: Cannot load project.", false); return; }
-    showLoading(true);
-    displayMessage("Loading project data...", true);
-    google.script.run
-        .withSuccessHandler(onProjectDataLoaded)
-        .withFailureHandler(onServerError) 
-        .getProjectDataForEditing(projectId);
-  }
-
-  function onProjectDataLoaded(jsonString) {
-    console.log("onProjectDataLoaded: Received data string length:", jsonString ? jsonString.length : 'null');
-
-    if (jsonString === null || jsonString === undefined) { 
-        showLoading(false);
-        console.error("onProjectDataLoaded: Received null data string from server (Project or data file likely not found).");
-        displayMessage("Error: Could not load project data. Project or its data file may not exist.", false);
-        adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
-        adminApp.state.currentSlideIndex = -1;
-        if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
-        updateSlideThumbnailsUI(); 
-        return;
+      loadAdminProjectsList();
     }
-
-    try {
-        const loadedData = JSON.parse(jsonString);
-        console.log("Parsed project data:", loadedData);
-
-        if (!loadedData || typeof loadedData !== 'object') throw new Error("Parsed data is not a valid object.");
-        if (!loadedData.projectId) throw new Error("Loaded project data is missing 'projectId'.");
-        
-        if (!Array.isArray(loadedData.slides)) {
-             console.warn("Loaded data missing 'slides' array or it's invalid, defaulting to empty.");
-             loadedData.slides = [];
-        }
-
-        adminApp.state.projectData = loadedData; 
-
-        if (editingProjectTitleEl) {
-            editingProjectTitleEl.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`;
-        }
-
-        updateSlideThumbnailsUI(); 
-
-        if (adminApp.state.projectData.slides.length > 0) {
-            selectSlide(0); 
-            displayMessage("Project loaded successfully.", true);
-        } else {
-            displayMessage("Project loaded, but it has no slides. Adding one.", true);
-            handleAddSlide(); 
-        }
-        showLoading(false); 
-
-    } catch (e) {
-        showLoading(false);
-        console.error("onProjectDataLoaded: Error parsing JSON data or invalid structure:", e);
-        console.error("Received JSON string that failed parsing:", jsonString); 
-        displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
-        adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
-        adminApp.state.currentSlideIndex = -1;
-        if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`;
-        updateSlideThumbnailsUI(); 
-    }
-  }
-
-  function handleAddSlide() {
-      console.log("handleAddSlide called");
-      if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
-      saveCurrentSlideState();
-      const newSlideId = 'slide_' + Utilities.getUuid();
-      const newSlide = { slideId: newSlideId, canvasWidth: adminApp.state.defaultCanvasWidth, canvasHeight: adminApp.state.defaultCanvasHeight, fabricCanvasJSON: null, slideMedia: { type: null, url: null, driveFileId: null, mimeType: null } };
-      if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
-      adminApp.state.projectData.slides.push(newSlide);
-      const newSlideIndex = adminApp.state.projectData.slides.length - 1;
-      selectSlide(newSlideIndex);
-      console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
-  }
-
-  function selectSlide(slideIndex) {
-      if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid index or slides array missing.", slideIndex); return; }
-      console.log(`Selecting slide ${slideIndex + 1}`);
-      saveCurrentSlideState();
-
-      adminApp.state.currentSlideIndex = slideIndex;
-      const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
-      const canvas = adminApp.state.fabricCanvasInstance;
-      if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
-
-      const slideWidth = selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth;
-      const slideHeight = selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight;
-      canvas.setWidth(slideWidth);
-      canvas.setHeight(slideHeight);
-      if (fabricCanvasEl) { fabricCanvasEl.width = slideWidth; fabricCanvasEl.height = slideHeight; }
-      console.log(`Canvas set to dimensions for slide ${slideIndex + 1}: ${slideWidth}x${slideHeight}`);
-
-      canvas.clear();
-      canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
-      canvas.backgroundColor = '#e9e9e9';
-
-      const media = selectedSlideData.slideMedia;
-      if (media && media.type === 'image' && media.url) {
-          if (media.url.startsWith('data:image')) { 
-              console.log("Loading background from base64 data URI.");
-              fabric.Image.fromURL(media.url, function(img) {
-                  if (!adminApp.state.fabricCanvasInstance) return;
-                  if (adminApp.state.currentSlideIndex !== slideIndex) {
-                      console.log("Slide changed before background loaded for index", slideIndex);
-                      return;
-                  }
-                  adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
-                  console.log("Background loaded for slide", slideIndex);
-              }, { crossOrigin: 'anonymous' }); 
-          } else if (media.driveFileId) { 
-               console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
-               showLoading(true); displayMessage("Loading slide background...", true);
-               google.script.run
-                   .withSuccessHandler(function(response) { 
-                        showLoading(false);
-                        if (adminApp.state.currentSlideIndex !== slideIndex) {
-                            console.log("Slide changed before background could be fetched for index", slideIndex);
-                            return;
-                        }
-                        if (response && response.success && response.base64Data) {
-                            fabric.Image.fromURL(response.base64Data, function(img) { 
-                                if (!adminApp.state.fabricCanvasInstance) return;
-                                adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
-                                console.log("Background fetched and loaded for slide", slideIndex);
-                            });
-                        } else { 
-                            console.error("Failed to re-fetch background", response);
-                            displayMessage("Error loading slide background image.", false); 
-                            canvas.renderAll(); 
-                        }
-                   })
-                   .withFailureHandler(onServerError) 
-                   .getImageAsBase64(media.driveFileId);
-           } else {
-              console.warn("Slide media URL/ID not suitable for loading:", media);
-              canvas.renderAll();
-          }
-      } else {
-          console.log("No background media found for slide", slideIndex);
-          canvas.renderAll();
-      }
-
-      if (selectedSlideData.fabricCanvasJSON) {
-        console.log("Loading fabricCanvasJSON for slide", slideIndex);
-        canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
-            if (!adminApp.state.fabricCanvasInstance) return; 
-            if (adminApp.state.currentSlideIndex !== slideIndex) {
-                console.log("Slide changed before overlays loaded for index", slideIndex);
-                return;
-            }
-            adminApp.state.fabricCanvasInstance.renderAll(); 
-            console.log("Finished loading canvas JSON for slide", slideIndex);
-            const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
-            populateToolbar(activeObj); 
-          }, function(o, object) { 
-          });
-          } else { 
-          console.log("No fabricCanvasJSON to load for slide", slideIndex);
-          canvas.renderAll(); 
-          populateToolbar(null); 
-      }
-      updateSlideThumbnailsUI(); 
-      if (imageUploaderEl) imageUploaderEl.value = null; 
-  }
-
-  function updateSlideThumbnailsUI() {
-      if (!slideThumbnailsContainerEl || !adminApp.state.projectData) { console.warn("updateSlideThumbnailsUI: Container or project data missing."); return; }
-      slideThumbnailsContainerEl.innerHTML = '';
-      if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
-      adminApp.state.projectData.slides.forEach((slide, index) => {
-          const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
-          thumb.textContent = `Slide ${index + 1}`; thumb.title = `Select Slide ${index + 1}`;
-          if (index === adminApp.state.currentSlideIndex) thumb.classList.add('active-slide');
-          thumb.onclick = function() { selectSlide(index); };
-          const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '×'; deleteBtn.title = "Delete slide";
-          deleteBtn.onclick = function(event) { event.stopPropagation(); handleDeleteSlide(index); };
-          thumb.appendChild(deleteBtn); slideThumbnailsContainerEl.appendChild(thumb);
-      });
-  }
-
-  function handleDeleteSlide(slideIndex) {
-      if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("handleDeleteSlide: Invalid index."); return; }
-      if (adminApp.state.projectData.slides.length <= 1) { displayMessage("Cannot delete the last slide.", false); return; }
-      if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) return;
-      adminApp.state.projectData.slides.splice(slideIndex, 1);
-      console.log("Deleted slide at index:", slideIndex);
-      const indexToSelect = (slideIndex === 0 && adminApp.state.projectData.slides.length > 0) ? 0 : Math.max(0, slideIndex - 1);
-
-      if (adminApp.state.currentSlideIndex === slideIndex) {
-          adminApp.state.currentSlideIndex = -1; 
-          selectSlide(indexToSelect);
-      } else if (adminApp.state.currentSlideIndex > slideIndex) {
-          adminApp.state.currentSlideIndex--; 
-          updateSlideThumbnailsUI(); 
-      } else {
-           updateSlideThumbnailsUI(); 
-      }
-  }
-
-  function saveCurrentSlideState() {
-      if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData || !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) { return; }
-      try {
-        const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-        const canvas = adminApp.state.fabricCanvasInstance;
-        const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; 
-        currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
-        currentSlide.canvasWidth = canvas.getWidth();
-        currentSlide.canvasHeight = canvas.getHeight();
-        if (!currentSlide.slideMedia) {
-             currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null };
-        }
-        console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved.`);
-      } catch(e) {
-          console.error("Error saving slide state:", e);
-      }
-  }
-
-  function handleSaveProject() {
-      if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
-      if (adminApp.state.isLoading) return;
-      saveCurrentSlideState();
-      showLoading(true); displayMessage("Saving project...", true);
-      try {
-          const jsonDataString = JSON.stringify(adminApp.state.projectData);
-          console.log("Saving projectData string length:", jsonDataString.length); 
-          google.script.run
-              .withSuccessHandler(onProjectSaved)
-              .withFailureHandler(onServerError)
-              .saveProjectData(adminApp.state.currentProjectId, jsonDataString);
-      } catch (e) {
-           showLoading(false);
-           console.error("Error stringifying project data:", e);
-           displayMessage("Error preparing data for saving.", false);
-      }
-  }
-
-  function onProjectSaved(response) {
-      showLoading(false);
-      if (response && response.success) { displayMessage(response.message || "Project saved!", true); }
-      else { onServerError((response && response.error) ? response.error : "Failed to save."); }
-  }
-
-  function showLoading(show) {
-    adminApp.state.isLoading = show;
-    if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
-    else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
-  }
-  function displayMessage(message, isSuccess) {
-      if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage messageAreaEl not found. Message:", message); }
-  }
   
-  function handleProjectStatusChange(projectId, newStatus, selectElement) {
-      console.log(`Attempting to update status for project ${projectId} to ${newStatus}`);
+    function switchToEditView(projectIdToEdit) {
+        console.log("Switching to Edit View for project ID:", projectIdToEdit);
+        adminApp.state.currentView = 'edit';
+        adminApp.state.currentProjectId = projectIdToEdit;
+        adminApp.state.projectData = null;
+        adminApp.state.currentSlideIndex = -1;
+  
+        if(listViewContainerEl) listViewContainerEl.style.display = 'none';
+        if(editViewContainerEl) editViewContainerEl.style.display = 'block';
+  
+        if(editingProjectTitleEl) { 
+            editingProjectTitleEl.textContent = `Loading Project (ID: ${projectIdToEdit})...`;
+        }
+  
+        if (adminApp.state.fabricCanvasInstance) {
+            adminApp.state.fabricCanvasInstance.dispose();
+            adminApp.state.fabricCanvasInstance = null;
+        }
+        if (messageAreaEl) messageAreaEl.innerHTML = '';
+        if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; 
+  
+        const ensureEditViewListener = (elementVar, id, eventType, handler) => {
+            if (!window[elementVar]) { 
+                window[elementVar] = document.getElementById(id);
+            }
+            const element = window[elementVar];
+            // Ensure listener isn't attached multiple times if view is switched back and forth rapidly
+            const listenerAttribute = `listener-${eventType}-attached`; 
+            if (element && !element.hasAttribute(listenerAttribute)) {
+                element.addEventListener(eventType, handler);
+                element.setAttribute(listenerAttribute, 'true'); 
+                console.log(`Listener attached for ${eventType} on #${id} in switchToEditView.`);
+            } else if (!element) {
+                console.error(`CRITICAL: Element #${id} not found in switchToEditView!`);
+            }
+        };
+  
+        fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
+        slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer'); 
+        adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder'); // Ensure ref
+  
+        ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView);
+        ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload);
+        ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide);
+        ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject);
+        ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle);
+        ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle);
+        ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox);
+        // Step 20 Listeners
+        ensureEditViewListener('setYoutubeBackgroundButtonEl', 'setYoutubeBackgroundButton', 'click', handleSetYoutubeBackground);
+        ensureEditViewListener('audioUploaderEl', 'audioUploader', 'change', handleAudioUpload); // Auto-upload on change
+        ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio); 
+  
+        if (typeof fabric !== 'undefined' && fabricCanvasEl) {
+            adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
+                width: adminApp.state.defaultCanvasWidth,
+                height: adminApp.state.defaultCanvasHeight,
+                backgroundColor: '#e9e9e9'
+            });
+            fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
+            fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
+            console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
+  
+            initToolbar(); 
+            
+            adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
+              if (e.target) populateToolbar(e.target);
+            });
+            adminApp.state.fabricCanvasInstance.on('selection:created', (e) => { 
+              if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]); 
+            });
+            adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => { 
+               if (e.selected && e.selected.length > 0) populateToolbar(e.selected[0]);
+            });
+            adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
+              populateToolbar(null);
+            });
+            if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none'; 
+  
+            loadProjectForEditing(projectIdToEdit); 
+  
+        } else { 
+            console.error("Fabric.js or canvas element not ready in switchToEditView.");
+            displayMessage("Critical error: Editor components not ready.", false);
+            showLoading(false);
+        }
+    }
+  
+    // --- Project Loading/Saving ---
+    function loadProjectForEditing(projectId) {
+      console.log(`loadProjectForEditing: Called for projectId: ${projectId}`);
+      if (!projectId) { console.error("loadProjectForEditing: No projectId."); displayMessage("Error: Cannot load project.", false); return; }
       showLoading(true);
-      const originalStatus = selectElement.getAttribute('data-original-status') || 
-                             (adminApp.state.projectListCache.find(p => p.projectId === projectId) || {}).status;
-      selectElement.setAttribute('data-original-status', originalStatus); // Store before call
-
+      displayMessage("Loading project data...", true);
       google.script.run
-          .withSuccessHandler(function(response) { onProjectStatusUpdated(response, projectId, newStatus, selectElement); })
-          .withFailureHandler(function(error) { 
-              onServerError(error);
-              if (selectElement) { 
-                  console.log("Reverting status dropdown due to server error for project:", projectId);
-                  selectElement.value = originalStatus; 
-              }
-          })
-          .updateProjectStatus(projectId, newStatus);
-  }
-
-  function onProjectStatusUpdated(response, projectId, newStatus, selectElement) {
-      showLoading(false);
-      if (response && response.success) {
-          displayMessage(response.message || "Project status updated successfully!", true);
-          
-          const projectInCache = adminApp.state.projectListCache.find(p => p.projectId === projectId);
-          if (projectInCache) projectInCache.status = newStatus;
-          selectElement.removeAttribute('data-original-status'); 
-
-          const statusSpan = selectElement.closest('.project-item').querySelector('.status-text');
-          if(statusSpan) statusSpan.textContent = `(${newStatus})`;
-          
-          if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === projectId && adminApp.state.projectData) {
-              adminApp.state.projectData.status = newStatus;
-          }
-      } else {
-          onServerError((response && response.error) ? response.error : "Failed to update status.");
-          if (selectElement) { 
-               console.log("Reverting status dropdown due to server failure for project:", projectId);
-               const originalStatus = selectElement.getAttribute('data-original-status');
-               if(originalStatus) selectElement.value = originalStatus; 
-               // Maybe remove attribute here too, or leave it for next attempt? Leave it for now.
-          }
-      }
-  }
-
-  function handleDeleteProject(projectId, projectTitle) {
-      if (!confirm(`Are you sure you want to delete the project "${projectTitle}" (ID: ${projectId})? This action cannot be undone.`)) {
+          .withSuccessHandler(onProjectDataLoaded)
+          .withFailureHandler(onServerError) 
+          .getProjectDataForEditing(projectId);
+    }
+  
+    function onProjectDataLoaded(jsonString) {
+      console.log("onProjectDataLoaded: Received data string length:", jsonString ? jsonString.length : 'null');
+  
+      if (jsonString === null || jsonString === undefined) { 
+          showLoading(false);
+          console.error("onProjectDataLoaded: Received null data string from server (Project or data file likely not found).");
+          displayMessage("Error: Could not load project data. Project or its data file may not exist.", false);
+          adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
+          adminApp.state.currentSlideIndex = -1;
+          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
+          updateSlideThumbnailsUI(); 
           return;
       }
-      console.log(`Attempting to delete project ${projectId}`);
-      showLoading(true);
-      google.script.run
-          .withSuccessHandler(onProjectDeleted)
-          .withFailureHandler(onServerError)
-          .deleteProject(projectId);
-  }
-
-  function onProjectDeleted(response) {
-      showLoading(false);
-      if (response && response.success) {
-          displayMessage(response.message || "Project deleted successfully!", true);
-          // If the deleted project was being edited, switch to list view
-          if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === response.deletedProjectId) {
-              switchToListView(); // This will also call loadAdminProjectsList
-          } else {
-              loadAdminProjectsList(); // Refresh the list
-          }
-      } else {
-          onServerError((response && response.error) ? response.error : "Failed to delete project.");
-      }
-  }
-
-  function onServerError(errorObject) {
-    console.error("onServerError triggered:", errorObject);
-    showLoading(false);
-    let errorMessage = "An unknown server error occurred.";
-     if (typeof errorObject === 'string') { errorMessage = errorObject; }
-     else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
-     else if (errorObject && errorObject.error && typeof errorObject.error === 'string') { errorMessage = errorObject.error; }
-    console.error('Formatted Server Error Message:', errorMessage);
-    displayMessage('Server Error: ' + errorMessage, false);
-  }
-
-  function handleCreateProject() {
-      if (adminApp.state.isLoading) return;
-      const currentProjectTitle = projectTitleInputEl.value.trim();
-      if (!currentProjectTitle) { displayMessage('Project title cannot be empty.', false); projectTitleInputEl.focus(); return; }
-      showLoading(true);
-      google.script.run.withSuccessHandler(onProjectCreated).withFailureHandler(onServerError).createProject(currentProjectTitle);
-  }
-  function onProjectCreated(response) {
-      showLoading(false);
-      if (response && response.success) { displayMessage(response.message || 'Project created!', true); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); }
-      else { onServerError((response && response.error) ? response.error : 'Failed to create project.'); }
-  }
-
-  function loadAdminProjectsList() {
-    console.log("loadAdminProjectsList: Function called.");
-    if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found."); showLoading(false); return; }
-    if (!google || !google.script || !google.script.run) { console.error("loadAdminProjectsList: google.script.run unavailable."); displayMessage("Error: Client-server bridge unavailable.", false); return; }
-    showLoading(true);
-    console.log("loadAdminProjectsList: Calling google.script.run.getAllProjectsForAdmin...");
-    google.script.run
-      .withSuccessHandler(displayAdminProjects)
-      .withFailureHandler(onServerError)
-      .getAllProjectsForAdmin();
-     console.log("loadAdminProjectsList: google.script.run.getAllProjectsForAdmin call initiated.");
-  }
-  function displayAdminProjects(projectsArray) {
-    console.log("displayAdminProjects (Success Handler) received data:", projectsArray);
-    showLoading(false);
-    if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found."); return; }
-    adminProjectListContainerEl.innerHTML = '';
-    if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
-    
-    adminApp.state.projectListCache = projectsArray; 
-
-    projectsArray.forEach(project => { 
-        if (!project || !project.projectId) return; 
-        const projectItem = document.createElement('div'); 
-        projectItem.className = 'project-item'; 
-        
-        const titleAndStatusDiv = document.createElement('div');
-        // titleAndStatusDiv.style.display = 'flex'; // Removed for default block stacking
-        // titleAndStatusDiv.style.flexDirection = 'column'; 
-
-        const titleSpan = document.createElement('span'); 
-        titleSpan.textContent = project.projectTitle || 'Untitled Project'; 
-        titleSpan.style.fontWeight = 'bold';
-        
-        const statusTextSpan = document.createElement('span'); 
-        statusTextSpan.className = 'status-text'; 
-        statusTextSpan.textContent = `(${project.status || 'N/A'})`; 
-        // statusTextSpan.style.fontSize = '0.9em'; // Defined in CSS
-        // statusTextSpan.style.fontStyle = 'italic';
-        // statusTextSpan.style.color = '#555';
-        
-        titleAndStatusDiv.appendChild(titleSpan);
-        titleAndStatusDiv.appendChild(statusTextSpan);
-
-        const controlsDiv = document.createElement('div'); 
-        // controlsDiv.style.display = 'flex'; // Defined in CSS
-        // controlsDiv.style.alignItems = 'center';
-
-        const statusSelect = document.createElement('select');
-        statusSelect.className = 'project-status-select';
-        statusSelect.setAttribute('data-project-id', project.projectId);
-        statusSelect.setAttribute('data-original-status', project.status || "Draft"); 
-        ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
-            const option = document.createElement('option');
-            option.value = statusValue;
-            option.textContent = statusValue;
-            if (project.status === statusValue) {
-                option.selected = true;
-            }
-            statusSelect.appendChild(option);
-        });
-        statusSelect.onchange = function() {
-            handleProjectStatusChange(project.projectId, this.value, this);
-        };
-        // statusSelect.style.padding = '5px'; // Defined in CSS
-        // statusSelect.style.marginRight = '10px';
-        // statusSelect.style.fontSize = '0.9em';
-        // statusSelect.style.border = '1px solid #ccc';
-        // statusSelect.style.borderRadius = '3px';
-
-        const editButton = document.createElement('button'); 
-        editButton.textContent = 'Edit'; 
-        editButton.className = 'edit-button'; 
-        editButton.setAttribute('data-project-id', project.projectId); 
-        editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; 
-        
-        const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete';
-        deleteButton.className = 'danger-button'; 
-        deleteButton.setAttribute('data-project-id', project.projectId);
-        deleteButton.setAttribute('data-project-title', project.projectTitle || 'Untitled Project');
-        deleteButton.style.marginLeft = '5px';
-        deleteButton.onclick = function() {
-            handleDeleteProject(project.projectId, project.projectTitle || 'Untitled Project');
-        };
-
-        controlsDiv.appendChild(statusSelect);
-        controlsDiv.appendChild(editButton);
-        controlsDiv.appendChild(deleteButton); 
-        
-        projectItem.appendChild(titleAndStatusDiv); 
-        projectItem.appendChild(controlsDiv); 
-        adminProjectListContainerEl.appendChild(projectItem);
-     });
-    console.log("displayAdminProjects: Finished rendering project list.");
-  }
-
-  function handleImageUpload(event) {
-      if (adminApp.state.isLoading) { if(event.target) event.target.value = null; return; }
-      const file = event.target.files[0];
-      if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
-      showLoading(true); displayMessage("Uploading image...", true);
-      const reader = new FileReader();
-      reader.onload = function(e) {
-          const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
-          if (!adminApp.state.currentProjectId) { showLoading(false); displayMessage("Error: No project.", false); if(event.target) event.target.value = null; return; }
-          google.script.run.withSuccessHandler(onImageUploaded).withFailureHandler(onServerError).uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
-      };
-      reader.onerror = function(error) { showLoading(false); displayMessage("Error reading file.", false); console.error(error); if(event.target) event.target.value = null; };
-      reader.readAsDataURL(file);
-  }
-  function onImageUploaded(response) { 
-      showLoading(false); if (imageUploaderEl) imageUploaderEl.value = null;
-      if (response && response.success && response.driveFileId) {
-          displayMessage("Image uploaded. Fetching...", true); showLoading(true);
-          adminApp.state.lastUploadedDriveId = response.driveFileId; 
-          google.script.run.withSuccessHandler(onBase64ImageReceived).withFailureHandler(onServerError).getImageAsBase64(response.driveFileId);
-      } else { onServerError({ message: (response && response.error) ? response.error : "Upload failed." }); }
-  }
-  function onBase64ImageReceived(response) { 
-      showLoading(false);
-      if (response && response.success && response.base64Data) {
-          if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas/Slide not ready.", false); return; }
-          const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-          if (!currentSlide) { displayMessage("Error: Slide data missing.", false); return; }
-          fabric.Image.fromURL(response.base64Data, function(img) {
-              if (!adminApp.state.fabricCanvasInstance) return;
-              if (adminApp.state.currentSlideIndex === -1) return; 
-              const canvas = adminApp.state.fabricCanvasInstance; const imgWidth = img.width; const imgHeight = img.height; const maxWidth = 960;
-              let cvWidth = imgWidth; let cvHeight = imgHeight; const ratio = imgWidth / imgHeight;
-              if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / ratio); }
-              canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
-              if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
-              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: cvWidth / imgWidth, scaleY: cvHeight / imgHeight });
-              canvas.renderAll(); displayMessage("Background set.", true);
-              if (!currentSlide.slideMedia) currentSlide.slideMedia = {}; 
-              currentSlide.slideMedia.type = 'image';
-              currentSlide.slideMedia.url = response.base64Data; 
-              currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null; 
-              currentSlide.slideMedia.mimeType = response.mimeType;
-              currentSlide.canvasWidth = cvWidth; currentSlide.canvasHeight = cvHeight;
-              console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated.`);
-              updateSlideThumbnailsUI();
-              delete adminApp.state.lastUploadedDriveId; 
-          });
-      } else { onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image." }); }
-  }
-
-  function addRectangle() {
-    if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
-    const canvas = adminApp.state.fabricCanvasInstance;
-    const rect = new fabric.Rect({ left: 50, top: 50, fill: 'rgba(255,0,0,0.7)', width: 150, height: 100, stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
-    canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll(); console.log("Rectangle added to canvas:", rect);
-  }
-
-  function addCircle() {
-    if (!adminApp.state.fabricCanvasInstance) { console.error("addCircle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
-    const canvas = adminApp.state.fabricCanvasInstance;
-    const circle = new fabric.Circle({ left: 150, top: 150, radius: 50, fill: 'rgba(0,0,255,0.7)', stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
-    canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll(); console.log("Circle added to canvas:", circle);
-  }
-
-  function addTextbox() {
-    if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add text.", false); return; }
-    const canvas = adminApp.state.fabricCanvasInstance;
-    // Set some default text properties for new textboxes
-    const textbox = new fabric.Textbox('Editable Text', { 
-        left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000', 
-        fontFamily: 'Arial', // Default font
-        fontWeight: 'normal',
-        fontStyle: 'normal',
-        textAlign: 'left',
-        lineHeight: 1.16, // Fabric default
-        charSpacing: 0,
-        customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, 
-        customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, 
-        sequenceOrder: null 
-    });
-    canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
-  }
   
-  function toHexColor(fabricColor) {
-    if (!fabricColor) return '#000000'; 
-    try {
-      // Handle gradients or patterns if necessary, though input type=color needs hex
-      if (typeof fabricColor === 'string') {
-          const colorInstance = new fabric.Color(fabricColor);
-          const hex = colorInstance.toHex();
-          return '#' + hex;
-      }
-      return '#000000'; // Fallback if it's complex (gradient etc)
-    } catch (e) {
-      console.warn("Could not convert color to HEX:", fabricColor, e);
-      return '#000000'; 
-    }
-  }
-
-  function initToolbar() { 
-    console.log("initToolbar: Attaching listeners to toolbar inputs."); 
-    
-    // Populate Font Family Dropdown
-    if(objFontFamilyEl) {
-        FONT_FAMILIES.forEach(font => {
-            const option = document.createElement('option');
-            option.value = font;
-            option.textContent = font;
-            objFontFamilyEl.appendChild(option);
-        });
-    } else {
-        console.warn("initToolbar: objFontFamilyEl not found, cannot populate fonts.");
-    }
-
-    const inputs = [
-      // Position & Size
-      {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
-      {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, 
-      {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
-      {el: objAngleEl, prop: 'angle', type: 'number'},
-      // Appearance
-      {el: objFillEl, prop: 'fill', type: 'color'},
-      {el: objStrokeColorEl, prop: 'stroke', type: 'color'},
-      {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
-      {el: objOpacityEl, prop: 'opacity', type: 'range'},
-      // Text Base
-      {el: objTextContentEl, prop: 'text', type: 'textarea'},
-      // Advanced Text
-      {el: objFontFamilyEl, prop: 'fontFamily', type: 'select'},
-      {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
-      {el: objFontWeightEl, prop: 'fontWeight', type: 'select'},
-      {el: objFontStyleEl, prop: 'fontStyle', type: 'select'},
-      {el: objTextAlignEl, prop: 'textAlign', type: 'select'},
-      {el: objLineHeightEl, prop: 'lineHeight', type: 'number'},
-      {el: objCharSpacingEl, prop: 'charSpacing', type: 'number'},
-      // Shadow Base
-      {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
-      {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'},
-      {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
-      {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'},
-      // Advanced Shadow
-      {el: objShadowAffectStrokeEl, prop: 'shadow.affectStroke', type: 'checkbox'},
-      {el: objShadowNonScalingEl, prop: 'shadow.nonScaling', type: 'checkbox'}
-    ];
-
-    inputs.forEach(inputConfig => {
-      if (inputConfig.el) {
-          const eventType = (inputConfig.el.tagName === 'SELECT' || inputConfig.el.type === 'color' || inputConfig.el.type === 'checkbox') ? 'change' : 'input';
-          inputConfig.el.addEventListener(eventType, (e) => { 
-              const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
-              updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type); 
+      try {
+          const loadedData = JSON.parse(jsonString);
+          console.log("Parsed project data:", loadedData);
+  
+          if (!loadedData || typeof loadedData !== 'object') throw new Error("Parsed data is not a valid object.");
+          if (!loadedData.projectId) throw new Error("Loaded project data is missing 'projectId'.");
+          
+          if (!Array.isArray(loadedData.slides)) {
+               console.warn("Loaded data missing 'slides' array or it's invalid, defaulting to empty.");
+               loadedData.slides = [];
+          }
+          
+          // Ensure slideMedia exists on all loaded slides
+          loadedData.slides.forEach(slide => {
+              if (!slide.slideMedia) {
+                  slide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
+              }
           });
-      } else {
-        console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); 
+
+          adminApp.state.projectData = loadedData; 
+  
+          if (editingProjectTitleEl) {
+              editingProjectTitleEl.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`;
+          }
+  
+          updateSlideThumbnailsUI(); 
+  
+          if (adminApp.state.projectData.slides.length > 0) {
+              selectSlide(0); 
+              displayMessage("Project loaded successfully.", true);
+          } else {
+              displayMessage("Project loaded, but it has no slides. Adding one.", true);
+              handleAddSlide(); 
+          }
+          showLoading(false); 
+  
+      } catch (e) {
+          showLoading(false);
+          console.error("onProjectDataLoaded: Error parsing JSON data or invalid structure:", e);
+          console.error("Received JSON string that failed parsing:", jsonString); 
+          displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
+          adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
+          adminApp.state.currentSlideIndex = -1;
+          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`;
+          updateSlideThumbnailsUI(); 
       }
-    });
-
-    if (objInteractionTriggerEl) objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
-    if (objInteractionActionEl) objInteractionActionEl.addEventListener('change', handleInteractionChange);
-    if (objModalContentEl) objModalContentEl.addEventListener('input', handleInteractionChange);
-    if (objNavigateToEl) objNavigateToEl.addEventListener('input', handleInteractionChange);
-  }
-
-  function populateToolbar(activeObject) { 
-    if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; } 
-    if (!activeObject) {
-      overlayPropertiesToolbarEl.style.display = 'none'; 
-      return;
     }
-    overlayPropertiesToolbarEl.style.display = 'block'; 
-
-    // --- Basic Properties ---
-    if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
-    if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
-    if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
-    if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
-    if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
-    if (objFillEl) objFillEl.value = toHexColor(activeObject.fill); 
-    if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke); 
-    if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth; 
-    if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; 
-
-    // --- Text Properties (Conditional Display) ---
-    const isTextObject = activeObject.type === 'textbox' || activeObject.type === 'i-text';
-    if (textSpecificControlsEl) {
-        textSpecificControlsEl.style.display = isTextObject ? 'block' : 'none';
-        if (isTextObject) {
-            if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
-            if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial';
-            if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
-            if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
-            if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
-            if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
-            if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight || 1.16;
-            if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing || 0;
+   
+    function saveCurrentSlideState() {
+        if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData || !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) { return; }
+        try {
+          const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+          const canvas = adminApp.state.fabricCanvasInstance;
+          const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; 
+          currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
+          currentSlide.canvasWidth = canvas.getWidth();
+          currentSlide.canvasHeight = canvas.getHeight();
+          // Ensure slideMedia object exists
+          if (!currentSlide.slideMedia) {
+               currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
+          }
+          console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Media:`, currentSlide.slideMedia);
+        } catch(e) {
+            console.error("Error saving slide state:", e);
         }
     }
+
+    function handleSaveProject() {
+        if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
+        if (adminApp.state.isLoading) return;
+        saveCurrentSlideState(); // Ensure latest slide state is captured
+        showLoading(true); displayMessage("Saving project...", true);
+        try {
+            const jsonDataString = JSON.stringify(adminApp.state.projectData);
+            console.log("Saving projectData string length:", jsonDataString.length); 
+            google.script.run
+                .withSuccessHandler(onProjectSaved)
+                .withFailureHandler(onServerError)
+                .saveProjectData(adminApp.state.currentProjectId, jsonDataString);
+        } catch (e) {
+             showLoading(false);
+             console.error("Error stringifying project data:", e);
+             displayMessage("Error preparing data for saving.", false);
+        }
+    }
+  
+    function onProjectSaved(response) {
+        showLoading(false);
+        if (response && response.success) { displayMessage(response.message || "Project saved!", true); }
+        else { onServerError((response && response.error) ? response.error : "Failed to save."); }
+    }
+
+    // --- Slide Management ---
+    function handleAddSlide() {
+        console.log("handleAddSlide called");
+        if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
+        saveCurrentSlideState(); // Save previous slide first
+        const newSlideId = 'slide_' + Utilities.getUuid();
+        // Initialize new slide with empty slideMedia object including originalName
+        const newSlide = { 
+            slideId: newSlideId, 
+            canvasWidth: adminApp.state.defaultCanvasWidth, 
+            canvasHeight: adminApp.state.defaultCanvasHeight, 
+            fabricCanvasJSON: null, 
+            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null } // Initialize fully
+        };
+        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
+        adminApp.state.projectData.slides.push(newSlide);
+        const newSlideIndex = adminApp.state.projectData.slides.length - 1;
+        selectSlide(newSlideIndex); // Select the new slide
+        console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
+    }
+
+    function selectSlide(slideIndex) {
+        if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid index or slides array missing.", slideIndex); return; }
+        console.log(`Selecting slide ${slideIndex + 1}`);
+        
+        // Make sure previous slide state (including potentially removed media) is saved
+        saveCurrentSlideState(); 
+  
+        adminApp.state.currentSlideIndex = slideIndex;
+        const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
+        const canvas = adminApp.state.fabricCanvasInstance;
+        if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
+  
+        // Ensure slideMedia object exists
+        if (!selectedSlideData.slideMedia) {
+            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
+        }
+
+        const slideWidth = selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth;
+        const slideHeight = selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight;
+        canvas.setWidth(slideWidth);
+        canvas.setHeight(slideHeight);
+        if (fabricCanvasEl) { fabricCanvasEl.width = slideWidth; fabricCanvasEl.height = slideHeight; }
+        console.log(`Canvas set to dimensions for slide ${slideIndex + 1}: ${slideWidth}x${slideHeight}`);
+  
+        // Clear canvas objects and background
+        canvas.clear();
+        canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
+        canvas.backgroundColor = '#e9e9e9'; // Default background
+
+        // Reset Admin UI inputs for media
+        if (imageUploaderEl) imageUploaderEl.value = null;
+        if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
+        if (audioUploaderEl) audioUploaderEl.value = null;
+        if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
+        if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
+        if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+
+        // Load media for the selected slide
+        const media = selectedSlideData.slideMedia;
+        if (media && media.type === 'image' && media.url) {
+            // Load image background (existing logic)
+            if (media.url.startsWith('data:image')) { 
+                console.log("Loading background from base64 data URI.");
+                fabric.Image.fromURL(media.url, function(img) { 
+                    if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return;
+                    adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
+                    console.log("Background loaded for slide", slideIndex);
+                }, { crossOrigin: 'anonymous' }); 
+            } else if (media.driveFileId) { 
+                 console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
+                 showLoading(true); displayMessage("Loading slide background...", true);
+                 google.script.run.withSuccessHandler(function(response) { 
+                     showLoading(false);
+                     if (adminApp.state.currentSlideIndex !== slideIndex) { console.log("Slide changed before background could be fetched for index", slideIndex); return; }
+                     if (response && response.success && response.base64Data) {
+                         fabric.Image.fromURL(response.base64Data, function(img) { 
+                             if (!adminApp.state.fabricCanvasInstance) return;
+                             adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
+                             console.log("Background fetched and loaded for slide", slideIndex);
+                         });
+                     } else { console.error("Failed to re-fetch background", response); displayMessage("Error loading slide background image.", false); canvas.renderAll(); }
+                 }).withFailureHandler(onServerError).getImageAsBase64(media.driveFileId);
+             } else { console.warn("Slide media URL/ID not suitable for loading:", media); canvas.renderAll(); }
+             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none'; // Ensure placeholder hidden if image loads
+
+        } else if (media && media.type === 'youtube' && media.url) {
+            // Show YouTube placeholder on admin canvas
+            console.log("Displaying YouTube placeholder for URL:", media.url);
+             if (adminMediaPlaceholderEl) {
+                 adminMediaPlaceholderEl.textContent = `YouTube BG: ${media.url}`;
+                 adminMediaPlaceholderEl.style.display = 'block';
+             }
+             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url; // Populate input field
+             canvas.backgroundColor = '#444'; // Darken canvas slightly
+             canvas.renderAll();
+
+        } else if (media && media.type === 'audio' && (media.url || media.driveFileId)) {
+             // Show Audio indicator in UI
+             console.log("Indicating attached audio:", media.originalName || media.driveFileId);
+             if (attachedAudioNameEl) attachedAudioNameEl.textContent = `Attached: ${media.originalName || 'Audio File'}`;
+             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
+             if (adminMediaPlaceholderEl) { // Optionally show placeholder on canvas too
+                 adminMediaPlaceholderEl.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
+                 adminMediaPlaceholderEl.style.display = 'block';
+             }
+             canvas.renderAll();
+
+        } else {
+            // No media or unknown type
+            console.log("No background media found or configured for slide", slideIndex);
+             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+             canvas.backgroundColor = '#e9e9e9'; // Reset background color
+             canvas.renderAll();
+        }
+  
+        // Load fabric objects (overlays)
+        if (selectedSlideData.fabricCanvasJSON) {
+          console.log("Loading fabricCanvasJSON for slide", slideIndex);
+          canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
+              if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return; 
+              adminApp.state.fabricCanvasInstance.renderAll(); 
+              console.log("Finished loading canvas JSON for slide", slideIndex);
+              const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
+              populateToolbar(activeObj); 
+            }, function(o, object) { /* Revival function if needed */ });
+            } else { 
+            console.log("No fabricCanvasJSON to load for slide", slideIndex);
+            canvas.renderAll(); 
+            populateToolbar(null); 
+        }
+        updateSlideThumbnailsUI(); 
+    }
+
+    function updateSlideThumbnailsUI() {
+        if (!slideThumbnailsContainerEl || !adminApp.state.projectData) { console.warn("updateSlideThumbnailsUI: Container or project data missing."); return; }
+        slideThumbnailsContainerEl.innerHTML = '';
+        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
+        adminApp.state.projectData.slides.forEach((slide, index) => {
+            const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
+            thumb.textContent = `Slide ${index + 1}`; thumb.title = `Select Slide ${index + 1}`;
+            if (index === adminApp.state.currentSlideIndex) thumb.classList.add('active-slide');
+            thumb.onclick = function() { selectSlide(index); };
+            const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '×'; deleteBtn.title = "Delete slide";
+            deleteBtn.onclick = function(event) { event.stopPropagation(); handleDeleteSlide(index); };
+            thumb.appendChild(deleteBtn); slideThumbnailsContainerEl.appendChild(thumb);
+        });
+    }
+  
+    function handleDeleteSlide(slideIndex) {
+        if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("handleDeleteSlide: Invalid index."); return; }
+        if (adminApp.state.projectData.slides.length <= 1) { displayMessage("Cannot delete the last slide.", false); return; }
+        if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) return;
+        adminApp.state.projectData.slides.splice(slideIndex, 1);
+        console.log("Deleted slide at index:", slideIndex);
+        const indexToSelect = (slideIndex === 0 && adminApp.state.projectData.slides.length > 0) ? 0 : Math.max(0, slideIndex - 1);
+  
+        if (adminApp.state.currentSlideIndex === slideIndex) {
+            adminApp.state.currentSlideIndex = -1; // Force re-selection logic
+            selectSlide(indexToSelect);
+        } else if (adminApp.state.currentSlideIndex > slideIndex) {
+            adminApp.state.currentSlideIndex--; // Adjust index if deletion was before current
+            updateSlideThumbnailsUI(); // Just update thumbnails, no need to reload canvas
+        } else {
+             updateSlideThumbnailsUI(); // Deletion was after current, just update thumbs
+        }
+    }
+  
+    // --- Project Management (Status/Delete) ---
+    function handleProjectStatusChange(projectId, newStatus, selectElement) {
+        console.log(`Attempting to update status for project ${projectId} to ${newStatus}`);
+        showLoading(true);
+        const originalStatus = selectElement.getAttribute('data-original-status') || 
+                               (adminApp.state.projectListCache.find(p => p.projectId === projectId) || {}).status;
+        selectElement.setAttribute('data-original-status', originalStatus); 
+
+        google.script.run
+            .withSuccessHandler(function(response) { onProjectStatusUpdated(response, projectId, newStatus, selectElement); })
+            .withFailureHandler(function(error) { 
+                onServerError(error);
+                if (selectElement) { 
+                    console.log("Reverting status dropdown due to server error for project:", projectId);
+                    selectElement.value = originalStatus; 
+                }
+            })
+            .updateProjectStatus(projectId, newStatus);
+    }
+
+    function onProjectStatusUpdated(response, projectId, newStatus, selectElement) {
+        showLoading(false);
+        if (response && response.success) {
+            displayMessage(response.message || "Project status updated successfully!", true);
+            
+            const projectInCache = adminApp.state.projectListCache.find(p => p.projectId === projectId);
+            if (projectInCache) projectInCache.status = newStatus;
+            selectElement.removeAttribute('data-original-status'); 
+
+            const statusSpan = selectElement.closest('.project-item').querySelector('.status-text');
+            if(statusSpan) statusSpan.textContent = `(${newStatus})`;
+            
+            if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === projectId && adminApp.state.projectData) {
+                adminApp.state.projectData.status = newStatus;
+            }
+        } else {
+            onServerError((response && response.error) ? response.error : "Failed to update status.");
+            if (selectElement) { 
+                 console.log("Reverting status dropdown due to server failure for project:", projectId);
+                 const originalStatus = selectElement.getAttribute('data-original-status');
+                 if(originalStatus) selectElement.value = originalStatus; 
+            }
+        }
+    }
+
+    function handleDeleteProject(projectId, projectTitle) {
+        if (!confirm(`Are you sure you want to delete the project "${projectTitle}" (ID: ${projectId})? This action cannot be undone.`)) {
+            return;
+        }
+        console.log(`Attempting to delete project ${projectId}`);
+        showLoading(true);
+        google.script.run
+            .withSuccessHandler(onProjectDeleted)
+            .withFailureHandler(onServerError)
+            .deleteProject(projectId);
+    }
+
+    function onProjectDeleted(response) {
+        showLoading(false);
+        if (response && response.success) {
+            displayMessage(response.message || "Project deleted successfully!", true);
+            if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === response.deletedProjectId) {
+                switchToListView(); 
+            } else {
+                loadAdminProjectsList(); 
+            }
+        } else {
+            onServerError((response && response.error) ? response.error : "Failed to delete project.");
+        }
+    }
+
+    // --- Error Handling & UI Utils ---
+    function showLoading(show) {
+      adminApp.state.isLoading = show;
+      if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+      else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
+    }
+    function displayMessage(message, isSuccess) {
+        if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage messageAreaEl not found. Message:", message); }
+    }
     
-    // --- Shadow Properties ---
-    const shadow = activeObject.shadow;
-    if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; 
-    if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
-    if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
-    if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
-    if (objShadowAffectStrokeEl) objShadowAffectStrokeEl.checked = shadow ? !!shadow.affectStroke : false;
-    if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
+    function onServerError(errorObject) {
+      console.error("onServerError triggered:", errorObject);
+      showLoading(false);
+      let errorMessage = "An unknown server error occurred.";
+       if (typeof errorObject === 'string') { errorMessage = errorObject; }
+       else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
+       else if (errorObject && errorObject.error && typeof errorObject.error === 'string') { errorMessage = errorObject.error; }
+      console.error('Formatted Server Error Message:', errorMessage);
+      displayMessage('Server Error: ' + errorMessage, false);
+    }
+  
+    function handleCreateProject() {
+        if (adminApp.state.isLoading) return;
+        const currentProjectTitle = projectTitleInputEl.value.trim();
+        if (!currentProjectTitle) { displayMessage('Project title cannot be empty.', false); projectTitleInputEl.focus(); return; }
+        showLoading(true);
+        google.script.run.withSuccessHandler(onProjectCreated).withFailureHandler(onServerError).createProject(currentProjectTitle);
+    }
+    function onProjectCreated(response) {
+        showLoading(false);
+        if (response && response.success) { displayMessage(response.message || 'Project created!', true); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); }
+        else { onServerError((response && response.error) ? response.error : 'Failed to create project.'); }
+    }
+  
+    function loadAdminProjectsList() {
+      console.log("loadAdminProjectsList: Function called.");
+      if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found."); showLoading(false); return; }
+      if (!google || !google.script || !google.script.run) { console.error("loadAdminProjectsList: google.script.run unavailable."); displayMessage("Error: Client-server bridge unavailable.", false); return; }
+      showLoading(true);
+      console.log("loadAdminProjectsList: Calling google.script.run.getAllProjectsForAdmin...");
+      google.script.run
+        .withSuccessHandler(displayAdminProjects)
+        .withFailureHandler(onServerError)
+        .getAllProjectsForAdmin();
+       console.log("loadAdminProjectsList: google.script.run.getAllProjectsForAdmin call initiated.");
+    }
+    function displayAdminProjects(projectsArray) {
+      console.log("displayAdminProjects (Success Handler) received data:", projectsArray);
+      showLoading(false);
+      if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found."); return; }
+      adminProjectListContainerEl.innerHTML = '';
+      if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
+      
+      adminApp.state.projectListCache = projectsArray; 
 
-    // --- Interaction Properties ---
-    const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
-    if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
-    if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
-    if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
-    if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
-    updateInteractionConfigVisibility(interaction.action);
-  }
+      projectsArray.forEach(project => { 
+          if (!project || !project.projectId) return; 
+          const projectItem = document.createElement('div'); 
+          projectItem.className = 'project-item'; 
+          
+          const titleAndStatusDiv = document.createElement('div');
+          const titleSpan = document.createElement('span'); 
+          titleSpan.textContent = project.projectTitle || 'Untitled Project'; 
+          titleSpan.style.fontWeight = 'bold';
+          const statusTextSpan = document.createElement('span'); 
+          statusTextSpan.className = 'status-text'; 
+          statusTextSpan.textContent = `(${project.status || 'N/A'})`; 
+          titleAndStatusDiv.appendChild(titleSpan);
+          titleAndStatusDiv.appendChild(statusTextSpan);
 
-  function handleInteractionChange() {
+          const controlsDiv = document.createElement('div'); 
+          const statusSelect = document.createElement('select');
+          statusSelect.className = 'project-status-select';
+          statusSelect.setAttribute('data-project-id', project.projectId);
+          statusSelect.setAttribute('data-original-status', project.status || "Draft"); 
+          ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
+              const option = document.createElement('option');
+              option.value = statusValue;
+              option.textContent = statusValue;
+              if (project.status === statusValue) { option.selected = true; }
+              statusSelect.appendChild(option);
+          });
+          statusSelect.onchange = function() { handleProjectStatusChange(project.projectId, this.value, this); };
+
+          const editButton = document.createElement('button'); 
+          editButton.textContent = 'Edit'; 
+          editButton.className = 'edit-button'; 
+          editButton.setAttribute('data-project-id', project.projectId); 
+          editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; 
+          
+          const deleteButton = document.createElement('button');
+          deleteButton.textContent = 'Delete';
+          deleteButton.className = 'danger-button'; 
+          deleteButton.setAttribute('data-project-id', project.projectId);
+          deleteButton.setAttribute('data-project-title', project.projectTitle || 'Untitled Project');
+          deleteButton.style.marginLeft = '5px';
+          deleteButton.onclick = function() { handleDeleteProject(project.projectId, project.projectTitle || 'Untitled Project'); };
+
+          controlsDiv.appendChild(statusSelect);
+          controlsDiv.appendChild(editButton);
+          controlsDiv.appendChild(deleteButton); 
+          
+          projectItem.appendChild(titleAndStatusDiv); 
+          projectItem.appendChild(controlsDiv); 
+          adminProjectListContainerEl.appendChild(projectItem);
+       });
+      console.log("displayAdminProjects: Finished rendering project list.");
+    }
+  
+    // --- Media Handling ---
+    function handleImageUpload(event) {
+        if (adminApp.state.isLoading) { if (event.target) event.target.value = null; return; }
+        const file = event.target.files[0];
+        if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
+        
+        saveCurrentSlideState(); // Save state before potential background change
+        
+        showLoading(true); displayMessage("Uploading image...", true);
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
+            if (!adminApp.state.currentProjectId) { showLoading(false); displayMessage("Error: No project selected.", false); if(event.target) event.target.value = null; return; }
+            google.script.run.withSuccessHandler(onImageUploaded).withFailureHandler(onServerError).uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
+        };
+        reader.onerror = function(error) { showLoading(false); displayMessage("Error reading file.", false); console.error(error); if(event.target) event.target.value = null; };
+        reader.readAsDataURL(file);
+    }
+
+    function onImageUploaded(response) { 
+        // Called AFTER Drive upload, before fetching base64
+        showLoading(false); 
+        if (imageUploaderEl) imageUploaderEl.value = null; // Clear input
+        if (response && response.success && response.driveFileId) {
+            displayMessage("Image uploaded. Fetching for preview...", true); 
+            showLoading(true);
+            adminApp.state.lastUploadedDriveId = response.driveFileId; // Store ID temporarily
+            adminApp.state.lastUploadedMimeType = response.mimeType;
+            adminApp.state.lastUploadedFileName = response.fileName;
+            google.script.run
+                .withSuccessHandler(onBase64ImageReceived) // This will set the BG and update slideMedia
+                .withFailureHandler(onServerError)
+                .getImageAsBase64(response.driveFileId);
+        } else { 
+            onServerError({ message: (response && response.error) ? response.error : "Upload failed." }); 
+        }
+    }
+
+    function onBase64ImageReceived(response) { 
+        // Called AFTER base64 fetch for image background
+        showLoading(false);
+        if (response && response.success && response.base64Data) {
+            if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas/Slide not ready.", false); return; }
+            const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+            if (!currentSlide) { displayMessage("Error: Slide data missing.", false); return; }
+            
+            // Set background
+            fabric.Image.fromURL(response.base64Data, function(img) {
+                if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) return; 
+                const canvas = adminApp.state.fabricCanvasInstance; 
+                const imgWidth = img.width; const imgHeight = img.height; 
+                const maxWidth = 960; // Max width constraint
+                let cvWidth = imgWidth; let cvHeight = imgHeight; const ratio = imgWidth / imgHeight;
+                if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / ratio); }
+                
+                canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
+                if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
+                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: cvWidth / imgWidth, scaleY: cvHeight / imgHeight });
+                canvas.renderAll(); 
+                displayMessage("Background image set.", true);
+
+                // Update slideMedia state AFTER setting background
+                if (!currentSlide.slideMedia) currentSlide.slideMedia = {}; 
+                currentSlide.slideMedia.type = 'image';
+                currentSlide.slideMedia.url = response.base64Data; // Store base64 for immediate load
+                currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null; 
+                currentSlide.slideMedia.mimeType = adminApp.state.lastUploadedMimeType || response.mimeType; // Use stored mime if available
+                currentSlide.slideMedia.originalName = adminApp.state.lastUploadedFileName || null;
+                currentSlide.canvasWidth = cvWidth; // Update slide dimensions
+                currentSlide.canvasHeight = cvHeight;
+                
+                console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated for image.`);
+                updateSlideThumbnailsUI(); // Refresh thumbnails if needed (though BG isn't shown)
+                
+                // Clear other media UI/placeholders
+                if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
+                if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
+                if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
+                if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+
+                // Clean up temporary state
+                delete adminApp.state.lastUploadedDriveId; 
+                delete adminApp.state.lastUploadedMimeType;
+                delete adminApp.state.lastUploadedFileName;
+
+            }, { crossOrigin: 'anonymous' }); // Needed for loading base64/external URLs sometimes
+        } else { 
+            onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." }); 
+            // Clean up temporary state on error too
+            delete adminApp.state.lastUploadedDriveId; 
+            delete adminApp.state.lastUploadedMimeType;
+            delete adminApp.state.lastUploadedFileName;
+        }
+    }
+
+    // -- NEW MEDIA HANDLERS --
+
+    function handleSetYoutubeBackground() {
+        if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) {
+            displayMessage("Please select a slide first.", false); return;
+        }
+        if (!youtubeUrlInputEl || !youtubeUrlInputEl.value) {
+            displayMessage("Please enter a YouTube URL.", false); return;
+        }
+        const url = youtubeUrlInputEl.value.trim();
+        // Basic validation - more robust parsing could be added
+        if (!url.includes("youtube.com/") && !url.includes("youtu.be/")) {
+            displayMessage("Please enter a valid YouTube URL.", false);
+            return;
+        }
+
+        saveCurrentSlideState(); // Save current state before changing media
+
+        const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+        if (!currentSlide.slideMedia) { 
+            currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null }; 
+        }
+        currentSlide.slideMedia.type = 'youtube';
+        currentSlide.slideMedia.url = url;
+        currentSlide.slideMedia.driveFileId = null; // Clear Drive ID if switching to YouTube
+        currentSlide.slideMedia.mimeType = 'video/youtube'; // Use custom mime type
+        currentSlide.slideMedia.originalName = null; // No original name for URL
+
+        console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
+        
+        // Update Admin UI immediately
+        if(adminApp.state.fabricCanvasInstance) {
+             adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
+             adminApp.state.fabricCanvasInstance.backgroundColor = '#444'; // Darken canvas slightly
+             adminApp.state.fabricCanvasInstance.renderAll(); // Render the background color change
+        }
+       if (adminMediaPlaceholderEl) {
+           adminMediaPlaceholderEl.textContent = `YouTube BG: ${url}`;
+           adminMediaPlaceholderEl.style.display = 'block';
+       }
+       // Clear other media inputs/indicators
+       if (imageUploaderEl) imageUploaderEl.value = null; 
+       if (audioUploaderEl) audioUploaderEl.value = null; 
+       if (attachedAudioNameEl) attachedAudioNameEl.textContent = ''; 
+       if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
+
+       displayMessage("YouTube background set for this slide.", true);
+    }
+
+    function handleAudioUpload(event) {
+        if (adminApp.state.isLoading) { if (event.target) event.target.value = null; return; }
+        const file = event.target.files[0];
+        if (!file || !file.type.startsWith('audio/')) { 
+            if (event.target) event.target.value = null; 
+            return; 
+        }
+        if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) {
+             displayMessage("Please select a slide first before uploading audio.", false); 
+             if (event.target) event.target.value = null; 
+             return;
+        }
+
+        saveCurrentSlideState(); // Save state before upload
+
+        showLoading(true); displayMessage("Uploading audio...", true);
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const fileData = { 
+                fileName: file.name, 
+                mimeType: file.type, 
+                data: e.target.result.split(',')[1] 
+            };
+            google.script.run
+                .withSuccessHandler(onAudioUploaded)
+                .withFailureHandler(onServerError)
+                .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'audio'); // Pass 'audio' type
+        };
+        reader.onerror = function(error) { 
+            showLoading(false); 
+            displayMessage("Error reading audio file.", false); 
+            console.error(error); 
+            if (event.target) event.target.value = null; 
+        };
+        reader.readAsDataURL(file);
+    }
+
+     function onAudioUploaded(response) {
+        showLoading(false); 
+        if (audioUploaderEl) audioUploaderEl.value = null; // Clear input regardless of success
+
+        if (response && response.success && response.driveFileId) {
+            displayMessage("Audio uploaded successfully.", true);
+            
+            // Update slideMedia state
+            const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+             if (!currentSlide.slideMedia) { 
+                currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null }; 
+             }
+            currentSlide.slideMedia.type = 'audio';
+            currentSlide.slideMedia.url = response.webContentLink; // Use the link provided by server
+            currentSlide.slideMedia.driveFileId = response.driveFileId;
+            currentSlide.slideMedia.mimeType = response.mimeType || audioUploaderEl?.files[0]?.type; 
+            currentSlide.slideMedia.originalName = response.fileName; 
+            
+            console.log(`Audio attached for slide ${adminApp.state.currentSlideIndex + 1}:`, currentSlide.slideMedia);
+           
+            // Update Admin UI
+            if (attachedAudioNameEl) attachedAudioNameEl.textContent = `Attached: ${response.fileName}`;
+            if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
+            if (youtubeUrlInputEl) youtubeUrlInputEl.value = ''; // Clear YouTube input
+            if (imageUploaderEl) imageUploaderEl.value = null; // Clear image input
+            if(adminApp.state.fabricCanvasInstance) { // Clear other backgrounds
+                adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
+                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; 
+                adminApp.state.fabricCanvasInstance.renderAll(); // Render changes
+            }
+            if (adminMediaPlaceholderEl) { 
+                 adminMediaPlaceholderEl.textContent = `Audio Attached: ${response.fileName}`;
+                 adminMediaPlaceholderEl.style.display = 'block';
+             }
+
+        } else {
+            onServerError((response && response.error) ? response.error : "Failed to upload audio.");
+        }
+    }
+
+    function handleRemoveAudio() {
+        if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) return;
+        
+        const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
+        if (currentSlide.slideMedia && currentSlide.slideMedia.type === 'audio') {
+            console.log(`Removing audio from slide ${adminApp.state.currentSlideIndex + 1}`);
+            
+            // Update state first
+            currentSlide.slideMedia.type = null;
+            currentSlide.slideMedia.url = null;
+            currentSlide.slideMedia.driveFileId = null;
+            currentSlide.slideMedia.mimeType = null;
+            currentSlide.slideMedia.originalName = null;
+
+            // Update UI
+            if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
+            if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
+            if (audioUploaderEl) audioUploaderEl.value = null; 
+            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+            if(adminApp.state.fabricCanvasInstance) {
+                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; // Reset BG color
+                adminApp.state.fabricCanvasInstance.renderAll();
+             }
+            displayMessage("Audio removed from this slide.", true);
+            // Optional: Could add server call here to delete Drive file if desired
+        }
+    }
+
+    // --- Overlay Creation & Toolbar ---
+    function addRectangle() {
+      if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
+      const canvas = adminApp.state.fabricCanvasInstance;
+      const rect = new fabric.Rect({ left: 50, top: 50, fill: 'rgba(255,0,0,0.7)', width: 150, height: 100, stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
+      canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll(); console.log("Rectangle added to canvas:", rect);
+    }
+  
+    function addCircle() {
+      if (!adminApp.state.fabricCanvasInstance) { console.error("addCircle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
+      const canvas = adminApp.state.fabricCanvasInstance;
+      const circle = new fabric.Circle({ left: 150, top: 150, radius: 50, fill: 'rgba(0,0,255,0.7)', stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
+      canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll(); console.log("Circle added to canvas:", circle);
+    }
+  
+    function addTextbox() {
+      if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add text.", false); return; }
+      const canvas = adminApp.state.fabricCanvasInstance;
+      const textbox = new fabric.Textbox('Editable Text', { 
+          left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000', 
+          fontFamily: 'Arial', fontWeight: 'normal', fontStyle: 'normal',
+          textAlign: 'left', lineHeight: 1.16, charSpacing: 0,
+          customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, 
+          customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, 
+          sequenceOrder: null 
+      });
+      canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
+    }
+    
+    function toHexColor(fabricColor) {
+      if (!fabricColor) return '#000000'; 
+      try {
+        if (typeof fabricColor === 'string') {
+            const colorInstance = new fabric.Color(fabricColor);
+            const hex = colorInstance.toHex();
+            return '#' + hex;
+        }
+        return '#000000'; 
+      } catch (e) {
+        console.warn("Could not convert color to HEX:", fabricColor, e);
+        return '#000000'; 
+      }
+    }
+  
+    function initToolbar() { 
+      console.log("initToolbar: Attaching listeners to toolbar inputs."); 
+      if(objFontFamilyEl) {
+          FONT_FAMILIES.forEach(font => {
+              const option = document.createElement('option'); option.value = font; option.textContent = font; objFontFamilyEl.appendChild(option);
+          });
+      } else { console.warn("initToolbar: objFontFamilyEl not found, cannot populate fonts."); }
+
+      const inputs = [
+        {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
+        {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
+        {el: objAngleEl, prop: 'angle', type: 'number'}, {el: objFillEl, prop: 'fill', type: 'color'},
+        {el: objStrokeColorEl, prop: 'stroke', type: 'color'}, {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
+        {el: objOpacityEl, prop: 'opacity', type: 'range'}, {el: objTextContentEl, prop: 'text', type: 'textarea'},
+        {el: objFontFamilyEl, prop: 'fontFamily', type: 'select'}, {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
+        {el: objFontWeightEl, prop: 'fontWeight', type: 'select'}, {el: objFontStyleEl, prop: 'fontStyle', type: 'select'},
+        {el: objTextAlignEl, prop: 'textAlign', type: 'select'}, {el: objLineHeightEl, prop: 'lineHeight', type: 'number'},
+        {el: objCharSpacingEl, prop: 'charSpacing', type: 'number'}, {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
+        {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'}, {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
+        {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'}, {el: objShadowAffectStrokeEl, prop: 'shadow.affectStroke', type: 'checkbox'},
+        {el: objShadowNonScalingEl, prop: 'shadow.nonScaling', type: 'checkbox'}
+      ];
+  
+      inputs.forEach(inputConfig => {
+        if (inputConfig.el) {
+            const eventType = (inputConfig.el.tagName === 'SELECT' || inputConfig.el.type === 'color' || inputConfig.el.type === 'checkbox') ? 'change' : 'input';
+            inputConfig.el.addEventListener(eventType, (e) => { 
+                const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
+                updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type); 
+            });
+        } else { console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); }
+      });
+
+      if (objInteractionTriggerEl) objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
+      if (objInteractionActionEl) objInteractionActionEl.addEventListener('change', handleInteractionChange);
+      if (objModalContentEl) objModalContentEl.addEventListener('input', handleInteractionChange);
+      if (objNavigateToEl) objNavigateToEl.addEventListener('input', handleInteractionChange);
+    }
+  
+    function populateToolbar(activeObject) { 
+      if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; } 
+      if (!activeObject) { overlayPropertiesToolbarEl.style.display = 'none'; return; }
+      overlayPropertiesToolbarEl.style.display = 'block'; 
+  
+      // --- Basic Properties ---
+      if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
+      if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
+      if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
+      if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
+      if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
+      if (objFillEl) objFillEl.value = toHexColor(activeObject.fill); 
+      if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke); 
+      if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth; 
+      if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; 
+  
+      // --- Text Properties (Conditional Display) ---
+      const isTextObject = activeObject.type === 'textbox' || activeObject.type === 'i-text';
+      if (textSpecificControlsEl) {
+          textSpecificControlsEl.style.display = isTextObject ? 'block' : 'none';
+          if (isTextObject) {
+              if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
+              if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial';
+              if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
+              if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
+              if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
+              if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
+              if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight || 1.16;
+              if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing || 0;
+          }
+      }
+      
+      // --- Shadow Properties ---
+      const shadow = activeObject.shadow;
+      if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; 
+      if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
+      if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
+      if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
+      if (objShadowAffectStrokeEl) objShadowAffectStrokeEl.checked = shadow ? !!shadow.affectStroke : false;
+      if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
+
+      // --- Interaction Properties ---
+      const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
+      if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
+      if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
+      if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
+      if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
+      updateInteractionConfigVisibility(interaction.action);
+    }
+  
+    function handleInteractionChange() {
+        const canvas = adminApp.state.fabricCanvasInstance;
+        if (!canvas) return;
+        const activeObject = canvas.getActiveObject();
+        if (!activeObject) return;
+        if (!activeObject.customInteraction) { activeObject.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "" }; }
+        if (objInteractionTriggerEl) activeObject.customInteraction.trigger = objInteractionTriggerEl.value;
+        if (objInteractionActionEl) activeObject.customInteraction.action = objInteractionActionEl.value;
+        if (objModalContentEl) activeObject.customInteraction.modalContent = objModalContentEl.value;
+        if (objNavigateToEl) activeObject.customInteraction.navigateTo = objNavigateToEl.value;
+        updateInteractionConfigVisibility(activeObject.customInteraction.action);
+        console.log("Interaction data updated for object:", activeObject.customInteraction);
+    }
+
+    function updateInteractionConfigVisibility(action) {
+        if (modalContentConfigEl) modalContentConfigEl.style.display = (action === 'showModal') ? 'block' : 'none';
+        if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
+    }
+
+    function updateFabricObjectFromToolbar(propertyName, value, inputType) { 
       const canvas = adminApp.state.fabricCanvasInstance;
       if (!canvas) return;
       const activeObject = canvas.getActiveObject();
       if (!activeObject) return;
-
-      if (!activeObject.customInteraction) {
-          activeObject.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "" };
-      }
-
-      if (objInteractionTriggerEl) activeObject.customInteraction.trigger = objInteractionTriggerEl.value;
-      if (objInteractionActionEl) activeObject.customInteraction.action = objInteractionActionEl.value;
-      if (objModalContentEl) activeObject.customInteraction.modalContent = objModalContentEl.value;
-      if (objNavigateToEl) activeObject.customInteraction.navigateTo = objNavigateToEl.value;
-
-      updateInteractionConfigVisibility(activeObject.customInteraction.action);
-      console.log("Interaction data updated for object:", activeObject.customInteraction);
-  }
-
-  function updateInteractionConfigVisibility(action) {
-      if (modalContentConfigEl) modalContentConfigEl.style.display = (action === 'showModal') ? 'block' : 'none';
-      if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
-  }
-
-  function updateFabricObjectFromToolbar(propertyName, value, inputType) { 
-    const canvas = adminApp.state.fabricCanvasInstance;
-    if (!canvas) return;
-    const activeObject = canvas.getActiveObject();
-    if (!activeObject) return;
-
-    let parsedValue = value;
-    if (inputType === 'number' || inputType === 'range') {
-        if (propertyName === 'lineHeight') { // Allow float for line height
-           parsedValue = parseFloat(value);
-        } else {
-           parsedValue = parseInt(value, 10);
-        }
-        // Handle potential NaN
-        if (isNaN(parsedValue)) {
-            // Allow clearing strokeWidth, default to 0
-            if (propertyName === 'strokeWidth' && value === '') parsedValue = 0; 
-            // Allow clearing charSpacing, default to 0? Fabric might default differently.
-            else if (propertyName === 'charSpacing' && value === '') parsedValue = 0; 
-            // For other number inputs, maybe revert or ignore if empty/invalid
-            else if (value === '') return; // Ignore empty numeric input for now
-            else return; // Ignore NaN
-        }
-    } else if (inputType === 'checkbox') {
-        parsedValue = !!value; // Convert checkbox value to boolean
-    }
-    
-    // Special handling for width/height via scaling
-    if (propertyName === 'width') {
-      activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001);
-    } else if (propertyName === 'height') {
-      activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001);
-    } 
-    // Special handling for shadow properties (update whole shadow object)
-    else if (propertyName.startsWith('shadow.')) {
-      const shadowProp = propertyName.split('.')[1];
-      let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
+      let parsedValue = value;
+      if (inputType === 'number' || inputType === 'range') {
+          if (propertyName === 'lineHeight') { parsedValue = parseFloat(value); } 
+          else { parsedValue = parseInt(value, 10); }
+          if (isNaN(parsedValue)) {
+              if (propertyName === 'strokeWidth' && value === '') parsedValue = 0; 
+              else if (propertyName === 'charSpacing' && value === '') parsedValue = 0; 
+              else if (value === '') return; 
+              else return; 
+          }
+      } else if (inputType === 'checkbox') { parsedValue = !!value; }
       
-      // Update the specific property being changed
-      shadowOptions[shadowProp] = parsedValue;
-
-      // Re-read other shadow properties from toolbar to ensure consistency
-      shadowOptions.color = objShadowColorEl.value || '#000000';
-      shadowOptions.blur = parseInt(objShadowBlurEl.value, 10) || 0;
-      shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
-      shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
-      shadowOptions.affectStroke = objShadowAffectStrokeEl.checked;
-      shadowOptions.nonScaling = objShadowNonScalingEl.checked;
-      
-      // Only create shadow if there's blur or offset, otherwise clear it
-      if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0) {
-           activeObject.set('shadow', new fabric.Shadow(shadowOptions));
+      if (propertyName === 'width') { activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001); } 
+      else if (propertyName === 'height') { activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001); } 
+      else if (propertyName.startsWith('shadow.')) {
+        const shadowProp = propertyName.split('.')[1];
+        let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
+        shadowOptions[shadowProp] = parsedValue;
+        shadowOptions.color = objShadowColorEl.value || '#000000';
+        shadowOptions.blur = parseInt(objShadowBlurEl.value, 10) || 0;
+        shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
+        shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
+        shadowOptions.affectStroke = objShadowAffectStrokeEl.checked;
+        shadowOptions.nonScaling = objShadowNonScalingEl.checked;
+        if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0) { activeObject.set('shadow', new fabric.Shadow(shadowOptions)); } 
+        else { activeObject.set('shadow', null); }
       } else {
-           activeObject.set('shadow', null); // Clear shadow if no blur/offset
+        if (!propertyName.startsWith('interaction.')) { activeObject.set(propertyName, parsedValue); }
       }
-    } 
-    // Handle standard properties
-    else {
-      if (!propertyName.startsWith('interaction.')) { // Avoid double-handling interactions
-          activeObject.set(propertyName, parsedValue);
-      }
+      if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'width'].includes(propertyName)) { activeObject.initDimensions(); }
+      activeObject.setCoords(); 
+      canvas.renderAll();
     }
-
-    // Text objects might need dimensions recalculated after property changes
-    if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && 
-        ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'width'].includes(propertyName)) {
-        activeObject.initDimensions(); 
-    }
-
-    activeObject.setCoords(); 
-    canvas.renderAll();
-  }
-
-  Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
-
-</script>
+  
+    Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
+  
+  </script>

@@ -4,6 +4,7 @@
 
     // --- Global Variables ---
     let ytPlayer; // Global variable to hold the YouTube player instance
+    let isYouTubeApiReady = false; // Flag to track API readiness
 
     // --- Application State ---
     viewerApp.state = {
@@ -367,7 +368,14 @@
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
                         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'block';
-                        setupYouTubePlayer(videoId); // This function now handles creating the player
+                        // *** Ensure API is ready before calling setup ***
+                        if (isYouTubeApiReady) {
+                             setupYouTubePlayer(videoId); 
+                        } else {
+                             console.warn("YouTube API not ready yet when trying to render slide. Waiting for onYouTubeIframeAPIReady.");
+                             // We might need a mechanism here to queue the player setup 
+                             // if onYouTubeIframeAPIReady hasn't fired yet. For now, just log.
+                        }
                          canvas.backgroundColor = 'transparent'; // Ensure canvas overlay is transparent
                          canvas.renderAll(); // Re-render canvas to ensure transparency
                     } else {
@@ -550,7 +558,8 @@
     // This global function MUST exist for the API script to call
     function onYouTubeIframeAPIReady() {
         console.log("YouTube IFrame API Ready (called by external script).");
-        // Player is created later by setupYouTubePlayer when needed
+        isYouTubeApiReady = true; // Set the flag
+        // If a player setup was pending, trigger it now? Or rely on renderSlide to call setup again.
     }
 
     function setupYouTubePlayer(videoId) {
@@ -558,22 +567,22 @@
             console.error("YouTube player container element not found."); return;
         }
         // Ensure container is empty and visible before creating player
-        youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div"></div>'; // Target for YT Player constructor
+        youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>'; // Target + Style
         youtubePlayerContainerEl.style.display = 'block';
         
         console.log("Setting up YouTube player for video ID:", videoId);
         
-        // Check if YT object and Player constructor are available
-        if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
-            console.error("YT object or YT.Player is not available. API might not be fully loaded yet.");
-            displayMessageViewer("YouTube Player API not ready. Please wait and try again.", false);
-            // Optionally, retry after a short delay
-            // setTimeout(() => setupYouTubePlayer(videoId), 500); 
+        // ** Check API readiness flag **
+        if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
+            console.error("YT object or YT.Player is not available or API not ready.");
+            displayMessageViewer("YouTube Player API not ready. Please wait or reload.", false);
+            // Optionally retry, but might indicate a loading issue with the API script itself
+            // setTimeout(() => { if(viewerApp.state.currentProjectData) setupYouTubePlayer(videoId); }, 1000); 
             return;
         }
 
         try {
-             // Ensure previous player is destroyed if somehow it exists
+             // Ensure previous player is destroyed
              if(ytPlayer && typeof ytPlayer.destroy === 'function') {
                  console.log("Destroying previous YT player instance.");
                  ytPlayer.destroy();
@@ -584,16 +593,16 @@
                 height: '100%', 
                 width: '100%', 
                 videoId: videoId,
-                playerVars: { // More restrictive player vars matching working example
-                    'autoplay': 0,        // Keep autoplay off (Essential)
-                    'controls': 0,        // **** Disable default controls ****
-                    'rel': 0,             // Keep off
-                    'showinfo': 0,        // Keep off
-                    'modestbranding': 1,  // Keep on
-                    'iv_load_policy': 3,  // Keep annotations off
-                    'fs': 0,              // **** Keep fullscreen disabled ****
-                    'disablekb': 1,       // **** Keep keyboard disabled ****
-                    'playsinline': 1      // Keep playsinline
+                playerVars: { 
+                    'autoplay': 0,       
+                    'controls': 0,       // Turn controls off again based on working example 
+                    'rel': 0,            
+                    'showinfo': 0,       
+                    'modestbranding': 1, 
+                    'iv_load_policy': 3, 
+                    'fs': 0,             
+                    'disablekb': 1,      
+                    'playsinline': 1     
                 },
                 events: {
                     'onReady': onPlayerReady,
@@ -605,29 +614,31 @@
         } catch (e) {
             console.error("Error creating YouTube player instance:", e);
             displayMessageViewer(`Error initializing YouTube player: ${e.message}`, false);
-             if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'none'; // Hide container on error
+             if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'none'; 
         }
     }
 
     function onPlayerReady(event) {
-        // Autoplay is off, so just log readiness. User needs to click play.
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
-        // Since default controls are off, we might need custom play button or start video programmatically on first interaction
-        // For now, user cannot play it easily. We need custom controls or different playerVars.
-        // Let's try playing it here to see if the permissions issue is gone, even if controls are hidden
-        // event.target.playVideo(); // Try playing it now that it's ready
         
-         // Add an event listener to the container to play on click as substitute for controls
-         if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
-             youtubePlayerContainerEl.addEventListener('click', function() {
+         // Add an event listener to the container to play on click (since controls=0)
+         const playerDiv = document.getElementById('youtube-player-div'); // Get the inner div
+         if(playerDiv && !playerDiv.hasAttribute('click-listener-added')){
+             console.log("Adding click-to-play listener to YT player div.");
+             playerDiv.addEventListener('click', function() {
+                 console.log("Player div clicked.");
                  if (ytPlayer && typeof ytPlayer.playVideo === 'function' && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+                     console.log("Calling playVideo().");
                      ytPlayer.playVideo();
+                 } else if (ytPlayer && typeof ytPlayer.pauseVideo === 'function' && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+                     console.log("Calling pauseVideo().");
+                     ytPlayer.pauseVideo(); // Allow clicking to pause too
                  }
              });
-             youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
+             playerDiv.setAttribute('click-listener-added', 'true');
          }
-
-
+         // Try playing immediately after adding listener, maybe it works now?
+         // event.target.playVideo();
     }
 
     function onPlayerStateChange(event) {
@@ -637,7 +648,6 @@
     function onPlayerError(event) {
         console.error("YouTube Player Error Code:", event.data);
         let errorMsg = `YouTube Player Error: Code ${event.data}. `;
-        // Provide more context based on common error codes
         switch (event.data) {
             case 2: errorMsg += "Invalid video ID."; break;
             case 5: errorMsg += "HTML5 player error."; break;
@@ -651,29 +661,22 @@
 
     function stopAndDestroyYouTubePlayer() {
         try {
-            // Check if ytPlayer exists and has the necessary methods before calling them
             if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
                 ytPlayer.stopVideo();
                 console.log("Called ytPlayer.stopVideo()");
-            } else {
-                 // console.log("ytPlayer.stopVideo not available or ytPlayer is null.");
             }
             if (ytPlayer && typeof ytPlayer.destroy === 'function') {
                 ytPlayer.destroy();
                  console.log("YouTube Player Destroyed.");
-            } else {
-                 // console.log("ytPlayer.destroy not available or ytPlayer is null.");
             }
-             ytPlayer = null; // Clear the global reference
+             ytPlayer = null; 
         } catch (e) {
             console.error("Error stopping/destroying YouTube player:", e);
         } finally {
-             // Always try to hide the container and remove click listener
              if (youtubePlayerContainerEl) {
                  youtubePlayerContainerEl.innerHTML = ''; 
                  youtubePlayerContainerEl.style.display = 'none';
-                 youtubePlayerContainerEl.removeAttribute('click-listener-added'); // Clean up listener flag
-                 // Consider explicitly removing the listener if needed, although removing innerHTML might suffice
+                 // No need to remove attribute here as container is cleared
              }
         }
     }
@@ -682,7 +685,6 @@
         if (!url) return null;
         let videoId = null;
         try {
-            // Handle various YouTube URL formats
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             videoId = (match && match[2].length === 11) ? match[2] : null;
@@ -707,11 +709,8 @@
                      console.log("Audio playback started.");
                  }).catch(error => { 
                      console.error("Audio playback failed (likely autoplay blocked):", error);
-                     // Don't show confusing message if source loaded fine but autoplay blocked
-                     // displayMessageViewer("Audio couldn't autoplay. Use controls.", false); 
                   }); 
              }
-             // Always show controls for audio
              viewerAudioPlayerEl.style.display = 'block'; 
              viewerApp.state.currentAudioElement = viewerAudioPlayerEl; // Store ref
         } catch (e) {

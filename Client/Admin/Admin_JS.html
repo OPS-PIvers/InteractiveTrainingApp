@@ -18,7 +18,14 @@
       projectListCache: [], // Added to cache project list for status updates/reverts
       lastUploadedDriveId: null, // Temp store for image uploads before base64 fetch
       lastUploadedMimeType: null,
-      lastUploadedFileName: null
+      lastUploadedFileName: null,
+      isPasteListenerActive: false, // To manage listener attachment for pasting images
+      // For Google Drive Picker (Part 2 of Step 22) - User must replace with their actual key
+      developerApiKey: 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER', 
+      gapiLoaded: false,
+      pickerApiLoaded: false,
+      oauthToken: null,
+      currentPickerMediaType: null // 'image' or 'audio' for Drive Picker context
     };
   
     // --- DOM Element References ---
@@ -43,7 +50,9 @@
         // Existing properties
         objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
         textSpecificControlsEl, objTextContentEl,
-        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
+        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl,
+        // Step 22 - Drive Picker Button
+        attachFromDriveButtonEl; 
   
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -118,6 +127,9 @@
       attachedAudioNameEl = document.getElementById('attachedAudioName');
       removeAudioButtonEl = document.getElementById('removeAudioButton');
       adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
+      
+      // Step 22
+      attachFromDriveButtonEl = document.getElementById('attachFromDriveButton');
   
       // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
@@ -125,6 +137,8 @@
       if (!listViewContainerEl) console.warn("setupDOMReferences: listViewContainerEl not found.");
       if (!editViewContainerEl) console.warn("setupDOMReferences: editViewContainerEl not found.");
       if (!createProjectButtonEl) console.warn("setupDOMReferences: createProjectButtonEl not found.");
+      if (!attachFromDriveButtonEl) console.warn("setupDOMReferences: attachFromDriveButtonEl not found.");
+
 
       console.log("Admin_JS: DOM references set up.");
     };
@@ -158,6 +172,13 @@
       if(listViewContainerEl) listViewContainerEl.style.display = 'block';
       if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
+      
+      // Remove paste listener if it was active
+      if (adminApp.state.isPasteListenerActive) {
+          document.removeEventListener('paste', handlePasteImage);
+          adminApp.state.isPasteListenerActive = false;
+          console.log("Admin_JS: Paste event listener for images removed from document.");
+      }
       loadAdminProjectsList(); // Reload list in case status changed etc.
     }
   
@@ -220,6 +241,19 @@
         ensureEditViewListener('setYoutubeBackgroundButtonEl', 'setYoutubeBackgroundButton', 'click', handleSetYoutubeBackground);
         ensureEditViewListener('audioUploaderEl', 'audioUploader', 'change', handleAudioUpload); // Auto-upload on change
         ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio); 
+
+        // Step 22 - Drive Picker Listener
+        ensureEditViewListener('attachFromDriveButtonEl', 'attachFromDriveButton', 'click', function() {
+             if (!adminApp.state.gapiLoaded || !adminApp.state.pickerApiLoaded) {
+                 displayMessage("Picker API not ready. Please wait.", false); return;
+             }
+             if (!adminApp.state.developerApiKey || adminApp.state.developerApiKey === 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER') {
+                 displayMessage("Developer API Key not configured for Drive Picker. Please update it in Admin_JS.html.", false); return;
+             }
+             // For this example, let's assume it's for images. Can be made more context specific
+             // e.g. by having separate buttons or prompting the user.
+             showDrivePicker('image'); 
+        });
   
         // Initialize Fabric Canvas with defaults
         if (typeof fabric !== 'undefined' && fabricCanvasEl) {
@@ -257,6 +291,13 @@
             // Initially hide toolbar
             if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none'; 
   
+            // Attach paste listener for images
+            if (!adminApp.state.isPasteListenerActive) {
+                document.addEventListener('paste', handlePasteImage);
+                adminApp.state.isPasteListenerActive = true;
+                console.log("Admin_JS: Paste event listener for images attached to document.");
+            }
+
             // ** NOW CALL LOAD PROJECT DATA **
             loadProjectForEditing(projectIdToEdit); // Load the actual project data
   
@@ -1013,6 +1054,64 @@
              }
             displayMessage("Audio removed from this slide.", true);
             // Optional: Could add server call here to delete Drive file if desired
+        }
+    }
+
+    // --- Step 22: Paste Image Handler ---
+    function handlePasteImage(event) {
+        if (adminApp.state.currentView !== 'edit' || !adminApp.state.currentProjectId || adminApp.state.isLoading) {
+            // Not in edit view, no project, or already processing something
+            return;
+        }
+
+        const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+        let imageFound = false;
+
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+                imageFound = true;
+                const blob = items[i].getAsFile();
+                if (!blob) continue;
+
+                event.preventDefault(); // Prevent default paste behavior for the image
+                console.log("Image pasted from clipboard:", blob.name, blob.type);
+
+                saveCurrentSlideState(); // Save current slide state before processing new image
+
+                showLoading(true);
+                displayMessage("Processing pasted image...", true);
+
+                const reader = new FileReader();
+                reader.onload = function(e_reader) {
+                    const fileData = {
+                        fileName: 'pasted_image.png', // Default name
+                        mimeType: blob.type,
+                        data: e_reader.target.result.split(',')[1] // Base64 data
+                    };
+
+                    if (!adminApp.state.currentProjectId) {
+                        showLoading(false);
+                        displayMessage("Error: No project selected for pasted image.", false);
+                        return;
+                    }
+                    google.script.run
+                        .withSuccessHandler(onImageUploaded) // Existing handler
+                        .withFailureHandler(onServerError)
+                        .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
+                };
+                reader.onerror = function(error) {
+                    showLoading(false);
+                    displayMessage("Error reading pasted image data.", false);
+                    console.error("FileReader error:", error);
+                };
+                reader.readAsDataURL(blob);
+                break; // Handle only the first image found
+            }
+        }
+        if (imageFound) {
+            console.log("Handled pasted image.");
+        } else {
+            console.log("Paste event did not contain a direct image file.");
         }
     }
 

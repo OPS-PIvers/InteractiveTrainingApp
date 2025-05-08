@@ -29,12 +29,6 @@ jobs:
         # Validate JSON format (fails if not valid)
         jq empty ~/.clasprc.json || { echo "Invalid JSON in credentials"; cat ~/.clasprc.json; exit 1; }
 
-    - name: Replace API Key Placeholder
-      run: |
-        # Replace the placeholder in your code with the actual API key
-        sed -i "s|developerApiKey: 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER'|developerApiKey: '${{ secrets.PICKER_API_KEY }}'|" Client/Admin/Admin_JS.html
-        echo "API key replaced successfully in Client/Admin/Admin_JS.html"
-
     - name: Push code to Apps Script
       # Use --force if you encounter issues with minor version bumps
       run: clasp push --force

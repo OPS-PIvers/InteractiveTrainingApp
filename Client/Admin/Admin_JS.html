@@ -3,42 +3,37 @@
     window.adminApp = {};
 
     // --- Constants ---
-    const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"]; 
+    const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"];
 
     // --- Application State ---
     adminApp.state = {
       isLoading: false,
       currentProjectId: null,
       currentView: 'list',
-      projectData: null, 
-      currentSlideIndex: -1, 
+      projectData: null,
+      currentSlideIndex: -1,
       fabricCanvasInstance: null,
-      defaultCanvasWidth: 960, 
+      defaultCanvasWidth: 960,
       defaultCanvasHeight: 540,
       projectListCache: [], // Added to cache project list for status updates/reverts
       lastUploadedDriveId: null, // Temp store for image uploads before base64 fetch
       lastUploadedMimeType: null,
       lastUploadedFileName: null,
-      isPasteListenerActive: false, // To manage listener attachment for pasting images
-      // For Google Drive Picker (Part 2 of Step 22) - User must replace with their actual key
-      developerApiKey: 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER', // <<< IMPORTANT: REPLACE THIS!
-      gapiLoaded: false, // Flag if the main gapi script has loaded
-      pickerApiLoaded: false, // Flag if the 'picker' module has loaded
-      oauthToken: null, // Store OAuth token for Picker
-      currentPickerMediaType: null // 'image' or 'audio' for Drive Picker context
+      isPasteListenerActive: false // To manage listener attachment for pasting images
+      // REMOVED: Picker state variables
     };
-  
+
     // --- DOM Element References ---
     let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
     let listViewContainerEl, adminProjectListContainerEl;
     let editViewContainerEl, editingProjectTitleEl, backToProjectsListButtonEl, fabricCanvasEl;
     let imageUploaderEl;
-    let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl; 
-    let addRectangleButtonEl, addCircleButtonEl; 
-    let addTextboxButtonEl; 
-  
+    let addSlideButtonEl, slideThumbnailsContainerEl, saveProjectButtonEl;
+    let addRectangleButtonEl, addCircleButtonEl;
+    let addTextboxButtonEl;
+
     let overlayPropertiesToolbarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
-        objInteractionTriggerEl, objInteractionActionEl, 
+        objInteractionTriggerEl, objInteractionActionEl,
         modalContentConfigEl, objModalContentEl,
         navigateToConfigEl, objNavigateToEl,
         objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl,
@@ -50,40 +45,22 @@
         // Existing properties
         objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
         textSpecificControlsEl, objTextContentEl,
-        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl,
-        // Step 22 - Drive Picker Button
-        attachFromDriveButtonEl; 
-  
+        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
+        // REMOVED: attachFromDriveButtonEl reference
+
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
       console.log("Admin_JS: DOMContentLoaded event fired!");
       adminApp.setupDOMReferences();
       adminApp.attachEventListeners();
       switchToListView();
-      loadAdminProjectsList(); 
-      // adminApp.handleGoogleApiLoad will be called by the gapi script's onload
-      console.log("Admin_JS: Initialization complete. Waiting for gapi.js to load if not already.");
+      loadAdminProjectsList();
+      // REMOVED: Picker API load trigger
+      console.log("Admin_JS: Initialization complete.");
     });
 
-    // --- Google API Loader Functions (Step 22 - Drive Picker) ---
-    adminApp.handleGoogleApiLoad = function() {
-        console.log("Admin_JS: Google API Client Library (gapi.js) loaded.");
-        adminApp.state.gapiLoaded = true;
-        // Now load the 'picker' module
-        if (typeof gapi !== 'undefined' && typeof gapi.load === 'function') {
-             gapi.load('picker', {'callback': adminApp.initializePickerApi});
-        } else {
-            console.error("Admin_JS: gapi object not available after script load.");
-            displayMessage("Failed to load Google API client.", false);
-        }
-    }
+    // REMOVED: handleGoogleApiLoad and initializePickerApi functions
 
-    adminApp.initializePickerApi = function() {
-        adminApp.state.pickerApiLoaded = true;
-        console.log("Admin_JS: Google Picker API module loaded.");
-        // You could enable the "Attach from Drive" button here if it was initially disabled
-    }
-  
     // --- Setup and Listeners ---
     adminApp.setupDOMReferences = function() {
       messageAreaEl = document.getElementById('messageArea');
@@ -100,12 +77,12 @@
       addSlideButtonEl = document.getElementById('addSlideButton');
       slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
       saveProjectButtonEl = document.getElementById('saveProjectButton');
-      
+
       addRectangleButtonEl = document.getElementById('addRectangleButton');
       addCircleButtonEl = document.getElementById('addCircleButton');
       addTextboxButtonEl = document.getElementById('addTextboxButton');
-  
-      overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar'); 
+
+      overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar');
       objXEl = document.getElementById('objX');
       objYEl = document.getElementById('objY');
       objWidthEl = document.getElementById('objWidth');
@@ -115,7 +92,7 @@
       objStrokeColorEl = document.getElementById('objStrokeColor');
       objStrokeWidthEl = document.getElementById('objStrokeWidth');
       objOpacityEl = document.getElementById('objOpacity');
-      textSpecificControlsEl = document.getElementById('textSpecificControls'); 
+      textSpecificControlsEl = document.getElementById('textSpecificControls');
       objTextContentEl = document.getElementById('objTextContent');
       objShadowColorEl = document.getElementById('objShadowColor');
       objShadowBlurEl = document.getElementById('objShadowBlur');
@@ -147,22 +124,20 @@
       attachedAudioNameEl = document.getElementById('attachedAudioName');
       removeAudioButtonEl = document.getElementById('removeAudioButton');
       adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
-      
-      // Step 22
-      attachFromDriveButtonEl = document.getElementById('attachFromDriveButton');
-  
+
+      // REMOVED: attachFromDriveButtonEl assignment
+
       // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
       if (!loadingSpinnerEl) console.warn("setupDOMReferences: loadingSpinnerEl not found.");
       if (!listViewContainerEl) console.warn("setupDOMReferences: listViewContainerEl not found.");
       if (!editViewContainerEl) console.warn("setupDOMReferences: editViewContainerEl not found.");
       if (!createProjectButtonEl) console.warn("setupDOMReferences: createProjectButtonEl not found.");
-      if (!attachFromDriveButtonEl) console.warn("setupDOMReferences: attachFromDriveButtonEl not found.");
-
+      // REMOVED: attachFromDriveButtonEl check
 
       console.log("Admin_JS: DOM references set up.");
     };
-  
+
     adminApp.attachEventListeners = function() {
       const safelyAddListener = (element, eventType, handler, elementName) => {
           if (element) {
@@ -176,16 +151,15 @@
       // Listeners for edit view elements will be attached/re-attached in switchToEditView
       console.log("Admin_JS: Initial event listeners attached.");
     };
-  
+
     // --- UI View Management ---
     function switchToListView() {
       console.log("Switching to List View");
       adminApp.state.currentView = 'list';
       adminApp.state.currentProjectId = null;
-      adminApp.state.projectData = null; 
+      adminApp.state.projectData = null;
       adminApp.state.currentSlideIndex = -1;
-      adminApp.state.oauthToken = null; // Clear picker token
-      adminApp.state.currentPickerMediaType = null;
+      // REMOVED: Picker token/state clear
 
       if (adminApp.state.fabricCanvasInstance) {
           adminApp.state.fabricCanvasInstance.dispose();
@@ -195,7 +169,7 @@
       if(listViewContainerEl) listViewContainerEl.style.display = 'block';
       if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
-      
+
       // Remove paste listener if it was active
       if (adminApp.state.isPasteListenerActive) {
           document.removeEventListener('paste', handlePasteImage);
@@ -204,21 +178,21 @@
       }
       loadAdminProjectsList(); // Reload list in case status changed etc.
     }
-  
+
     function switchToEditView(projectIdToEdit) {
         console.log("Switching to Edit View for project ID:", projectIdToEdit);
         adminApp.state.currentView = 'edit';
         adminApp.state.currentProjectId = projectIdToEdit;
         adminApp.state.projectData = null; // Clear previous project data
         adminApp.state.currentSlideIndex = -1; // Reset slide index
-  
+
         if(listViewContainerEl) listViewContainerEl.style.display = 'none';
         if(editViewContainerEl) editViewContainerEl.style.display = 'block';
-  
+
         if(editingProjectTitleEl) { // Set temporary title
             editingProjectTitleEl.textContent = `Loading Project (ID: ${projectIdToEdit})...`;
         }
-  
+
         // Clear previous canvas instance if exists
         if (adminApp.state.fabricCanvasInstance) {
             adminApp.state.fabricCanvasInstance.dispose();
@@ -226,32 +200,36 @@
         }
         if (messageAreaEl) messageAreaEl.innerHTML = '';
         if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; // Clear old thumbnails
-  
+
         // Helper to ensure elements are found and listeners attached ONLY ONCE for edit view
         const ensureEditViewListener = (elementVar, id, eventType, handler) => {
             // Assign element reference if not already assigned in setupDOMReferences (might be null initially)
-             if (!window[elementVar]) { 
+             if (!window[elementVar]) {
                 window[elementVar] = document.getElementById(id);
              }
             const element = window[elementVar];
             // Ensure listener isn't attached multiple times if view is switched back and forth rapidly
-            const listenerAttribute = `listener-${eventType}-attached`; 
+            const listenerAttribute = `listener-${eventType}-attached`;
             if (element && !element.hasAttribute(listenerAttribute)) {
                 element.addEventListener(eventType, handler);
-                element.setAttribute(listenerAttribute, 'true'); 
+                element.setAttribute(listenerAttribute, 'true');
                 console.log(`Listener attached for ${eventType} on #${id} in switchToEditView.`);
             } else if (!element) {
                 // It's expected some elements won't be found if AdminView.html is incomplete, log but don't stop
-                console.warn(`WARN: Element #${id} not found in switchToEditView! Cannot attach listener.`); 
+                 // Only log warning for elements we absolutely expect to be there always
+                 const criticalElements = ['backToProjectsListButton', 'imageUploader', 'addSlideButton', 'saveProjectButton', 'addRectangleButton', 'addCircleButton', 'addTextboxButton', 'setYoutubeBackgroundButton', 'audioUploader', 'removeAudioButton'];
+                 if (criticalElements.includes(id)) {
+                    console.warn(`WARN: Element #${id} not found in switchToEditView! Cannot attach listener.`);
+                 }
             }
         };
-  
+
         // Ensure references are fresh (needed after potential view switches)
-        fabricCanvasEl = document.getElementById('fabricCanvasElement'); 
-        slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer'); 
-        adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder'); 
+        fabricCanvasEl = document.getElementById('fabricCanvasElement');
+        slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
+        adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
         overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar');
-        attachFromDriveButtonEl = document.getElementById('attachFromDriveButton'); // Re-assign here
+        // REMOVED: attachFromDriveButtonEl assignment
 
         // Attach listeners for edit view buttons and controls
         ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView);
@@ -264,26 +242,10 @@
         // Step 20 Listeners
         ensureEditViewListener('setYoutubeBackgroundButtonEl', 'setYoutubeBackgroundButton', 'click', handleSetYoutubeBackground);
         ensureEditViewListener('audioUploaderEl', 'audioUploader', 'change', handleAudioUpload); // Auto-upload on change
-        ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio); 
+        ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio);
 
-        // Step 22 - Drive Picker Listener
-        ensureEditViewListener('attachFromDriveButtonEl', 'attachFromDriveButton', 'click', function() {
-             if (!adminApp.state.gapiLoaded || !adminApp.state.pickerApiLoaded) {
-                 displayMessage("Picker API not ready. Please wait a moment and try again.", false); return;
-             }
-             if (!adminApp.state.developerApiKey || adminApp.state.developerApiKey === 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER') {
-                 displayMessage("Developer API Key not configured for Drive Picker. Please update it in Admin_JS.html.", false); return;
-             }
-             // For now, let's make it choose between image/audio based on a prompt
-             const choice = prompt("Select type to attach from Drive: 'image' or 'audio'", "image");
-             if (choice === 'image' || choice === 'audio') {
-                adminApp.state.currentPickerMediaType = choice;
-                showDrivePicker(choice); 
-             } else if (choice !== null) { // if not null, it means user entered something invalid
-                 displayMessage("Invalid type. Please enter 'image' or 'audio'.", false);
-             }
-        });
-  
+        // REMOVED: Picker Listener attachment
+
         // Initialize Fabric Canvas with defaults
         if (typeof fabric !== 'undefined' && fabricCanvasEl) {
             adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
@@ -295,21 +257,21 @@
             fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
             fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
             console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
-  
+
             // Initialize toolbar listeners (only needs to happen once if structure is static)
             // If toolbar elements were dynamically added/removed, initToolbar might need calling here
             initToolbar(); // Assuming it's safe to call again or checks internally
-            
+
             // Attach Fabric canvas event listeners
             adminApp.state.fabricCanvasInstance.off(); // Remove previous listeners first
             adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
               if (e.target) populateToolbar(e.target);
             });
-            adminApp.state.fabricCanvasInstance.on('selection:created', (e) => { 
-              if (e.selected && e.selected.length === 1) populateToolbar(e.selected[0]); 
+            adminApp.state.fabricCanvasInstance.on('selection:created', (e) => {
+              if (e.selected && e.selected.length === 1) populateToolbar(e.selected[0]);
               else populateToolbar(null); // Handle multi-select or empty selection
             });
-            adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => { 
+            adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => {
                if (e.selected && e.selected.length === 1) populateToolbar(e.selected[0]);
                else populateToolbar(null);
             });
@@ -318,8 +280,8 @@
             });
 
             // Initially hide toolbar
-            if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none'; 
-  
+            if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none';
+
             // Attach paste listener for images
             if (!adminApp.state.isPasteListenerActive) {
                 document.addEventListener('paste', handlePasteImage);
@@ -329,14 +291,14 @@
 
             // ** NOW CALL LOAD PROJECT DATA **
             loadProjectForEditing(projectIdToEdit); // Load the actual project data
-  
-        } else { 
+
+        } else {
             console.error("Fabric.js library or canvas element #fabricCanvasElement not found in switchToEditView.");
             displayMessage("Critical error: Editor canvas could not be initialized.", false);
             showLoading(false); // Ensure spinner hidden
         }
     }
-  
+
     // --- Project Loading/Saving ---
     function loadProjectForEditing(projectId) {
       console.log(`loadProjectForEditing: Called for projectId: ${projectId}`);
@@ -345,14 +307,14 @@
       displayMessage("Loading project data...", true);
       google.script.run
           .withSuccessHandler(onProjectDataLoaded)
-          .withFailureHandler(onServerError) 
+          .withFailureHandler(onServerError)
           .getProjectDataForEditing(projectId);
     }
-  
+
     function onProjectDataLoaded(jsonString) {
       console.log("onProjectDataLoaded: Received data string length:", jsonString ? jsonString.length : 'null');
-  
-      if (jsonString === null || jsonString === undefined) { 
+
+      if (jsonString === null || jsonString === undefined) {
           showLoading(false);
           console.error("onProjectDataLoaded: Received null data string from server (Project or data file likely not found).");
           displayMessage("Error: Could not load project data. Project or its data file may not exist.", false);
@@ -360,22 +322,22 @@
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
           adminApp.state.currentSlideIndex = -1;
           if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
-          updateSlideThumbnailsUI(); 
+          updateSlideThumbnailsUI();
           return;
       }
-  
+
       try {
           const loadedData = JSON.parse(jsonString);
           console.log("Parsed project data:", loadedData);
-  
+
           if (!loadedData || typeof loadedData !== 'object') throw new Error("Parsed data is not a valid object.");
           if (!loadedData.projectId) throw new Error("Loaded project data is missing 'projectId'.");
-          
+
           if (!Array.isArray(loadedData.slides)) {
                console.warn("Loaded data missing 'slides' array or it's invalid, defaulting to empty.");
                loadedData.slides = [];
           }
-          
+
           // Ensure slideMedia exists on all loaded slides
           loadedData.slides.forEach(slide => {
               if (!slide.slideMedia) {
@@ -383,14 +345,14 @@
               }
           });
 
-          adminApp.state.projectData = loadedData; 
-  
+          adminApp.state.projectData = loadedData;
+
           if (editingProjectTitleEl) {
               editingProjectTitleEl.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`;
           }
-  
-          updateSlideThumbnailsUI(); 
-  
+
+          updateSlideThumbnailsUI();
+
           if (adminApp.state.projectData.slides.length > 0) {
               selectSlide(0); // Select and load the first slide
               displayMessage("Project loaded successfully.", true);
@@ -399,11 +361,11 @@
               handleAddSlide(); // Add an initial slide if the loaded project was empty
           }
           showLoading(false); // Success path loading finished
-  
+
       } catch (e) {
           showLoading(false);
           console.error("onProjectDataLoaded: Error parsing JSON data or invalid structure:", e);
-          console.error("Received JSON string that failed parsing:", jsonString); 
+          console.error("Received JSON string that failed parsing:", jsonString);
           displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
           // Set minimal state
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
@@ -412,17 +374,17 @@
           updateSlideThumbnailsUI(); // Clear thumbnails
       }
     }
-   
+
     function saveCurrentSlideState() {
-        if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData || !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) { 
+        if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.fabricCanvasInstance || !adminApp.state.projectData || !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) {
             console.log("saveCurrentSlideState: Skipping, no active slide/canvas/data.");
-            return; 
+            return;
         }
         try {
           const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
           const canvas = adminApp.state.fabricCanvasInstance;
           // Ensure custom props are included when saving canvas state
-          const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; 
+          const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder'];
           currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
           // Also save current canvas dimensions to the slide object
           currentSlide.canvasWidth = canvas.getWidth();
@@ -447,24 +409,24 @@
     function handleSaveProject() {
         if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
         if (adminApp.state.isLoading) { console.log("handleSaveProject: Already saving."); return; }
-        
+
         saveCurrentSlideState(); // Ensure latest slide state is captured before saving entire project
-        
+
         showLoading(true); displayMessage("Saving project...", true);
         try {
             // Make a deep copy to avoid potential issues if state changes during async call
             const projectDataToSave = JSON.parse(JSON.stringify(adminApp.state.projectData));
-            
+
             // Remove potentially large base64 image URLs from non-image slides before saving
              projectDataToSave.slides.forEach(slide => {
                  if (slide.slideMedia && slide.slideMedia.type !== 'image' && slide.slideMedia.url && slide.slideMedia.url.startsWith('data:image')) {
-                     slide.slideMedia.url = null; 
+                     slide.slideMedia.url = null;
                  }
              });
 
             const jsonDataString = JSON.stringify(projectDataToSave);
-            console.log("Saving projectData string length:", jsonDataString.length); 
-            
+            console.log("Saving projectData string length:", jsonDataString.length);
+
             google.script.run
                 .withSuccessHandler(onProjectSaved)
                 .withFailureHandler(onServerError)
@@ -475,7 +437,7 @@
              displayMessage("Error preparing data for saving.", false);
         }
     }
-  
+
     function onProjectSaved(response) {
         showLoading(false);
         if (response && response.success) { displayMessage(response.message || "Project saved!", true); }
@@ -489,14 +451,14 @@
         saveCurrentSlideState(); // Save previous slide first
         const newSlideId = 'slide_' + Utilities.getUuid();
         // Initialize new slide with empty slideMedia object including originalName
-        const newSlide = { 
-            slideId: newSlideId, 
-            canvasWidth: adminApp.state.defaultCanvasWidth, 
-            canvasHeight: adminApp.state.defaultCanvasHeight, 
-            fabricCanvasJSON: null, 
+        const newSlide = {
+            slideId: newSlideId,
+            canvasWidth: adminApp.state.defaultCanvasWidth,
+            canvasHeight: adminApp.state.defaultCanvasHeight,
+            fabricCanvasJSON: null,
             slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null } // Initialize fully
         };
-        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
+        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
         const newSlideIndex = adminApp.state.projectData.slides.length - 1;
         selectSlide(newSlideIndex); // Select the new slide
@@ -506,18 +468,18 @@
     function selectSlide(slideIndex) {
         if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid index or slides array missing.", slideIndex); return; }
         console.log(`Selecting slide ${slideIndex + 1}`);
-        
+
         // Make sure previous slide state (including potentially removed media) is saved
         // Check if the current slide is valid before saving
         if (adminApp.state.currentSlideIndex !== -1 && adminApp.state.currentSlideIndex < adminApp.state.projectData.slides.length) {
-             saveCurrentSlideState(); 
+             saveCurrentSlideState();
         }
-  
+
         adminApp.state.currentSlideIndex = slideIndex;
         const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
-  
+
         // Ensure slideMedia object exists
         if (!selectedSlideData.slideMedia) {
             selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
@@ -529,10 +491,10 @@
         canvas.setHeight(slideHeight);
         if (fabricCanvasEl) { fabricCanvasEl.width = slideWidth; fabricCanvasEl.height = slideHeight; }
         console.log(`Canvas set to dimensions for slide ${slideIndex + 1}: ${slideWidth}x${slideHeight}`);
-  
+
         // Clear canvas objects and background
         canvas.clear();
-        canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
+        canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
         canvas.backgroundColor = '#e9e9e9'; // Default background
 
         // Reset Admin UI inputs for media
@@ -546,24 +508,24 @@
         // Load media for the selected slide
         const media = selectedSlideData.slideMedia;
         if (media && media.type === 'image' && (media.url || media.driveFileId)) { // Check both URL (base64) and driveId
-            if (media.url && media.url.startsWith('data:image')) { 
+            if (media.url && media.url.startsWith('data:image')) {
                 console.log("Loading background from base64 data URI.");
-                fabric.Image.fromURL(media.url, function(img) { 
+                fabric.Image.fromURL(media.url, function(img) {
                     if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return;
                     adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
                     console.log("Background loaded for slide", slideIndex);
-                }, { crossOrigin: 'anonymous' }); 
+                }, { crossOrigin: 'anonymous' });
                  if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
-            } else if (media.driveFileId) { 
+            } else if (media.driveFileId) {
                  console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
                  showLoading(true); displayMessage("Loading slide background...", true);
-                 google.script.run.withSuccessHandler(function(response) { 
+                 google.script.run.withSuccessHandler(function(response) {
                      showLoading(false);
                      if (adminApp.state.currentSlideIndex !== slideIndex) { console.log("Slide changed before background could be fetched for index", slideIndex); return; }
                      if (response && response.success && response.base64Data) {
                           // Store base64 in slide data for future loads within this session
-                          media.url = response.base64Data; 
-                         fabric.Image.fromURL(response.base64Data, function(img) { 
+                          media.url = response.base64Data;
+                         fabric.Image.fromURL(response.base64Data, function(img) {
                              if (!adminApp.state.fabricCanvasInstance) return;
                              adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
                              console.log("Background fetched and loaded for slide", slideIndex);
@@ -572,7 +534,7 @@
                      } else { console.error("Failed to re-fetch background", response); displayMessage("Error loading slide background image.", false); canvas.renderAll(); }
                  }).withFailureHandler(onServerError).getImageAsBase64(media.driveFileId);
              } else { console.warn("Slide media URL/ID not suitable for loading:", media); canvas.renderAll(); }
-             
+
 
         } else if (media && media.type === 'youtube' && media.url) {
             // Show YouTube placeholder on admin canvas
@@ -603,29 +565,29 @@
              canvas.backgroundColor = '#e9e9e9'; // Reset background color
              canvas.renderAll();
         }
-  
+
         // Load fabric objects (overlays)
         if (selectedSlideData.fabricCanvasJSON) {
           console.log("Loading fabricCanvasJSON for slide", slideIndex);
           canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
-              if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return; 
-              adminApp.state.fabricCanvasInstance.renderAll(); 
+              if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return;
+              adminApp.state.fabricCanvasInstance.renderAll();
               console.log("Finished loading canvas JSON for slide", slideIndex);
               const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
-              populateToolbar(activeObj); 
+              populateToolbar(activeObj);
             }, function(o, object) { /* Revival function if needed */ });
-            } else { 
+            } else {
             console.log("No fabricCanvasJSON to load for slide", slideIndex);
-            canvas.renderAll(); 
-            populateToolbar(null); 
+            canvas.renderAll();
+            populateToolbar(null);
         }
-        updateSlideThumbnailsUI(); 
+        updateSlideThumbnailsUI();
     }
 
     function updateSlideThumbnailsUI() {
         if (!slideThumbnailsContainerEl || !adminApp.state.projectData) { console.warn("updateSlideThumbnailsUI: Container or project data missing."); return; }
         slideThumbnailsContainerEl.innerHTML = '';
-        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = []; 
+        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.forEach((slide, index) => {
             const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
             thumb.textContent = `Slide ${index + 1}`; thumb.title = `Select Slide ${index + 1}`;
@@ -636,7 +598,7 @@
             thumb.appendChild(deleteBtn); slideThumbnailsContainerEl.appendChild(thumb);
         });
     }
-  
+
     function handleDeleteSlide(slideIndex) {
         if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("handleDeleteSlide: Invalid index."); return; }
         if (adminApp.state.projectData.slides.length <= 1) { displayMessage("Cannot delete the last slide.", false); return; }
@@ -644,7 +606,7 @@
         adminApp.state.projectData.slides.splice(slideIndex, 1);
         console.log("Deleted slide at index:", slideIndex);
         const indexToSelect = (slideIndex === 0 && adminApp.state.projectData.slides.length > 0) ? 0 : Math.max(0, slideIndex - 1);
-  
+
         if (adminApp.state.currentSlideIndex === slideIndex) {
             adminApp.state.currentSlideIndex = -1; // Force re-selection logic
             selectSlide(indexToSelect);
@@ -655,22 +617,22 @@
              updateSlideThumbnailsUI(); // Deletion was after current, just update thumbs
         }
     }
-  
+
     // --- Project Management (Status/Delete) ---
     function handleProjectStatusChange(projectId, newStatus, selectElement) {
         console.log(`Attempting to update status for project ${projectId} to ${newStatus}`);
         showLoading(true);
-        const originalStatus = selectElement.getAttribute('data-original-status') || 
+        const originalStatus = selectElement.getAttribute('data-original-status') ||
                                (adminApp.state.projectListCache.find(p => p.projectId === projectId) || {}).status;
-        selectElement.setAttribute('data-original-status', originalStatus); 
+        selectElement.setAttribute('data-original-status', originalStatus);
 
         google.script.run
             .withSuccessHandler(function(response) { onProjectStatusUpdated(response, projectId, newStatus, selectElement); })
-            .withFailureHandler(function(error) { 
+            .withFailureHandler(function(error) {
                 onServerError(error);
-                if (selectElement) { 
+                if (selectElement) {
                     console.log("Reverting status dropdown due to server error for project:", projectId);
-                    selectElement.value = originalStatus; 
+                    selectElement.value = originalStatus;
                 }
             })
             .updateProjectStatus(projectId, newStatus);
@@ -680,23 +642,23 @@
         showLoading(false);
         if (response && response.success) {
             displayMessage(response.message || "Project status updated successfully!", true);
-            
+
             const projectInCache = adminApp.state.projectListCache.find(p => p.projectId === projectId);
             if (projectInCache) projectInCache.status = newStatus;
-            selectElement.removeAttribute('data-original-status'); 
+            selectElement.removeAttribute('data-original-status');
 
             const statusSpan = selectElement.closest('.project-item').querySelector('.status-text');
             if(statusSpan) statusSpan.textContent = `(${newStatus})`;
-            
+
             if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === projectId && adminApp.state.projectData) {
                 adminApp.state.projectData.status = newStatus;
             }
         } else {
             onServerError((response && response.error) ? response.error : "Failed to update status.");
-            if (selectElement) { 
+            if (selectElement) {
                  console.log("Reverting status dropdown due to server failure for project:", projectId);
                  const originalStatus = selectElement.getAttribute('data-original-status');
-                 if(originalStatus) selectElement.value = originalStatus; 
+                 if(originalStatus) selectElement.value = originalStatus;
             }
         }
     }
@@ -718,9 +680,9 @@
         if (response && response.success) {
             displayMessage(response.message || "Project deleted successfully!", true);
             if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === response.deletedProjectId) {
-                switchToListView(); 
+                switchToListView();
             } else {
-                loadAdminProjectsList(); 
+                loadAdminProjectsList();
             }
         } else {
             onServerError((response && response.error) ? response.error : "Failed to delete project.");
@@ -736,7 +698,7 @@
     function displayMessage(message, isSuccess) {
         if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage messageAreaEl not found. Message:", message); }
     }
-    
+
     function onServerError(errorObject) {
       console.error("onServerError triggered:", errorObject);
       showLoading(false);
@@ -747,7 +709,7 @@
       console.error('Formatted Server Error Message:', errorMessage);
       displayMessage('Server Error: ' + errorMessage, false);
     }
-  
+
     function handleCreateProject() {
         if (adminApp.state.isLoading) return;
         const currentProjectTitle = projectTitleInputEl.value.trim();
@@ -760,7 +722,7 @@
         if (response && response.success) { displayMessage(response.message || 'Project created!', true); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); }
         else { onServerError((response && response.error) ? response.error : 'Failed to create project.'); }
     }
-  
+
     function loadAdminProjectsList() {
       console.log("loadAdminProjectsList: Function called.");
       if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found."); showLoading(false); return; }
@@ -779,29 +741,29 @@
       if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found."); return; }
       adminProjectListContainerEl.innerHTML = '';
       if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
-      
-      adminApp.state.projectListCache = projectsArray; 
 
-      projectsArray.forEach(project => { 
-          if (!project || !project.projectId) return; 
-          const projectItem = document.createElement('div'); 
-          projectItem.className = 'project-item'; 
-          
+      adminApp.state.projectListCache = projectsArray;
+
+      projectsArray.forEach(project => {
+          if (!project || !project.projectId) return;
+          const projectItem = document.createElement('div');
+          projectItem.className = 'project-item';
+
           const titleAndStatusDiv = document.createElement('div');
-          const titleSpan = document.createElement('span'); 
-          titleSpan.textContent = project.projectTitle || 'Untitled Project'; 
+          const titleSpan = document.createElement('span');
+          titleSpan.textContent = project.projectTitle || 'Untitled Project';
           titleSpan.style.fontWeight = 'bold';
-          const statusTextSpan = document.createElement('span'); 
-          statusTextSpan.className = 'status-text'; 
-          statusTextSpan.textContent = `(${project.status || 'N/A'})`; 
+          const statusTextSpan = document.createElement('span');
+          statusTextSpan.className = 'status-text';
+          statusTextSpan.textContent = `(${project.status || 'N/A'})`;
           titleAndStatusDiv.appendChild(titleSpan);
           titleAndStatusDiv.appendChild(statusTextSpan);
 
-          const controlsDiv = document.createElement('div'); 
+          const controlsDiv = document.createElement('div');
           const statusSelect = document.createElement('select');
           statusSelect.className = 'project-status-select';
           statusSelect.setAttribute('data-project-id', project.projectId);
-          statusSelect.setAttribute('data-original-status', project.status || "Draft"); 
+          statusSelect.setAttribute('data-original-status', project.status || "Draft");
           ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
               const option = document.createElement('option');
               option.value = statusValue;
@@ -811,15 +773,15 @@
           });
           statusSelect.onchange = function() { handleProjectStatusChange(project.projectId, this.value, this); };
 
-          const editButton = document.createElement('button'); 
-          editButton.textContent = 'Edit'; 
-          editButton.className = 'edit-button'; 
-          editButton.setAttribute('data-project-id', project.projectId); 
-          editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); }; 
-          
+          const editButton = document.createElement('button');
+          editButton.textContent = 'Edit';
+          editButton.className = 'edit-button';
+          editButton.setAttribute('data-project-id', project.projectId);
+          editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); };
+
           const deleteButton = document.createElement('button');
           deleteButton.textContent = 'Delete';
-          deleteButton.className = 'danger-button'; 
+          deleteButton.className = 'danger-button';
           deleteButton.setAttribute('data-project-id', project.projectId);
           deleteButton.setAttribute('data-project-title', project.projectTitle || 'Untitled Project');
           deleteButton.style.marginLeft = '5px';
@@ -827,23 +789,23 @@
 
           controlsDiv.appendChild(statusSelect);
           controlsDiv.appendChild(editButton);
-          controlsDiv.appendChild(deleteButton); 
-          
-          projectItem.appendChild(titleAndStatusDiv); 
-          projectItem.appendChild(controlsDiv); 
+          controlsDiv.appendChild(deleteButton);
+
+          projectItem.appendChild(titleAndStatusDiv);
+          projectItem.appendChild(controlsDiv);
           adminProjectListContainerEl.appendChild(projectItem);
        });
       console.log("displayAdminProjects: Finished rendering project list.");
     }
-  
+
     // --- Media Handling ---
     function handleImageUpload(event) {
         if (adminApp.state.isLoading) { if (event.target) event.target.value = null; return; }
         const file = event.target.files[0];
         if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
-        
+
         saveCurrentSlideState(); // Save state before potential background change
-        
+
         showLoading(true); displayMessage("Uploading image...", true);
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -855,61 +817,61 @@
         reader.readAsDataURL(file);
     }
 
-    function onImageUploaded(response) { 
+    function onImageUploaded(response) {
         // Called AFTER Drive upload (direct or Picker copy), before fetching base64 for images
-        showLoading(false); 
+        showLoading(false);
         if (imageUploaderEl) imageUploaderEl.value = null; // Clear input
         if (response && response.success && response.driveFileId) {
-            displayMessage("Image processed. Fetching for preview...", true); 
+            displayMessage("Image processed. Fetching for preview...", true);
             showLoading(true);
-            adminApp.state.lastUploadedDriveId = response.driveFileId; // Store ID 
+            adminApp.state.lastUploadedDriveId = response.driveFileId; // Store ID
             adminApp.state.lastUploadedMimeType = response.mimeType;
             adminApp.state.lastUploadedFileName = response.fileName;
             google.script.run
-                .withSuccessHandler(onBase64ImageReceived) 
+                .withSuccessHandler(onBase64ImageReceived)
                 .withFailureHandler(onServerError)
                 .getImageAsBase64(response.driveFileId);
-        } else { 
-            onServerError({ message: (response && response.error) ? response.error : "Image processing failed." }); 
+        } else {
+            onServerError({ message: (response && response.error) ? response.error : "Image processing failed." });
         }
     }
 
-    function onBase64ImageReceived(response) { 
+    function onBase64ImageReceived(response) {
         // Called AFTER base64 fetch for image background
         showLoading(false);
         if (response && response.success && response.base64Data) {
             if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas/Slide not ready.", false); return; }
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
             if (!currentSlide) { displayMessage("Error: Slide data missing.", false); return; }
-            
+
             // Set background
             fabric.Image.fromURL(response.base64Data, function(img) {
-                if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) return; 
-                const canvas = adminApp.state.fabricCanvasInstance; 
-                const imgWidth = img.width; const imgHeight = img.height; 
+                if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) return;
+                const canvas = adminApp.state.fabricCanvasInstance;
+                const imgWidth = img.width; const imgHeight = img.height;
                 const maxWidth = 960; // Max width constraint
                 let cvWidth = imgWidth; let cvHeight = imgHeight; const ratio = imgWidth / imgHeight;
                 if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / ratio); }
-                
+
                 canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
                 if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
                 canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: cvWidth / imgWidth, scaleY: cvHeight / imgHeight });
-                canvas.renderAll(); 
+                canvas.renderAll();
                 displayMessage("Background image set.", true);
 
                 // Update slideMedia state AFTER setting background
-                if (!currentSlide.slideMedia) currentSlide.slideMedia = {}; 
+                if (!currentSlide.slideMedia) currentSlide.slideMedia = {};
                 currentSlide.slideMedia.type = 'image';
                 currentSlide.slideMedia.url = response.base64Data; // Store base64 for immediate load
-                currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null; 
+                currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null;
                 currentSlide.slideMedia.mimeType = adminApp.state.lastUploadedMimeType || response.mimeType; // Use stored mime if available
                 currentSlide.slideMedia.originalName = adminApp.state.lastUploadedFileName || null;
                 currentSlide.canvasWidth = cvWidth; // Update slide dimensions
                 currentSlide.canvasHeight = cvHeight;
-                
+
                 console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated for image.`);
-                updateSlideThumbnailsUI(); 
-                
+                updateSlideThumbnailsUI();
+
                 // Clear other media UI/placeholders
                 if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
                 if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
@@ -917,15 +879,15 @@
                 if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
 
                 // Clean up temporary state
-                delete adminApp.state.lastUploadedDriveId; 
+                delete adminApp.state.lastUploadedDriveId;
                 delete adminApp.state.lastUploadedMimeType;
                 delete adminApp.state.lastUploadedFileName;
 
-            }, { crossOrigin: 'anonymous' }); 
-        } else { 
-            onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." }); 
+            }, { crossOrigin: 'anonymous' });
+        } else {
+            onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." });
             // Clean up temporary state on error too
-            delete adminApp.state.lastUploadedDriveId; 
+            delete adminApp.state.lastUploadedDriveId;
             delete adminApp.state.lastUploadedMimeType;
             delete adminApp.state.lastUploadedFileName;
         }
@@ -950,8 +912,8 @@
         saveCurrentSlideState(); // Save current state before changing media
 
         const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-        if (!currentSlide.slideMedia) { 
-            currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null }; 
+        if (!currentSlide.slideMedia) {
+            currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
         }
         currentSlide.slideMedia.type = 'youtube';
         currentSlide.slideMedia.url = url;
@@ -960,7 +922,7 @@
         currentSlide.slideMedia.originalName = null; // No original name for URL
 
         console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
-        
+
         // Update Admin UI immediately
         if(adminApp.state.fabricCanvasInstance) {
              adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
@@ -972,9 +934,9 @@
            adminMediaPlaceholderEl.style.display = 'block';
        }
        // Clear other media inputs/indicators
-       if (imageUploaderEl) imageUploaderEl.value = null; 
-       if (audioUploaderEl) audioUploaderEl.value = null; 
-       if (attachedAudioNameEl) attachedAudioNameEl.textContent = ''; 
+       if (imageUploaderEl) imageUploaderEl.value = null;
+       if (audioUploaderEl) audioUploaderEl.value = null;
+       if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
        if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
 
        displayMessage("YouTube background set for this slide.", true);
@@ -983,13 +945,13 @@
     function handleAudioUpload(event) {
         if (adminApp.state.isLoading) { if (event.target) event.target.value = null; return; }
         const file = event.target.files[0];
-        if (!file || !file.type.startsWith('audio/')) { 
-            if (event.target) event.target.value = null; 
-            return; 
+        if (!file || !file.type.startsWith('audio/')) {
+            if (event.target) event.target.value = null;
+            return;
         }
         if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) {
-             displayMessage("Please select a slide first before uploading audio.", false); 
-             if (event.target) event.target.value = null; 
+             displayMessage("Please select a slide first before uploading audio.", false);
+             if (event.target) event.target.value = null;
              return;
         }
 
@@ -998,45 +960,45 @@
         showLoading(true); displayMessage("Uploading audio...", true);
         const reader = new FileReader();
         reader.onload = function(e) {
-            const fileData = { 
-                fileName: file.name, 
-                mimeType: file.type, 
-                data: e.target.result.split(',')[1] 
+            const fileData = {
+                fileName: file.name,
+                mimeType: file.type,
+                data: e.target.result.split(',')[1]
             };
             google.script.run
                 .withSuccessHandler(onAudioUploaded) // Use the same handler for direct & Picker uploads
                 .withFailureHandler(onServerError)
                 .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'audio'); // Pass 'audio' type
         };
-        reader.onerror = function(error) { 
-            showLoading(false); 
-            displayMessage("Error reading audio file.", false); 
-            console.error(error); 
-            if (event.target) event.target.value = null; 
+        reader.onerror = function(error) {
+            showLoading(false);
+            displayMessage("Error reading audio file.", false);
+            console.error(error);
+            if (event.target) event.target.value = null;
         };
         reader.readAsDataURL(file);
     }
 
      function onAudioUploaded(response) { // Handles both direct upload and Picker copy
-        showLoading(false); 
+        showLoading(false);
         if (audioUploaderEl) audioUploaderEl.value = null; // Clear input regardless of success
 
         if (response && response.success && response.driveFileId) {
             displayMessage("Audio processed successfully.", true);
-            
+
             // Update slideMedia state
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-             if (!currentSlide.slideMedia) { 
-                currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null }; 
+             if (!currentSlide.slideMedia) {
+                currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
              }
             currentSlide.slideMedia.type = 'audio';
-            currentSlide.slideMedia.url = null; 
+            currentSlide.slideMedia.url = null;
             currentSlide.slideMedia.driveFileId = response.driveFileId;
-            currentSlide.slideMedia.mimeType = response.mimeType; 
-            currentSlide.slideMedia.originalName = response.fileName; 
-            
+            currentSlide.slideMedia.mimeType = response.mimeType;
+            currentSlide.slideMedia.originalName = response.fileName;
+
             console.log(`Audio attached for slide ${adminApp.state.currentSlideIndex + 1}:`, currentSlide.slideMedia);
-           
+
             // Update Admin UI
             if (attachedAudioNameEl) attachedAudioNameEl.textContent = `Attached: ${response.fileName}`;
             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
@@ -1044,10 +1006,10 @@
             if (imageUploaderEl) imageUploaderEl.value = null; // Clear image input
             if(adminApp.state.fabricCanvasInstance) { // Clear other backgrounds
                 adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
-                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; 
+                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9';
                 adminApp.state.fabricCanvasInstance.renderAll(); // Render changes
             }
-            if (adminMediaPlaceholderEl) { 
+            if (adminMediaPlaceholderEl) {
                  adminMediaPlaceholderEl.textContent = `Audio Attached: ${response.fileName}`;
                  adminMediaPlaceholderEl.style.display = 'block';
              }
@@ -1059,11 +1021,11 @@
 
     function handleRemoveAudio() {
         if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) return;
-        
+
         const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
         if (currentSlide.slideMedia && currentSlide.slideMedia.type === 'audio') {
             console.log(`Removing audio from slide ${adminApp.state.currentSlideIndex + 1}`);
-            
+
             // Update state first
             currentSlide.slideMedia.type = null;
             currentSlide.slideMedia.url = null;
@@ -1074,7 +1036,7 @@
             // Update UI
             if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
-            if (audioUploaderEl) audioUploaderEl.value = null; 
+            if (audioUploaderEl) audioUploaderEl.value = null;
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; // Reset BG color
@@ -1143,109 +1105,7 @@
         }
     }
 
-    // --- Step 22: Google Drive Picker Functions ---
-    function showDrivePicker(mediaType) { // mediaType is 'image' or 'audio'
-        adminApp.state.currentPickerMediaType = mediaType; // Store for callback context
-        showLoading(true);
-        displayMessage("Fetching authentication for Drive Picker...", true);
-        // Get OAuth Token from server
-        google.script.run
-            .withSuccessHandler(function(token) {
-                showLoading(false);
-                if (token) {
-                    adminApp.state.oauthToken = token;
-                    createPickerWithToken(token);
-                } else {
-                    onServerError({message: "Failed to get OAuth token for Picker."});
-                }
-            })
-            .withFailureHandler(onServerError)
-            .getOAuthTokenForPicker();
-    }
-
-    function createPickerWithToken(token) {
-        if (!adminApp.state.pickerApiLoaded || typeof google === 'undefined' || !google.picker) {
-            displayMessage("Google Picker API is not loaded yet. Please try again.", false);
-            return;
-        }
-         if (!adminApp.state.developerApiKey || adminApp.state.developerApiKey === 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER') {
-             displayMessage("Developer API Key for Picker is not set. Please configure it in Admin_JS.html.", false);
-             return;
-         }
-
-        let view;
-        if (adminApp.state.currentPickerMediaType === 'image') {
-            view = new google.picker.View(google.picker.ViewId.DOCS_IMAGES);
-            view.setMimeTypes("image/png,image/jpeg,image/gif,image/webp");
-        } else if (adminApp.state.currentPickerMediaType === 'audio') {
-            view = new google.picker.View(google.picker.ViewId.DOCS_VIDEOS); // Using DOCS_VIDEOS as it supports audio MIME types better
-            view.setMimeTypes("audio/mpeg,audio/wav,audio/ogg,audio/aac,audio/mp4"); // mp4 for m4a often
-        } else {
-            displayMessage("Invalid media type for Picker.", false); return;
-        }
-        
-        // ---> FIX #2: Hardcode the *expected* origin by the Picker's check <---
-        const expectedOrigin = "https://script.google.com"; 
-        console.log("Setting Picker origin to (EXPECTED):", expectedOrigin); 
-
-        const picker = new google.picker.PickerBuilder()
-            .addView(view)
-            .setOAuthToken(token)
-            .setDeveloperKey(adminApp.state.developerApiKey)
-            .setCallback(pickerCallback)
-            // ---> FIX #2: Use the hardcoded expected origin <---
-            .setOrigin(expectedOrigin) 
-            .build();
-        picker.setVisible(true);
-        console.log("Drive Picker is now visible.");
-    }
-
-    function pickerCallback(data) {
-        let message = 'No file selected.';
-        if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
-            const doc = data[google.picker.Response.DOCUMENTS][0];
-            if (doc) {
-                const fileId = doc[google.picker.Document.ID];
-                const fileName = doc[google.picker.Document.NAME];
-                const mimeType = doc[google.picker.Document.MIME_TYPE];
-                message = `Selected: ${fileName} (ID: ${fileId})`;
-                console.log(message);
-                
-                saveCurrentSlideState(); // Save any pending changes
-
-                showLoading(true);
-                displayMessage(`Processing selected file: ${fileName}...`, true);
-                
-                // Call server to copy file to project and set permissions
-                google.script.run
-                    .withSuccessHandler(onDriveFileCopied)
-                    .withFailureHandler(onServerError)
-                    .copyDriveFileToProject(fileId, adminApp.state.currentProjectId, adminApp.state.currentPickerMediaType, fileName, mimeType);
-            }
-        } else if (data[google.picker.Response.ACTION] == google.picker.Action.CANCEL) {
-            message = 'Picker selection cancelled.';
-            console.log(message);
-            displayMessage(message, true);
-        }
-    }
-
-    function onDriveFileCopied(response) {
-        showLoading(false);
-        if (response && response.success) {
-            displayMessage(`File "${response.fileName}" attached to project.`, true);
-            // Now call the appropriate handler based on media type
-            if (adminApp.state.currentPickerMediaType === 'image') {
-                // onImageUploaded expects driveFileId, mimeType, fileName
-                onImageUploaded(response); // This will then trigger base64 fetch
-            } else if (adminApp.state.currentPickerMediaType === 'audio') {
-                // onAudioUploaded expects driveFileId, mimeType, fileName
-                onAudioUploaded(response);
-            }
-        } else {
-            onServerError(response || {message: "Failed to process file from Drive."});
-        }
-        adminApp.state.currentPickerMediaType = null; // Reset picker context
-    }
+    // REMOVED: Google Drive Picker Functions (showDrivePicker, createPickerWithToken, pickerCallback, onDriveFileCopied)
 
     // --- Overlay Creation & Toolbar ---
     function addRectangle() {
@@ -1254,48 +1114,48 @@
       const rect = new fabric.Rect({ left: 50, top: 50, fill: 'rgba(255,0,0,0.7)', width: 150, height: 100, stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
       canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll(); console.log("Rectangle added to canvas:", rect);
     }
-  
+
     function addCircle() {
       if (!adminApp.state.fabricCanvasInstance) { console.error("addCircle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
       const canvas = adminApp.state.fabricCanvasInstance;
       const circle = new fabric.Circle({ left: 150, top: 150, radius: 50, fill: 'rgba(0,0,255,0.7)', stroke: 'black', strokeWidth: 1, customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, sequenceOrder: null });
       canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll(); console.log("Circle added to canvas:", circle);
     }
-  
+
     function addTextbox() {
       if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add text.", false); return; }
       const canvas = adminApp.state.fabricCanvasInstance;
-      const textbox = new fabric.Textbox('Editable Text', { 
-          left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000', 
+      const textbox = new fabric.Textbox('Editable Text', {
+          left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000',
           fontFamily: 'Arial', fontWeight: 'normal', fontStyle: 'normal',
           textAlign: 'left', lineHeight: 1.16, charSpacing: 0,
-          customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" }, 
-          customAnimation: { type: null, duration: 500, strength: 5, trigger: null }, 
-          sequenceOrder: null 
+          customInteraction: { trigger: "", action: "", modalContent: "", navigateTo: "" },
+          customAnimation: { type: null, duration: 500, strength: 5, trigger: null },
+          sequenceOrder: null
       });
       canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
     }
-    
+
     function toHexColor(fabricColor) {
-      if (!fabricColor) return '#000000'; 
+      if (!fabricColor) return '#000000';
       try {
         if (typeof fabricColor === 'string') {
             const colorInstance = new fabric.Color(fabricColor);
             const hex = colorInstance.toHex();
             return '#' + hex;
         }
-        return '#000000'; 
+        return '#000000';
       } catch (e) {
         console.warn("Could not convert color to HEX:", fabricColor, e);
-        return '#000000'; 
+        return '#000000';
       }
     }
-  
-    function initToolbar() { 
-      console.log("initToolbar: Attaching listeners to toolbar inputs."); 
+
+    function initToolbar() {
+      console.log("initToolbar: Attaching listeners to toolbar inputs.");
       if(objFontFamilyEl) {
           // Clear existing options before adding new ones
-          objFontFamilyEl.innerHTML = ''; 
+          objFontFamilyEl.innerHTML = '';
           FONT_FAMILIES.forEach(font => {
               const option = document.createElement('option'); option.value = font; option.textContent = font; objFontFamilyEl.appendChild(option);
           });
@@ -1315,44 +1175,56 @@
         {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'}, {el: objShadowAffectStrokeEl, prop: 'shadow.affectStroke', type: 'checkbox'},
         {el: objShadowNonScalingEl, prop: 'shadow.nonScaling', type: 'checkbox'}
       ];
-  
+
       inputs.forEach(inputConfig => {
         if (inputConfig.el) {
-             // Remove existing listeners before adding new ones, to prevent duplicates if initToolbar is called multiple times
-             // This requires storing the handler function if it's complex, or using anonymous functions carefully
-             // For simplicity now, we assume initToolbar is called reliably only once per edit view setup.
-             // If issues arise, implement listener removal.
             const eventType = (inputConfig.el.tagName === 'SELECT' || inputConfig.el.type === 'color' || inputConfig.el.type === 'checkbox') ? 'change' : 'input';
-            inputConfig.el.addEventListener(eventType, (e) => { 
-                const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
-                updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type); 
-            });
+            // Check if listener already exists to avoid duplicates (simple check)
+            if (!inputConfig.el.hasAttribute('listener-attached')) {
+                 inputConfig.el.addEventListener(eventType, (e) => {
+                     const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
+                     updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type);
+                 });
+                 inputConfig.el.setAttribute('listener-attached', 'true');
+             }
         } else { console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); }
       });
 
       // Interaction listeners only need to be attached once too
-      if (objInteractionTriggerEl) objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
-      if (objInteractionActionEl) objInteractionActionEl.addEventListener('change', handleInteractionChange);
-      if (objModalContentEl) objModalContentEl.addEventListener('input', handleInteractionChange);
-      if (objNavigateToEl) objNavigateToEl.addEventListener('input', handleInteractionChange);
+      if (objInteractionTriggerEl && !objInteractionTriggerEl.hasAttribute('listener-attached')) {
+           objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
+           objInteractionTriggerEl.setAttribute('listener-attached', 'true');
+       }
+       if (objInteractionActionEl && !objInteractionActionEl.hasAttribute('listener-attached')) {
+            objInteractionActionEl.addEventListener('change', handleInteractionChange);
+            objInteractionActionEl.setAttribute('listener-attached', 'true');
+       }
+       if (objModalContentEl && !objModalContentEl.hasAttribute('listener-attached')) {
+           objModalContentEl.addEventListener('input', handleInteractionChange);
+           objModalContentEl.setAttribute('listener-attached', 'true');
+       }
+       if (objNavigateToEl && !objNavigateToEl.hasAttribute('listener-attached')) {
+            objNavigateToEl.addEventListener('input', handleInteractionChange);
+            objNavigateToEl.setAttribute('listener-attached', 'true');
+       }
     }
-  
-    function populateToolbar(activeObject) { 
-      if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; } 
+
+    function populateToolbar(activeObject) {
+      if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
       if (!activeObject) { overlayPropertiesToolbarEl.style.display = 'none'; return; }
-      overlayPropertiesToolbarEl.style.display = 'block'; 
-  
+      overlayPropertiesToolbarEl.style.display = 'block';
+
       // --- Basic Properties ---
       if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
       if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
       if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
       if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
       if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
-      if (objFillEl) objFillEl.value = toHexColor(activeObject.fill); 
-      if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke); 
-      if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth; 
-      if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; 
-  
+      if (objFillEl) objFillEl.value = toHexColor(activeObject.fill);
+      if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
+      if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
+      if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
+
       // --- Text Properties (Conditional Display) ---
       const isTextObject = activeObject.type === 'textbox' || activeObject.type === 'i-text';
       if (textSpecificControlsEl) {
@@ -1368,10 +1240,10 @@
               if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing || 0;
           }
       }
-      
+
       // --- Shadow Properties ---
       const shadow = activeObject.shadow;
-      if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; 
+      if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000';
       if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
       if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
       if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
@@ -1386,7 +1258,7 @@
       if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
       updateInteractionConfigVisibility(interaction.action);
     }
-  
+
     function handleInteractionChange() {
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) return;
@@ -1406,25 +1278,25 @@
         if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
     }
 
-    function updateFabricObjectFromToolbar(propertyName, value, inputType) { 
+    function updateFabricObjectFromToolbar(propertyName, value, inputType) {
       const canvas = adminApp.state.fabricCanvasInstance;
       if (!canvas) return;
       const activeObject = canvas.getActiveObject();
       if (!activeObject) return;
       let parsedValue = value;
       if (inputType === 'number' || inputType === 'range') {
-          if (propertyName === 'lineHeight') { parsedValue = parseFloat(value); } 
+          if (propertyName === 'lineHeight') { parsedValue = parseFloat(value); }
           else { parsedValue = parseInt(value, 10); }
           if (isNaN(parsedValue)) {
-              if (propertyName === 'strokeWidth' && value === '') parsedValue = 0; 
-              else if (propertyName === 'charSpacing' && value === '') parsedValue = 0; 
-              else if (value === '') return; 
-              else return; 
+              if (propertyName === 'strokeWidth' && value === '') parsedValue = 0;
+              else if (propertyName === 'charSpacing' && value === '') parsedValue = 0;
+              else if (value === '') return;
+              else return;
           }
       } else if (inputType === 'checkbox') { parsedValue = !!value; }
-      
-      if (propertyName === 'width') { activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001); } 
-      else if (propertyName === 'height') { activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001); } 
+
+      if (propertyName === 'width') { activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001); }
+      else if (propertyName === 'height') { activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001); }
       else if (propertyName.startsWith('shadow.')) {
         const shadowProp = propertyName.split('.')[1];
         let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
@@ -1435,16 +1307,16 @@
         shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
         shadowOptions.affectStroke = objShadowAffectStrokeEl.checked;
         shadowOptions.nonScaling = objShadowNonScalingEl.checked;
-        if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0) { activeObject.set('shadow', new fabric.Shadow(shadowOptions)); } 
+        if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0) { activeObject.set('shadow', new fabric.Shadow(shadowOptions)); }
         else { activeObject.set('shadow', null); }
       } else {
         if (!propertyName.startsWith('interaction.')) { activeObject.set(propertyName, parsedValue); }
       }
       if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'width'].includes(propertyName)) { activeObject.initDimensions(); }
-      activeObject.setCoords(); 
+      activeObject.setCoords();
       canvas.renderAll();
     }
-  
+
     Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
-  
+
   </script>

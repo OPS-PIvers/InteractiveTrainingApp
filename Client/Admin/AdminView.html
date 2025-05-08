@@ -5,9 +5,8 @@
     <title>Admin Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <!-- Add YouTube Player API script (Needed if you ever add YT previews here) -->
-    <!-- <script src="https://www.youtube.com/iframe_api"></script> --> 
-    <!-- Step 22: Add Google API Client Library for Picker -->
-    <script async defer src="https://apis.google.com/js/api.js" onload="adminApp.handleGoogleApiLoad()"></script>
+    <!-- <script src="https://www.youtube.com/iframe_api"></script> -->
+    <!-- REMOVED: Google API Client Library for Picker -->
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
       .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -26,7 +25,7 @@
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
       .success { border-color: green; background-color: #d4edda; color: #155724; }
       .error { border-color: red; background-color: #f8d7da; color: #721c24; }
-      
+
       #adminProjectListContainer { margin-top: 15px; }
       .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;} /* Allow wrap */
       .project-item > div:first-child { flex-basis: 60%; min-width: 200px;} /* Title/Status area */
@@ -46,8 +45,8 @@
         border-radius: 5px;
         background-color: #f9f9f9;
       }
-      .edit-controls-group label { 
-          margin-right: 10px; 
+      .edit-controls-group label {
+          margin-right: 10px;
           display: block; /* Make labels block for better spacing */
           margin-bottom: 5px;
       }
@@ -64,18 +63,18 @@
 
 
       #fabricCanvasContainer {
-        display: flex; 
+        display: flex;
         justify-content: center;
-        align-items: flex-start; 
-        max-height: 70vh; 
-        overflow: auto; 
-        border: 1px dashed #ccc; 
-        min-height: 300px; 
-        margin-top: 15px; 
+        align-items: flex-start;
+        max-height: 70vh;
+        overflow: auto;
+        border: 1px dashed #ccc;
+        min-height: 300px;
+        margin-top: 15px;
         position: relative; /* Needed for absolute positioning of placeholder */
       }
-      #fabricCanvasElement { 
-        border: 1px solid #000; 
+      #fabricCanvasElement {
+        border: 1px solid #000;
       }
 
        /* Style for media placeholder on admin canvas */
@@ -154,7 +153,7 @@
         border: 1px solid #ccc;
         background-color: #f9f9f9;
         border-radius: 5px;
-        margin-bottom: 15px; 
+        margin-bottom: 15px;
       }
       #overlayPropertiesToolbar h3 {
           margin-top: 0;
@@ -162,18 +161,18 @@
           border-bottom: 1px solid #e0e0e0;
           padding-bottom: 10px;
       }
-      .toolbar-sections-container { 
+      .toolbar-sections-container {
         display: flex;
-        flex-wrap: wrap; 
-        gap: 20px; 
+        flex-wrap: wrap;
+        gap: 20px;
       }
-      .toolbar-section { 
+      .toolbar-section {
         padding-bottom: 10px;
       }
        .toolbar-section label {
-          display: inline-block; 
-          width: 110px; 
-          margin-bottom: 8px; 
+          display: inline-block;
+          width: 110px;
+          margin-bottom: 8px;
           vertical-align: middle;
       }
        .toolbar-section input[type="number"],
@@ -181,8 +180,8 @@
        .toolbar-section input[type="text"],
        .toolbar-section select,
        .toolbar-section textarea {
-          display: inline-block; 
-          width: 150px; 
+          display: inline-block;
+          width: 150px;
           max-width: 180px;
           padding: 6px;
           margin-bottom: 8px;
@@ -192,24 +191,24 @@
           font-size: 0.9em;
           vertical-align: middle;
       }
-       .toolbar-section input[type="range"] { 
+       .toolbar-section input[type="range"] {
           width: 150px;
           max-width: 180px;
           margin-bottom: 8px;
           vertical-align: middle;
       }
-      .toolbar-section textarea { 
+      .toolbar-section textarea {
         min-height: 60px;
-        width: 200px; 
-        vertical-align: top; 
+        width: 200px;
+        vertical-align: top;
       }
        .toolbar-section input[type="checkbox"] {
-            width: auto; 
+            width: auto;
             vertical-align: middle;
-            margin-left: 5px; 
+            margin-left: 5px;
        }
-        .toolbar-section .checkbox-label { 
-           width: auto; 
+        .toolbar-section .checkbox-label {
+           width: auto;
            margin-left: 5px;
            font-weight: normal; /* Make checkbox labels normal weight */
        }
@@ -220,16 +219,16 @@
         color: #555;
         font-size: 0.9em;
         text-transform: uppercase;
-        width: 100%; 
+        width: 100%;
       }
-      .config-section { 
+      .config-section {
         margin-top: 10px;
-        padding-left: 10px; 
+        padding-left: 10px;
         border-left: 2px solid #007bff;
-        width: 100%; 
+        width: 100%;
       }
-       .config-section label { width: 110px; } 
-       .config-section input, .config-section textarea { width: 200px; } 
+       .config-section label { width: 110px; }
+       .config-section input, .config-section textarea { width: 200px; }
     </style>
   </head>
   <body>
@@ -255,15 +254,14 @@
     <div class="container" id="editViewContainer" style="display:none;">
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
-      
+
         <!-- Updated Slide Settings Group -->
         <div class="edit-controls-group">
             <h3>Current Slide Settings / Media</h3>
-            
+
             <label for="imageUploader">Image Background (Upload):</label>
             <input type="file" id="imageUploader" accept="image/*">
-
-            <button id="attachFromDriveButton" style="margin-top: 5px;">Attach Image/Audio from Drive</button>
+            <!-- REMOVED: Attach from Drive button -->
 
             <hr style="margin: 20px 0;">
 
@@ -286,11 +284,11 @@
             <button id="addCircleButton">Add Circle</button>
             <button id="addTextboxButton">Add Text</button>
         </div>
-        
+
         <div id="overlayPropertiesToolbar" style="display:none;">
             <h3>Overlay Properties</h3>
-            <div class="toolbar-sections-container"> 
-                <div class="toolbar-section"> 
+            <div class="toolbar-sections-container">
+                <div class="toolbar-section">
                     <h4>Position & Size</h4>
                     <label for="objX">X:</label> <input type="number" id="objX" class="sidebar-input"><br>
                     <label for="objY">Y:</label> <input type="number" id="objY" class="sidebar-input"><br>
@@ -299,19 +297,19 @@
                     <label for="objAngle">Angle:</label> <input type="number" id="objAngle" class="sidebar-input">
                 </div>
 
-                <div class="toolbar-section"> 
+                <div class="toolbar-section">
                     <h4>Appearance</h4>
                     <label for="objFill">Fill Color:</label> <input type="color" id="objFill" class="sidebar-input" value="#ff0000"><br>
                     <label for="objStrokeColor">Stroke Color:</label> <input type="color" id="objStrokeColor" class="sidebar-input" value="#000000"><br>
                     <label for="objStrokeWidth">Stroke Width:</label> <input type="number" id="objStrokeWidth" min="0" class="sidebar-input" value="1"><br>
                     <label for="objOpacity">Opacity:</label> <input type="range" id="objOpacity" min="0" max="1" step="0.01" class="sidebar-input" value="1.0">
                 </div>
-                
+
                 <div class="toolbar-section" id="textSpecificControls" style="display:none;">
                     <h4>Text Styling</h4>
                     <label for="objTextContent">Content:</label><br>
                     <textarea id="objTextContent" rows="3" class="sidebar-input"></textarea><br>
-                    
+
                     <label for="objFontFamily">Font Family:</label>
                     <select id="objFontFamily" class="sidebar-input"></select><br>
 
@@ -345,13 +343,13 @@
                     <input type="number" id="objCharSpacing" class="sidebar-input">
                 </div>
 
-                <div class="toolbar-section"> 
+                <div class="toolbar-section">
                     <h4>Shadow</h4>
                     <label for="objShadowColor">Color:</label> <input type="color" id="objShadowColor" class="sidebar-input" value="#000000"><br>
                     <label for="objShadowBlur">Blur:</label> <input type="range" id="objShadowBlur" min="0" max="50" step="1" class="sidebar-input" value="0"><br>
                     <label for="objShadowOffsetX">Offset X:</label> <input type="number" id="objShadowOffsetX" class="sidebar-input" value="0"><br>
                     <label for="objShadowOffsetY">Offset Y:</label> <input type="number" id="objShadowOffsetY" class="sidebar-input" value="0"><br>
-                    
+
                     <input type="checkbox" id="objShadowAffectStroke" class="sidebar-input">
                     <label for="objShadowAffectStroke" class="checkbox-label">Affects Stroke</label><br>
 
@@ -405,13 +403,13 @@
                  <!-- Dynamically populated -->
             </div>
         </div>
-        
+
     </div>
 
     <div id="messageArea"></div>
 
     <?!= include('Client/Shared/LoadingSpinner'); ?>
     <!-- **** CORRECT SCRIPT INCLUDE FOR ADMIN **** -->
-    <?!= include('Client/Admin/Admin_JS'); ?> 
+    <?!= include('Client/Admin/Admin_JS'); ?>
   </body>
 </html>

@@ -1,6 +1,8 @@
+// Server/Code.gs
+
 // --- CONSTANTS ---
-const PROJECT_INDEX_SHEET_ID = '1_a8qB_Vzy5ItoSTqPPrN25jLLz5wnar5SjQ0GLwFFug';
-const ROOT_PROJECT_FOLDER_ID = '1_YNn3PPj0Xn4bcN_C1jqHCBC_v4wuLKU';
+const PROJECT_INDEX_SHEET_ID = '1_a8qB_Vzy5ItoSTqPPrN25jLLz5wnar5SjQ0GLwFFug'; // Replace with your actual Sheet ID
+const ROOT_PROJECT_FOLDER_ID = '1_YNn3PPj0Xn4bcN_C1jqHCBC_v4wuLKU'; // Replace with your actual Root Folder ID
 const ADMIN_EMAILS = ['paul.ivers@orono.k12.mn.us']; // Add more admin emails here as needed
 
 const PROJECT_INDEX_DATA_SHEET_NAME = "Projects"; // The name of the sheet/tab within your ProjectIndex Spreadsheet file
@@ -55,7 +57,7 @@ function isAdminUser() {
   } catch (e) {
     // If Session.getActiveUser().getEmail() fails (e.g. script run by anonymous user or in a context without user session)
     console.error("Error getting active user email: " + e.toString());
-    return false; 
+    return false;
   }
 }
 
@@ -80,7 +82,7 @@ function getWebAppUrl() {
 /**
  * Called by the client to get initial mode and projectId based on URL parameters
  * that were present when the page initially loaded.
- * @param {object} params The e.parameter object from the initial doGet call, passed by client if needed.
+ * @param {object} initialPageParameters The e.parameter object from the initial doGet call, passed by client if needed.
  *                       Alternatively, the client could parse window.location.search itself.
  * @return {object} An object containing mode and projectId.
  */
@@ -108,22 +110,4 @@ function getServerData(initialPageParameters) {
     mode: modeToReturn,
     projectId: projectIdToReturn
   };
-}
-
-/**
- * Gets an OAuth token for the Google Picker API.
- * The token belongs to the effective user running the script.
- * @return {string} The OAuth token.
- */
-function getOAuthTokenForPicker() {
-  try {
-    const token = ScriptApp.getOAuthToken();
-    Logger.log("getOAuthTokenForPicker: Successfully retrieved OAuth token.");
-    return token;
-  } catch (e) {
-    Logger.log(`Error in getOAuthTokenForPicker: ${e.toString()}`);
-    // Depending on the error, you might not want to re-throw,
-    // but let the client handle the null/undefined token.
-    return null; 
-  }
 }

@@ -2,7 +2,9 @@
 <html>
   <head>
     <base target="_top">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script> <!-- ADD THIS LINE -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script> 
+    <!-- Add YouTube Player API script -->
+    <script src="https://www.youtube.com/iframe_api"></script> 
     <title>Interactive Training Modules</title>
     <?!= include('Client/Shared/Modal_CSS'); ?>
     <style>
@@ -52,21 +54,67 @@
 
       /* Styles for Project View Mode */
       #viewerProjectDisplayArea { display: none; /* Hidden initially */ }
+
+      /* New wrapper for canvas and potential YT player */
+      #viewerMediaContainer {
+        position: relative; /* Important for layering */
+        width: 100%; /* Take available width */
+        /* The height will be determined by the canvas/video aspect ratio, set by JS */
+        /* max-width: 960px; /* Optional max width */
+        margin: 15px auto; /* Center container */
+        /* min-height: 300px; /* Removed, let content define height */
+        background-color: #333; /* Default dark BG for player area */
+        overflow: hidden; /* Ensure nothing spills out */
+      }
+
       #viewerCanvasContainer {
+        position: absolute; /* Position canvas on top */
+        top: 0;
+        left: 0;
+        width: 100%; /* Fill the media container */
+        height: 100%; /* Fill the media container */
+        z-index: 10;      /* Ensure canvas is above the player */
         display: flex; 
         justify-content: center;
-        align-items: flex-start; 
-        max-height: 80vh; /* Adjust as needed */
-        overflow: auto; 
-        border: 1px dashed #ccc; 
-        min-height: 300px; 
-        margin-top: 15px;
-        background-color: #e9e9e9; /* Default background if no image */
+        align-items: center; /* Center canvas if smaller than container */
       }
-      #viewerFabricCanvas { border: 1px solid #000; }
+      #viewerFabricCanvas { 
+          /* width/height set by JS based on slide */
+          /* border: 1px solid red; /* For debugging positioning */
+          max-width: 100%; 
+          max-height: 100%; 
+      }
+
+      /* YouTube Player Container */
+      #youtubePlayerContainer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 5; /* Behind canvas */
+      }
+       #youtubePlayerContainer iframe { /* Target the iframe directly */
+           position: absolute; /* Ensure iframe fills the container */
+           top: 0;
+           left: 0;
+           width: 100%;
+           height: 100%;
+           border: none; /* Remove iframe border */
+       }
+
+
       #viewerSlideNavigation { margin-top: 15px; text-align: center; }
       #viewerSlideNavigation button { margin: 0 10px; }
       #backToViewerListButton { margin-bottom: 15px; }
+
+      /* Basic styles for Audio Player */
+       #viewerAudioPlayer {
+           width: 90%; /* Make controls slightly smaller than container */
+           margin: 15px auto 0; /* Center and add top margin */
+           display: none; /* Hidden by default */
+       }
+
 
     </style>
   </head>
@@ -81,9 +129,22 @@
     <div id="viewerProjectDisplayArea" class="container">
         <button id="backToViewerListButton">Back to Project List</button>
         <h2 id="viewingProjectTitle"></h2>
-        <div id="viewerCanvasContainer">
-            <canvas id="viewerFabricCanvas"></canvas>
+
+        <!-- New Media Container -->
+        <div id="viewerMediaContainer">
+            <!-- YouTube Player will be injected here -->
+            <div id="youtubePlayerContainer" style="display: none;"></div> 
+            
+            <!-- Canvas Container -->
+            <div id="viewerCanvasContainer">
+                <canvas id="viewerFabricCanvas"></canvas>
+            </div>
         </div>
+
+        <!-- Audio Player (can be hidden visually if desired) -->
+        <audio id="viewerAudioPlayer" controls></audio>
+
+
         <div id="viewerSlideNavigation">
             <button id="viewerPrevSlideButton" disabled>< Previous Slide</button>
             <span id="viewerSlideIndicator">Slide 0 / 0</span>
@@ -98,6 +159,7 @@
         <div class="modal-content">
             <span id="viewerModalCloseButton" class="modal-close-button">×</span>
             <div id="viewerModalBody"></div>
+            <!-- Modal Nav Buttons Added Here Later (Step 21) -->
         </div>
     </div>
 

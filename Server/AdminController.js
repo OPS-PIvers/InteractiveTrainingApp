@@ -585,3 +585,70 @@ function getAudioAsBase64(driveFileId) {
       return { success: false, error: `Failed to retrieve audio as base64: ${e.message}` };
   }
 }
+
+/**
+ * Copies a file from Google Drive (source) to the specified project's folder.
+ * Sets sharing permissions on the copy to "anyone with link can view".
+ * @param {string} sourceFileId The ID of the file to copy from Drive.
+ * @param {string} projectId The ID of the project to associate the copied file with.
+ * @param {string} mediaType 'image' or 'audio', used for context and potential view settings.
+ * @param {string} originalFileName The original name of the file from the picker (optional, helps if source name is weird)
+ * @param {string} originalMimeType The original mime type from picker (optional)
+ * @return {object} An object like { success: true, driveFileId: '...', fileName: '...', mimeType: '...' } or { success: false, error: '...' }.
+ */
+function copyDriveFileToProject(sourceFileId, projectId, mediaType, originalFileName, originalMimeType) {
+  try {
+    Logger.log(`copyDriveFileToProject: Starting copy for sourceFileId: ${sourceFileId}, projectId: ${projectId}, mediaType: ${mediaType}`);
+
+    if (!sourceFileId || !projectId || !mediaType) {
+      Logger.log("copyDriveFileToProject: Missing required parameters.");
+      return { success: false, error: "Source File ID, Project ID, and Media Type are required." };
+    }
+
+    const projectFolderId = getProjectFolderIdFromSheet(projectId);
+    if (!projectFolderId) {
+      Logger.log(`copyDriveFileToProject: Could not find ProjectFolderID for projectId "${projectId}".`);
+      return { success: false, error: `Project folder not found for project ID: ${projectId}.` };
+    }
+    const projectFolder = DriveApp.getFolderById(projectFolderId);
+
+    const sourceFile = DriveApp.getFileById(sourceFileId);
+    const fileNameToUse = originalFileName || sourceFile.getName(); // Prefer Picker name if available
+    const mimeTypeToUse = originalMimeType || sourceFile.getMimeType();
+
+    // Check if the file type from picker matches the expected mediaType context
+    if (mediaType === 'image' && !mimeTypeToUse.startsWith('image/')) {
+        return { success: false, error: `Selected file "${fileNameToUse}" is not an image (type: ${mimeTypeToUse}). Please select an image file.`};
+    }
+    if (mediaType === 'audio' && !mimeTypeToUse.startsWith('audio/')) {
+        return { success: false, error: `Selected file "${fileNameToUse}" is not an audio file (type: ${mimeTypeToUse}). Please select an audio file.`};
+    }
+    
+    // Create a copy in the project folder
+    const copiedFile = sourceFile.makeCopy(fileNameToUse, projectFolder);
+    if (!copiedFile || !copiedFile.getId()) {
+      Logger.log(`copyDriveFileToProject: Failed to copy file ${sourceFileId} to project folder ${projectFolderId}.`);
+      return { success: false, error: "Failed to copy file to project folder." };
+    }
+    
+    // Set sharing permissions on the copy
+    copiedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    Logger.log(`copyDriveFileToProject: File "${copiedFile.getName()}" (ID: ${copiedFile.getId()}) copied to project and shared as ANYONE_WITH_LINK.`);
+    
+    // Get webContentLink (not strictly needed if client fetches base64, but good to have)
+    let webContentLink = null;
+    try { webContentLink = copiedFile.getWebContentLink(); } catch(e) { Logger.log("Could not get webContentLink for copied file: " + e.toString());}
+    
+    return {
+      success: true,
+      driveFileId: copiedFile.getId(),
+      fileName: copiedFile.getName(),
+      mimeType: copiedFile.getMimeType(),
+      webContentLink: webContentLink // Can be null
+    };
+
+  } catch (e) {
+    Logger.log(`Error in copyDriveFileToProject: ${e.toString()} - SourceFileID: ${sourceFileId}, ProjectID: ${projectId} \nStack: ${e.stack}`);
+    return { success: false, error: `Failed to process file from Drive: ${e.message}` };
+  }
+}

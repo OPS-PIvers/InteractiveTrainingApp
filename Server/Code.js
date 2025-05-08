@@ -1,5 +1,3 @@
-// Server/Code.gs
-
 // --- CONSTANTS ---
 const PROJECT_INDEX_SHEET_ID = '1_a8qB_Vzy5ItoSTqPPrN25jLLz5wnar5SjQ0GLwFFug';
 const ROOT_PROJECT_FOLDER_ID = '1_YNn3PPj0Xn4bcN_C1jqHCBC_v4wuLKU';
@@ -110,4 +108,22 @@ function getServerData(initialPageParameters) {
     mode: modeToReturn,
     projectId: projectIdToReturn
   };
+}
+
+/**
+ * Gets an OAuth token for the Google Picker API.
+ * The token belongs to the effective user running the script.
+ * @return {string} The OAuth token.
+ */
+function getOAuthTokenForPicker() {
+  try {
+    const token = ScriptApp.getOAuthToken();
+    Logger.log("getOAuthTokenForPicker: Successfully retrieved OAuth token.");
+    return token;
+  } catch (e) {
+    Logger.log(`Error in getOAuthTokenForPicker: ${e.toString()}`);
+    // Depending on the error, you might not want to re-throw,
+    // but let the client handle the null/undefined token.
+    return null; 
+  }
 }

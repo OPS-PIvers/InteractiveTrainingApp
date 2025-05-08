@@ -21,10 +21,10 @@
       lastUploadedFileName: null,
       isPasteListenerActive: false, // To manage listener attachment for pasting images
       // For Google Drive Picker (Part 2 of Step 22) - User must replace with their actual key
-      developerApiKey: 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER', 
-      gapiLoaded: false,
-      pickerApiLoaded: false,
-      oauthToken: null,
+      developerApiKey: 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER', // <<< IMPORTANT: REPLACE THIS!
+      gapiLoaded: false, // Flag if the main gapi script has loaded
+      pickerApiLoaded: false, // Flag if the 'picker' module has loaded
+      oauthToken: null, // Store OAuth token for Picker
       currentPickerMediaType: null // 'image' or 'audio' for Drive Picker context
     };
   
@@ -61,8 +61,28 @@
       adminApp.attachEventListeners();
       switchToListView();
       loadAdminProjectsList(); 
-      console.log("Admin_JS: Initialization complete.");
+      // adminApp.handleGoogleApiLoad will be called by the gapi script's onload
+      console.log("Admin_JS: Initialization complete. Waiting for gapi.js to load if not already.");
     });
+
+    // --- Google API Loader Functions (Step 22 - Drive Picker) ---
+    adminApp.handleGoogleApiLoad = function() {
+        console.log("Admin_JS: Google API Client Library (gapi.js) loaded.");
+        adminApp.state.gapiLoaded = true;
+        // Now load the 'picker' module
+        if (typeof gapi !== 'undefined' && typeof gapi.load === 'function') {
+             gapi.load('picker', {'callback': adminApp.initializePickerApi});
+        } else {
+            console.error("Admin_JS: gapi object not available after script load.");
+            displayMessage("Failed to load Google API client.", false);
+        }
+    }
+
+    adminApp.initializePickerApi = function() {
+        adminApp.state.pickerApiLoaded = true;
+        console.log("Admin_JS: Google Picker API module loaded.");
+        // You could enable the "Attach from Drive" button here if it was initially disabled
+    }
   
     // --- Setup and Listeners ---
     adminApp.setupDOMReferences = function() {
@@ -164,6 +184,9 @@
       adminApp.state.currentProjectId = null;
       adminApp.state.projectData = null; 
       adminApp.state.currentSlideIndex = -1;
+      adminApp.state.oauthToken = null; // Clear picker token
+      adminApp.state.currentPickerMediaType = null;
+
       if (adminApp.state.fabricCanvasInstance) {
           adminApp.state.fabricCanvasInstance.dispose();
           adminApp.state.fabricCanvasInstance = null;
@@ -228,6 +251,7 @@
         slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer'); 
         adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder'); 
         overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar');
+        attachFromDriveButtonEl = document.getElementById('attachFromDriveButton'); // Re-assign here
 
         // Attach listeners for edit view buttons and controls
         ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView);
@@ -245,14 +269,19 @@
         // Step 22 - Drive Picker Listener
         ensureEditViewListener('attachFromDriveButtonEl', 'attachFromDriveButton', 'click', function() {
              if (!adminApp.state.gapiLoaded || !adminApp.state.pickerApiLoaded) {
-                 displayMessage("Picker API not ready. Please wait.", false); return;
+                 displayMessage("Picker API not ready. Please wait a moment and try again.", false); return;
              }
              if (!adminApp.state.developerApiKey || adminApp.state.developerApiKey === 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER') {
                  displayMessage("Developer API Key not configured for Drive Picker. Please update it in Admin_JS.html.", false); return;
              }
-             // For this example, let's assume it's for images. Can be made more context specific
-             // e.g. by having separate buttons or prompting the user.
-             showDrivePicker('image'); 
+             // For now, let's make it choose between image/audio based on a prompt
+             const choice = prompt("Select type to attach from Drive: 'image' or 'audio'", "image");
+             if (choice === 'image' || choice === 'audio') {
+                adminApp.state.currentPickerMediaType = choice;
+                showDrivePicker(choice); 
+             } else if (choice !== null) { // if not null, it means user entered something invalid
+                 displayMessage("Invalid type. Please enter 'image' or 'audio'.", false);
+             }
         });
   
         // Initialize Fabric Canvas with defaults
@@ -827,21 +856,21 @@
     }
 
     function onImageUploaded(response) { 
-        // Called AFTER Drive upload, before fetching base64
+        // Called AFTER Drive upload (direct or Picker copy), before fetching base64 for images
         showLoading(false); 
         if (imageUploaderEl) imageUploaderEl.value = null; // Clear input
         if (response && response.success && response.driveFileId) {
-            displayMessage("Image uploaded. Fetching for preview...", true); 
+            displayMessage("Image processed. Fetching for preview...", true); 
             showLoading(true);
-            adminApp.state.lastUploadedDriveId = response.driveFileId; // Store ID temporarily
+            adminApp.state.lastUploadedDriveId = response.driveFileId; // Store ID 
             adminApp.state.lastUploadedMimeType = response.mimeType;
             adminApp.state.lastUploadedFileName = response.fileName;
             google.script.run
-                .withSuccessHandler(onBase64ImageReceived) // This will set the BG and update slideMedia
+                .withSuccessHandler(onBase64ImageReceived) 
                 .withFailureHandler(onServerError)
                 .getImageAsBase64(response.driveFileId);
         } else { 
-            onServerError({ message: (response && response.error) ? response.error : "Upload failed." }); 
+            onServerError({ message: (response && response.error) ? response.error : "Image processing failed." }); 
         }
     }
 
@@ -879,7 +908,7 @@
                 currentSlide.canvasHeight = cvHeight;
                 
                 console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated for image.`);
-                updateSlideThumbnailsUI(); // Refresh thumbnails if needed (though BG isn't shown)
+                updateSlideThumbnailsUI(); 
                 
                 // Clear other media UI/placeholders
                 if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
@@ -892,7 +921,7 @@
                 delete adminApp.state.lastUploadedMimeType;
                 delete adminApp.state.lastUploadedFileName;
 
-            }, { crossOrigin: 'anonymous' }); // Needed for loading base64/external URLs sometimes
+            }, { crossOrigin: 'anonymous' }); 
         } else { 
             onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." }); 
             // Clean up temporary state on error too
@@ -975,7 +1004,7 @@
                 data: e.target.result.split(',')[1] 
             };
             google.script.run
-                .withSuccessHandler(onAudioUploaded)
+                .withSuccessHandler(onAudioUploaded) // Use the same handler for direct & Picker uploads
                 .withFailureHandler(onServerError)
                 .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'audio'); // Pass 'audio' type
         };
@@ -988,12 +1017,12 @@
         reader.readAsDataURL(file);
     }
 
-     function onAudioUploaded(response) {
+     function onAudioUploaded(response) { // Handles both direct upload and Picker copy
         showLoading(false); 
         if (audioUploaderEl) audioUploaderEl.value = null; // Clear input regardless of success
 
         if (response && response.success && response.driveFileId) {
-            displayMessage("Audio uploaded successfully.", true);
+            displayMessage("Audio processed successfully.", true);
             
             // Update slideMedia state
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
@@ -1001,8 +1030,7 @@
                 currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null }; 
              }
             currentSlide.slideMedia.type = 'audio';
-            // Store Drive ID, clear base64 URL (url), store original name
-            currentSlide.slideMedia.url = null; // URL is not needed, viewer uses driveFileId
+            currentSlide.slideMedia.url = null; 
             currentSlide.slideMedia.driveFileId = response.driveFileId;
             currentSlide.slideMedia.mimeType = response.mimeType; 
             currentSlide.slideMedia.originalName = response.fileName; 
@@ -1025,7 +1053,7 @@
              }
 
         } else {
-            onServerError((response && response.error) ? response.error : "Failed to upload audio.");
+            onServerError((response && response.error) ? response.error : "Failed to process audio.");
         }
     }
 
@@ -1114,6 +1142,105 @@
             console.log("Paste event did not contain a direct image file.");
         }
     }
+
+    // --- Step 22: Google Drive Picker Functions ---
+    function showDrivePicker(mediaType) { // mediaType is 'image' or 'audio'
+        adminApp.state.currentPickerMediaType = mediaType; // Store for callback context
+        showLoading(true);
+        displayMessage("Fetching authentication for Drive Picker...", true);
+        // Get OAuth Token from server
+        google.script.run
+            .withSuccessHandler(function(token) {
+                showLoading(false);
+                if (token) {
+                    adminApp.state.oauthToken = token;
+                    createPickerWithToken(token);
+                } else {
+                    onServerError({message: "Failed to get OAuth token for Picker."});
+                }
+            })
+            .withFailureHandler(onServerError)
+            .getOAuthTokenForPicker();
+    }
+
+    function createPickerWithToken(token) {
+        if (!adminApp.state.pickerApiLoaded || typeof google === 'undefined' || !google.picker) {
+            displayMessage("Google Picker API is not loaded yet. Please try again.", false);
+            return;
+        }
+         if (!adminApp.state.developerApiKey || adminApp.state.developerApiKey === 'YOUR_GOOGLE_CLOUD_API_KEY_FOR_PICKER') {
+             displayMessage("Developer API Key for Picker is not set. Please configure it in Admin_JS.html.", false);
+             return;
+         }
+
+        let view;
+        if (adminApp.state.currentPickerMediaType === 'image') {
+            view = new google.picker.View(google.picker.ViewId.DOCS_IMAGES);
+            view.setMimeTypes("image/png,image/jpeg,image/gif,image/webp");
+        } else if (adminApp.state.currentPickerMediaType === 'audio') {
+            view = new google.picker.View(google.picker.ViewId.DOCS_VIDEOS); // Using DOCS_VIDEOS as it supports audio MIME types better
+            view.setMimeTypes("audio/mpeg,audio/wav,audio/ogg,audio/aac,audio/mp4"); // mp4 for m4a often
+        } else {
+            displayMessage("Invalid media type for Picker.", false); return;
+        }
+        
+        const picker = new google.picker.PickerBuilder()
+            .addView(view)
+            .setOAuthToken(token)
+            .setDeveloperKey(adminApp.state.developerApiKey)
+            .setCallback(pickerCallback)
+            .build();
+        picker.setVisible(true);
+        console.log("Drive Picker is now visible.");
+    }
+
+    function pickerCallback(data) {
+        let message = 'No file selected.';
+        if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+            const doc = data[google.picker.Response.DOCUMENTS][0];
+            if (doc) {
+                const fileId = doc[google.picker.Document.ID];
+                const fileName = doc[google.picker.Document.NAME];
+                const mimeType = doc[google.picker.Document.MIME_TYPE];
+                message = `Selected: ${fileName} (ID: ${fileId})`;
+                console.log(message);
+                
+                saveCurrentSlideState(); // Save any pending changes
+
+                showLoading(true);
+                displayMessage(`Processing selected file: ${fileName}...`, true);
+                
+                // Call server to copy file to project and set permissions
+                google.script.run
+                    .withSuccessHandler(onDriveFileCopied)
+                    .withFailureHandler(onServerError)
+                    .copyDriveFileToProject(fileId, adminApp.state.currentProjectId, adminApp.state.currentPickerMediaType, fileName, mimeType);
+            }
+        } else if (data[google.picker.Response.ACTION] == google.picker.Action.CANCEL) {
+            message = 'Picker selection cancelled.';
+            console.log(message);
+            displayMessage(message, true);
+        }
+    }
+
+    function onDriveFileCopied(response) {
+        showLoading(false);
+        if (response && response.success) {
+            displayMessage(`File "${response.fileName}" attached to project.`, true);
+            // Now call the appropriate handler based on media type
+            if (adminApp.state.currentPickerMediaType === 'image') {
+                // onImageUploaded expects driveFileId, mimeType, fileName
+                onImageUploaded(response); // This will then trigger base64 fetch
+            } else if (adminApp.state.currentPickerMediaType === 'audio') {
+                // onAudioUploaded expects driveFileId, mimeType, fileName
+                onAudioUploaded(response);
+            }
+        } else {
+            onServerError(response || {message: "Failed to process file from Drive."});
+        }
+        adminApp.state.currentPickerMediaType = null; // Reset picker context
+    }
+
 
     // --- Overlay Creation & Toolbar ---
     function addRectangle() {

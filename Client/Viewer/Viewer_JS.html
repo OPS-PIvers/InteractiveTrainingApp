@@ -14,7 +14,11 @@
       viewerFabricCanvas: null,
       defaultCanvasWidth: 960, 
       defaultCanvasHeight: 540,
-      currentAudioElement: null // Reference to the currently playing audio element
+      currentAudioElement: null, // Reference to the currently playing audio element
+      // State for Modal Sequencing (Step 21)
+      currentModalOverlay: null, // The Fabric object that triggered the current modal sequence
+      modalSequence: [],         // Array of Fabric objects in the current sequence on the slide
+      currentModalSequenceIndex: -1 // Index within modalSequence being displayed
     };
   
     // --- DOM Element References ---
@@ -23,7 +27,8 @@
     let viewerMediaContainerEl, youtubePlayerContainerEl, // New media container refs
         viewerCanvasContainerEl, viewerFabricCanvasEl;
     let viewerPrevSlideButtonEl, viewerNextSlideButtonEl, viewerSlideIndicatorEl, backToViewerListButtonEl;
-    let viewerModalEl, viewerModalCloseButtonEl, viewerModalBodyEl;
+    let viewerModalEl, viewerModalCloseButtonEl, viewerModalBodyEl,
+        modalPrevButtonEl, modalNextButtonEl; // Modal Nav Buttons (Step 21)
     let viewerAudioPlayerEl; // Ref for the audio element
   
     // --- Initialization ---
@@ -47,8 +52,8 @@
       viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
       viewingProjectTitleEl = document.getElementById('viewingProjectTitle');
       
-      viewerMediaContainerEl = document.getElementById('viewerMediaContainer'); // New
-      youtubePlayerContainerEl = document.getElementById('youtubePlayerContainer'); // New
+      viewerMediaContainerEl = document.getElementById('viewerMediaContainer'); 
+      youtubePlayerContainerEl = document.getElementById('youtubePlayerContainer'); 
       viewerCanvasContainerEl = document.getElementById('viewerCanvasContainer'); // Container for the canvas
       viewerFabricCanvasEl = document.getElementById('viewerFabricCanvas'); // The actual canvas element
       
@@ -60,12 +65,15 @@
       viewerModalEl = document.getElementById('viewerModal');
       viewerModalCloseButtonEl = document.getElementById('viewerModalCloseButton');
       viewerModalBodyEl = document.getElementById('viewerModalBody');
+      modalPrevButtonEl = document.getElementById('modalPrevButton'); // Step 21
+      modalNextButtonEl = document.getElementById('modalNextButton'); // Step 21
 
-      viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer'); // New Audio Ref
+      viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer'); 
   
       if (!viewerProjectListContainerEl) console.error("CRITICAL: viewerProjectListContainerEl not found!");
       if (!viewerModalEl) console.error("CRITICAL: viewerModalEl not found!");
       if (!viewerAudioPlayerEl) console.error("CRITICAL: viewerAudioPlayerEl not found!");
+      if (!modalPrevButtonEl || !modalNextButtonEl) console.error("CRITICAL: Modal navigation buttons not found!"); // Step 21 Check
       console.log("Viewer_JS: DOM references set up.");
     };
 
@@ -81,6 +89,9 @@
                 }
             });
         }
+        // Step 21: Attach listeners for modal navigation buttons
+        if (modalPrevButtonEl) modalPrevButtonEl.addEventListener('click', navigateModalPrevious);
+        if (modalNextButtonEl) modalNextButtonEl.addEventListener('click', navigateModalNext);
     };
   
     // --- UI Utils & Server Error Handling ---
@@ -253,7 +264,6 @@
             }
 
             console.log("Project for viewing loaded:", viewerApp.state.currentProjectData);
-            // *** ADDED LOG ***
             console.log("Number of slides loaded:", viewerApp.state.currentProjectData.slides.length); 
             
             viewerApp.state.currentSlideIndex = 0; // Reset to first slide
@@ -323,7 +333,7 @@
         // Set canvas dimensions and container dimensions
         const slideWidth = slideData.canvasWidth || viewerApp.state.defaultCanvasWidth;
         const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
-        const media = slideData.slideMedia; // Get media info early
+        const media = slideData.slideMedia; 
         let mediaType = (media && media.type) ? media.type : 'none';
         
         // Set canvas element size regardless of media type now
@@ -371,27 +381,30 @@
                 if (media.url) {
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
+                        // Canvas container is already hidden
                         if (isYouTubeApiReady) {
                              setupYouTubePlayer(videoId); 
                         } else {
                              console.warn("YouTube API not ready yet when trying to render slide.");
                         }
+                         // No canvas background setting needed
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
-                        // Show canvas container with error BG if YT fails
-                        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
-                        canvas.backgroundColor = '#555'; 
-                        canvas.renderAll(); 
+                         // Show canvas container with error BG if YT fails
+                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
+                         canvas.backgroundColor = '#555'; 
+                         canvas.renderAll(); 
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
-                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
+                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas
                      canvas.backgroundColor = '#e9e9e9'; 
                      canvas.renderAll(); 
                 }
                 break;
 
             case 'audio':
+                 // Canvas container is already visible
                  if (media.driveFileId) { 
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true); 
@@ -426,6 +439,7 @@
                  break;
 
             default: // 'none' or unknown
+                 // Canvas container is already visible
                  canvas.backgroundColor = '#e9e9e9'; 
                  canvas.renderAll(); 
                  break;
@@ -465,8 +479,8 @@
                 canvas.renderAll(); 
             });
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
-             // If canvas shown but no JSON, render background if it wasn't already rendered
-             if(mediaType !== 'image' && mediaType !== 'audio') { // Avoid redundant render if BG set in switch
+             // Render canvas background if no JSON but canvas is visible
+             if(mediaType !== 'image' && mediaType !== 'audio') { // Avoid redundant render
                  canvas.renderAll();
              }
         }
@@ -484,8 +498,42 @@
 
         switch (interaction.action) {
             case 'showModal':
-                if (interaction.modalContent) {
-                    showViewerModal(interaction.modalContent);
+                // Check if the clicked object itself has modal content
+                if (fabricObject.customInteraction && fabricObject.customInteraction.modalContent) {
+                    // --- Step 21: Modal Sequence Logic ---
+                    const canvas = viewerApp.state.viewerFabricCanvas;
+                    if (!canvas) break; 
+                    
+                    // Find all modal objects on the current canvas with sequence order
+                    const allObjects = canvas.getObjects();
+                    viewerApp.state.modalSequence = allObjects.filter(obj => 
+                        obj.customInteraction && 
+                        obj.customInteraction.action === 'showModal' && 
+                        typeof obj.sequenceOrder === 'number' && 
+                        !isNaN(obj.sequenceOrder) 
+                    ).sort((a, b) => a.sequenceOrder - b.sequenceOrder); 
+
+                    // Find the index of the clicked object in the sequence
+                    viewerApp.state.currentModalSequenceIndex = viewerApp.state.modalSequence.findIndex(obj => obj === fabricObject);
+
+                    if (viewerApp.state.currentModalSequenceIndex === -1) {
+                        // If the clicked object wasn't in the sequence (no sequenceOrder), treat it as standalone
+                        console.warn("Clicked modal object not found in sequence or missing sequenceOrder.");
+                        viewerApp.state.modalSequence = [fabricObject]; // Sequence of 1
+                        viewerApp.state.currentModalSequenceIndex = 0;
+                    }
+
+                    viewerApp.state.currentModalOverlay = fabricObject; 
+                    
+                    showViewerModal(interaction.modalContent); // Show initial content
+                    updateModalNavigationButtons(); // Update button visibility/state
+                    // --- End Step 21 Logic ---
+
+                } else { 
+                     console.warn("Show Modal action triggered, but modalContent is missing on the object.");
+                     // Hide nav buttons if no content
+                     if(modalPrevButtonEl) modalPrevButtonEl.style.display = 'none';
+                     if(modalNextButtonEl) modalNextButtonEl.style.display = 'none';
                 }
                 break;
             case 'navigateToSlide':
@@ -525,21 +573,98 @@
     function showViewerModal(htmlContent) {
         if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;
         if (viewerModalEl) viewerModalEl.style.display = 'flex'; 
+        // Note: updateModalNavigationButtons is called by handleOverlayInteraction now
     }
 
     function hideViewerModal() {
         if (viewerModalEl) viewerModalEl.style.display = 'none';
         if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = ''; 
+        // Step 21: Reset modal sequence state
+        viewerApp.state.currentModalOverlay = null;
+        viewerApp.state.modalSequence = [];
+        viewerApp.state.currentModalSequenceIndex = -1;
+        // Hide nav buttons explicitly on close
+        if(modalPrevButtonEl) modalPrevButtonEl.style.display = 'none';
+        if(modalNextButtonEl) modalNextButtonEl.style.display = 'none';
     }
     
+     // --- Step 21: Modal Navigation Functions ---
+    function updateModalNavigationButtons() {
+         if (!modalPrevButtonEl || !modalNextButtonEl) return;
+
+         const sequence = viewerApp.state.modalSequence;
+         const currentIndex = viewerApp.state.currentModalSequenceIndex;
+
+         if (sequence.length <= 1) { // Hide buttons if sequence has 0 or 1 item
+             modalPrevButtonEl.style.display = 'none';
+             modalNextButtonEl.style.display = 'none';
+             return;
+         }
+
+         // Previous Button Logic
+         if (currentIndex > 0) {
+             modalPrevButtonEl.disabled = false;
+             modalPrevButtonEl.style.display = 'inline-block';
+         } else {
+             modalPrevButtonEl.disabled = true;
+              modalPrevButtonEl.style.display = 'inline-block'; // Keep visible but disabled
+         }
+
+         // Next Button Logic
+         if (currentIndex < sequence.length - 1) {
+             modalNextButtonEl.disabled = false;
+             modalNextButtonEl.style.display = 'inline-block';
+         } else {
+             modalNextButtonEl.disabled = true;
+             modalNextButtonEl.style.display = 'inline-block'; // Keep visible but disabled
+         }
+     }
+
+     function navigateModalPrevious() {
+          const sequence = viewerApp.state.modalSequence;
+          let currentIndex = viewerApp.state.currentModalSequenceIndex;
+
+          if (currentIndex > 0) {
+              currentIndex--;
+              const prevOverlay = sequence[currentIndex];
+              if (prevOverlay && prevOverlay.customInteraction && prevOverlay.customInteraction.modalContent) {
+                  viewerApp.state.currentModalSequenceIndex = currentIndex;
+                  viewerApp.state.currentModalOverlay = prevOverlay; // Update current overlay ref
+                  if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = prevOverlay.customInteraction.modalContent;
+                  updateModalNavigationButtons();
+                  console.log("Navigated to previous modal, index:", currentIndex);
+              } else {
+                   console.error("Previous overlay or its content is invalid.");
+              }
+          }
+     }
+
+     function navigateModalNext() {
+          const sequence = viewerApp.state.modalSequence;
+          let currentIndex = viewerApp.state.currentModalSequenceIndex;
+
+          if (currentIndex < sequence.length - 1) {
+              currentIndex++;
+              const nextOverlay = sequence[currentIndex];
+               if (nextOverlay && nextOverlay.customInteraction && nextOverlay.customInteraction.modalContent) {
+                   viewerApp.state.currentModalSequenceIndex = currentIndex;
+                   viewerApp.state.currentModalOverlay = nextOverlay; // Update current overlay ref
+                   if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = nextOverlay.customInteraction.modalContent;
+                   updateModalNavigationButtons();
+                    console.log("Navigated to next modal, index:", currentIndex);
+               } else {
+                    console.error("Next overlay or its content is invalid.");
+               }
+          }
+     }
+
+
     // --- Slide Navigation ---
     function updateSlideNavigationUI() {
-        // *** ADDED LOG ***
         console.log("updateSlideNavigationUI called. Current Index:", viewerApp.state.currentSlideIndex, "Project Data:", viewerApp.state.currentProjectData);
 
         if (!viewerApp.state.currentProjectData || !Array.isArray(viewerApp.state.currentProjectData.slides)) {
              console.error("updateSlideNavigationUI: Invalid project data or slides array.");
-             // Reset UI to default state?
              if (viewerSlideIndicatorEl) viewerSlideIndicatorEl.textContent = "Slide ? / ?";
              if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = true;
              if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.disabled = true;
@@ -568,7 +693,7 @@
     // --- YouTube Player API Functions ---
     function onYouTubeIframeAPIReady() {
         console.log("YouTube IFrame API Ready (called by external script).");
-        isYouTubeApiReady = true; // Set the flag
+        isYouTubeApiReady = true; 
     }
 
     function setupYouTubePlayer(videoId) {

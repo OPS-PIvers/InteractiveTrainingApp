@@ -77,6 +77,7 @@
         display: flex; 
         justify-content: center;
         align-items: center; /* Center canvas if smaller than container */
+        /* pointer-events: none; Set dynamically by JS */
       }
       #viewerFabricCanvas { 
           /* width/height set by JS based on slide */
@@ -114,6 +115,27 @@
            margin: 15px auto 0; /* Center and add top margin */
            display: none; /* Hidden by default */
        }
+
+       /* Modal Navigation Buttons */
+        .modal-navigation {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+         .modal-navigation button {
+             padding: 8px 15px;
+             cursor: pointer;
+             border-radius: 4px;
+             border: 1px solid #ccc;
+         }
+          .modal-navigation button:disabled {
+              cursor: not-allowed;
+              opacity: 0.5;
+          }
+         #modalPrevButton { background-color: #f0f0f0; }
+         #modalNextButton { background-color: #007bff; color: white; border-color: #007bff;}
 
 
     </style>
@@ -159,7 +181,11 @@
         <div class="modal-content">
             <span id="viewerModalCloseButton" class="modal-close-button">×</span>
             <div id="viewerModalBody"></div>
-            <!-- Modal Nav Buttons Added Here Later (Step 21) -->
+            <!-- Modal Navigation Buttons -->
+            <div class="modal-navigation">
+                <button id="modalPrevButton" style="display: none;">< Previous</button>
+                <button id="modalNextButton" style="display: none;">Next ></button>
+            </div>
         </div>
     </div>
 

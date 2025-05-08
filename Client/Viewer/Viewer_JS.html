@@ -327,8 +327,6 @@
         // Adjust media container size to match canvas/slide aspect ratio
         if (viewerMediaContainerEl) {
             viewerMediaContainerEl.style.width = slideWidth + 'px';
-             // Use padding-bottom trick for aspect ratio IF YT video is main element
-             // For now, just set height directly. Might need refinement.
              viewerMediaContainerEl.style.height = slideHeight + 'px'; 
         }
         
@@ -359,6 +357,7 @@
                 } else {
                      console.warn("Image media present but URL is missing or not base64:", media.url);
                      canvas.backgroundColor = '#e9e9e9'; // Fallback BG
+                     canvas.renderAll(); // Render fallback immediately
                 }
                 break;
 
@@ -369,33 +368,60 @@
                         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = 'block';
                         setupYouTubePlayer(videoId); // This function now handles creating the player
                          canvas.backgroundColor = 'transparent'; // Ensure canvas overlay is transparent
+                         canvas.renderAll(); // Re-render canvas to ensure transparency
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
                          canvas.backgroundColor = '#555'; // Error state background
+                         canvas.renderAll(); // Render error background
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
                      canvas.backgroundColor = '#e9e9e9'; // Fallback BG
+                     canvas.renderAll(); // Render fallback
                 }
                 break;
 
             case 'audio':
-                 if (media.url) { // URL should be the webContentLink from Drive upload
-                     setupAudioPlayer(media.url);
-                     if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block'; // Show controls
-                      canvas.backgroundColor = '#e0e0e0'; // Neutral background for audio slides
+                 if (media.driveFileId) { // Use Drive File ID to fetch base64 data
+                     console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
+                     showLoadingViewer(true); // Show spinner while fetching audio data
+                     google.script.run
+                         .withSuccessHandler(function(audioResponse) {
+                             showLoadingViewer(false);
+                             if (viewerApp.state.currentSlideIndex !== slideIndex) return; // Slide changed
+                             if (audioResponse && audioResponse.success && audioResponse.base64Data) {
+                                 setupAudioPlayer(audioResponse.base64Data); // Use base64 data URI
+                                 if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block'; // Show controls
+                                 canvas.backgroundColor = '#e0e0e0'; // Neutral background for audio slides
+                                 canvas.renderAll(); // Render BG change
+                             } else {
+                                 console.error("Failed to fetch audio base64 data:", audioResponse);
+                                 onServerErrorViewer(audioResponse || {error: "Failed to load audio data."});
+                                 canvas.backgroundColor = '#e9e9e9'; // Fallback BG
+                                 canvas.renderAll(); // Render fallback
+                             }
+                         })
+                         .withFailureHandler(function(error) { // Separate failure handler for audio fetch
+                             showLoadingViewer(false);
+                             onServerErrorViewer(error);
+                             canvas.backgroundColor = '#e9e9e9'; // Fallback BG
+                             canvas.renderAll(); // Render fallback
+                         })
+                         .getAudioAsBase64(media.driveFileId);
                  } else {
-                     console.warn("Audio media type set but URL is missing.");
-                      canvas.backgroundColor = '#e9e9e9'; // Fallback BG
+                     console.warn("Audio media type set but driveFileId is missing.");
+                     canvas.backgroundColor = '#e9e9e9'; // Fallback BG
+                     canvas.renderAll(); // Render fallback BG immediately
                  }
                  break;
 
             default: // 'none' or unknown
                  canvas.backgroundColor = '#e9e9e9'; // Standard empty background
+                 canvas.renderAll(); // Render background
                  break;
         }
         
-        // Load Fabric objects (overlays) - AFTER setting background color/transparency
+        // Load Fabric objects (overlays) - AFTER background/media setup
         if (slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) return; 
@@ -432,7 +458,7 @@
             });
         } else {
              // Ensure canvas renders even if no objects AND background was set
-            canvas.renderAll();
+            // canvas.renderAll(); // Already called after setting BG color/media
         }
         updateSlideNavigationUI();
     }
@@ -470,7 +496,6 @@
                     if (!url.startsWith('http://') && !url.startsWith('https://')) {
                         url = 'https://' + url; // Default to https
                     }
-                    // Use try-catch for potential issues with window.open in some environments
                     try {
                          const newWindow = window.open(url, '_blank');
                          if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
@@ -562,8 +587,8 @@
                     'controls': 0,    
                     'rel': 0,         
                     'showinfo': 0,     
-                    'modestbranding': 1, // Minimal YT logo
-                    'iv_load_policy': 3 // Hide annotations
+                    'modestbranding': 1, 
+                    'iv_load_policy': 3 
                 },
                 events: {
                     'onReady': onPlayerReady,
@@ -580,21 +605,18 @@
     function onPlayerReady(event) {
         console.log("YouTube Player Ready. Attempting to play video:", event.target.getVideoData().video_id);
         event.target.playVideo();
-        // Optional: Mute if needed for autoplay policies
-        // event.target.mute(); 
+        // event.target.mute(); // Mute might be required for autoplay in some browsers
     }
 
     function onPlayerStateChange(event) {
         console.log("YouTube Player State Change:", event.data);
-        // Example: Loop video when it ends
-        // if (event.data == YT.PlayerState.ENDED) {
-        //     ytPlayer.seekTo(0); 
-        // }
+        // if (event.data == YT.PlayerState.ENDED) { ytPlayer.seekTo(0); } // Example: Loop
     }
 
     function onPlayerError(event) {
         console.error("YouTube Player Error:", event.data);
-        displayMessageViewer(`YouTube Player Error: ${event.data}. Video might be private or removed.`, false);
+        // Map error codes to messages if needed: https://developers.google.com/youtube/iframe_api_reference#onError
+        displayMessageViewer(`YouTube Player Error: Code ${event.data}. Video might be private, removed, or blocked.`, false);
     }
 
     function stopAndDestroyYouTubePlayer() {
@@ -622,7 +644,6 @@
         if (!url) return null;
         let videoId = null;
         try {
-            // Handle various YouTube URL formats
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             videoId = (match && match[2].length === 11) ? match[2] : null;
@@ -635,27 +656,25 @@
     }
 
      // --- Audio Player Functions ---
-    function setupAudioPlayer(audioUrl) {
+    function setupAudioPlayer(audioDataURI) { // Now expects base64 data URI
         if (!viewerAudioPlayerEl) { console.error("Audio player element not found."); return;}
-        console.log("Setting up audio player with URL:", audioUrl);
+        console.log("Setting up audio player with base64 data URI.");
         try {
-             viewerAudioPlayerEl.src = audioUrl;
+             viewerAudioPlayerEl.src = audioDataURI;
              viewerAudioPlayerEl.load(); 
-             // Attempt to play, handle potential browser block
              const playPromise = viewerAudioPlayerEl.play();
              if (playPromise !== undefined) {
                  playPromise.then(() => {
-                     console.log("Audio playback started for:", audioUrl);
-                     viewerAudioPlayerEl.style.display = 'block'; // Show controls only if playing starts
+                     console.log("Audio playback started.");
+                     // viewerAudioPlayerEl.style.display = 'block'; // Controls shown below
                  }).catch(error => { 
                      console.error("Audio playback failed (likely autoplay blocked):", error);
                      displayMessageViewer("Audio couldn't autoplay. Use controls.", false); 
-                     viewerAudioPlayerEl.style.display = 'block'; // Show controls anyway
+                     // viewerAudioPlayerEl.style.display = 'block'; // Ensure controls are visible if autoplay fails
                   }); 
-             } else {
-                  // Fallback for older browsers maybe? Ensure controls are visible.
-                  viewerAudioPlayerEl.style.display = 'block'; 
              }
+             // Always show controls for audio for now
+             viewerAudioPlayerEl.style.display = 'block'; 
              viewerApp.state.currentAudioElement = viewerAudioPlayerEl; // Store ref
         } catch (e) {
              console.error("Error setting up audio player:", e);

@@ -196,29 +196,35 @@ function uploadFileToDrive(fileData, projectId, mediaType) {
     
     let webContentLink = null; 
 
+    // Try to get webContentLink first
     if (driveFile && typeof driveFile.getWebContentLink === 'function') {
       webContentLink = driveFile.getWebContentLink(); 
       Logger.log(`uploadFileToDrive: Called driveFile.getWebContentLink(), result: ${webContentLink}`);
     } else {
-      Logger.log(`uploadFileToDrive: driveFile.getWebContentLink is not available or not a function. Object keys: ${JSON.stringify(Object.keys(driveFile || {}))}`);
+      Logger.log(`uploadFileToDrive: driveFile.getWebContentLink is not available or not a function.`);
     }
 
+    // Fallback if webContentLink is null or unsuitable
     if (!webContentLink) { 
-        Logger.log(`uploadFileToDrive: webContentLink is null or method was not callable. Using fallback for file ID: ${driveFile.getId()}`);
+        Logger.log(`uploadFileToDrive: webContentLink is null or wasn't obtained. Using fallback for file ID: ${driveFile.getId()}`);
         if (mediaType === 'image') {
+          // Use direct image view URL
           webContentLink = 'https://drive.google.com/uc?export=view&id=' + driveFile.getId();
         } else {
-           const downloadUrl = driveFile.getDownloadUrl();
+           // For audio/other, construct a view/download URL (may still have issues in <audio> tag)
+           const downloadUrl = driveFile.getDownloadUrl(); // Requires Drive API v2 scope potentially if getDownloadUrl fails
            webContentLink = downloadUrl ? downloadUrl.replace("&export=download", "&export=view") : 'https://drive.google.com/uc?id=' + driveFile.getId();
+           // Note: This fallback URL might still NOT work reliably in <audio src="">
         }
     }
 
-    Logger.log(`uploadFileToDrive: File uploaded successfully. ID: ${driveFile.getId()}, Final WebContentLink: ${webContentLink}`);
+    Logger.log(`uploadFileToDrive: File uploaded successfully. ID: ${driveFile.getId()}, Final Link (may not work directly for audio): ${webContentLink}`);
     return {
       success: true,
       driveFileId: driveFile.getId(),
-      webContentLink: webContentLink,
-      fileName: driveFile.getName()
+      webContentLink: webContentLink, // Return the link, viewer will decide if usable
+      fileName: driveFile.getName(),
+      mimeType: driveFile.getMimeType() // Return actual mime type
     };
 
   } catch (e) {
@@ -229,7 +235,7 @@ function uploadFileToDrive(fileData, projectId, mediaType) {
 
 
 /**
- * Retrieves a file from Drive as a base64 data URI.
+ * Retrieves an image file from Drive as a base64 data URI.
  * @param {string} driveFileId The ID of the file in Google Drive.
  * @return {object} An object like { success: true, base64Data: 'data:mime/type;base64,...' } or { success: false, error: '...' }.
  */
@@ -241,6 +247,11 @@ function getImageAsBase64(driveFileId) {
     const file = DriveApp.getFileById(driveFileId);
     const blob = file.getBlob();
     const mimeType = blob.getContentType();
+    // Ensure it's an image type before encoding? Optional.
+    if (!mimeType || !mimeType.startsWith('image/')) {
+       Logger.log(`getImageAsBase64: File ID ${driveFileId} is not an image (MIME: ${mimeType}).`);
+       return { success: false, error: `File is not an image (type: ${mimeType})` };
+    }
     const base64Data = Utilities.base64Encode(blob.getBytes());
     const dataURI = 'data:' + mimeType + ';base64,' + base64Data;
     
@@ -248,6 +259,10 @@ function getImageAsBase64(driveFileId) {
     return { success: true, base64Data: dataURI, mimeType: mimeType };
 
   } catch (e) {
+     if (e.message.toLowerCase().includes("access denied") || e.message.toLowerCase().includes("not found")) {
+          Logger.log(`getImageAsBase64: File not found or access denied for ID ${driveFileId}. Error: ${e.toString()}`);
+          return { success: false, error: "Image file not found or access denied." };
+      }
     Logger.log(`Error in getImageAsBase64 for file ID ${driveFileId}: ${e.toString()} \nStack: ${e.stack}`);
     return { success: false, error: `Failed to retrieve image as base64: ${e.message}` };
   }
@@ -285,30 +300,50 @@ function saveProjectData(projectId, projectDataJSON) {
 
     if (allProjects && Array.isArray(allProjects)) {
         // Determine if getAllSheetData returned headers
-        const hasHeaders = allProjects.length > 0 && typeof allProjects[0][COL_PROJECT_ID -1] === 'string' && allProjects[0][COL_PROJECT_ID -1].toLowerCase().includes('id');
+        const headerRow = allProjects.length > 0 ? allProjects[0] : null;
+        const looksLikeHeaders = headerRow && headerRow.every(h => typeof h === 'string');
 
       for (let i = 0; i < allProjects.length; i++) {
         const p = allProjects[i];
-        const currentSheetProjectId = p['ProjectID'] || p[COL_PROJECT_ID - 1];
+        const currentSheetProjectId = typeof p === 'object' ? p['ProjectID'] : p[COL_PROJECT_ID - 1]; // Handle object or array
         if (currentSheetProjectId === projectId) {
           projectEntry = p;
-          // If getAllSheetData returns an array of objects (meaning it processed headers), 
-          // then the data rows start from index 0 of this array, which corresponds to row 2 in the sheet.
-          // If it returns array of arrays (including header), then data row i is sheet row i+1.
-          // findRowIndexByValue returns 1-based index, which is what we need.
-          projectRowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
+          projectRowIndex = i + (looksLikeHeaders ? 2 : 1); // Adjust index based on headers
           break;
         }
       }
+       // Fallback if loop didn't find it but maybe findRowIndexByValue can (e.g., if getAllSheetData failed partially)
+       if (!projectEntry) {
+            projectRowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
+       }
+    } else {
+        // If getAllSheetData failed, try findRowIndexByValue directly
+         projectRowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
     }
 
-    if (!projectEntry || projectRowIndex === -1) {
+
+    if (projectRowIndex === -1) { // Check if row index was found
       Logger.log(`saveProjectData: Project with ID "${projectId}" not found in ProjectIndex.`);
       return { success: false, error: `Project metadata not found for ID: ${projectId}. Cannot save.` };
     }
+    
+    // If we only have rowIndex, fetch projectEntry data
+    if (!projectEntry) {
+        const rowValues = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, projectRowIndex);
+        if (rowValues) {
+             // Reconstruct projectEntry minimally for folder/file IDs
+             projectEntry = {};
+             projectEntry['ProjectFolderID'] = rowValues[COL_PROJECT_FOLDER_ID - 1];
+             projectEntry['ProjectDataFileID'] = rowValues[COL_PROJECT_DATA_FILE_ID - 1];
+        } else {
+             Logger.log(`saveProjectData: Found row index ${projectRowIndex} but failed to fetch row data for ${projectId}.`);
+             return { success: false, error: `Failed to retrieve project details for ID: ${projectId}. Cannot save.` };
+        }
+    }
 
-    const projectFolderId = projectEntry['ProjectFolderID'] || projectEntry[COL_PROJECT_FOLDER_ID - 1];
-    const projectDataFileIdToOverwrite = projectEntry['ProjectDataFileID'] || projectEntry[COL_PROJECT_DATA_FILE_ID - 1];
+
+    const projectFolderId = typeof projectEntry === 'object' ? projectEntry['ProjectFolderID'] : projectEntry[COL_PROJECT_FOLDER_ID - 1];
+    const projectDataFileIdToOverwrite = typeof projectEntry === 'object' ? projectEntry['ProjectDataFileID'] : projectEntry[COL_PROJECT_DATA_FILE_ID - 1];
 
     if (!projectFolderId || !projectDataFileIdToOverwrite) {
       Logger.log(`saveProjectData: Missing FolderID or DataFileID for project "${projectId}". FolderID: ${projectFolderId}, FileID: ${projectDataFileIdToOverwrite}`);
@@ -435,23 +470,28 @@ function deleteProject(projectId) {
 
     // 1. Find the row and ProjectFolderID from the ProjectIndex sheet
     const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
-    if (!rowIndex) {
-      Logger.log(`deleteProject: Project with ID "${projectId}" not found in ProjectIndex. No row to delete.`);
-      // If not in sheet, perhaps folder still exists? Or consider it deleted.
-      // For now, let's return success if sheet entry is gone, as folder might be orphaned or already deleted.
-      return { success: true, message: "Project not found in index, assumed already deleted or no action needed for sheet.", deletedProjectId: projectId };
+    let projectFolderId = null;
+
+    if (rowIndex) {
+        const rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
+        if (rowData) {
+            projectFolderId = rowData[COL_PROJECT_FOLDER_ID - 1]; // 0-indexed access to array
+        } else {
+             Logger.log(`deleteProject: Could not retrieve row data for project ${projectId} at row ${rowIndex}, though index was found.`);
+             // Decide whether to proceed with sheet deletion only or fail
+             // Let's proceed cautiously and require rowData for folder deletion
+             return { success: false, error: "Failed to retrieve project details for deletion." };
+        }
+        // 2. Delete the project's row from the "ProjectIndex" sheet
+        deleteSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
+        Logger.log(`deleteProject: Row ${rowIndex} for project ${projectId} deleted from ProjectIndex sheet.`);
+    } else {
+         Logger.log(`deleteProject: Project with ID "${projectId}" not found in ProjectIndex. No row to delete.`);
+         // If not in sheet, maybe still try to delete folder if we implement orphan cleanup later?
+         // For now, consider it "deleted" from the user's perspective if not in index.
+         return { success: true, message: "Project not found in index, assumed already deleted.", deletedProjectId: projectId };
     }
 
-    const rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
-    if (!rowData) {
-      Logger.log(`deleteProject: Could not retrieve row data for project ${projectId} at row ${rowIndex}, though index was found.`);
-      return { success: false, error: "Failed to retrieve project details for deletion." };
-    }
-    const projectFolderId = rowData[COL_PROJECT_FOLDER_ID - 1]; // 0-indexed access to array
-
-    // 2. Delete the project's row from the "ProjectIndex" sheet
-    deleteSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
-    Logger.log(`deleteProject: Row ${rowIndex} for project ${projectId} deleted from ProjectIndex sheet.`);
 
     // 3. Delete the project's folder from Google Drive
     if (projectFolderId) {
@@ -460,10 +500,8 @@ function deleteProject(projectId) {
         Logger.log(`deleteProject: Project folder ${projectFolderId} for project ${projectId} and its contents have been trashed.`);
       } catch (driveError) {
         Logger.log(`deleteProject: Error while deleting project folder ${projectFolderId} for project ${projectId}. Error: ${driveError.toString()}. Sheet entry was removed.`);
-        // Don't make the whole operation fail if folder deletion has an issue but sheet row is gone.
-        // Log it as a warning/partial success.
         return { 
-            success: true, // Consider it a success from user's perspective of removing from list
+            success: true, // Success because removed from list
             message: `Project removed from index. Warning: Error deleting Drive folder: ${driveError.message}`,
             deletedProjectId: projectId 
         };
@@ -523,3 +561,39 @@ function deleteProject(projectId) {
       return null; 
     }
   }
+
+/**
+ * Retrieves an audio file from Drive as a base64 data URI.
+ * @param {string} driveFileId The ID of the audio file in Google Drive.
+ * @return {object} An object like { success: true, base64Data: 'data:audio/mpeg;base64,...', mimeType: 'audio/mpeg' } or { success: false, error: '...' }.
+ */
+function getAudioAsBase64(driveFileId) {
+  try {
+    if (!driveFileId) {
+      return { success: false, error: "Drive File ID is required." };
+    }
+    const file = DriveApp.getFileById(driveFileId);
+    const blob = file.getBlob();
+    const mimeType = blob.getContentType();
+    
+    // Check if it's an audio type (basic check)
+    if (!mimeType || !mimeType.startsWith('audio/')) {
+       Logger.log(`getAudioAsBase64: File ID ${driveFileId} is not audio (MIME: ${mimeType}).`);
+       return { success: false, error: `File is not audio (type: ${mimeType})` };
+    }
+
+    const base64Data = Utilities.base64Encode(blob.getBytes());
+    const dataURI = 'data:' + mimeType + ';base64,' + base64Data;
+    
+    Logger.log(`getAudioAsBase64: Successfully retrieved and encoded audio file ID: ${driveFileId}. MimeType: ${mimeType}. DataURI length: ${dataURI.length}`);
+    return { success: true, base64Data: dataURI, mimeType: mimeType };
+
+  } catch (e) {
+      if (e.message.toLowerCase().includes("access denied") || e.message.toLowerCase().includes("not found")) {
+          Logger.log(`getAudioAsBase64: File not found or access denied for ID ${driveFileId}. Error: ${e.toString()}`);
+          return { success: false, error: "Audio file not found or access denied." };
+      }
+      Logger.log(`Error in getAudioAsBase64 for file ID ${driveFileId}: ${e.toString()} \nStack: ${e.stack}`);
+      return { success: false, error: `Failed to retrieve audio as base64: ${e.message}` };
+  }
+}

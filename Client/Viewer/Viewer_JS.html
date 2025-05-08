@@ -584,19 +584,21 @@
                 height: '100%', 
                 width: '100%', 
                 videoId: videoId,
-                playerVars: {
-                    'playsinline': 1, 
-                    'autoplay': 0,    // **** CHANGED TO 0 ****
-                    'controls': 1,    // **** CHANGED TO 1 **** Show controls so user can play
-                    'rel': 0,         
-                    'showinfo': 0,     
-                    'modestbranding': 1, 
-                    'iv_load_policy': 3 
+                playerVars: { // More restrictive player vars
+                    'autoplay': 0,       // Keep autoplay off
+                    'controls': 1,       // Keep controls on
+                    'rel': 0,            // Keep off
+                    'showinfo': 0,       // Keep off (though deprecated)
+                    'modestbranding': 1, // Keep on
+                    'iv_load_policy': 3, // Keep annotations off
+                    'fs': 0,             // **** Disable fullscreen button ****
+                    'disablekb': 1,      // **** Disable keyboard controls ****
+                    'playsinline': 1     // Keep playsinline
                 },
                 events: {
                     'onReady': onPlayerReady,
                     'onStateChange': onPlayerStateChange,
-                    'onError': onPlayerError // Add error handler
+                    'onError': onPlayerError 
                 }
             });
              console.log("YT.Player instance potentially created (check console for errors/readiness).");

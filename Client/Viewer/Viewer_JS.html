@@ -19,6 +19,8 @@
       currentModalOverlay: null, // The Fabric object that triggered the current modal sequence
       modalSequence: [],         // Array of Fabric objects in the current sequence on the slide
       currentModalSequenceIndex: -1 // Index within modalSequence being displayed
+      isSpotlightActive: false, // NEW: Track if spotlight effect is on
+      spotlightOriginalOpacities: new Map() // NEW: Store original opacities
     };
   
     // --- DOM Element References ---
@@ -69,11 +71,13 @@
       modalNextButtonEl = document.getElementById('modalNextButton'); // Step 21
 
       viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer'); 
+      viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
   
       if (!viewerProjectListContainerEl) console.error("CRITICAL: viewerProjectListContainerEl not found!");
       if (!viewerModalEl) console.error("CRITICAL: viewerModalEl not found!");
       if (!viewerAudioPlayerEl) console.error("CRITICAL: viewerAudioPlayerEl not found!");
       if (!modalPrevButtonEl || !modalNextButtonEl) console.error("CRITICAL: Modal navigation buttons not found!"); // Step 21 Check
+      if (!viewerProjectDisplayAreaEl) console.error("CRITICAL: viewerProjectDisplayAreaEl not found!"); // Step 22 check
       console.log("Viewer_JS: DOM references set up.");
     };
 
@@ -92,6 +96,21 @@
         // Step 21: Attach listeners for modal navigation buttons
         if (modalPrevButtonEl) modalPrevButtonEl.addEventListener('click', navigateModalPrevious);
         if (modalNextButtonEl) modalNextButtonEl.addEventListener('click', navigateModalNext);
+            // NEW: Listener to remove spotlight when clicking outside spotlighted object
+        if (viewerProjectDisplayAreaEl) {
+            viewerProjectDisplayAreaEl.addEventListener('click', function(event) {
+                // Check if spotlight is active and the click wasn't on the canvas itself
+                // (or more accurately, not handled by a fabric object mousedown)
+                // This simple check works if fabric events stop propagation.
+                if (viewerApp.state.isSpotlightActive) {
+                    // We rely on Fabric objects stopping propagation. If a Fabric object
+                    // with an interaction was clicked, its handler should run first.
+                    // If the click reaches here, it means it wasn't on an interactive object.
+                    console.log("Viewer area click detected while spotlight active, removing effect.");
+                    removeSpotlightEffect();
+                }
+            }, true); // Use capture phase to potentially catch clicks before they bubble? Or just bubble phase (false)? Let's try bubble (default/false).
+        }
     };
   
     // --- UI Utils & Server Error Handling ---
@@ -491,6 +510,14 @@
     function handleOverlayInteraction(fabricObject, eventType) {
         if (!fabricObject.customInteraction) return;
         const interaction = fabricObject.customInteraction;
+        // If spotlight is active, remove it before processing new interaction,
+        // unless the click was ON the currently spotlighted object (which we don't track easily here)
+        // Simplification: Any interaction click removes existing spotlight.
+        if (viewerApp.state.isSpotlightActive) {
+            removeSpotlightEffect();
+            // If the action was JUST spotlight, don't proceed to do it again immediately
+            if (interaction.action === 'spotlight') return;
+        }
 
         if (interaction.trigger !== eventType) return; 
 
@@ -565,6 +592,32 @@
                     }
                 }
                 break;
+            default:
+                console.log("Unknown or no action defined for this interaction.");
+            // --- NEW Cases for Step 23 ---
+            case 'spotlight':
+                applySpotlightEffect(fabricObject);
+                break;
+            case 'reveal':
+                // Implement reveal logic here in next phase
+                console.log("Reveal action triggered for:", fabricObject);
+                // Simple reveal: Animate opacity to 1
+                if (fabricObject) {
+                    fabricObject.animate('opacity', 1, {
+                        duration: 500, // Adjust duration as needed
+                        onChange: viewerApp.state.viewerFabricCanvas.renderAll.bind(viewerApp.state.viewerFabricCanvas),
+                        onComplete: function() {
+                            console.log("Reveal animation complete.");
+                        }
+                    });
+                }
+                break;
+            /* // Add later
+            case 'panZoom':
+                console.log("Pan/Zoom action triggered for:", fabricObject);
+                // Implement pan/zoom logic here
+                break;
+            */
             default:
                 console.log("Unknown or no action defined for this interaction.");
         }
@@ -689,6 +742,57 @@
         }
     }
 
+    // --- NEW Spotlight Functions (Step 23) ---
+    function applySpotlightEffect(targetObject) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || viewerApp.state.isSpotlightActive) return; // Don't apply if already active
+
+        console.log("Applying spotlight effect to:", targetObject);
+        viewerApp.state.isSpotlightActive = true;
+        viewerApp.state.spotlightOriginalOpacities.clear(); // Clear previous opacities
+
+        const spotlightOpacity = 0.2; // How much to dim other objects
+
+        canvas.forEachObject(function(obj) {
+            if (obj !== targetObject) {
+                // Store original opacity, handling undefined (treat as 1)
+                const originalOpacity = obj.opacity === undefined ? 1 : obj.opacity;
+                viewerApp.state.spotlightOriginalOpacities.set(obj, originalOpacity);
+                // Apply spotlight dimming
+                obj.set('opacity', spotlightOpacity);
+                obj.set('evented', false); // Make dimmed objects non-interactive
+            } else {
+                // Ensure the target object remains interactive
+                obj.set('evented', true);
+            }
+        });
+
+        canvas.renderAll();
+        displayMessageViewer("Spotlight active. Click outside the object to remove.", true); // Inform user
+    }
+
+    function removeSpotlightEffect() {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || !viewerApp.state.isSpotlightActive) return; // Only remove if active
+
+        console.log("Removing spotlight effect.");
+
+        canvas.forEachObject(function(obj) {
+            // Restore original opacity if it was stored
+            if (viewerApp.state.spotlightOriginalOpacities.has(obj)) {
+                obj.set('opacity', viewerApp.state.spotlightOriginalOpacities.get(obj));
+            }
+            // Restore interactivity for all objects (simplest approach)
+            obj.set('evented', true);
+        });
+
+        viewerApp.state.isSpotlightActive = false;
+        viewerApp.state.spotlightOriginalOpacities.clear();
+        canvas.renderAll();
+        // Clear the message or let it timeout
+        // displayMessageViewer("", true); // Optionally clear message immediately
+    }
+    // --- End NEW Spotlight Functions ---
 
     // --- YouTube Player API Functions ---
     function onYouTubeIframeAPIReady() {

@@ -1276,8 +1276,8 @@
     function updateInteractionConfigVisibility(action) {
         if (modalContentConfigEl) modalContentConfigEl.style.display = (action === 'showModal') ? 'block' : 'none';
         if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
+        // Add similar logic here later if Spotlight/Reveal get specific parameters requiring UI elements
     }
-
     function updateFabricObjectFromToolbar(propertyName, value, inputType) {
       const canvas = adminApp.state.fabricCanvasInstance;
       if (!canvas) return;

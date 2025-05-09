@@ -20,7 +20,9 @@
       modalSequence: [],         // Array of Fabric objects in the current sequence on the slide
       currentModalSequenceIndex: -1, // Index within modalSequence being displayed
       // --- State for Spotlight Overlay ---
-      spotlightOverlayObject: null // Holds the reference to the dimming overlay rect
+      // spotlightOverlayObject: null // Holds the reference to the dimming overlay rect
+      isSpotlightActive: false,
+      currentSpotlightInfo: null // Will hold { svg, clickCatcher, targetFabricObject, textBubble, notesPanel }
     };
 
     // --- DOM Element References ---
@@ -229,7 +231,7 @@
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
         // Remove spotlight if active
-        removeSpotlightEffect();
+        hideSpotlightSVG();
 
         if (viewerApp.state.viewerFabricCanvas) {
             viewerApp.state.viewerFabricCanvas.dispose();
@@ -343,7 +345,7 @@
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
         // Also remove any lingering spotlight effect from previous slide
-        removeSpotlightEffect(); // Ensure clean state between slides (safe to call even if not active)
+        hideSpotlightSVG(); // Ensure spotlight is cleared when changing slides
 
 
         viewerApp.state.currentSlideIndex = slideIndex; // Update state *before* using it
@@ -517,23 +519,23 @@
         if (!fabricObject.customInteraction) return;
         const interaction = fabricObject.customInteraction;
 
-        // Log initial state for debugging
         console.log(`Interaction Triggered: type=${eventType}, action=${interaction.action}, object=${fabricObject.type}, currentOpacity=${fabricObject.opacity}`);
 
-        // Spotlight is handled differently now
         if (interaction.trigger !== eventType) return;
+
+        // If a spotlight is active and the new action ISN'T spotlight, remove spotlight first.
+        if (viewerApp.state.isSpotlightActive && interaction.action !== 'spotlight') {
+            hideSpotlightSVG();
+        }
 
         console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
 
         switch (interaction.action) {
             case 'showModal':
-                // Ensure spotlight is removed before showing modal
-                removeSpotlightEffect();
+                // hideSpotlightSVG(); // Already handled above
                 if (fabricObject.customInteraction && fabricObject.customInteraction.modalContent) {
-                    // --- Step 21: Modal Sequence Logic ---
                     const canvas = viewerApp.state.viewerFabricCanvas;
                     if (!canvas) break;
-
                     const allObjects = canvas.getObjects();
                     viewerApp.state.modalSequence = allObjects.filter(obj =>
                         obj.customInteraction &&
@@ -541,11 +543,8 @@
                         typeof obj.sequenceOrder === 'number' &&
                         !isNaN(obj.sequenceOrder)
                     ).sort((a, b) => a.sequenceOrder - b.sequenceOrder);
-
                     viewerApp.state.currentModalSequenceIndex = viewerApp.state.modalSequence.findIndex(obj => obj === fabricObject);
-
                     if (viewerApp.state.currentModalSequenceIndex === -1) {
-                        console.warn("Clicked modal object not found in sequence or missing sequenceOrder.");
                         viewerApp.state.modalSequence = [fabricObject];
                         viewerApp.state.currentModalSequenceIndex = 0;
                     }
@@ -553,86 +552,57 @@
                     showViewerModal(interaction.modalContent);
                     updateModalNavigationButtons();
                 } else {
-                     console.warn("Show Modal action triggered, but modalContent is missing on the object.");
+                     console.warn("Show Modal: modalContent missing.");
                      if(modalPrevButtonEl) modalPrevButtonEl.style.display = 'none';
                      if(modalNextButtonEl) modalNextButtonEl.style.display = 'none';
                 }
                 break;
             case 'navigateToSlide':
-                removeSpotlightEffect();
+                // hideSpotlightSVG(); // Already handled above
                 const targetSlideId = interaction.navigateTo;
                 if (targetSlideId && viewerApp.state.currentProjectData && viewerApp.state.currentProjectData.slides) {
                     const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
                     if (targetSlideIndex !== -1) {
                         renderSlideForViewing(targetSlideIndex);
                     } else {
-                        console.warn("NavigateToSlide: Target slide ID not found:", targetSlideId);
                         displayMessageViewer(`Navigation error: Slide '${targetSlideId}' not found.`, false);
                     }
                 }
                 break;
             case 'navigateToURL':
-                removeSpotlightEffect();
+                // hideSpotlightSVG(); // Already handled above
                 if (interaction.navigateTo) {
                     let url = interaction.navigateTo;
-                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                        url = 'https://' + url;
-                    }
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
                     try {
                          const newWindow = window.open(url, '_blank');
                          if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-                              displayMessageViewer("Could not open link. Please check browser popup settings.", false);
+                              displayMessageViewer("Could not open link. Check popup settings.", false);
                          }
-                    } catch (e) {
-                         console.error("Error opening URL:", e);
-                         displayMessageViewer("Error opening link.", false);
-                    }
+                    } catch (e) { displayMessageViewer("Error opening link.", false); }
                 }
                 break;
             case 'spotlight':
-                 if (viewerApp.state.spotlightOverlayObject && viewerApp.state.spotlightOverlayObject.target === fabricObject) {
-                     // If clicking the same object that is already spotlighted, remove the spotlight
-                     console.log("Spotlight target clicked while active, removing.");
-                     removeSpotlightEffect();
-                 } else if (viewerApp.state.spotlightOverlayObject) {
-                    // If a spotlight is active on a *different* object, remove it first, then apply new one
-                    console.log("Spotlight action triggered while another is active. Removing existing, then applying new.");
-                    removeSpotlightEffect();
-                    applySpotlightEffect(fabricObject);
-                 }
-                 else {
-                    // No spotlight active, apply it
-                    applySpotlightEffect(fabricObject);
+                 if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === fabricObject) {
+                     // Clicking the *same* spotlighted object again toggles it off
+                     hideSpotlightSVG();
+                 } else {
+                     // If different object or no spotlight, apply (hideSpotlightSVG is called within showSpotlightSVG if needed)
+                     showSpotlightSVG(fabricObject, interaction);
                  }
                  break;
             case 'reveal':
-                 console.log("Handling interaction: reveal for object:", fabricObject);
+                 console.log("Reveal action triggered for:", fabricObject);
                  if (fabricObject && viewerApp.state.viewerFabricCanvas) {
-                      console.log(`Reveal: Animating opacity from ${fabricObject.opacity} to 1.`);
                       fabricObject.animate('opacity', 1, {
                           duration: 500,
-                          onChange: function() {
-                               if (viewerApp.state.viewerFabricCanvas) {
-                                   viewerApp.state.viewerFabricCanvas.renderAll();
-                               }
-                           },
-                          onComplete: function() {
-                              console.log("Reveal animation complete. Final opacity:", fabricObject.opacity);
-                              if (viewerApp.state.viewerFabricCanvas) {
-                                  viewerApp.state.viewerFabricCanvas.renderAll();
-                              }
-                          },
-                          abort: function() {
-                               console.log("Reveal animation aborted.");
-                               return false;
-                           }
+                          onChange: viewerApp.state.viewerFabricCanvas.renderAll.bind(viewerApp.state.viewerFabricCanvas),
+                          onComplete: () => console.log("Reveal complete. Opacity:", fabricObject.opacity)
                       });
-                 } else {
-                      console.error("Reveal: Target object or canvas not available.");
                  }
                  break;
             default:
-                console.log("Unknown or no action defined for this interaction.");
+                console.log("Unknown interaction action:", interaction.action);
         }
     }
 
@@ -712,6 +682,151 @@
           }
      }
 
+     // --- Spotlight SVG Functions ---
+    function showSpotlightSVG(targetFabricObject, interactionData) {
+        hideSpotlightSVG(); // Remove any existing spotlight
+
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || !targetFabricObject) {
+            console.error("Cannot show spotlight: canvas or targetFabricObject missing.");
+            return;
+        }
+
+        console.log(`[WebApp] Spotlight SVG requested for Fabric object:`, targetFabricObject);
+
+        // Get target's position and dimensions relative to the canvas
+        // Fabric's getBoundingRect() gives coordinates relative to canvas top-left
+        // We need to ensure these are correctly translated if the canvas itself has an offset
+        // For simplicity now, assume canvas container (viewerMediaContainerEl) is the reference.
+
+        const targetRect = targetFabricObject.getBoundingRect(true); // true for absolute coords within canvas
+        const canvasRect = viewerFabricCanvasEl.getBoundingClientRect(); // Screen coords of canvas element
+
+        // Calculate position for the SVG cutout relative to the viewport
+        const viewportLeft = canvasRect.left + targetRect.left;
+        const viewportTop = canvasRect.top + targetRect.top;
+        const viewportWidth = targetRect.width;
+        const viewportHeight = targetRect.height;
+
+        console.log(`  Target BBox (canvas relative): L${targetRect.left}, T${targetRect.top}, W${targetRect.width}, H${targetRect.height}`);
+        console.log(`  Canvas BBox (screen relative): L${canvasRect.left}, T${canvasRect.top}`);
+        console.log(`  Cutout Coords (viewport): L${viewportLeft}, T${viewportTop}, W${viewportWidth}, H${viewportHeight}`);
+
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("id", "spotlightSVG");
+        // Style the SVG to cover the entire viewport
+        svg.style.position = "fixed";
+        svg.style.top = "0";
+        svg.style.left = "0";
+        svg.style.width = "100vw"; // Use viewport units
+        svg.style.height = "100vh";
+        svg.style.zIndex = "9990"; // High z-index
+        svg.style.pointerEvents = "none"; // SVG itself doesn't catch clicks initially
+
+        const mask = document.createElementNS(svgNS, "mask");
+        mask.setAttribute("id", "spotlightMask");
+
+        const bgRect = document.createElementNS(svgNS, "rect");
+        bgRect.setAttribute("x", "0");
+        bgRect.setAttribute("y", "0");
+        bgRect.setAttribute("width", "100%");
+        bgRect.setAttribute("height", "100%");
+        bgRect.setAttribute("fill", "white");
+        mask.appendChild(bgRect);
+
+        const cutoutRect = document.createElementNS(svgNS, "rect");
+        cutoutRect.setAttribute("x", viewportLeft);
+        cutoutRect.setAttribute("y", viewportTop);
+        cutoutRect.setAttribute("width", viewportWidth);
+        cutoutRect.setAttribute("height", viewportHeight);
+        cutoutRect.setAttribute("fill", "black"); // Black makes this part of the mask transparent
+        // Optional: Add rounded corners to the cutout if desired
+        // cutoutRect.setAttribute("rx", "5");
+        // cutoutRect.setAttribute("ry", "5");
+        mask.appendChild(cutoutRect);
+        svg.appendChild(mask);
+
+        const dimRect = document.createElementNS(svgNS, "rect");
+        dimRect.setAttribute("x", "0");
+        dimRect.setAttribute("y", "0");
+        dimRect.setAttribute("width", "100%");
+        dimRect.setAttribute("height", "100%");
+        dimRect.setAttribute("fill", "rgba(0, 0, 0, 0.75)");
+        dimRect.setAttribute("mask", "url(#spotlightMask)");
+        svg.appendChild(dimRect);
+
+        document.body.appendChild(svg);
+
+        // Click Catcher (full screen, below SVG mask visually, but catches clicks)
+        const clickCatcher = document.createElement('div');
+        clickCatcher.id = 'spotlightClickCatcher';
+        clickCatcher.style.position = 'fixed';
+        clickCatcher.style.top = '0';
+        clickCatcher.style.left = '0';
+        clickCatcher.style.width = '100vw';
+        clickCatcher.style.height = '100vh';
+        clickCatcher.style.zIndex = '9989'; // Just below SVG
+        clickCatcher.style.cursor = 'pointer'; // Indicate it's clickable
+        clickCatcher.addEventListener('click', function(event) {
+            console.log("Spotlight click catcher clicked.");
+            hideSpotlightSVG();
+            event.stopPropagation(); // Prevent further bubbling
+        });
+        document.body.appendChild(clickCatcher);
+
+        // Store info
+        viewerApp.state.isSpotlightActive = true;
+        viewerApp.state.currentSpotlightInfo = {
+            svg: svg,
+            clickCatcher: clickCatcher,
+            targetFabricObject: targetFabricObject,
+            // textBubble: null, // For later text/notes
+            // notesPanel: null
+        };
+
+        // Make the target Fabric object temporarily non-evented IF we don't want it to
+        // trigger its own spotlight removal on a second click.
+        // For now, allow clicking target again to remove.
+        // targetFabricObject.set('evented', false); // Optional
+
+        // Optional: Add a visual highlight to the Fabric object itself (e.g., temp stroke)
+        // targetFabricObject.set('stroke', 'rgba(255, 255, 0, 0.7)');
+        // targetFabricObject.set('strokeWidth', 3);
+        // canvas.renderAll();
+
+        displayMessageViewer("Spotlight active. Click anywhere to dismiss.", true);
+        console.log("[WebApp] SVG Spotlight activated for Fabric object:", targetFabricObject);
+    }
+
+    function hideSpotlightSVG() {
+        if (!viewerApp.state.isSpotlightActive || !viewerApp.state.currentSpotlightInfo) {
+            return;
+        }
+        console.log('[WebApp] Hiding SVG Spotlight');
+
+        if (viewerApp.state.currentSpotlightInfo.svg) {
+            document.body.removeChild(viewerApp.state.currentSpotlightInfo.svg);
+        }
+        if (viewerApp.state.currentSpotlightInfo.clickCatcher) {
+            document.body.removeChild(viewerApp.state.currentSpotlightInfo.clickCatcher);
+        }
+
+        // Restore target Fabric object's eventing if changed
+        // if (viewerApp.state.currentSpotlightInfo.targetFabricObject) {
+        //     viewerApp.state.currentSpotlightInfo.targetFabricObject.set('evented', true);
+            // Remove temporary highlight
+        //     viewerApp.state.currentSpotlightInfo.targetFabricObject.set('stroke', viewerApp.state.currentSpotlightInfo.originalStroke || null);
+        //     viewerApp.state.currentSpotlightInfo.targetFabricObject.set('strokeWidth', viewerApp.state.currentSpotlightInfo.originalStrokeWidth || 0);
+        //     if(viewerApp.state.viewerFabricCanvas) viewerApp.state.viewerFabricCanvas.renderAll();
+        // }
+
+
+        viewerApp.state.isSpotlightActive = false;
+        viewerApp.state.currentSpotlightInfo = null;
+        // displayMessageViewer("", true); // Clear message
+    }
     // --- Slide Navigation ---
     function updateSlideNavigationUI() {
         console.log("updateSlideNavigationUI called. Current Index:", viewerApp.state.currentSlideIndex, "Project Data:", viewerApp.state.currentProjectData);

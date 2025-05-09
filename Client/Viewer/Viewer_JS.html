@@ -333,7 +333,7 @@
         }
     }
 
-    function renderSlideForViewing(slideIndex) {
+function renderSlideForViewing(slideIndex) {
         if (!viewerApp.state.currentProjectData || !viewerApp.state.viewerFabricCanvas) {
             console.error("Cannot render slide: Project data or canvas not ready."); return;
         }
@@ -493,8 +493,23 @@
                     // Attach interaction listeners
                     if (obj.customInteraction && obj.customInteraction.trigger) {
                         const trigger = obj.customInteraction.trigger;
+                        const action = obj.customInteraction.action;
 
-                        if (trigger === 'click') {
+                        // --- MODIFICATION FOR HOVER SPOTLIGHT ---
+                        if (trigger === 'hover' && action === 'spotlight') {
+                            obj.on('mouseover', function() {
+                                // Ensure 'this' refers to the fabric object
+                                if (this.customInteraction && this.customInteraction.trigger === 'hover' && this.customInteraction.action === 'spotlight') {
+                                    showSpotlightSVG(this, this.customInteraction);
+                                }
+                            });
+                            obj.on('mouseout', function() {
+                                // hideSpotlightSVG will check internally if a spotlight is active.
+                                hideSpotlightSVG();
+                            });
+                        } 
+                        // --- END MODIFICATION FOR HOVER SPOTLIGHT ---
+                        else if (trigger === 'click') {
                             obj.on('mousedown', function(options) {
                                 // Ensure this specific mousedown is for a 'click' trigger
                                 if (this.customInteraction && this.customInteraction.trigger === 'click') {
@@ -508,7 +523,7 @@
                                     if(options.e) options.e.stopPropagation();
                                 }
                             });
-                        } else if (trigger === 'hover') {
+                        } else if (trigger === 'hover' && action !== 'spotlight') { // Ensure other hover actions still go to handler
                              obj.on('mouseover', function() {
                                 if (this.customInteraction && this.customInteraction.trigger === 'hover') {
                                     handleOverlayInteraction(this, 'hover');
@@ -555,7 +570,6 @@
         }
         updateSlideNavigationUI(); // Update nav AFTER potential async operations
     }
-
     // --- Interaction & Modal Handling ---
     function handleOverlayInteraction(fabricObject, eventType) {
         if (!fabricObject.customInteraction) return;

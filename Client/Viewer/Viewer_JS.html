@@ -19,9 +19,8 @@
       currentModalOverlay: null, // The Fabric object that triggered the current modal sequence
       modalSequence: [],         // Array of Fabric objects in the current sequence on the slide
       currentModalSequenceIndex: -1, // Index within modalSequence being displayed
-      // --- FIX: Add comma after the previous line ---
-      isSpotlightActive: false, // NEW: Track if spotlight effect is on
-      spotlightOriginalOpacities: new Map() // NEW: Store original opacities
+      // --- State for Spotlight Overlay ---
+      spotlightOverlayObject: null // Holds the reference to the dimming overlay rect
     };
 
     // --- DOM Element References ---
@@ -100,20 +99,18 @@
         if (modalPrevButtonEl) modalPrevButtonEl.addEventListener('click', navigateModalPrevious);
         if (modalNextButtonEl) modalNextButtonEl.addEventListener('click', navigateModalNext);
 
-        // NEW: Listener to remove spotlight when clicking outside spotlighted object
+        // Listener to remove spotlight when clicking outside the spotlighted object
         if (viewerProjectDisplayAreaEl) {
              viewerProjectDisplayAreaEl.addEventListener('click', function(event) {
-                // Check if spotlight is active and the click wasn't on the canvas itself
-                // (or more accurately, not handled by a fabric object mousedown)
-                // This simple check works if fabric events stop propagation.
-                if (viewerApp.state.isSpotlightActive) {
-                    // We rely on Fabric objects stopping propagation. If a Fabric object
-                    // with an interaction was clicked, its handler should run first.
-                    // If the click reaches here, it means it wasn't on an interactive object.
+                // If the spotlight overlay exists, remove it.
+                // We rely on the fabric event on the target object stopping propagation
+                // so this only fires on clicks *not* handled by the target object itself.
+                // A more robust way would be to check if event.target is the canvas background.
+                if (viewerApp.state.spotlightOverlayObject && event.target !== viewerApp.state.spotlightOverlayObject.target) {
                     console.log("Viewer area click detected while spotlight active, removing effect.");
                     removeSpotlightEffect();
                 }
-             }, false); // Use bubble phase (default)
+             }, false); // Use bubble phase
         }
     };
 
@@ -231,6 +228,8 @@
         // Cleanup media players
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
+        // Remove spotlight if active
+        removeSpotlightEffect();
 
         if (viewerApp.state.viewerFabricCanvas) {
             viewerApp.state.viewerFabricCanvas.dispose();
@@ -344,9 +343,8 @@
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
         // Also remove any lingering spotlight effect from previous slide
-        if (viewerApp.state.isSpotlightActive) {
-            removeSpotlightEffect(); // Ensure clean state between slides
-        }
+        removeSpotlightEffect(); // Ensure clean state between slides (safe to call even if not active)
+
 
         viewerApp.state.currentSlideIndex = slideIndex; // Update state *before* using it
         const slideData = slides[slideIndex];
@@ -522,28 +520,20 @@
         // Log initial state for debugging
         console.log(`Interaction Triggered: type=${eventType}, action=${interaction.action}, object=${fabricObject.type}, currentOpacity=${fabricObject.opacity}`);
 
-        // If spotlight is active, remove it before processing new interaction,
-        // unless the click was ON the currently spotlighted object (which we don't track easily here)
-        // Simplification: Any interaction click removes existing spotlight.
-        if (viewerApp.state.isSpotlightActive && interaction.action !== 'spotlight') { // Don't remove if clicking the same spotlight object again
-             console.log("Removing existing spotlight before handling new interaction.");
-             removeSpotlightEffect();
-        }
-
-
+        // Spotlight is handled differently now
         if (interaction.trigger !== eventType) return;
 
         console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
 
         switch (interaction.action) {
             case 'showModal':
-                // ... (existing modal logic remains the same) ...
+                // Ensure spotlight is removed before showing modal
+                removeSpotlightEffect();
                 if (fabricObject.customInteraction && fabricObject.customInteraction.modalContent) {
                     // --- Step 21: Modal Sequence Logic ---
                     const canvas = viewerApp.state.viewerFabricCanvas;
                     if (!canvas) break;
 
-                    // Find all modal objects on the current canvas with sequence order
                     const allObjects = canvas.getObjects();
                     viewerApp.state.modalSequence = allObjects.filter(obj =>
                         obj.customInteraction &&
@@ -552,31 +542,24 @@
                         !isNaN(obj.sequenceOrder)
                     ).sort((a, b) => a.sequenceOrder - b.sequenceOrder);
 
-                    // Find the index of the clicked object in the sequence
                     viewerApp.state.currentModalSequenceIndex = viewerApp.state.modalSequence.findIndex(obj => obj === fabricObject);
 
                     if (viewerApp.state.currentModalSequenceIndex === -1) {
-                        // If the clicked object wasn't in the sequence (no sequenceOrder), treat it as standalone
                         console.warn("Clicked modal object not found in sequence or missing sequenceOrder.");
-                        viewerApp.state.modalSequence = [fabricObject]; // Sequence of 1
+                        viewerApp.state.modalSequence = [fabricObject];
                         viewerApp.state.currentModalSequenceIndex = 0;
                     }
-
                     viewerApp.state.currentModalOverlay = fabricObject;
-
-                    showViewerModal(interaction.modalContent); // Show initial content
-                    updateModalNavigationButtons(); // Update button visibility/state
-                    // --- End Step 21 Logic ---
-
+                    showViewerModal(interaction.modalContent);
+                    updateModalNavigationButtons();
                 } else {
                      console.warn("Show Modal action triggered, but modalContent is missing on the object.");
-                     // Hide nav buttons if no content
                      if(modalPrevButtonEl) modalPrevButtonEl.style.display = 'none';
                      if(modalNextButtonEl) modalNextButtonEl.style.display = 'none';
                 }
                 break;
             case 'navigateToSlide':
-                // ... (existing logic) ...
+                removeSpotlightEffect();
                 const targetSlideId = interaction.navigateTo;
                 if (targetSlideId && viewerApp.state.currentProjectData && viewerApp.state.currentProjectData.slides) {
                     const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
@@ -589,11 +572,11 @@
                 }
                 break;
             case 'navigateToURL':
-                // ... (existing logic) ...
+                removeSpotlightEffect();
                 if (interaction.navigateTo) {
                     let url = interaction.navigateTo;
                     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                        url = 'https://' + url; // Default to https
+                        url = 'https://' + url;
                     }
                     try {
                          const newWindow = window.open(url, '_blank');
@@ -606,25 +589,29 @@
                     }
                 }
                 break;
-            // --- NEW Cases for Step 23 ---
             case 'spotlight':
-                 // Check if already spotlighted - if so, remove it. Otherwise apply.
-                 if (viewerApp.state.isSpotlightActive) {
-                      console.log("Spotlight clicked while active, removing.");
-                      removeSpotlightEffect();
-                 } else {
-                      applySpotlightEffect(fabricObject);
+                 if (viewerApp.state.spotlightOverlayObject && viewerApp.state.spotlightOverlayObject.target === fabricObject) {
+                     // If clicking the same object that is already spotlighted, remove the spotlight
+                     console.log("Spotlight target clicked while active, removing.");
+                     removeSpotlightEffect();
+                 } else if (viewerApp.state.spotlightOverlayObject) {
+                    // If a spotlight is active on a *different* object, remove it first, then apply new one
+                    console.log("Spotlight action triggered while another is active. Removing existing, then applying new.");
+                    removeSpotlightEffect();
+                    applySpotlightEffect(fabricObject);
+                 }
+                 else {
+                    // No spotlight active, apply it
+                    applySpotlightEffect(fabricObject);
                  }
                  break;
             case 'reveal':
                  console.log("Handling interaction: reveal for object:", fabricObject);
-                 // Simple reveal: Animate opacity to 1
-                 if (fabricObject && viewerApp.state.viewerFabricCanvas) { // Added canvas check
+                 if (fabricObject && viewerApp.state.viewerFabricCanvas) {
                       console.log(`Reveal: Animating opacity from ${fabricObject.opacity} to 1.`);
                       fabricObject.animate('opacity', 1, {
-                          duration: 500, // Adjust duration as needed
-                          onChange: function() { // Use function() to access canvas easily
-                               // console.log("Reveal onChange"); // DEBUG - can be noisy
+                          duration: 500,
+                          onChange: function() {
                                if (viewerApp.state.viewerFabricCanvas) {
                                    viewerApp.state.viewerFabricCanvas.renderAll();
                                }
@@ -632,26 +619,18 @@
                           onComplete: function() {
                               console.log("Reveal animation complete. Final opacity:", fabricObject.opacity);
                               if (viewerApp.state.viewerFabricCanvas) {
-                                  viewerApp.state.viewerFabricCanvas.renderAll(); // Ensure final render
+                                  viewerApp.state.viewerFabricCanvas.renderAll();
                               }
                           },
                           abort: function() {
                                console.log("Reveal animation aborted.");
-                               // Basic abort check - might need refinement if objects move between slides
-                               // For now, let it run even if slide changes, complexity vs benefit
-                               return false; // Return true to abort if needed
+                               return false;
                            }
                       });
                  } else {
                       console.error("Reveal: Target object or canvas not available.");
                  }
                  break;
-            /* // Add later
-            case 'panZoom':
-                 console.log("Pan/Zoom action triggered for:", fabricObject);
-                 // Implement pan/zoom logic here
-                 break;
-            */
             default:
                 console.log("Unknown or no action defined for this interaction.");
         }
@@ -660,63 +639,52 @@
     function showViewerModal(htmlContent) {
         if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;
         if (viewerModalEl) viewerModalEl.style.display = 'flex';
-        // Note: updateModalNavigationButtons is called by handleOverlayInteraction now
     }
 
     function hideViewerModal() {
         if (viewerModalEl) viewerModalEl.style.display = 'none';
         if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = '';
-        // Step 21: Reset modal sequence state
         viewerApp.state.currentModalOverlay = null;
         viewerApp.state.modalSequence = [];
         viewerApp.state.currentModalSequenceIndex = -1;
-        // Hide nav buttons explicitly on close
         if(modalPrevButtonEl) modalPrevButtonEl.style.display = 'none';
         if(modalNextButtonEl) modalNextButtonEl.style.display = 'none';
     }
 
-     // --- Step 21: Modal Navigation Functions ---
     function updateModalNavigationButtons() {
          if (!modalPrevButtonEl || !modalNextButtonEl) return;
-
          const sequence = viewerApp.state.modalSequence;
          const currentIndex = viewerApp.state.currentModalSequenceIndex;
-
-         if (sequence.length <= 1) { // Hide buttons if sequence has 0 or 1 item
+         if (sequence.length <= 1) {
              modalPrevButtonEl.style.display = 'none';
              modalNextButtonEl.style.display = 'none';
              return;
          }
-
-         // Previous Button Logic
          if (currentIndex > 0) {
              modalPrevButtonEl.disabled = false;
              modalPrevButtonEl.style.display = 'inline-block';
          } else {
              modalPrevButtonEl.disabled = true;
-              modalPrevButtonEl.style.display = 'inline-block'; // Keep visible but disabled
+              modalPrevButtonEl.style.display = 'inline-block';
          }
-
-         // Next Button Logic
          if (currentIndex < sequence.length - 1) {
              modalNextButtonEl.disabled = false;
              modalNextButtonEl.style.display = 'inline-block';
          } else {
              modalNextButtonEl.disabled = true;
-             modalNextButtonEl.style.display = 'inline-block'; // Keep visible but disabled
+             modalNextButtonEl.style.display = 'inline-block';
          }
      }
 
      function navigateModalPrevious() {
           const sequence = viewerApp.state.modalSequence;
           let currentIndex = viewerApp.state.currentModalSequenceIndex;
-
           if (currentIndex > 0) {
               currentIndex--;
               const prevOverlay = sequence[currentIndex];
               if (prevOverlay && prevOverlay.customInteraction && prevOverlay.customInteraction.modalContent) {
                   viewerApp.state.currentModalSequenceIndex = currentIndex;
-                  viewerApp.state.currentModalOverlay = prevOverlay; // Update current overlay ref
+                  viewerApp.state.currentModalOverlay = prevOverlay;
                   if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = prevOverlay.customInteraction.modalContent;
                   updateModalNavigationButtons();
                   console.log("Navigated to previous modal, index:", currentIndex);
@@ -729,13 +697,12 @@
      function navigateModalNext() {
           const sequence = viewerApp.state.modalSequence;
           let currentIndex = viewerApp.state.currentModalSequenceIndex;
-
           if (currentIndex < sequence.length - 1) {
               currentIndex++;
               const nextOverlay = sequence[currentIndex];
                if (nextOverlay && nextOverlay.customInteraction && nextOverlay.customInteraction.modalContent) {
                    viewerApp.state.currentModalSequenceIndex = currentIndex;
-                   viewerApp.state.currentModalOverlay = nextOverlay; // Update current overlay ref
+                   viewerApp.state.currentModalOverlay = nextOverlay;
                    if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = nextOverlay.customInteraction.modalContent;
                    updateModalNavigationButtons();
                     console.log("Navigated to next modal, index:", currentIndex);
@@ -745,11 +712,9 @@
           }
      }
 
-
     // --- Slide Navigation ---
     function updateSlideNavigationUI() {
         console.log("updateSlideNavigationUI called. Current Index:", viewerApp.state.currentSlideIndex, "Project Data:", viewerApp.state.currentProjectData);
-
         if (!viewerApp.state.currentProjectData || !Array.isArray(viewerApp.state.currentProjectData.slides)) {
              console.error("updateSlideNavigationUI: Invalid project data or slides array.");
              if (viewerSlideIndicatorEl) viewerSlideIndicatorEl.textContent = "Slide ? / ?";
@@ -759,9 +724,8 @@
         }
         const numSlides = viewerApp.state.currentProjectData.slides.length;
         const currentIndex = viewerApp.state.currentSlideIndex;
-
         if (viewerSlideIndicatorEl) viewerSlideIndicatorEl.textContent = `Slide ${currentIndex + 1} / ${numSlides}`;
-        if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = (currentIndex <= 0); // Check <= 0
+        if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = (currentIndex <= 0);
         if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.disabled = (currentIndex >= numSlides - 1);
     }
 
@@ -776,7 +740,6 @@
         }
     }
 
-
     // --- YouTube Player API Functions ---
     function onYouTubeIframeAPIReady() {
         console.log("YouTube IFrame API Ready (called by external script).");
@@ -790,13 +753,11 @@
         youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>';
         youtubePlayerContainerEl.style.display = 'block';
         console.log("Setting up YouTube player for video ID:", videoId);
-
         if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
             console.error("YT object or YT.Player is not available or API not ready.");
             displayMessageViewer("YouTube Player API not ready. Please wait or reload.", false);
             return;
         }
-
         try {
              if(ytPlayer && typeof ytPlayer.destroy === 'function') {
                  console.log("Destroying previous YT player instance.");
@@ -809,15 +770,9 @@
                 width: '100%',
                 videoId: videoId,
                 playerVars: {
-                    'autoplay': 0,
-                    'controls': 0, // Keep controls off
-                    'rel': 0,
-                    'showinfo': 0,
-                    'modestbranding': 1,
-                    'iv_load_policy': 3,
-                    'fs': 0,
-                    'disablekb': 1,
-                    'playsinline': 1
+                    'autoplay': 0, 'controls': 0, 'rel': 0, 'showinfo': 0,
+                    'modestbranding': 1, 'iv_load_policy': 3, 'fs': 0,
+                    'disablekb': 1, 'playsinline': 1
                 },
                 events: {
                     'onReady': onPlayerReady,
@@ -825,7 +780,7 @@
                     'onError': onPlayerError
                 }
             });
-             console.log("YT.Player instance potentially created (check console for errors/readiness).");
+             console.log("YT.Player instance potentially created.");
         } catch (e) {
             console.error("Error creating YouTube player instance:", e);
             displayMessageViewer(`Error initializing YouTube player: ${e.message}`, false);
@@ -835,8 +790,6 @@
 
     function onPlayerReady(event) {
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
-
-         // Add click listener to the CONTAINER div now
          if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
              console.log("Adding click-to-play listener to YT player container.");
              youtubePlayerContainerEl.addEventListener('click', function() {
@@ -859,7 +812,7 @@
     }
 
     function onPlayerStateChange(event) {
-        console.log("YouTube Player State Change:", event.data, "(Playing:", YT.PlayerState.PLAYING, "Paused:", YT.PlayerState.PAUSED, "Ended:", YT.PlayerState.ENDED, ")");
+        console.log("YouTube Player State Change:", event.data);
     }
 
     function onPlayerError(event) {
@@ -869,8 +822,7 @@
             case 2: errorMsg += "Invalid video ID."; break;
             case 5: errorMsg += "HTML5 player error."; break;
             case 100: errorMsg += "Video not found or private."; break;
-            case 101:
-            case 150: errorMsg += "Playback forbidden by owner."; break;
+            case 101: case 150: errorMsg += "Playback forbidden by owner."; break;
             default: errorMsg += "Unknown error."; break;
         }
         displayMessageViewer(errorMsg, false);
@@ -878,18 +830,11 @@
 
     function stopAndDestroyYouTubePlayer() {
         try {
-            if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
-                ytPlayer.stopVideo();
-                console.log("Called ytPlayer.stopVideo()");
-            }
-            if (ytPlayer && typeof ytPlayer.destroy === 'function') {
-                ytPlayer.destroy();
-                 console.log("YouTube Player Destroyed.");
-            }
-             ytPlayer = null;
-        } catch (e) {
-            console.error("Error stopping/destroying YouTube player:", e);
-        } finally {
+            if (ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
+            if (ytPlayer && typeof ytPlayer.destroy === 'function') ytPlayer.destroy();
+            ytPlayer = null;
+        } catch (e) { console.error("Error stopping/destroying YouTube player:", e); }
+        finally {
              if (youtubePlayerContainerEl) {
                  youtubePlayerContainerEl.removeAttribute('click-listener-added');
                  youtubePlayerContainerEl.innerHTML = '';
@@ -905,31 +850,24 @@
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
             const match = url.match(regExp);
             videoId = (match && match[2].length === 11) ? match[2] : null;
-        } catch (e) {
-            console.error("Error extracting YouTube Video ID with Regex:", e);
-            videoId = null;
-        }
+        } catch (e) { console.error("Error extracting YouTube Video ID:", e); videoId = null; }
         console.log(`Extracted Video ID: ${videoId} from URL: ${url}`);
         return videoId;
     }
 
-     // --- Audio Player Functions ---
-    function setupAudioPlayer(audioDataURI) { // Now expects base64 data URI
+    function setupAudioPlayer(audioDataURI) {
         if (!viewerAudioPlayerEl) { console.error("Audio player element not found."); return;}
-        console.log("Setting up audio player with base64 data URI.");
+        console.log("Setting up audio player.");
         try {
              viewerAudioPlayerEl.src = audioDataURI;
              viewerAudioPlayerEl.load();
              const playPromise = viewerAudioPlayerEl.play();
              if (playPromise !== undefined) {
-                 playPromise.then(() => {
-                     console.log("Audio playback started.");
-                 }).catch(error => {
-                     console.error("Audio playback failed (likely autoplay blocked):", error);
-                  });
+                 playPromise.then(() => console.log("Audio playback started."))
+                          .catch(error => console.error("Audio playback failed:", error));
              }
              viewerAudioPlayerEl.style.display = 'block';
-             viewerApp.state.currentAudioElement = viewerAudioPlayerEl; // Store ref
+             viewerApp.state.currentAudioElement = viewerAudioPlayerEl;
         } catch (e) {
              console.error("Error setting up audio player:", e);
              displayMessageViewer("Error loading audio.", false);
@@ -937,91 +875,90 @@
     }
 
     function stopAndClearAudioPlayer() {
-        const audioPlayer = viewerApp.state.currentAudioElement || viewerAudioPlayerEl; // Get ref
+        const audioPlayer = viewerApp.state.currentAudioElement || viewerAudioPlayerEl;
         if (audioPlayer) {
              try {
-                 if (!audioPlayer.paused) {
-                     audioPlayer.pause();
-                 }
+                 if (!audioPlayer.paused) audioPlayer.pause();
                  audioPlayer.removeAttribute('src');
                  audioPlayer.load();
                  audioPlayer.style.display = 'none';
                  console.log("Audio Player Stopped and Cleared.");
-             } catch (e) {
-                  console.error("Error stopping/clearing audio player:", e);
-             }
+             } catch (e) { console.error("Error stopping/clearing audio player:", e); }
         }
-         viewerApp.state.currentAudioElement = null; // Clear ref
+         viewerApp.state.currentAudioElement = null;
     }
 
-    // --- NEW Spotlight Functions (Step 23) ---
+    // --- UPDATED Spotlight Functions (Step 23 - Cutout Overlay) ---
     function applySpotlightEffect(targetObject) {
         const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas || viewerApp.state.isSpotlightActive) {
-             console.log(`Spotlight not applied: canvas=${!!canvas}, isSpotlightActive=${viewerApp.state.isSpotlightActive}`);
-             return;
+        if (!canvas) {
+            console.log("Spotlight not applied: Canvas not available.");
+            return;
+        }
+        // If a spotlight is already active, remove it first.
+        // This handles cases where another object is clicked for spotlight or the same object is clicked again.
+        if (viewerApp.state.spotlightOverlayObject) {
+            console.log("Spotlight already active, removing previous one first.");
+            removeSpotlightEffect();
         }
 
-        console.log("Applying spotlight effect to:", targetObject);
-        viewerApp.state.isSpotlightActive = true;
-        viewerApp.state.spotlightOriginalOpacities.clear(); // Clear previous opacities
+        console.log("Applying spotlight (cutout) effect to:", targetObject);
+        viewerApp.state.spotlightOverlayObject = {}; // Initialize as an object to indicate it's active
+        viewerApp.state.spotlightOverlayObject.target = targetObject; // Store the actual target
 
-        const spotlightOpacity = 0.15; // Make it more noticeable
-        let objectsDimmed = 0;
-
-        canvas.forEachObject(function(obj) {
-            if (obj !== targetObject) {
-                // Store original opacity, handling undefined (treat as 1)
-                const originalOpacity = obj.opacity === undefined ? 1 : obj.opacity;
-                viewerApp.state.spotlightOriginalOpacities.set(obj, originalOpacity);
-                // Apply spotlight dimming
-                console.log(`  Dimming object ${obj.type}: opacity ${originalOpacity} -> ${spotlightOpacity}`);
-                obj.set('opacity', spotlightOpacity);
-                obj.set('evented', false); // Make dimmed objects non-interactive
-                objectsDimmed++;
-            } else {
-                 console.log(`  Target object ${obj.type}: opacity ${obj.opacity} (unchanged), evented=true`);
-                 // Ensure the target object remains interactive
-                 obj.set('evented', true);
-            }
+        // Create the dimming overlay
+        const overlayRect = new fabric.Rect({
+            left: 0,
+            top: 0,
+            originX: 'left',
+            originY: 'top',
+            width: canvas.width,
+            height: canvas.height,
+            fill: 'rgba(0, 0, 0, 0.75)', // Adjust color and alpha as needed
+            selectable: false,
+            evented: true, // Make overlay evented to catch clicks for removal
+            hoverCursor: 'default',
+            // Add a custom property to identify it as our spotlight overlay
+            customInteraction: { isSpotlightDimOverlay: true }
+        });
+        // Add a mousedown listener to the overlay itself to remove the spotlight
+        overlayRect.on('mousedown', function(options) {
+             console.log("Spotlight dim overlay clicked, removing spotlight.");
+             if (options.e) options.e.stopPropagation(); // Stop event from bubbling further
+             removeSpotlightEffect();
         });
 
-        console.log(`Spotlight applied. ${objectsDimmed} objects dimmed.`);
+
+        // Add overlay and bring target object to front
+        canvas.add(overlayRect);
+        canvas.bringToFront(targetObject); // Bring the clicked object above the overlay
+
+        // Store reference to the overlay rectangle
+        viewerApp.state.spotlightOverlayObject.rect = overlayRect;
+
         canvas.renderAll();
-        displayMessageViewer("Spotlight active. Click outside the object to remove.", true); // Inform user
+        displayMessageViewer("Spotlight active. Click outside the object (on the dim area) to remove.", true);
     }
 
     function removeSpotlightEffect() {
         const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas || !viewerApp.state.isSpotlightActive) {
-            console.log(`Spotlight not removed: canvas=${!!canvas}, isSpotlightActive=${viewerApp.state.isSpotlightActive}`);
-            return;
+        // Check the rect property specifically
+        const overlayRect = viewerApp.state.spotlightOverlayObject ? viewerApp.state.spotlightOverlayObject.rect : null;
+
+        if (!canvas || !overlayRect) {
+            // console.log(`Spotlight not removed: canvas=${!!canvas}, overlayRectExists=${!!overlayRect}`);
+            return; // Nothing to remove
         }
 
-        console.log("Removing spotlight effect.");
-        let objectsRestored = 0;
+        console.log("Removing spotlight (cutout) effect.");
 
-        canvas.forEachObject(function(obj) {
-            // Restore original opacity if it was stored
-            if (viewerApp.state.spotlightOriginalOpacities.has(obj)) {
-                const originalOpacity = viewerApp.state.spotlightOriginalOpacities.get(obj);
-                console.log(`  Restoring object ${obj.type}: opacity ${obj.opacity} -> ${originalOpacity}`);
-                obj.set('opacity', originalOpacity);
-                objectsRestored++;
-            } else {
-                 console.log(`  Object ${obj.type} not in original opacity map (likely target).`);
-            }
-            // Restore interactivity for all objects (simplest approach)
-             obj.set('evented', true);
-        });
+        canvas.remove(overlayRect); // Remove the overlay rectangle
+        viewerApp.state.spotlightOverlayObject = null; // Clear the state reference
 
-        viewerApp.state.isSpotlightActive = false;
-        viewerApp.state.spotlightOriginalOpacities.clear();
-        console.log(`Spotlight removed. ${objectsRestored} objects restored.`);
         canvas.renderAll();
-         // Clear the message or let it timeout
-        // displayMessageViewer("", true); // Optionally clear message immediately
+        // Optionally clear the message
+        // displayMessageViewer("", true);
     }
-    // --- End NEW Spotlight Functions ---
+    // --- End UPDATED Spotlight Functions ---
 
   </script>

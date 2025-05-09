@@ -480,14 +480,18 @@ function renderSlideForViewing(slideIndex) {
 
                 canvas.forEachObject(function(obj) {
                     obj.selectable = false;
-                    obj.evented = true; // Canvas container is visible, so events should work
+                    obj.evented = true; 
                     obj.hoverCursor = 'pointer';
                     obj._clickAndHoldTimer = null;
+
+                    // --- ADD perPixelTargetFind FOR MORE ACCURATE HOVER ---
+                    obj.perPixelTargetFind = true; 
+                    // --- END ADD ---
 
                     obj.off('mousedown');
                     obj.off('mouseup');
                     obj.off('mouseout');
-                    obj.off('mousemove'); // Usually not needed to cancel hold unless specific logic
+                    obj.off('mousemove'); 
                     obj.off('mouseover');
 
                     // Attach interaction listeners
@@ -495,57 +499,44 @@ function renderSlideForViewing(slideIndex) {
                         const trigger = obj.customInteraction.trigger;
                         const action = obj.customInteraction.action;
 
-                        // --- MODIFICATION FOR HOVER SPOTLIGHT ---
                         if (trigger === 'hover' && action === 'spotlight') {
                             obj.on('mouseover', function() {
-                                // Ensure 'this' refers to the fabric object
                                 if (this.customInteraction && this.customInteraction.trigger === 'hover' && this.customInteraction.action === 'spotlight') {
                                     showSpotlightSVG(this, this.customInteraction);
                                 }
                             });
                             obj.on('mouseout', function() {
-                                // hideSpotlightSVG will check internally if a spotlight is active.
                                 hideSpotlightSVG();
                             });
                         } 
-                        // --- END MODIFICATION FOR HOVER SPOTLIGHT ---
                         else if (trigger === 'click') {
                             obj.on('mousedown', function(options) {
-                                // Ensure this specific mousedown is for a 'click' trigger
                                 if (this.customInteraction && this.customInteraction.trigger === 'click') {
-                                    // If a click-and-hold timer was somehow pending for this object, clear it.
                                     if (this._clickAndHoldTimer) {
                                         clearTimeout(this._clickAndHoldTimer);
                                         this._clickAndHoldTimer = null;
                                         console.log("ClickAndHold: Timer cleared by click for", this.type);
                                     }
-                                    handleOverlayInteraction(this, 'click'); // 'click' is the eventType
+                                    handleOverlayInteraction(this, 'click'); 
                                     if(options.e) options.e.stopPropagation();
                                 }
                             });
-                        } else if (trigger === 'hover' && action !== 'spotlight') { // Ensure other hover actions still go to handler
+                        } else if (trigger === 'hover' && action !== 'spotlight') { 
                              obj.on('mouseover', function() {
                                 if (this.customInteraction && this.customInteraction.trigger === 'hover') {
                                     handleOverlayInteraction(this, 'hover');
                                 }
                             });
-                            // Note: You might want a 'mouseout' handler here if hover needs to be undone
                         } else if (trigger === 'clickAndHold') {
                             obj.on('mousedown', function(options) {
-                                // This specific 'this' is the Fabric object
                                 console.log("ClickAndHold: mousedown on", this.type, this);
-                                // Clear any existing timer *for this object*
                                 if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
 
                                 this._clickAndHoldTimer = setTimeout(() => {
                                     console.log("ClickAndHold: Timer fired for", this.type, this);
-                                    // Ensure the event is marked as 'clickAndHold' for handleOverlayInteraction
                                     handleOverlayInteraction(this, 'clickAndHold');
-                                    this._clickAndHoldTimer = null; // Reset timer after firing
+                                    this._clickAndHoldTimer = null; 
                                 }, CLICK_AND_HOLD_DURATION);
-
-                                // Do not stop propagation here, allow other mousedown listeners if any
-                                // (though typically, one trigger per object is best)
                             });
 
                             const cancelHold = function() {
@@ -563,13 +554,13 @@ function renderSlideForViewing(slideIndex) {
                 canvas.renderAll();
             });
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
-             // Render canvas background if no JSON but canvas is visible
-             if(mediaType !== 'image' && mediaType !== 'audio') { // Avoid redundant render
+             if(mediaType !== 'image' && mediaType !== 'audio') { 
                  canvas.renderAll();
              }
         }
-        updateSlideNavigationUI(); // Update nav AFTER potential async operations
+        updateSlideNavigationUI(); 
     }
+    
     // --- Interaction & Modal Handling ---
     function handleOverlayInteraction(fabricObject, eventType) {
         if (!fabricObject.customInteraction) return;

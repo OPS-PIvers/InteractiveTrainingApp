@@ -362,32 +362,23 @@
         canvas.setWidth(slideWidth);
         canvas.setHeight(slideHeight);
 
-        // --- ADDRESS FABRIC WARNING ---
-        // Set willReadFrequently on the Fabric canvas instance itself (if supported by version)
-        // This is generally preferred as Fabric manages its internal canvases.
-        if (typeof canvas.set === 'function') { // Check if canvas.set exists
+        if (typeof canvas.set === 'function') {
             try {
                 canvas.set({ willReadFrequently: true });
-                 console.log("Set canvas.willReadFrequently = true");
+                 // console.log("Set canvas.willReadFrequently = true");
             } catch (wfError) {
-                console.warn("Could not set canvas.willReadFrequently directly on Fabric.Canvas instance. May need older method or Fabric version doesn't support it directly.", wfError);
-                // Fallback to trying on the HTML element if direct set fails or not available
+                console.warn("Could not set canvas.willReadFrequently directly on Fabric.Canvas instance.", wfError);
                 if (viewerFabricCanvasEl) {
                     viewerFabricCanvasEl.getContext('2d', { willReadFrequently: true });
-                     console.log("Set willReadFrequently on HTML canvas element's context as fallback.");
                 }
             }
-        } else if (viewerFabricCanvasEl) { // Fallback if canvas.set doesn't exist (older Fabric?)
+        } else if (viewerFabricCanvasEl) {
             viewerFabricCanvasEl.getContext('2d', { willReadFrequently: true });
-            console.log("Set willReadFrequently on HTML canvas element's context (canvas.set not found).");
         }
-        // Forcing on lower/upper canvases as well, as a belt-and-suspenders approach
         if (canvas.lowerCanvasEl && canvas.lowerCanvasEl.getContext) canvas.lowerCanvasEl.getContext('2d').willReadFrequently = true;
         if (canvas.upperCanvasEl && canvas.upperCanvasEl.getContext) canvas.upperCanvasEl.getContext('2d').willReadFrequently = true;
-        // --- END ADDRESS FABRIC WARNING ---
 
-
-        if (viewerFabricCanvasEl) { // Ensure HTML element dimensions also match
+        if (viewerFabricCanvasEl) {
             viewerFabricCanvasEl.width = slideWidth;
             viewerFabricCanvasEl.height = slideHeight;
         }
@@ -404,7 +395,7 @@
         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = (mediaType === 'youtube') ? 'none' : 'flex';
         if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'none';
 
-        console.log(`Rendering slide ${slideIndex + 1}, media type: ${mediaType}`);
+        // console.log(`Rendering slide ${slideIndex + 1}, media type: ${mediaType}`);
 
         switch(mediaType) {
             case 'image':
@@ -416,7 +407,6 @@
                         });
                     }, { crossOrigin: 'anonymous' });
                 } else {
-                     console.warn("Image media present but URL is missing or not base64:", media.url);
                      canvas.backgroundColor = '#e9e9e9';
                      canvas.renderAll();
                 }
@@ -428,13 +418,11 @@
                         if (isYouTubeApiReady) setupYouTubePlayer(videoId);
                         else console.warn("YouTube API not ready yet when trying to render slide.");
                     } else {
-                        console.error("Could not extract YouTube Video ID from URL:", media.url);
                          if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
                          canvas.backgroundColor = '#555';
                          canvas.renderAll();
                     }
                 } else {
-                     console.warn("YouTube media type set but URL is missing.");
                       if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
                      canvas.backgroundColor = '#e9e9e9';
                      canvas.renderAll();
@@ -442,7 +430,6 @@
                 break;
             case 'audio':
                  if (media.driveFileId) {
-                     console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true);
                      google.script.run
                          .withSuccessHandler(function(audioResponse) {
@@ -454,7 +441,6 @@
                                  canvas.backgroundColor = '#e0e0e0';
                                  canvas.renderAll();
                              } else {
-                                 console.error("Failed to fetch audio base64 data:", audioResponse);
                                  onServerErrorViewer(audioResponse || {error: "Failed to load audio data."});
                                  canvas.backgroundColor = '#e9e9e9';
                                  canvas.renderAll();
@@ -468,7 +454,6 @@
                          })
                          .getAudioAsBase64(media.driveFileId);
                  } else {
-                     console.warn("Audio media type set but driveFileId is missing.");
                      canvas.backgroundColor = '#e9e9e9';
                      canvas.renderAll();
                  }
@@ -482,7 +467,6 @@
         if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none' && slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) {
-                    console.log("Slide changed during loadFromJSON, aborting object setup for old slide.");
                     return;
                 }
 
@@ -492,64 +476,62 @@
                     obj.hoverCursor = 'pointer';
                     obj._clickAndHoldTimer = null;
                     obj.perPixelTargetFind = true; 
-                    // Set objectCaching to false if perPixelTargetFind is true and issues persist,
-                    // though it has a performance cost. Try without it first.
-                    // obj.objectCaching = false; 
+                    
+                    // Store the original opacity for hover-reveal to revert to
+                    // This ensures if admin set 0.01, it reverts to 0.01, not 0
+                    obj.originalOpacityForReveal = obj.opacity; 
 
-                    // Clear ALL previous Fabric event listeners for this object specifically
-                    obj.off(); // Removes all listeners for this object
+                    obj.off(); 
 
                     if (obj.customInteraction && obj.customInteraction.trigger) {
                         const trigger = obj.customInteraction.trigger;
                         const action = obj.customInteraction.action;
 
-                        // --- REVISED AND SIMPLIFIED EVENT ATTACHMENT ---
                         if (trigger === 'hover') {
                             if (action === 'spotlight') {
                                 obj.on('mouseover', function(options) {
-                                    // Check 'this' context and customInteraction existence
                                     if (this && this.customInteraction && this.customInteraction.action === 'spotlight') {
-                                        console.log("Hover-Spotlight: mouseover on", this.type, "(target:", options.target ? options.target.type : 'none', ")");
+                                        // console.log("Hover-Spotlight: mouseover on", this.type);
                                         showSpotlightSVG(this, this.customInteraction);
                                     }
                                 });
                                 obj.on('mouseout', function(options) {
-                                    if (this && this.customInteraction && this.customInteraction.action === 'spotlight') { // Check action on mouseout too
-                                        console.log("Hover-Spotlight: mouseout on", this.type);
+                                    if (this && this.customInteraction && this.customInteraction.action === 'spotlight') {
+                                        // console.log("Hover-Spotlight: mouseout on", this.type);
                                         if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
                                             hideSpotlightSVG();
                                         } else if (!viewerApp.state.isSpotlightActive){
-                                            hideSpotlightSVG(); // Failsafe
+                                            hideSpotlightSVG(); 
                                         }
                                     }
                                 });
                             } else if (action === 'reveal') {
+                                // console.log(`Attaching HOVER-REVEAL listeners to ${obj.type} (ID: ${obj.id || 'N/A'}, Initial Opacity: ${obj.originalOpacityForReveal})`);
                                 obj.on('mouseover', function(options) {
                                     if (this && this.customInteraction && this.customInteraction.action === 'reveal') {
-                                        console.log('Hover-Reveal: mouseover on', this.type);
+                                        // console.log('Hover-Reveal: mouseover on', this.type, 'current opacity:', this.opacity);
                                         this.animate('opacity', 1, { duration: 250, onChange: canvas.renderAll.bind(canvas) });
                                     }
                                 });
                                 obj.on('mouseout', function(options) {
                                      if (this && this.customInteraction && this.customInteraction.action === 'reveal') {
-                                        console.log('Hover-Reveal: mouseout on', this.type);
-                                        this.animate('opacity', 0, { duration: 250, onChange: canvas.renderAll.bind(canvas) });
+                                        // console.log('Hover-Reveal: mouseout on', this.type, 'reverting to:', this.originalOpacityForReveal);
+                                        this.animate('opacity', this.originalOpacityForReveal, { duration: 250, onChange: canvas.renderAll.bind(canvas) });
                                     }
                                 });
-                            } else { // Generic hover
+                            } else { 
                                 obj.on('mouseover', function(options) {
                                      if (this && this.customInteraction && this.customInteraction.trigger === 'hover') {
-                                        console.log('Generic Hover: mouseover on', this.type);
+                                        // console.log('Generic Hover: mouseover on', this.type, "Action:", this.customInteraction.action);
                                         handleOverlayInteraction(this, 'hover');
                                     }
                                 });
-                                // Add generic mouseout if needed for other hover actions
                             }
                         } else if (trigger === 'click') {
-                            obj.on('mousedown', function(options) {
+                             obj.on('mousedown', function(options) {
                                 if (this && this.customInteraction && this.customInteraction.trigger === 'click') {
                                     if (this._clickAndHoldTimer) { clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null; }
-                                    console.log('Click: mousedown on', this.type);
+                                    // console.log('Click: mousedown on', this.type, "Action:", this.customInteraction.action);
                                     handleOverlayInteraction(this, 'click'); 
                                     if(options.e) options.e.stopPropagation();
                                 }
@@ -557,11 +539,11 @@
                         } else if (trigger === 'clickAndHold') {
                             obj.on('mousedown', function(options) {
                                 if (this && this.customInteraction && this.customInteraction.trigger === 'clickAndHold') {
-                                    console.log("ClickAndHold: mousedown on", this.type);
+                                    // console.log("ClickAndHold: mousedown on", this.type, "Action:", this.customInteraction.action);
                                     if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
                                     this._clickAndHoldTimer = setTimeout(() => {
-                                        if (this && this.customInteraction) { // Check 'this' again in timeout
-                                           console.log("ClickAndHold: Timer fired for", this.type);
+                                        if (this && this.customInteraction) { 
+                                        //    console.log("ClickAndHold: Timer fired for", this.type);
                                            handleOverlayInteraction(this, 'clickAndHold');
                                         }
                                         this._clickAndHoldTimer = null; 
@@ -570,7 +552,7 @@
                             });
                             const cancelHold = function() {
                                 if (this && this._clickAndHoldTimer) {
-                                    console.log("ClickAndHold: Cancelling for", this.type);
+                                    // console.log("ClickAndHold: Cancelling for", this.type);
                                     clearTimeout(this._clickAndHoldTimer);
                                     this._clickAndHoldTimer = null;
                                 }
@@ -578,29 +560,20 @@
                             obj.on('mouseup', cancelHold);
                             obj.on('mouseout', cancelHold);
                         }
-                    } else {
-                        // console.log("Object has no customInteraction or trigger defined:", obj.type);
-                    }
-                }); // End forEachObject
+                    } 
+                }); 
 
-                // After all objects are processed and listeners attached:
-                canvas.requestRenderAll(); // Ensure canvas is re-rendered with all changes.
-                console.log("loadFromJSON callback completed. Canvas objects processed and rendered.");
+                canvas.requestRenderAll(); 
+                // console.log("loadFromJSON callback completed. Canvas objects processed and rendered.");
 
             }, function(o, object) {
-                // This is the REVIVER function for loadFromJSON.
-                // It's called for each object *before* it's added to the canvas.
-                // We can set properties here that might not be automatically revived.
-                if (object) { // object is the Fabric object being created
+                if (object) { 
                     object.selectable = false;
                     object.evented = true;
                     object.hoverCursor = 'pointer';
                     object.perPixelTargetFind = true;
-                    // If customInteraction or other custom props were simple JSON, they usually revive.
-                    // If they contained complex objects or functions, more revival logic would be needed here.
-                    // console.log("Reviver: Processed object type:", object.type, "ID:", object.id);
                 }
-            }); // End loadFromJSON
+            }); 
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
              if(mediaType !== 'image' && mediaType !== 'audio') { 
                  canvas.renderAll();

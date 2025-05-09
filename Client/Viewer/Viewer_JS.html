@@ -26,7 +26,8 @@
       // --- State for Pan/Zoom ---
       originalViewportTransform: null, // To store [zoom, 0, 0, zoom, panX, panY]
       isCanvasPannedOrZoomed: false,
-      panZoomTargetObject: null 
+      panZoomTargetObject: null, 
+      activeAnimations: new Map(),
     };
 
     // --- DOM Element References ---

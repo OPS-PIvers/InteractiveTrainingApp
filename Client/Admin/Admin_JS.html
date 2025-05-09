@@ -98,7 +98,6 @@
       objShadowBlurEl = document.getElementById('objShadowBlur');
       objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
       objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
-      objFillTransparentEl = document.getElementById('objFillTransparent');
 
       objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
       objInteractionActionEl = document.getElementById('objInteractionAction');
@@ -1155,7 +1154,8 @@
     function initToolbar() {
       console.log("initToolbar: Attaching listeners to toolbar inputs.");
       if(objFontFamilyEl) {
-          objFontFamilyEl.innerHTML = ''; // Clear existing options
+          // Clear existing options before adding new ones
+          objFontFamilyEl.innerHTML = '';
           FONT_FAMILIES.forEach(font => {
               const option = document.createElement('option'); option.value = font; option.textContent = font; objFontFamilyEl.appendChild(option);
           });
@@ -1164,7 +1164,7 @@
       const inputs = [
         {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
         {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
-        {el: objAngleEl, prop: 'angle', type: 'number'}, /* objFillEl handled separately */
+        {el: objAngleEl, prop: 'angle', type: 'number'}, {el: objFillEl, prop: 'fill', type: 'color'},
         {el: objStrokeColorEl, prop: 'stroke', type: 'color'}, {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
         {el: objOpacityEl, prop: 'opacity', type: 'range'}, {el: objTextContentEl, prop: 'text', type: 'textarea'},
         {el: objFontFamilyEl, prop: 'fontFamily', type: 'select'}, {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
@@ -1179,6 +1179,7 @@
       inputs.forEach(inputConfig => {
         if (inputConfig.el) {
             const eventType = (inputConfig.el.tagName === 'SELECT' || inputConfig.el.type === 'color' || inputConfig.el.type === 'checkbox') ? 'change' : 'input';
+            // Check if listener already exists to avoid duplicates (simple check)
             if (!inputConfig.el.hasAttribute('listener-attached')) {
                  inputConfig.el.addEventListener(eventType, (e) => {
                      const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -1189,36 +1190,7 @@
         } else { console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); }
       });
 
-      // Special handling for Fill Color Picker and Transparent Fill Checkbox
-      if (objFillEl && !objFillEl.hasAttribute('listener-attached-fill-color')) {
-          objFillEl.addEventListener('input', (e) => {
-              if (objFillTransparentEl && !objFillTransparentEl.checked) {
-                  updateFabricObjectFromToolbar('fill', e.target.value, 'color');
-              }
-          });
-          objFillEl.setAttribute('listener-attached-fill-color', 'true');
-      }
-
-      const NEARLY_TRANSPARENT_FILL = 'rgba(0,0,0,0.001)'; // Define this constant
-
-      if (objFillTransparentEl && !objFillTransparentEl.hasAttribute('listener-attached-fill-transparent')) {
-          objFillTransparentEl.addEventListener('change', (e) => {
-              const activeObject = adminApp.state.fabricCanvasInstance ? adminApp.state.fabricCanvasInstance.getActiveObject() : null;
-              if (!activeObject || !objFillEl) return;
-
-              if (e.target.checked) { // Transparent fill is NOW ACTIVE
-                  activeObject.set('fill', NEARLY_TRANSPARENT_FILL); // Use nearly transparent RGBA
-                  objFillEl.disabled = true;
-              } else { // Transparent fill is NOW INACTIVE
-                  objFillEl.disabled = false;
-                  activeObject.set('fill', objFillEl.value); 
-              }
-              if(adminApp.state.fabricCanvasInstance) adminApp.state.fabricCanvasInstance.renderAll();
-          });
-          objFillTransparentEl.setAttribute('listener-attached-fill-transparent', 'true');
-      }
-      // --- End Special Handling ---
-
+      // Interaction listeners only need to be attached once too
       if (objInteractionTriggerEl && !objInteractionTriggerEl.hasAttribute('listener-attached')) {
            objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
            objInteractionTriggerEl.setAttribute('listener-attached', 'true');
@@ -1239,45 +1211,16 @@
 
     function populateToolbar(activeObject) {
       if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
-      if (!activeObject) { 
-        overlayPropertiesToolbarEl.style.display = 'none'; 
-        return; 
-      }
+      if (!activeObject) { overlayPropertiesToolbarEl.style.display = 'none'; return; }
       overlayPropertiesToolbarEl.style.display = 'block';
 
       // --- Basic Properties ---
       if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
       if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
-      if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width ? activeObject.width.toFixed(0) : 0);
-      if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height ? activeObject.height.toFixed(0) : 0);
+      if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
+      if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
       if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
-      
-      // --- Fill Properties with Transparency (REVISED LOGIC) ---
-      const NEARLY_TRANSPARENT_FILL_CHECK = 'rgba(0,0,0,0.001)'; 
-      // Check if fill is our specific nearly transparent value OR the keyword 'transparent' (for backward compatibility if any old data uses it)
-      const isFillEffectivelyTransparent = activeObject.fill === NEARLY_TRANSPARENT_FILL_CHECK ||
-                                       activeObject.fill === null ||
-                                       (typeof activeObject.fill === 'string' && activeObject.fill.toLowerCase() === 'transparent');
-
-      if (objFillTransparentEl) {
-          objFillTransparentEl.checked = isFillEffectivelyTransparent;
-      }
-
-      if (objFillEl) {
-          objFillEl.disabled = isFillEffectivelyTransparent;
-          if (!isFillEffectivelyTransparent) {
-              objFillEl.value = toHexColor(activeObject.fill);
-          } else {
-              // When transparent, color picker is disabled. 
-              // Keep its current color value, or set a default. If user unchecks "Transparent Fill",
-              // this color will be applied.
-              // if (objFillEl.value === NEARLY_TRANSPARENT_FILL_CHECK || objFillEl.value === 'transparent') {
-              //    objFillEl.value = '#cccccc'; // Or the object's original color before becoming transparent
-              // }
-          }
-      }
-      // --- END Fill Properties ---
-
+      if (objFillEl) objFillEl.value = toHexColor(activeObject.fill);
       if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
       if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
       if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
@@ -1308,9 +1251,7 @@
       if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
 
       // --- Interaction Properties ---
-      const interaction = activeObject.customInteraction || 
-                          { trigger: "", action: "", modalContent: "", navigateTo: "" };
-      
+      const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
       if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
       if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
       if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";

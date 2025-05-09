@@ -680,7 +680,7 @@
         }
     }
 
-function animatePanZoom(targetObject, targetZoom) {
+    function animatePanZoom(targetObject, targetZoom) {
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas || !targetObject) return;
 
@@ -689,35 +689,40 @@ function animatePanZoom(targetObject, targetZoom) {
 
         // Current viewport transform components
         const vpt = canvas.viewportTransform;
-        const currentZoom = vpt[0]; // Assuming uniform zoom
+        const currentZoom = vpt[0];
         const currentPanX = vpt[4];
         const currentPanY = vpt[5];
 
         // Calculate desired final pan to center the object AT THE TARGET ZOOM
-        // The center of the canvas (viewport) should align with the object's center point *after* it's scaled by targetZoom
         const finalPanX = (canvas.width / 2) - (objectCenter.x * targetZoom);
         const finalPanY = (canvas.height / 2) - (objectCenter.y * targetZoom);
 
-        console.log(`Animating Pan/Zoom. Current: Z=${currentZoom.toFixed(2)}, X=${currentPanX.toFixed(2)}, Y=${currentPanY.toFixed(2)}`);
-        console.log(`Target: Z=${targetZoom.toFixed(2)}, X=${finalPanX.toFixed(2)}, Y=${finalPanY.toFixed(2)} for obj center (${objectCenter.x}, ${objectCenter.y})`);
+        console.log(`Animating Pan/Zoom. From: Z=${currentZoom.toFixed(2)}, X=${currentPanX.toFixed(2)}, Y=${currentPanY.toFixed(2)}`);
+        console.log(`Targeting: Z=${targetZoom.toFixed(2)}, X=${finalPanX.toFixed(2)}, Y=${finalPanY.toFixed(2)} for obj center (${objectCenter.x.toFixed(2)}, ${objectCenter.y.toFixed(2)})`);
 
-
+        // Animate a dummy object or just use the progress value directly
         fabric.util.animate({
-            startValue: { zoom: currentZoom, panX: currentPanX, panY: currentPanY },
-            endValue: { zoom: targetZoom, panX: finalPanX, panY: finalPanY },
+            startValue: 0, // Animation progress from 0%
+            endValue: 1,   // to 100%
             duration: animationDuration,
-            onChange: function(values) {
-                canvas.setViewportTransform([values.zoom, 0, 0, values.zoom, values.panX, values.panY]);
-                canvas.renderAll();
+            onChange: function(progress) {
+                const newZoom = currentZoom + (targetZoom - currentZoom) * progress;
+                const newPanX = currentPanX + (finalPanX - currentPanX) * progress;
+                const newPanY = currentPanY + (finalPanY - currentPanY) * progress;
+
+                canvas.setViewportTransform([newZoom, 0, 0, newZoom, newPanX, newPanY]);
+                // Fabric's animate utility might not automatically render canvas on each tick
+                // when not animating a Fabric object property directly.
+                canvas.requestRenderAll(); 
             },
             onComplete: function() {
                 viewerApp.state.isCanvasPannedOrZoomed = true;
                 // Ensure final state is precise
                 canvas.setViewportTransform([targetZoom, 0, 0, targetZoom, finalPanX, finalPanY]);
-                canvas.renderAll();
+                canvas.renderAll(); // Final render
                 console.log("Pan/Zoom animation complete.");
             },
-            easing: fabric.util.ease.easeInOutQuad
+            easing: fabric.util.ease.easeInOutQuad // Smoother easing
         });
     }
 
@@ -725,6 +730,7 @@ function animatePanZoom(targetObject, targetZoom) {
         const canvas = viewerApp.state.viewerFabricCanvas;
 
         console.log("[ResetPanZoom] Called. Immediate:", immediate);
+        // ... (keep the detailed logging from the previous version here for diagnostics)
         console.log("  - canvas valid:", !!canvas);
         console.log("  - isCanvasPannedOrZoomed:", viewerApp.state.isCanvasPannedOrZoomed);
         console.log("  - originalViewportTransform type:", typeof viewerApp.state.originalViewportTransform);
@@ -735,10 +741,8 @@ function animatePanZoom(targetObject, targetZoom) {
             console.log("  - originalViewportTransform value: Not an array or null");
         }
 
-
         if (!canvas) {
             console.error("[ResetPanZoom] Aborting: Canvas object is null.");
-            // Attempt to clear state flags even if canvas is gone
             viewerApp.state.isCanvasPannedOrZoomed = false;
             viewerApp.state.panZoomTargetObject = null;
             viewerApp.state.originalViewportTransform = null;
@@ -746,14 +750,11 @@ function animatePanZoom(targetObject, targetZoom) {
         }
         if (!viewerApp.state.isCanvasPannedOrZoomed) {
             console.log("[ResetPanZoom] Aborting: Canvas not currently panned or zoomed (isCanvasPannedOrZoomed is false).");
-            // If originalViewportTransform still exists, it implies an inconsistent state.
-            // This might happen if an interaction reset the flag but not the transform fully.
             if (Array.isArray(viewerApp.state.originalViewportTransform)) {
                  console.warn("[ResetPanZoom] Inconsistent state: isCanvasPannedOrZoomed is false, but originalViewportTransform exists. Attempting hard reset to original.");
                  canvas.setViewportTransform(viewerApp.state.originalViewportTransform.slice());
                  canvas.renderAll();
             }
-            // Ensure all pan/zoom state is cleared
             viewerApp.state.isCanvasPannedOrZoomed = false;
             viewerApp.state.panZoomTargetObject = null;
             viewerApp.state.originalViewportTransform = null;
@@ -761,11 +762,8 @@ function animatePanZoom(targetObject, targetZoom) {
         }
         if (!Array.isArray(viewerApp.state.originalViewportTransform) || viewerApp.state.originalViewportTransform.length !== 6) {
             console.error("[ResetPanZoom] Aborting: originalViewportTransform is not a valid 6-element array. Cannot reset. Value:", viewerApp.state.originalViewportTransform);
-            // Even if we can't animate back, ensure the state flag is false so user isn't stuck
             viewerApp.state.isCanvasPannedOrZoomed = false;
             viewerApp.state.panZoomTargetObject = null;
-            // Do not clear originalViewportTransform here if it was invalid, might be needed for debugging
-            // but if it's not an array, it's unusable, so null it out.
             if (!Array.isArray(viewerApp.state.originalViewportTransform)) {
                  viewerApp.state.originalViewportTransform = null;
             }
@@ -775,20 +773,16 @@ function animatePanZoom(targetObject, targetZoom) {
         console.log("[ResetPanZoom] Conditions met, proceeding with reset.");
 
         const animationDuration = immediate ? 0 : 500;
-        const vpt = canvas.viewportTransform; // Current transform [a,b,c,d,e,f] -> [zoom,0,0,zoom,tx,ty] for us
+        const vpt = canvas.viewportTransform;
         const currentZoom = vpt[0];
         const currentPanX = vpt[4];
         const currentPanY = vpt[5];
 
-        const finalZoom = viewerApp.state.originalViewportTransform[0];
-        const finalPanX = viewerApp.state.originalViewportTransform[4];
-        const finalPanY = viewerApp.state.originalViewportTransform[5];
-        const finalOriginalVPT = viewerApp.state.originalViewportTransform.slice(); // Keep a copy before nulling
-
-        console.log(`Resetting Pan/Zoom. Current: Z=${currentZoom.toFixed(2)}, X=${currentPanX.toFixed(2)}, Y=${currentPanY.toFixed(2)}`);
-        console.log(`Target (Original): Z=${finalZoom.toFixed(2)}, X=${finalPanX.toFixed(2)}, Y=${finalPanY.toFixed(2)}`);
-
-        // Clear the target object now, as we are resetting away from it
+        const finalOriginalVPT = viewerApp.state.originalViewportTransform.slice(); // Secure a copy
+        const finalZoom = finalOriginalVPT[0];
+        const finalPanX = finalOriginalVPT[4];
+        const finalPanY = finalOriginalVPT[5];
+        
         viewerApp.state.panZoomTargetObject = null; 
 
         if (immediate) {
@@ -801,22 +795,22 @@ function animatePanZoom(targetObject, targetZoom) {
         }
 
         fabric.util.animate({
-            startValue: { zoom: currentZoom, panX: currentPanX, panY: currentPanY },
-            endValue: { zoom: finalZoom, panX: finalPanX, panY: finalPanY },
+            startValue: 0, // Animation progress 0%
+            endValue: 1,   // to 100%
             duration: animationDuration,
-            onChange: function(values) {
-                canvas.setViewportTransform([values.zoom, 0, 0, values.zoom, values.panX, values.panY]);
-                // renderAll is called by fabric.util.animate by default if a canvas is associated or if canvas.renderOnAddition is true
-                // but explicit call is safer if that's not the case or if we change default fabric settings
-                canvas.renderAll(); 
+            onChange: function(progress) {
+                const newZoom = currentZoom + (finalZoom - currentZoom) * progress;
+                const newPanX = currentPanX + (finalPanX - currentPanX) * progress;
+                const newPanY = currentPanY + (finalPanY - currentPanY) * progress;
+                
+                canvas.setViewportTransform([newZoom, 0, 0, newZoom, newPanX, newPanY]);
+                canvas.requestRenderAll();
             },
             onComplete: function() {
-                // Ensure final state is precise using the stored original
-                canvas.setViewportTransform(finalOriginalVPT);
+                canvas.setViewportTransform(finalOriginalVPT); // Ensure final state
                 viewerApp.state.isCanvasPannedOrZoomed = false;
-                // panZoomTargetObject was already cleared
-                viewerApp.state.originalViewportTransform = null; // Clear stored original
-                canvas.renderAll();
+                viewerApp.state.originalViewportTransform = null; 
+                canvas.renderAll(); // Final render
                 console.log("Pan/Zoom reset animation complete.");
             },
             easing: fabric.util.ease.easeInOutQuad

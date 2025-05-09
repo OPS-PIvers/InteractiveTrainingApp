@@ -394,7 +394,43 @@
                         <input type="number" id="objPanZoomLevel" class="sidebar-input" step="0.1" min="0.1" value="1.5">
                     </div>
                 </div>
+                              <!-- New Animation Section -->
+              < div class="toolbar-section">
+                   <h4>Animations</h4>
+                   <label for="objAnimationTrigger">Anim. Trigger:</label>
+                   <select id="objAnimationTrigger" class="sidebar-input">
+                       <option value="">None</option>
+                       <option value="onLoad">On Slide Load</option>
+                       <option value="onHover">On Hover</option>
+                       <option value="onClick">On Click</option>
+                   </select><br>
 
+                   <label for="objAnimationType">Anim. Type:</label>
+                   <select id="objAnimationType" class="sidebar-input">
+                       <option value="">None</option>
+                       <option value="wiggle">Wiggle</option>
+                       <option value="float">Float</option>
+                       <option value="growShrink">Grow/Shrink</option>
+                       <!-- Add more animation types later if needed -->
+                   </select><br>
+
+                   <div id="animationParamsConfig" style="display:none;">
+                       <label for="objAnimationDuration">Duration (ms):</label>
+                       <input type="number" id="objAnimationDuration" class="sidebar-input" min="100" step="50" value="500"><br>
+                      
+                       <label for="objAnimationStrength">Strength:</label>
+                       <input type="number" id="objAnimationStrength" class="sidebar-input" step="0.1" value="5">
+                       <span id="objAnimationStrengthUnit" style="font-size:0.8em; margin-left:5px;">(pixels/degrees/scale)</span>
+                   </div>
+                </div>
+
+                <div class="toolbar-section">
+                    <h4>Actions</h4>
+                    <button id="deleteOverlayButton" class="danger-button">Delete Overlay</button>
+                    <button id="duplicateOverlayButton">Duplicate Overlay</button>
+                    <button id="bringToFrontButton">Bring to Front</button>
+                    <button id="sendToBackButton">Send to Back</button>
+                </div>
             </div>
         </div>
 

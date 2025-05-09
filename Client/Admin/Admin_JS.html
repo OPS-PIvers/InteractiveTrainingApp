@@ -36,8 +36,13 @@
         objInteractionTriggerEl, objInteractionActionEl,
         modalContentConfigEl, objModalContentEl,
         navigateToConfigEl, objNavigateToEl,
+        panZoomConfigEl, objPanZoomLevelEl, // These are for Pan/Zoom
+        objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl,
         objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl,
         objShadowAffectStrokeEl, objShadowNonScalingEl,
+        objAnimationTriggerEl, objAnimationTypeEl, animationParamsConfigEl,
+        objAnimationDurationEl, objAnimationStrengthEl, objAnimationStrengthUnitEl,
+
         // Step 20 Media Elements
         youtubeUrlInputEl, setYoutubeBackgroundButtonEl,
         audioUploaderEl, /* attachAudioButtonEl, */ attachedAudioNameEl, removeAudioButtonEl, // Removed attachAudioButtonEl reference as we trigger on change
@@ -105,6 +110,8 @@
       objModalContentEl = document.getElementById('objModalContent');
       navigateToConfigEl = document.getElementById('navigateToConfig');
       objNavigateToEl = document.getElementById('objNavigateTo');
+      panZoomConfigEl = document.getElementById('panZoomConfigEl');
+      objPanZoomLevelEl = document.getElementById('objPanZoomLevel');
 
       objFontFamilyEl = document.getElementById('objFontFamily');
       objFontSizeEl = document.getElementById('objFontSize');
@@ -115,6 +122,15 @@
       objCharSpacingEl = document.getElementById('objCharSpacing');
       objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
       objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
+
+
+
+      objAnimationTriggerEl = document.getElementById('objAnimationTrigger');
+      objAnimationTypeEl = document.getElementById('objAnimationType');
+      animationParamsConfigEl = document.getElementById('animationParamsConfig');
+      objAnimationDurationEl = document.getElementById('objAnimationDuration');
+      objAnimationStrengthEl = document.getElementById('objAnimationStrength');
+      objAnimationStrengthUnitEl = document.getElementById('objAnimationStrengthUnit');
 
       // Step 20 Elements
       youtubeUrlInputEl = document.getElementById('youtubeUrlInput');
@@ -1207,6 +1223,28 @@
             objNavigateToEl.addEventListener('input', handleInteractionChange);
             objNavigateToEl.setAttribute('listener-attached', 'true');
        }
+       if (objPanZoomLevelEl && !objPanZoomLevelEl.hasAttribute('listener-attached')) {
+            objPanZoomLevelEl.addEventListener('input', handleInteractionChange);
+            objPanZoomLevelEl.setAttribute('listener-attached', 'true');
+        }
+
+      // Animation listeners
+      if (objAnimationTriggerEl && !objAnimationTriggerEl.hasAttribute('listener-attached')) {
+           objAnimationTriggerEl.addEventListener('change', handleAnimationChange);
+           objAnimationTriggerEl.setAttribute('listener-attached', 'true');
+       }
+       if (objAnimationTypeEl && !objAnimationTypeEl.hasAttribute('listener-attached')) {
+            objAnimationTypeEl.addEventListener('change', handleAnimationChange);
+            objAnimationTypeEl.setAttribute('listener-attached', 'true');
+       }
+       if (objAnimationDurationEl && !objAnimationDurationEl.hasAttribute('listener-attached')) {
+            objAnimationDurationEl.addEventListener('input', handleAnimationChange);
+            objAnimationDurationEl.setAttribute('listener-attached', 'true');
+       }
+       if (objAnimationStrengthEl && !objAnimationStrengthEl.hasAttribute('listener-attached')) {
+            objAnimationStrengthEl.addEventListener('input', handleAnimationChange);
+            objAnimationStrengthEl.setAttribute('listener-attached', 'true');
+       }
     }
 
     function populateToolbar(activeObject) {
@@ -1257,6 +1295,19 @@
       if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
       if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
       updateInteractionConfigVisibility(interaction.action);
+
+      // --- Animation Properties ---
+      const animation = activeObject.customAnimation || { trigger: "", type: "", duration: 500, strength: 5 };
+      if (objAnimationTriggerEl) objAnimationTriggerEl.value = animation.trigger || "";
+      if (objAnimationTypeEl) objAnimationTypeEl.value = animation.type || "";
+
+      const showAnimParams = !!(animation.trigger && animation.type);
+      if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none';
+
+      if (showAnimParams) {
+      if (objAnimationDurationEl) objAnimationDurationEl.value = animation.duration || 500;
+      if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
+      updateAnimationStrengthUnit(animation.type);
     }
 
     function handleInteractionChange() {
@@ -1289,6 +1340,52 @@
         // Add similar logic here later if Spotlight/Reveal get specific parameters requiring UI elements
         // For instance, if "spotlight" had a color input, it would be handled here.
     }
+    
+    function handleAnimationChange() {
+        const canvas = adminApp.state.fabricCanvasInstance;
+        if (!canvas) return;
+        const activeObject = canvas.getActiveObject();
+        if (!activeObject) return;
+
+        if (!activeObject.customAnimation) {
+            activeObject.customAnimation = { trigger: "", type: "", duration: 500, strength: 5 };
+        }
+
+        if (objAnimationTriggerEl) activeObject.customAnimation.trigger = objAnimationTriggerEl.value;
+        if (objAnimationTypeEl) activeObject.customAnimation.type = objAnimationTypeEl.value;
+
+        const showAnimParams = !!(activeObject.customAnimation.trigger && activeObject.customAnimation.type);
+        if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none';
+
+        if (showAnimParams) {
+            if (objAnimationDurationEl) activeObject.customAnimation.duration = parseInt(objAnimationDurationEl.value, 10) || 500;
+            if (objAnimationStrengthEl) activeObject.customAnimation.strength = parseFloat(objAnimationStrengthEl.value) || 5;
+            updateAnimationStrengthUnit(activeObject.customAnimation.type);
+        } else {
+            // If trigger or type is none, effectively clear other params for consistency
+            activeObject.customAnimation.duration = 500; // Reset to default
+            activeObject.customAnimation.strength = 5;  // Reset to default
+        }
+        console.log("Animation data updated for object:", activeObject.customAnimation);
+    }
+
+    function updateAnimationStrengthUnit(animationType) {
+        if (!objAnimationStrengthUnitEl) return;
+        let unitText = "(pixels/degrees/scale)"; // Default generic
+            switch(animationType) {
+                case 'wiggle':
+                    unitText = "(degrees)";
+            break;
+                case 'float':
+                    unitText = "(pixels)";
+            break;
+                case 'growShrink':
+                    unitText = "(scale factor e.g., 1.2)";
+            break;
+            }
+        objAnimationStrengthUnitEl.textContent = unitText;
+    }
+
     function updateFabricObjectFromToolbar(propertyName, value, inputType) {
       const canvas = adminApp.state.fabricCanvasInstance;
       if (!canvas) return;
@@ -1330,4 +1427,4 @@
 
     Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
 
-  </script>
+</script>

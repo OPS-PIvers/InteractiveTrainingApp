@@ -342,50 +342,53 @@
             console.error("Invalid slide index:", slideIndex); return;
         }
 
-        // --- Cleanup Previous Slide Media FIRST ---
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
-        // Also remove any lingering spotlight effect from previous slide
-        hideSpotlightSVG(); // Ensure spotlight is cleared when changing slides
+        hideSpotlightSVG();
 
 
-        viewerApp.state.currentSlideIndex = slideIndex; // Update state *before* using it
+        viewerApp.state.currentSlideIndex = slideIndex;
         const slideData = slides[slideIndex];
         const canvas = viewerApp.state.viewerFabricCanvas;
 
-        // Ensure slideMedia exists
          if (!slideData.slideMedia) {
             slideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
          }
 
-        // Set canvas dimensions and container dimensions
         const slideWidth = slideData.canvasWidth || viewerApp.state.defaultCanvasWidth;
         const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
         const media = slideData.slideMedia;
         let mediaType = (media && media.type) ? media.type : 'none';
 
-        // Set canvas element size regardless of media type now
         canvas.setWidth(slideWidth);
         canvas.setHeight(slideHeight);
         if (viewerFabricCanvasEl) {
             viewerFabricCanvasEl.width = slideWidth;
             viewerFabricCanvasEl.height = slideHeight;
+            // --- ADDRESS FABRIC WARNING ---
+            // Get the underlying 2D context of the Fabric canvas element
+            const fabricContext = viewerFabricCanvasEl.getContext('2d', { willReadFrequently: true });
+            // Note: Fabric.js might re-create its internal contexts.
+            // A more robust way is to set this on Fabric's own internal canvas elements if accessible,
+            // or set it on the main canvas element Fabric uses. This is a good start.
+            // Fabric.js itself also has canvas.willReadFrequently as of later versions.
+            if (canvas.lowerCanvasEl) canvas.lowerCanvasEl.getContext('2d').willReadFrequently = true;
+            if (canvas.upperCanvasEl) canvas.upperCanvasEl.getContext('2d').willReadFrequently = true;
+            // --- END ADDRESS FABRIC WARNING ---
+
         }
-        // Adjust media container size
         if (viewerMediaContainerEl) {
             viewerMediaContainerEl.style.width = slideWidth + 'px';
             viewerMediaContainerEl.style.height = slideHeight + 'px';
         }
 
-        // Clear canvas objects and background image
         canvas.clear();
         canvas.setBackgroundImage(null, () => { canvas.renderAll(); });
         canvas.backgroundColor = 'transparent';
 
-        // Hide/show containers based on media type
         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = (mediaType === 'youtube') ? 'block' : 'none';
-        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = (mediaType === 'youtube') ? 'none' : 'flex'; // Show unless YT
-        if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'none'; // Hide audio initially
+        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = (mediaType === 'youtube') ? 'none' : 'flex';
+        if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'none';
 
         console.log(`Rendering slide ${slideIndex + 1}, media type: ${mediaType}`);
 
@@ -404,35 +407,26 @@
                      canvas.renderAll();
                 }
                 break;
-
             case 'youtube':
                 if (media.url) {
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
-                        // Canvas container is already hidden
-                        if (isYouTubeApiReady) {
-                             setupYouTubePlayer(videoId);
-                        } else {
-                             console.warn("YouTube API not ready yet when trying to render slide.");
-                        }
-                         // No canvas background setting needed
+                        if (isYouTubeApiReady) setupYouTubePlayer(videoId);
+                        else console.warn("YouTube API not ready yet when trying to render slide.");
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
-                         // Show canvas container with error BG if YT fails
                          if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
                          canvas.backgroundColor = '#555';
                          canvas.renderAll();
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
-                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas
+                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
                      canvas.backgroundColor = '#e9e9e9';
                      canvas.renderAll();
                 }
                 break;
-
             case 'audio':
-                 // Canvas container is already visible
                  if (media.driveFileId) {
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true);
@@ -465,15 +459,12 @@
                      canvas.renderAll();
                  }
                  break;
-
-            default: // 'none' or unknown
-                 // Canvas container is already visible
+            default:
                  canvas.backgroundColor = '#e9e9e9';
                  canvas.renderAll();
                  break;
         }
 
-        // Load Fabric objects (overlays) ONLY if canvas container is visible
         if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none' && slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) return;
@@ -485,59 +476,58 @@
                     obj._clickAndHoldTimer = null;
                     obj.perPixelTargetFind = true; 
 
-                    // Store original opacity for hover-reveal if needed.
-                    // For now, we assume admin sets initial opacity to 0 for revealable objects.
-                    // If you want to revert to the object's actual saved opacity:
-                    // obj.originalOpacity = obj.opacity;
+                    obj.off('mousedown'); obj.off('mouseup'); obj.off('mouseout');
+                    obj.off('mousemove'); obj.off('mouseover');
 
-
-                    obj.off('mousedown');
-                    obj.off('mouseup');
-                    obj.off('mouseout');
-                    obj.off('mousemove'); 
-                    obj.off('mouseover');
-
-                    // Attach interaction listeners
                     if (obj.customInteraction && obj.customInteraction.trigger) {
                         const trigger = obj.customInteraction.trigger;
                         const action = obj.customInteraction.action;
 
-                        if (trigger === 'hover' && action === 'spotlight') {
-                            obj.on('mouseover', function() {
-                                if (this.customInteraction && this.customInteraction.trigger === 'hover' && this.customInteraction.action === 'spotlight') {
-                                    showSpotlightSVG(this, this.customInteraction);
-                                }
-                            });
-                            obj.on('mouseout', function() {
-                                hideSpotlightSVG();
-                            });
+                        // Prioritize specific hover interactions
+                        if (trigger === 'hover') {
+                            if (action === 'spotlight') {
+                                obj.on('mouseover', function() {
+                                    if (this.customInteraction && this.customInteraction.action === 'spotlight') { // Double check action
+                                        showSpotlightSVG(this, this.customInteraction);
+                                    }
+                                });
+                                obj.on('mouseout', function() {
+                                     // Only hide if this spotlight was from this object, or rely on global hide
+                                     if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
+                                        hideSpotlightSVG();
+                                    } else if (!viewerApp.state.isSpotlightActive) { // If no spotlight is active, ensure it is hidden (e.g. rapid mouse movements)
+                                        hideSpotlightSVG();
+                                    }
+                                });
+                            } else if (action === 'reveal') {
+                                // Ensure admin set initial opacity of this object to 0 (or very low)
+                                obj.on('mouseover', function() {
+                                    if (this.customInteraction && this.customInteraction.action === 'reveal') {
+                                        this.animate('opacity', 1, {
+                                            duration: 250,
+                                            onChange: canvas.renderAll.bind(canvas)
+                                        });
+                                    }
+                                });
+                                obj.on('mouseout', function() {
+                                    if (this.customInteraction && this.customInteraction.action === 'reveal') {
+                                        this.animate('opacity', 0, { 
+                                            duration: 250,
+                                            onChange: canvas.renderAll.bind(canvas)
+                                        });
+                                    }
+                                });
+                            } else { 
+                                // Generic hover actions that go through handleOverlayInteraction
+                                obj.on('mouseover', function() {
+                                    if (this.customInteraction && this.customInteraction.trigger === 'hover') { // Check trigger again
+                                        handleOverlayInteraction(this, 'hover');
+                                    }
+                                });
+                                // Potentially add mouseout handler for generic hover if needed
+                            }
                         } 
-                        // --- NEW: Hover to Reveal (self, temporary) ---
-                        else if (trigger === 'hover' && action === 'reveal') {
-                            // The admin should set the initial opacity of this object to 0 (or very low).
-                            obj.on('mouseover', function() {
-                                if (this.customInteraction && this.customInteraction.trigger === 'hover' && this.customInteraction.action === 'reveal') {
-                                    console.log('Hover-Reveal: mouseover on', this.type, 'current opacity:', this.opacity);
-                                    this.animate('opacity', 1, {
-                                        duration: 250, // Quick reveal
-                                        onChange: canvas.renderAll.bind(canvas)
-                                    });
-                                }
-                            });
-                            obj.on('mouseout', function() {
-                                if (this.customInteraction && this.customInteraction.trigger === 'hover' && this.customInteraction.action === 'reveal') {
-                                    console.log('Hover-Reveal: mouseout on', this.type);
-                                    // Animate back to a hidden state.
-                                    // Assumes admin set initial opacity to 0 or low for this object.
-                                    // If you stored obj.originalOpacity, animate to that instead of 0.
-                                    this.animate('opacity', 0, { 
-                                        duration: 250, // Quick hide
-                                        onChange: canvas.renderAll.bind(canvas)
-                                    });
-                                }
-                            });
-                        }
-                        // --- END NEW: Hover to Reveal (self, temporary) ---
+                        // Other triggers
                         else if (trigger === 'click') {
                             obj.on('mousedown', function(options) {
                                 if (this.customInteraction && this.customInteraction.trigger === 'click') {
@@ -549,26 +539,16 @@
                                     if(options.e) options.e.stopPropagation();
                                 }
                             });
-                        } 
-                        // Ensure other hover actions (if any defined later) still go to handler
-                        else if (trigger === 'hover' && action !== 'spotlight' && action !== 'reveal') { 
-                             obj.on('mouseover', function() {
-                                if (this.customInteraction && this.customInteraction.trigger === 'hover') {
-                                    handleOverlayInteraction(this, 'hover');
-                                }
-                            });
                         } else if (trigger === 'clickAndHold') {
                             obj.on('mousedown', function(options) {
                                 console.log("ClickAndHold: mousedown on", this.type, this);
                                 if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
-
                                 this._clickAndHoldTimer = setTimeout(() => {
                                     console.log("ClickAndHold: Timer fired for", this.type, this);
                                     handleOverlayInteraction(this, 'clickAndHold');
                                     this._clickAndHoldTimer = null; 
                                 }, CLICK_AND_HOLD_DURATION);
                             });
-
                             const cancelHold = function() {
                                 if (this._clickAndHoldTimer) {
                                     console.log("ClickAndHold: Cancelling hold due to mouseup/mouseout for", this.type, this);
@@ -577,7 +557,7 @@
                                 }
                             };
                             obj.on('mouseup', cancelHold);
-                            obj.on('mouseout', cancelHold);
+                            obj.on('mouseout', cancelHold); // Mouseout also cancels hold
                         }
                     }
                 });
@@ -590,7 +570,7 @@
         }
         updateSlideNavigationUI(); 
     }
-
+    
     // --- Interaction & Modal Handling ---
     function handleOverlayInteraction(fabricObject, eventType) {
         if (!fabricObject.customInteraction) return;

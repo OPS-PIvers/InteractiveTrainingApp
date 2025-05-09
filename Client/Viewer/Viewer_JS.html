@@ -328,13 +328,15 @@
             // Listener for resetting pan/zoom on background click
             viewerApp.state.viewerFabricCanvas.on('mouse:down', function(options) {
                 if (viewerApp.state.isCanvasPannedOrZoomed && !options.target) { // No object clicked, means background
-                    console.log("Background clicked, resetting pan/zoom.");
+                    console.log("Canvas background clicked while panned/zoomed, initiating reset.");
                     resetPanZoomWithAnimation();
                 } else if (viewerApp.state.isCanvasPannedOrZoomed && options.target && options.target === viewerApp.state.panZoomTargetObject) {
                     // If the same panned/zoomed object is clicked again, reset.
-                    console.log("Panned/zoomed object clicked again, resetting pan/zoom.");
+                    console.log("Panned/zoomed target object clicked again, initiating reset.");
                     resetPanZoomWithAnimation();
                 }
+                // If options.target is another interactive object, its own 'mousedown' (from renderSlideForViewing)
+                // will call handleOverlayInteraction, which has its own logic to reset zoom if needed.
             });
             viewerApp.state.viewerFabricCanvas.renderAll(); 
             console.log("Viewer canvas initialized.");
@@ -721,22 +723,59 @@ function animatePanZoom(targetObject, targetZoom) {
 
     function resetPanZoomWithAnimation(immediate = false) {
         const canvas = viewerApp.state.viewerFabricCanvas;
-        // Ensure originalViewportTransform is an array: [zoom, 0, 0, zoom, tx, ty]
-        if (!canvas || !viewerApp.state.isCanvasPannedOrZoomed || !Array.isArray(viewerApp.state.originalViewportTransform)) {
-            console.log("ResetPanZoom: Conditions not met or original transform invalid.");
-            // Attempt a hard reset if original transform is somehow available but state flag is off
-            if (canvas && Array.isArray(viewerApp.state.originalViewportTransform)) {
-                 canvas.setViewportTransform(viewerApp.state.originalViewportTransform.slice());
-                 canvas.renderAll();
-            }
+
+        console.log("[ResetPanZoom] Called. Immediate:", immediate);
+        console.log("  - canvas valid:", !!canvas);
+        console.log("  - isCanvasPannedOrZoomed:", viewerApp.state.isCanvasPannedOrZoomed);
+        console.log("  - originalViewportTransform type:", typeof viewerApp.state.originalViewportTransform);
+        console.log("  - originalViewportTransform isArray:", Array.isArray(viewerApp.state.originalViewportTransform));
+        if(Array.isArray(viewerApp.state.originalViewportTransform)) {
+            console.log("  - originalViewportTransform value:", JSON.stringify(viewerApp.state.originalViewportTransform));
+        } else {
+            console.log("  - originalViewportTransform value: Not an array or null");
+        }
+
+
+        if (!canvas) {
+            console.error("[ResetPanZoom] Aborting: Canvas object is null.");
+            // Attempt to clear state flags even if canvas is gone
             viewerApp.state.isCanvasPannedOrZoomed = false;
             viewerApp.state.panZoomTargetObject = null;
             viewerApp.state.originalViewportTransform = null;
             return;
         }
+        if (!viewerApp.state.isCanvasPannedOrZoomed) {
+            console.log("[ResetPanZoom] Aborting: Canvas not currently panned or zoomed (isCanvasPannedOrZoomed is false).");
+            // If originalViewportTransform still exists, it implies an inconsistent state.
+            // This might happen if an interaction reset the flag but not the transform fully.
+            if (Array.isArray(viewerApp.state.originalViewportTransform)) {
+                 console.warn("[ResetPanZoom] Inconsistent state: isCanvasPannedOrZoomed is false, but originalViewportTransform exists. Attempting hard reset to original.");
+                 canvas.setViewportTransform(viewerApp.state.originalViewportTransform.slice());
+                 canvas.renderAll();
+            }
+            // Ensure all pan/zoom state is cleared
+            viewerApp.state.isCanvasPannedOrZoomed = false;
+            viewerApp.state.panZoomTargetObject = null;
+            viewerApp.state.originalViewportTransform = null;
+            return;
+        }
+        if (!Array.isArray(viewerApp.state.originalViewportTransform) || viewerApp.state.originalViewportTransform.length !== 6) {
+            console.error("[ResetPanZoom] Aborting: originalViewportTransform is not a valid 6-element array. Cannot reset. Value:", viewerApp.state.originalViewportTransform);
+            // Even if we can't animate back, ensure the state flag is false so user isn't stuck
+            viewerApp.state.isCanvasPannedOrZoomed = false;
+            viewerApp.state.panZoomTargetObject = null;
+            // Do not clear originalViewportTransform here if it was invalid, might be needed for debugging
+            // but if it's not an array, it's unusable, so null it out.
+            if (!Array.isArray(viewerApp.state.originalViewportTransform)) {
+                 viewerApp.state.originalViewportTransform = null;
+            }
+            return;
+        }
+        
+        console.log("[ResetPanZoom] Conditions met, proceeding with reset.");
 
         const animationDuration = immediate ? 0 : 500;
-        const vpt = canvas.viewportTransform;
+        const vpt = canvas.viewportTransform; // Current transform [a,b,c,d,e,f] -> [zoom,0,0,zoom,tx,ty] for us
         const currentZoom = vpt[0];
         const currentPanX = vpt[4];
         const currentPanY = vpt[5];
@@ -744,15 +783,18 @@ function animatePanZoom(targetObject, targetZoom) {
         const finalZoom = viewerApp.state.originalViewportTransform[0];
         const finalPanX = viewerApp.state.originalViewportTransform[4];
         const finalPanY = viewerApp.state.originalViewportTransform[5];
+        const finalOriginalVPT = viewerApp.state.originalViewportTransform.slice(); // Keep a copy before nulling
 
         console.log(`Resetting Pan/Zoom. Current: Z=${currentZoom.toFixed(2)}, X=${currentPanX.toFixed(2)}, Y=${currentPanY.toFixed(2)}`);
         console.log(`Target (Original): Z=${finalZoom.toFixed(2)}, X=${finalPanX.toFixed(2)}, Y=${finalPanY.toFixed(2)}`);
 
+        // Clear the target object now, as we are resetting away from it
+        viewerApp.state.panZoomTargetObject = null; 
+
         if (immediate) {
-            canvas.setViewportTransform(viewerApp.state.originalViewportTransform.slice());
+            canvas.setViewportTransform(finalOriginalVPT);
             viewerApp.state.isCanvasPannedOrZoomed = false;
-            viewerApp.state.panZoomTargetObject = null;
-            viewerApp.state.originalViewportTransform = null;
+            viewerApp.state.originalViewportTransform = null; 
             canvas.renderAll();
             console.log("Pan/Zoom reset immediately.");
             return;
@@ -764,13 +806,15 @@ function animatePanZoom(targetObject, targetZoom) {
             duration: animationDuration,
             onChange: function(values) {
                 canvas.setViewportTransform([values.zoom, 0, 0, values.zoom, values.panX, values.panY]);
-                canvas.renderAll();
+                // renderAll is called by fabric.util.animate by default if a canvas is associated or if canvas.renderOnAddition is true
+                // but explicit call is safer if that's not the case or if we change default fabric settings
+                canvas.renderAll(); 
             },
             onComplete: function() {
-                // Ensure final state is precise
-                canvas.setViewportTransform(viewerApp.state.originalViewportTransform.slice());
+                // Ensure final state is precise using the stored original
+                canvas.setViewportTransform(finalOriginalVPT);
                 viewerApp.state.isCanvasPannedOrZoomed = false;
-                viewerApp.state.panZoomTargetObject = null;
+                // panZoomTargetObject was already cleared
                 viewerApp.state.originalViewportTransform = null; // Clear stored original
                 canvas.renderAll();
                 console.log("Pan/Zoom reset animation complete.");
@@ -778,7 +822,6 @@ function animatePanZoom(targetObject, targetZoom) {
             easing: fabric.util.ease.easeInOutQuad
         });
     }
-
 
     function showViewerModal(htmlContent) {
         if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;

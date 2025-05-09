@@ -1274,9 +1274,20 @@
     }
 
     function updateInteractionConfigVisibility(action) {
-        if (modalContentConfigEl) modalContentConfigEl.style.display = (action === 'showModal') ? 'block' : 'none';
-        if (navigateToConfigEl) navigateToConfigEl.style.display = (action === 'navigateToSlide' || action === 'navigateToURL') ? 'block' : 'none';
+        const showModal = action === 'showModal';
+        const showNavigate = action === 'navigateToSlide' || action === 'navigateToURL';
+        // Pan/Zoom currently has no specific config fields
+        // const showPanZoomConfig = action === 'panZoomToTarget';
+
+        if (modalContentConfigEl) modalContentConfigEl.style.display = showModal ? 'block' : 'none';
+        if (navigateToConfigEl) navigateToConfigEl.style.display = showNavigate ? 'block' : 'none';
+
+        // Hide all specific config sections if not relevant
+        if (!showModal && modalContentConfigEl) modalContentConfigEl.style.display = 'none';
+        if (!showNavigate && navigateToConfigEl) navigateToConfigEl.style.display = 'none';
+
         // Add similar logic here later if Spotlight/Reveal get specific parameters requiring UI elements
+        // For instance, if "spotlight" had a color input, it would be handled here.
     }
     function updateFabricObjectFromToolbar(propertyName, value, inputType) {
       const canvas = adminApp.state.fabricCanvasInstance;

@@ -493,18 +493,45 @@
                     // Attach interaction listeners
                     if (obj.customInteraction && obj.customInteraction.trigger) {
                         const trigger = obj.customInteraction.trigger;
+                        const action = obj.customInteraction.action;
 
-                        if (trigger === 'click') {
+                        // Special handling for "Click and Hold" + "Spotlight" (SVG Mask version)
+                        if (trigger === 'clickAndHold' && action === 'spotlight') {
                             obj.on('mousedown', function(options) {
-                                // Ensure this specific mousedown is for a 'click' trigger
-                                if (this.customInteraction && this.customInteraction.trigger === 'click') {
-                                    // If a click-and-hold timer was somehow pending for this object, clear it.
-                                    if (this._clickAndHoldTimer) {
-                                        clearTimeout(this._clickAndHoldTimer);
-                                        this._clickAndHoldTimer = null;
-                                        console.log("ClickAndHold: Timer cleared by click for", this.type);
+                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
+                                    console.log("Hold-Spotlight: mousedown, showing spotlight for", this.type);
+                                    showSpotlightSVG(this, this.customInteraction);
+                                    // We don't stop propagation here as the target itself might be clicked again to dismiss a non-hold spotlight
+                                    // However, for hold, the mouseup/mouseout on THIS object should dismiss.
+                                }
+                            });
+                            obj.on('mouseup', function() {
+                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
+                                     // Only hide if the *current* spotlight target is this object
+                                    if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
+                                        console.log("Hold-Spotlight: mouseup, hiding spotlight for", this.type);
+                                        hideSpotlightSVG();
                                     }
-                                    handleOverlayInteraction(this, 'click'); // 'click' is the eventType
+                                }
+                            });
+                            obj.on('mouseout', function() { // If mouse leaves while still holding
+                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
+                                     // Only hide if the *current* spotlight target is this object
+                                    if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
+                                        console.log("Hold-Spotlight: mouseout, hiding spotlight for", this.type);
+                                        hideSpotlightSVG();
+                                    }
+                                }
+                            });
+                        }
+                        // General click, hover, and other clickAndHold actions
+                        else if (trigger === 'click') {
+                            obj.on('mousedown', function(options) {
+                                if (this.customInteraction && this.customInteraction.trigger === 'click') {
+                                    if (this._clickAndHoldTimer) { // Clear any pending hold timer from other configs
+                                        clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null;
+                                    }
+                                    handleOverlayInteraction(this, 'click');
                                     if(options.e) options.e.stopPropagation();
                                 }
                             });
@@ -514,34 +541,24 @@
                                     handleOverlayInteraction(this, 'hover');
                                 }
                             });
-                            // Note: You might want a 'mouseout' handler here if hover needs to be undone
-                        } else if (trigger === 'clickAndHold') {
+                            // Note: you might need a mouseout for hover "undo" actions later
+                        } else if (trigger === 'clickAndHold') { // For actions OTHER than spotlight
                             obj.on('mousedown', function(options) {
-                                // This specific 'this' is the Fabric object
-                                console.log("ClickAndHold: mousedown on", this.type, this);
-                                // Clear any existing timer *for this object*
-                                if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
-
-                                this._clickAndHoldTimer = setTimeout(() => {
-                                    console.log("ClickAndHold: Timer fired for", this.type, this);
-                                    // Ensure the event is marked as 'clickAndHold' for handleOverlayInteraction
-                                    handleOverlayInteraction(this, 'clickAndHold');
-                                    this._clickAndHoldTimer = null; // Reset timer after firing
-                                }, CLICK_AND_HOLD_DURATION);
-
-                                // Do not stop propagation here, allow other mousedown listeners if any
-                                // (though typically, one trigger per object is best)
+                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold') { // Check trigger again
+                                    if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
+                                    this._clickAndHoldTimer = setTimeout(() => {
+                                        handleOverlayInteraction(this, 'clickAndHold');
+                                        this._clickAndHoldTimer = null;
+                                    }, CLICK_AND_HOLD_DURATION);
+                                }
                             });
-
-                            const cancelHold = function() {
+                            const cancelGenericHold = function() {
                                 if (this._clickAndHoldTimer) {
-                                    console.log("ClickAndHold: Cancelling hold due to mouseup/mouseout for", this.type, this);
-                                    clearTimeout(this._clickAndHoldTimer);
-                                    this._clickAndHoldTimer = null;
+                                    clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null;
                                 }
                             };
-                            obj.on('mouseup', cancelHold);
-                            obj.on('mouseout', cancelHold);
+                            obj.on('mouseup', cancelGenericHold);
+                            obj.on('mouseout', cancelGenericHold);
                         }
                     }
                 });
@@ -637,6 +654,26 @@
                      showSpotlightSVG(fabricObject, interaction);
                  }
                  break;
+            case 'panZoomToTarget':
+                // hideSpotlightSVG(); // Already handled if spotlight was active
+                console.log("Pan/Zoom to Target action triggered for:", fabricObject);
+                if (fabricObject && viewerApp.state.viewerFabricCanvas) {
+                    const canvas = viewerApp.state.viewerFabricCanvas;
+                    const centerPoint = fabricObject.getCenterPoint();
+                    const desiredZoomLevel = 1.5; // Or make this configurable later
+
+                    // canvas.viewportCenterObject(fabricObject); // This centers without zoom
+                    // canvas.setZoom(desiredZoomLevel);
+
+                    canvas.zoomToPoint(new fabric.Point(centerPoint.x, centerPoint.y), desiredZoomLevel);
+                    // Note: zoomToPoint pans the canvas so that the given point is the new center of the viewport
+                    // and then applies the zoom. If you want the object to appear larger at its *current*
+                    // screen position, you might need viewportTransform calculations.
+                    // For a simple "zoom in on this object", zoomToPoint is often good.
+                    canvas.renderAll();
+                    console.log(`Pan/Zoomed to point (${centerPoint.x}, ${centerPoint.y}) with zoom ${desiredZoomLevel}`);
+                }
+                break;
             case 'reveal':
                  console.log("Reveal action triggered for:", fabricObject);
                  if (fabricObject && viewerApp.state.viewerFabricCanvas) {

@@ -490,7 +490,7 @@
                     obj.off('mousemove'); 
                     obj.off('mouseover');
 
-                    // Attach interaction listeners
+                    // --- Attach Interaction & Animation Listeners ---
                     if (obj.customInteraction && obj.customInteraction.trigger) {
                         const trigger = obj.customInteraction.trigger;
                         const action = obj.customInteraction.action;
@@ -499,14 +499,12 @@
                         if (trigger === 'clickAndHold' && action === 'spotlight') {
                             obj.on('mousedown', function(options) {
                                 if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
-                                    console.log("Hold-Spotlight: mousedown, showing spotlight for", this.type);
                                     showSpotlightSVG(this, this.customInteraction);
                                 }
                             });
                             obj.on('mouseup', function() {
                                 if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
                                     if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
-                                        console.log("Hold-Spotlight: mouseup, hiding spotlight for", this.type);
                                         hideSpotlightSVG();
                                     }
                                 }
@@ -514,7 +512,6 @@
                             obj.on('mouseout', function() { 
                                 if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
                                     if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
-                                        console.log("Hold-Spotlight: mouseout, hiding spotlight for", this.type);
                                         hideSpotlightSVG();
                                     }
                                 }
@@ -528,13 +525,27 @@
                                         clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null;
                                     }
                                     handleOverlayInteraction(this, 'click');
+                                    // Animation on click (if also configured)
+                                    if (this.customAnimation && this.customAnimation.trigger === 'onClick' && this.customAnimation.type) {
+                                        executeAnimation(this, this.customAnimation);
+                                    }
                                     if(options.e) options.e.stopPropagation();
                                 }
                             });
                         } else if (trigger === 'hover') {
-                             obj.on('mouseover', function() {
+                            obj.on('mouseover', function() {
                                 if (this.customInteraction && this.customInteraction.trigger === 'hover') {
                                     handleOverlayInteraction(this, 'hover');
+                                }
+                                // Animation on hover (if also configured)
+                                if (this.customAnimation && this.customAnimation.trigger === 'onHover' && this.customAnimation.type) {
+                                    executeAnimation(this, this.customAnimation);
+                                }
+                            });
+                            // Optionally, add mouseout to stop/reset hover animations if needed
+                            obj.on('mouseout', function() {
+                                if (this.customAnimation && this.customAnimation.trigger === 'onHover' && this.customAnimation.type) {
+                                    stopAnimation(this); // Implement stopAnimation if needed
                                 }
                             });
                         } else if (trigger === 'clickAndHold') { 
@@ -543,6 +554,10 @@
                                     if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
                                     this._clickAndHoldTimer = setTimeout(() => {
                                         handleOverlayInteraction(this, 'clickAndHold');
+                                        // Animation on clickAndHold (if also configured)
+                                        if (this.customAnimation && this.customAnimation.trigger === 'onClick' && this.customAnimation.type) { // Assuming 'onClick' trigger for animation on hold completion
+                                            executeAnimation(this, this.customAnimation);
+                                        }
                                         this._clickAndHoldTimer = null;
                                     }, CLICK_AND_HOLD_DURATION);
                                 }
@@ -556,9 +571,15 @@
                             obj.on('mouseout', cancelGenericHold);
                         }
                     }
-                });
+
+                    // Animation: On Load
+                    if (obj.customAnimation && obj.customAnimation.trigger === 'onLoad' && obj.customAnimation.type) {
+                        // Delay slightly to ensure object is fully rendered
+                        setTimeout(() => executeAnimation(obj, obj.customAnimation), 100);
+                    }
+                }); // End of canvas.forEachObject
                 canvas.renderAll();
-            });
+            }); // End of canvas.loadFromJSON
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
              if(mediaType !== 'image' && mediaType !== 'audio') { 
                  canvas.renderAll();
@@ -678,6 +699,167 @@
             default:
                 console.log("Unknown interaction action:", interaction.action);
         }
+    }
+
+    function executeAnimation(fabricObject, animConfig) {
+        if (!fabricObject || !animConfig || !animConfig.type) return;
+        console.log(`Executing animation: ${animConfig.type} for object`, fabricObject);
+
+        // Stop any existing animation on this object first (optional, but good for hover)
+        stopAnimation(fabricObject); // You'll need to implement stopAnimation
+
+        // Store original properties for reset, if animation is not looping or needs reset
+        if (!fabricObject._originalState) {
+            fabricObject._originalState = {
+                angle: fabricObject.angle,
+                top: fabricObject.top,
+                left: fabricObject.left, // For float if it moves horizontally too
+                scaleX: fabricObject.scaleX,
+                scaleY: fabricObject.scaleY
+            };
+        }
+        
+        // Simple AbortController-like mechanism for stopping
+        const controller = { aborted: false };
+        viewerApp.state.activeAnimations.set(fabricObject, controller);
+
+
+        switch (animConfig.type) {
+            case 'wiggle':
+                animateWiggle(fabricObject, animConfig.duration, animConfig.strength, controller);
+                break;
+            case 'float':
+                animateFloat(fabricObject, animConfig.duration, animConfig.strength, controller);
+                break;
+            case 'growShrink':
+                animateGrowShrink(fabricObject, animConfig.duration, animConfig.strength, controller);
+                break;
+            default:
+                console.warn("Unknown animation type:", animConfig.type);
+                viewerApp.state.activeAnimations.delete(fabricObject); // Clean up if type unknown
+        }
+    }
+
+    function stopAnimation(fabricObject) {
+        if (viewerApp.state.activeAnimations.has(fabricObject)) {
+            const controller = viewerApp.state.activeAnimations.get(fabricObject);
+            controller.aborted = true;
+            viewerApp.state.activeAnimations.delete(fabricObject);
+            console.log("Animation stopped for object", fabricObject);
+
+            // Option: Reset to original state if defined
+            // if (fabricObject._originalState) {
+            //     fabricObject.set(fabricObject._originalState);
+            //     viewerApp.state.viewerFabricCanvas.renderAll();
+            // }
+        }
+    }
+
+    function animateWiggle(fabricObject, duration = 500, strength = 5, controller) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas) return;
+        const originalAngle = fabricObject._originalState ? fabricObject._originalState.angle : fabricObject.angle;
+        strength = parseFloat(strength) || 5; // degrees
+
+        fabricObject.animate('angle', originalAngle - strength, {
+            duration: duration / 4,
+            onChange: canvas.renderAll.bind(canvas),
+            abort: () => controller.aborted,
+            onComplete: function() {
+                if (controller.aborted) { fabricObject.set('angle', originalAngle); canvas.renderAll(); return; }
+                fabricObject.animate('angle', originalAngle + strength, {
+                    duration: duration / 2,
+                    onChange: canvas.renderAll.bind(canvas),
+                    abort: () => controller.aborted,
+                    onComplete: function() {
+                        if (controller.aborted) { fabricObject.set('angle', originalAngle); canvas.renderAll(); return; }
+                        fabricObject.animate('angle', originalAngle, {
+                            duration: duration / 4,
+                            onChange: canvas.renderAll.bind(canvas),
+                            abort: () => controller.aborted,
+                            onComplete: function() {
+                                viewerApp.state.activeAnimations.delete(fabricObject);
+                                if (controller.aborted) { fabricObject.set('angle', originalAngle); canvas.renderAll(); }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    function animateFloat(fabricObject, duration = 1000, strength = 10, controller) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas) return;
+        const originalTop = fabricObject._originalState ? fabricObject._originalState.top : fabricObject.top;
+        strength = parseFloat(strength) || 10; // pixels
+
+        fabricObject.animate('top', originalTop - strength, {
+            duration: duration / 2,
+            onChange: canvas.renderAll.bind(canvas),
+            abort: () => controller.aborted,
+            onComplete: function() {
+                if (controller.aborted) { fabricObject.set('top', originalTop); canvas.renderAll(); return; }
+                fabricObject.animate('top', originalTop, {
+                    duration: duration / 2,
+                    onChange: canvas.renderAll.bind(canvas),
+                    abort: () => controller.aborted,
+                    onComplete: function() {
+                        viewerApp.state.activeAnimations.delete(fabricObject);
+                        if (controller.aborted) { fabricObject.set('top', originalTop); canvas.renderAll(); }
+                    }
+                });
+            }
+        });
+    }
+
+    function animateGrowShrink(fabricObject, duration = 500, strength = 1.2, controller) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas) return;
+        const originalScaleX = fabricObject._originalState ? fabricObject._originalState.scaleX : fabricObject.scaleX;
+        const originalScaleY = fabricObject._originalState ? fabricObject._originalState.scaleY : fabricObject.scaleY;
+        strength = parseFloat(strength) || 1.2; // scale factor
+
+        // Animate scaleX and scaleY together by animating a dummy property and setting both in onChange
+        fabricObject.animate({ // Animate a dummy property, or use an object
+            dummy: strength 
+        },{
+            duration: duration / 2,
+            onChange: function(value) {
+                fabricObject.set({ scaleX: originalScaleX * value, scaleY: originalScaleY * value });
+                canvas.renderAll();
+            },
+            abort: () => controller.aborted,
+            onComplete: function() {
+                if (controller.aborted) { fabricObject.set({scaleX: originalScaleX, scaleY: originalScaleY}); canvas.renderAll(); return; }
+                fabricObject.animate({
+                    dummy: 1
+                }, {
+                    duration: duration / 2,
+                    onChange: function(value) {
+                        // Interpolate back to originalScaleX/Y based on the 'value' which goes from 'strength' back to 1
+                        let progress = (strength - value) / (strength - 1 || 1); // How far from strength to 1
+                        if (strength < 1) progress = (value - strength) / (1 - strength || 1); // handle shrink then grow
+
+                        fabricObject.set({ 
+                            scaleX: originalScaleX * strength * (1-progress) + originalScaleX * progress, 
+                            scaleY: originalScaleY * strength * (1-progress) + originalScaleY * progress 
+                        });
+                        // Simpler way if the dummy value directly controls the final scale factor applied to original
+                        // fabricObject.set({ scaleX: originalScaleX * value, scaleY: originalScaleY * value });
+                        canvas.renderAll();
+                    },
+                    abort: () => controller.aborted,
+                    onComplete: function() {
+                        viewerApp.state.activeAnimations.delete(fabricObject);
+                        if (controller.aborted || (originalScaleX && originalScaleY)) { // Ensure reset if aborted or original state exists
+                            fabricObject.set({scaleX: originalScaleX, scaleY: originalScaleY});
+                            canvas.renderAll();
+                        }
+                    }
+                });
+            }
+        });
     }
 
     function animatePanZoom(targetObject, targetZoom) {

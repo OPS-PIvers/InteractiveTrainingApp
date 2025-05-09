@@ -98,6 +98,7 @@
       objShadowBlurEl = document.getElementById('objShadowBlur');
       objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
       objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
+      objFillTransparentEl = document.getElementById('objFillTransparent');
 
       objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
       objInteractionActionEl = document.getElementById('objInteractionAction');
@@ -1164,7 +1165,7 @@
       const inputs = [
         {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
         {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
-        {el: objAngleEl, prop: 'angle', type: 'number'}, {el: objFillEl, prop: 'fill', type: 'color'},
+        {el: objAngleEl, prop: 'angle', type: 'number'}, // {el: objFillEl, prop: 'fill', type: 'color'},
         {el: objStrokeColorEl, prop: 'stroke', type: 'color'}, {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
         {el: objOpacityEl, prop: 'opacity', type: 'range'}, {el: objTextContentEl, prop: 'text', type: 'textarea'},
         {el: objFontFamilyEl, prop: 'fontFamily', type: 'select'}, {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
@@ -1207,20 +1208,79 @@
             objNavigateToEl.addEventListener('input', handleInteractionChange);
             objNavigateToEl.setAttribute('listener-attached', 'true');
        }
+       if (objFillEl) {
+            const listenerAttribute = 'listener-attached-fill-color'; // Unique attribute
+            if (!objFillEl.hasAttribute(listenerAttribute)) {
+                objFillEl.addEventListener('input', (e) => {
+                    if (objFillTransparentEl && !objFillTransparentEl.checked) { // Only if transparent is OFF
+                        updateFabricObjectFromToolbar('fill', e.target.value, 'color');
+                    }
+                });
+                objFillEl.setAttribute(listenerAttribute, 'true');
+            }
+        }
+
+        // Add listener for objFillTransparentEl (Transparent Fill Checkbox)
+        if (objFillTransparentEl) {
+            const listenerAttribute = 'listener-attached-fill-transparent'; // Unique attribute
+            if (!objFillTransparentEl.hasAttribute(listenerAttribute)) {
+                objFillTransparentEl.addEventListener('change', (e) => {
+                    const activeObject = adminApp.state.fabricCanvasInstance ? adminApp.state.fabricCanvasInstance.getActiveObject() : null;
+                    if (!activeObject || !objFillEl) return;
+
+                    if (e.target.checked) { // Transparent fill is NOW ACTIVE
+                        activeObject.set('fill', 'transparent'); // Use 'transparent' string
+                        objFillEl.disabled = true; // Disable the color picker
+                    } else { // Transparent fill is NOW INACTIVE
+                        objFillEl.disabled = false; // Enable the color picker
+                        // Set object's fill to the current value of the (now enabled) color picker
+                        activeObject.set('fill', objFillEl.value); 
+                    }
+                    if(adminApp.state.fabricCanvasInstance) adminApp.state.fabricCanvasInstance.renderAll();
+                });
+                objFillTransparentEl.setAttribute(listenerAttribute, 'true');
+            }
+        }
+
     }
 
     function populateToolbar(activeObject) {
       if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
-      if (!activeObject) { overlayPropertiesToolbarEl.style.display = 'none'; return; }
+      if (!activeObject) { 
+        overlayPropertiesToolbarEl.style.display = 'none'; 
+        return; 
+      }
       overlayPropertiesToolbarEl.style.display = 'block';
 
       // --- Basic Properties ---
       if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
       if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
-      if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
-      if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
+      // For width/height, use getScaledWidth/Height if available, otherwise direct width/height.
+      // This accounts for objects that might have been scaled.
+      if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width ? activeObject.width.toFixed(0) : 0);
+      if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height ? activeObject.height.toFixed(0) : 0);
       if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
-      if (objFillEl) objFillEl.value = toHexColor(activeObject.fill);
+      
+      // --- Fill Properties with Transparency (NEW LOGIC) ---
+      const isFillCurrentlyTransparent = activeObject.fill === null || 
+                                     (typeof activeObject.fill === 'string' && activeObject.fill.toLowerCase() === 'transparent');
+
+      if (objFillTransparentEl) {
+          objFillTransparentEl.checked = isFillCurrentlyTransparent;
+      }
+
+      if (objFillEl) {
+          objFillEl.disabled = isFillCurrentlyTransparent;
+          if (!isFillCurrentlyTransparent) {
+              objFillEl.value = toHexColor(activeObject.fill);
+          } else {
+              // When transparent, color picker is disabled. Its value will be the last valid color.
+              // Or, you could set a default placeholder, but it's not essential for function.
+              // objFillEl.value = '#cccccc'; // Example placeholder if needed
+          }
+      }
+      // --- END Fill Properties ---
+
       if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
       if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
       if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
@@ -1242,7 +1302,7 @@
       }
 
       // --- Shadow Properties ---
-      const shadow = activeObject.shadow;
+      const shadow = activeObject.shadow; // activeObject.shadow can be null or a Fabric.Shadow instance
       if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000';
       if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
       if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
@@ -1251,12 +1311,15 @@
       if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
 
       // --- Interaction Properties ---
-      const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
+      // Ensure customInteraction exists, defaulting if not
+      const interaction = activeObject.customInteraction || 
+                          { trigger: "", action: "", modalContent: "", navigateTo: "" };
+      
       if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
       if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
       if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
       if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
-      updateInteractionConfigVisibility(interaction.action);
+      updateInteractionConfigVisibility(interaction.action); // Show/hide relevant config sections
     }
 
     function handleInteractionChange() {

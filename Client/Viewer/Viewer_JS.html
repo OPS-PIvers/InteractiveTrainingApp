@@ -5,6 +5,7 @@
     // --- Global Variables ---
     let ytPlayer; // Global variable to hold the YouTube player instance
     let isYouTubeApiReady = false; // Flag to track API readiness
+    const CLICK_AND_HOLD_DURATION = 750; // Milliseconds for click and hold
 
     // --- Application State ---
     viewerApp.state = {
@@ -481,25 +482,66 @@
                     obj.selectable = false;
                     obj.evented = true; // Canvas container is visible, so events should work
                     obj.hoverCursor = 'pointer';
+                    obj._clickAndHoldTimer = null;
 
-                    obj.off('mousedown'); // Remove previous listeners
+                    obj.off('mousedown');
+                    obj.off('mouseup');
+                    obj.off('mouseout');
+                    obj.off('mousemove'); // Usually not needed to cancel hold unless specific logic
                     obj.off('mouseover');
 
                     // Attach interaction listeners
                     if (obj.customInteraction && obj.customInteraction.trigger) {
-                        if (obj.customInteraction.trigger === 'click') {
+                        const trigger = obj.customInteraction.trigger;
+
+                        if (trigger === 'click') {
                             obj.on('mousedown', function(options) {
-                                if (this.customInteraction.trigger === 'click') {
-                                    handleOverlayInteraction(this, 'click');
+                                // Ensure this specific mousedown is for a 'click' trigger
+                                if (this.customInteraction && this.customInteraction.trigger === 'click') {
+                                    // If a click-and-hold timer was somehow pending for this object, clear it.
+                                    if (this._clickAndHoldTimer) {
+                                        clearTimeout(this._clickAndHoldTimer);
+                                        this._clickAndHoldTimer = null;
+                                        console.log("ClickAndHold: Timer cleared by click for", this.type);
+                                    }
+                                    handleOverlayInteraction(this, 'click'); // 'click' is the eventType
                                     if(options.e) options.e.stopPropagation();
                                 }
                             });
-                        } else if (obj.customInteraction.trigger === 'hover') {
+                        } else if (trigger === 'hover') {
                              obj.on('mouseover', function() {
-                                if (this.customInteraction.trigger === 'hover') {
+                                if (this.customInteraction && this.customInteraction.trigger === 'hover') {
                                     handleOverlayInteraction(this, 'hover');
                                 }
                             });
+                            // Note: You might want a 'mouseout' handler here if hover needs to be undone
+                        } else if (trigger === 'clickAndHold') {
+                            obj.on('mousedown', function(options) {
+                                // This specific 'this' is the Fabric object
+                                console.log("ClickAndHold: mousedown on", this.type, this);
+                                // Clear any existing timer *for this object*
+                                if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
+
+                                this._clickAndHoldTimer = setTimeout(() => {
+                                    console.log("ClickAndHold: Timer fired for", this.type, this);
+                                    // Ensure the event is marked as 'clickAndHold' for handleOverlayInteraction
+                                    handleOverlayInteraction(this, 'clickAndHold');
+                                    this._clickAndHoldTimer = null; // Reset timer after firing
+                                }, CLICK_AND_HOLD_DURATION);
+
+                                // Do not stop propagation here, allow other mousedown listeners if any
+                                // (though typically, one trigger per object is best)
+                            });
+
+                            const cancelHold = function() {
+                                if (this._clickAndHoldTimer) {
+                                    console.log("ClickAndHold: Cancelling hold due to mouseup/mouseout for", this.type, this);
+                                    clearTimeout(this._clickAndHoldTimer);
+                                    this._clickAndHoldTimer = null;
+                                }
+                            };
+                            obj.on('mouseup', cancelHold);
+                            obj.on('mouseout', cancelHold);
                         }
                     }
                 });
@@ -521,8 +563,12 @@
 
         console.log(`Interaction Triggered: type=${eventType}, action=${interaction.action}, object=${fabricObject.type}, currentOpacity=${fabricObject.opacity}`);
 
-        if (interaction.trigger !== eventType) return;
-
+        if (interaction.trigger !== eventType) {
+            // This log helps debug if a 'click' mousedown is processed by a 'clickAndHold' configured object
+            // before the hold timer completes or is cancelled.
+            console.log(`Interaction Mismatch: Configured trigger '${interaction.trigger}' does not match event '${eventType}'. Ignoring for this handler instance.`);
+            return;
+        }
         // If a spotlight is active and the new action ISN'T spotlight, remove spotlight first.
         if (viewerApp.state.isSpotlightActive && interaction.action !== 'spotlight') {
             hideSpotlightSVG();

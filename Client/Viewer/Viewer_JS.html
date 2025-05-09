@@ -21,9 +21,12 @@
       modalSequence: [],         // Array of Fabric objects in the current sequence on the slide
       currentModalSequenceIndex: -1, // Index within modalSequence being displayed
       // --- State for Spotlight Overlay ---
-      // spotlightOverlayObject: null // Holds the reference to the dimming overlay rect
       isSpotlightActive: false,
-      currentSpotlightInfo: null // Will hold { svg, clickCatcher, targetFabricObject, textBubble, notesPanel }
+      currentSpotlightInfo: null, // Will hold { svg, clickCatcher, targetFabricObject, textBubble, notesPanel }
+      // --- State for Pan/Zoom ---
+      originalViewportTransform: null, 
+      isCanvasPannedOrZoomed: false,
+      panZoomTargetObject: null 
     };
 
     // --- DOM Element References ---
@@ -103,17 +106,15 @@
         if (modalNextButtonEl) modalNextButtonEl.addEventListener('click', navigateModalNext);
 
         // Listener to remove spotlight when clicking outside the spotlighted object
+        // This listener on viewerProjectDisplayAreaEl is now less critical for spotlight (SVG catcher handles it),
+        // but might be useful for other "click off" behaviors later.
         if (viewerProjectDisplayAreaEl) {
              viewerProjectDisplayAreaEl.addEventListener('click', function(event) {
-                // If the spotlight overlay exists, remove it.
-                // We rely on the fabric event on the target object stopping propagation
-                // so this only fires on clicks *not* handled by the target object itself.
-                // A more robust way would be to check if event.target is the canvas background.
                 if (viewerApp.state.spotlightOverlayObject && event.target !== viewerApp.state.spotlightOverlayObject.target) {
-                    console.log("Viewer area click detected while spotlight active, removing effect.");
-                    removeSpotlightEffect();
+                    // console.log("Viewer area click detected while spotlight active, removing effect.");
+                    // removeSpotlightEffect(); // SVG spotlight uses its own catcher
                 }
-             }, false); // Use bubble phase
+             }, false);
         }
     };
 
@@ -231,8 +232,8 @@
         // Cleanup media players
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
-        // Remove spotlight if active
         hideSpotlightSVG();
+        if(viewerApp.state.isCanvasPannedOrZoomed) resetPanZoomWithAnimation(true); // Reset immediately if panned/zoomed
 
         if (viewerApp.state.viewerFabricCanvas) {
             viewerApp.state.viewerFabricCanvas.dispose();
@@ -271,7 +272,6 @@
         }
         try {
             viewerApp.state.currentProjectData = JSON.parse(response.data);
-             // Ensure slides array exists and has slideMedia initialized
              if (viewerApp.state.currentProjectData && Array.isArray(viewerApp.state.currentProjectData.slides)) {
                  viewerApp.state.currentProjectData.slides.forEach(slide => {
                     if (!slide.slideMedia) {
@@ -284,24 +284,24 @@
 
             if (viewerApp.state.currentProjectData.slides.length === 0) {
                 displayMessageViewer("Project loaded, but it has no slides.", false);
-                 showProjectListView(); // Go back to list if project is empty
+                 showProjectListView(); 
                 return;
             }
 
             console.log("Project for viewing loaded:", viewerApp.state.currentProjectData);
             console.log("Number of slides loaded:", viewerApp.state.currentProjectData.slides.length);
 
-            viewerApp.state.currentSlideIndex = 0; // Reset to first slide
+            viewerApp.state.currentSlideIndex = 0; 
             showProjectView();
             if (viewingProjectTitleEl) viewingProjectTitleEl.textContent = viewerApp.state.currentProjectData.title || "Untitled Project";
-            initializeViewerCanvas(); // Initialize canvas once per project load
-            renderSlideForViewing(viewerApp.state.currentSlideIndex); // Render the first slide
+            initializeViewerCanvas(); 
+            renderSlideForViewing(viewerApp.state.currentSlideIndex); 
             displayMessageViewer("Project loaded.", true);
         } catch (e) {
             console.error("Error parsing project data for viewing:", e);
             displayMessageViewer("Error loading project: Invalid data format.", false);
             viewerApp.state.currentProjectData = null;
-             showProjectListView(); // Go back to list on error
+             showProjectListView();
         }
     }
 
@@ -321,11 +321,22 @@
                 height: viewerApp.state.defaultCanvasHeight,
                 selection: false,
                 hoverCursor: 'default',
-                backgroundColor: 'transparent' // Default to transparent for layering
+                backgroundColor: 'transparent' 
             });
-             // Make canvas non-interactive for drawing selection, etc.
             viewerApp.state.viewerFabricCanvas.selection = false;
-            viewerApp.state.viewerFabricCanvas.renderAll(); // Initial render
+            
+            // Listener for resetting pan/zoom on background click
+            viewerApp.state.viewerFabricCanvas.on('mouse:down', function(options) {
+                if (viewerApp.state.isCanvasPannedOrZoomed && !options.target) { // No object clicked, means background
+                    console.log("Background clicked, resetting pan/zoom.");
+                    resetPanZoomWithAnimation();
+                } else if (viewerApp.state.isCanvasPannedOrZoomed && options.target && options.target === viewerApp.state.panZoomTargetObject) {
+                    // If the same panned/zoomed object is clicked again, reset.
+                    console.log("Panned/zoomed object clicked again, resetting pan/zoom.");
+                    resetPanZoomWithAnimation();
+                }
+            });
+            viewerApp.state.viewerFabricCanvas.renderAll(); 
             console.log("Viewer canvas initialized.");
         } catch(e) {
             console.error("Error initializing viewer Fabric canvas:", e);
@@ -342,50 +353,43 @@
             console.error("Invalid slide index:", slideIndex); return;
         }
 
-        // --- Cleanup Previous Slide Media FIRST ---
         stopAndDestroyYouTubePlayer();
         stopAndClearAudioPlayer();
-        // Also remove any lingering spotlight effect from previous slide
-        hideSpotlightSVG(); // Ensure spotlight is cleared when changing slides
+        hideSpotlightSVG(); 
+        if(viewerApp.state.isCanvasPannedOrZoomed) resetPanZoomWithAnimation(true); // Reset immediately if panned/zoomed
 
 
-        viewerApp.state.currentSlideIndex = slideIndex; // Update state *before* using it
+        viewerApp.state.currentSlideIndex = slideIndex; 
         const slideData = slides[slideIndex];
         const canvas = viewerApp.state.viewerFabricCanvas;
 
-        // Ensure slideMedia exists
          if (!slideData.slideMedia) {
             slideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
          }
 
-        // Set canvas dimensions and container dimensions
         const slideWidth = slideData.canvasWidth || viewerApp.state.defaultCanvasWidth;
         const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
         const media = slideData.slideMedia;
         let mediaType = (media && media.type) ? media.type : 'none';
 
-        // Set canvas element size regardless of media type now
         canvas.setWidth(slideWidth);
         canvas.setHeight(slideHeight);
         if (viewerFabricCanvasEl) {
             viewerFabricCanvasEl.width = slideWidth;
             viewerFabricCanvasEl.height = slideHeight;
         }
-        // Adjust media container size
         if (viewerMediaContainerEl) {
             viewerMediaContainerEl.style.width = slideWidth + 'px';
             viewerMediaContainerEl.style.height = slideHeight + 'px';
         }
 
-        // Clear canvas objects and background image
         canvas.clear();
         canvas.setBackgroundImage(null, () => { canvas.renderAll(); });
         canvas.backgroundColor = 'transparent';
 
-        // Hide/show containers based on media type
         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = (mediaType === 'youtube') ? 'block' : 'none';
-        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = (mediaType === 'youtube') ? 'none' : 'flex'; // Show unless YT
-        if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'none'; // Hide audio initially
+        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = (mediaType === 'youtube') ? 'none' : 'flex'; 
+        if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'none'; 
 
         console.log(`Rendering slide ${slideIndex + 1}, media type: ${mediaType}`);
 
@@ -409,30 +413,26 @@
                 if (media.url) {
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
-                        // Canvas container is already hidden
                         if (isYouTubeApiReady) {
                              setupYouTubePlayer(videoId);
                         } else {
                              console.warn("YouTube API not ready yet when trying to render slide.");
                         }
-                         // No canvas background setting needed
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
-                         // Show canvas container with error BG if YT fails
                          if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
                          canvas.backgroundColor = '#555';
                          canvas.renderAll();
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
-                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; // Show canvas
+                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; 
                      canvas.backgroundColor = '#e9e9e9';
                      canvas.renderAll();
                 }
                 break;
 
             case 'audio':
-                 // Canvas container is already visible
                  if (media.driveFileId) {
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true);
@@ -466,28 +466,26 @@
                  }
                  break;
 
-            default: // 'none' or unknown
-                 // Canvas container is already visible
+            default: 
                  canvas.backgroundColor = '#e9e9e9';
                  canvas.renderAll();
                  break;
         }
 
-        // Load Fabric objects (overlays) ONLY if canvas container is visible
         if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none' && slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) return;
 
                 canvas.forEachObject(function(obj) {
                     obj.selectable = false;
-                    obj.evented = true; // Canvas container is visible, so events should work
+                    obj.evented = true; 
                     obj.hoverCursor = 'pointer';
                     obj._clickAndHoldTimer = null;
 
                     obj.off('mousedown');
                     obj.off('mouseup');
                     obj.off('mouseout');
-                    obj.off('mousemove'); // Usually not needed to cancel hold unless specific logic
+                    obj.off('mousemove'); 
                     obj.off('mouseover');
 
                     // Attach interaction listeners
@@ -501,22 +499,18 @@
                                 if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
                                     console.log("Hold-Spotlight: mousedown, showing spotlight for", this.type);
                                     showSpotlightSVG(this, this.customInteraction);
-                                    // We don't stop propagation here as the target itself might be clicked again to dismiss a non-hold spotlight
-                                    // However, for hold, the mouseup/mouseout on THIS object should dismiss.
                                 }
                             });
                             obj.on('mouseup', function() {
                                 if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
-                                     // Only hide if the *current* spotlight target is this object
                                     if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
                                         console.log("Hold-Spotlight: mouseup, hiding spotlight for", this.type);
                                         hideSpotlightSVG();
                                     }
                                 }
                             });
-                            obj.on('mouseout', function() { // If mouse leaves while still holding
+                            obj.on('mouseout', function() { 
                                 if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
-                                     // Only hide if the *current* spotlight target is this object
                                     if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
                                         console.log("Hold-Spotlight: mouseout, hiding spotlight for", this.type);
                                         hideSpotlightSVG();
@@ -528,7 +522,7 @@
                         else if (trigger === 'click') {
                             obj.on('mousedown', function(options) {
                                 if (this.customInteraction && this.customInteraction.trigger === 'click') {
-                                    if (this._clickAndHoldTimer) { // Clear any pending hold timer from other configs
+                                    if (this._clickAndHoldTimer) { 
                                         clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null;
                                     }
                                     handleOverlayInteraction(this, 'click');
@@ -541,10 +535,9 @@
                                     handleOverlayInteraction(this, 'hover');
                                 }
                             });
-                            // Note: you might need a mouseout for hover "undo" actions later
-                        } else if (trigger === 'clickAndHold') { // For actions OTHER than spotlight
+                        } else if (trigger === 'clickAndHold') { 
                             obj.on('mousedown', function(options) {
-                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold') { // Check trigger again
+                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold') { 
                                     if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
                                     this._clickAndHoldTimer = setTimeout(() => {
                                         handleOverlayInteraction(this, 'clickAndHold');
@@ -565,12 +558,11 @@
                 canvas.renderAll();
             });
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
-             // Render canvas background if no JSON but canvas is visible
-             if(mediaType !== 'image' && mediaType !== 'audio') { // Avoid redundant render
+             if(mediaType !== 'image' && mediaType !== 'audio') { 
                  canvas.renderAll();
              }
         }
-        updateSlideNavigationUI(); // Update nav AFTER potential async operations
+        updateSlideNavigationUI(); 
     }
 
     // --- Interaction & Modal Handling ---
@@ -581,21 +573,25 @@
         console.log(`Interaction Triggered: type=${eventType}, action=${interaction.action}, object=${fabricObject.type}, currentOpacity=${fabricObject.opacity}`);
 
         if (interaction.trigger !== eventType) {
-            // This log helps debug if a 'click' mousedown is processed by a 'clickAndHold' configured object
-            // before the hold timer completes or is cancelled.
             console.log(`Interaction Mismatch: Configured trigger '${interaction.trigger}' does not match event '${eventType}'. Ignoring for this handler instance.`);
             return;
         }
-        // If a spotlight is active and the new action ISN'T spotlight, remove spotlight first.
         if (viewerApp.state.isSpotlightActive && interaction.action !== 'spotlight') {
             hideSpotlightSVG();
         }
+         if (viewerApp.state.isCanvasPannedOrZoomed && interaction.action !== 'panZoomToTarget') {
+            // If canvas is zoomed and a new, non-panZoom interaction is triggered, reset zoom.
+            // Or, if the interaction is on the panZoomTargetObject itself, don't reset yet (allow modals from a zoomed object).
+            if(fabricObject !== viewerApp.state.panZoomTargetObject){
+                 resetPanZoomWithAnimation();
+            }
+        }
+
 
         console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
 
         switch (interaction.action) {
             case 'showModal':
-                // hideSpotlightSVG(); // Already handled above
                 if (fabricObject.customInteraction && fabricObject.customInteraction.modalContent) {
                     const canvas = viewerApp.state.viewerFabricCanvas;
                     if (!canvas) break;
@@ -621,7 +617,6 @@
                 }
                 break;
             case 'navigateToSlide':
-                // hideSpotlightSVG(); // Already handled above
                 const targetSlideId = interaction.navigateTo;
                 if (targetSlideId && viewerApp.state.currentProjectData && viewerApp.state.currentProjectData.slides) {
                     const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
@@ -633,7 +628,6 @@
                 }
                 break;
             case 'navigateToURL':
-                // hideSpotlightSVG(); // Already handled above
                 if (interaction.navigateTo) {
                     let url = interaction.navigateTo;
                     if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
@@ -647,31 +641,25 @@
                 break;
             case 'spotlight':
                  if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === fabricObject) {
-                     // Clicking the *same* spotlighted object again toggles it off
                      hideSpotlightSVG();
                  } else {
-                     // If different object or no spotlight, apply (hideSpotlightSVG is called within showSpotlightSVG if needed)
                      showSpotlightSVG(fabricObject, interaction);
                  }
                  break;
             case 'panZoomToTarget':
-                // hideSpotlightSVG(); // Already handled if spotlight was active
                 console.log("Pan/Zoom to Target action triggered for:", fabricObject);
                 if (fabricObject && viewerApp.state.viewerFabricCanvas) {
                     const canvas = viewerApp.state.viewerFabricCanvas;
-                    const centerPoint = fabricObject.getCenterPoint();
-                    const desiredZoomLevel = 1.5; // Or make this configurable later
 
-                    // canvas.viewportCenterObject(fabricObject); // This centers without zoom
-                    // canvas.setZoom(desiredZoomLevel);
+                    if (!viewerApp.state.isCanvasPannedOrZoomed) { 
+                        viewerApp.state.originalViewportTransform = fabric.util.qrDecompose(canvas.viewportTransform);
+                        console.log("Storing original viewport transform:", viewerApp.state.originalViewportTransform);
+                    }
 
-                    canvas.zoomToPoint(new fabric.Point(centerPoint.x, centerPoint.y), desiredZoomLevel);
-                    // Note: zoomToPoint pans the canvas so that the given point is the new center of the viewport
-                    // and then applies the zoom. If you want the object to appear larger at its *current*
-                    // screen position, you might need viewportTransform calculations.
-                    // For a simple "zoom in on this object", zoomToPoint is often good.
-                    canvas.renderAll();
-                    console.log(`Pan/Zoomed to point (${centerPoint.x}, ${centerPoint.y}) with zoom ${desiredZoomLevel}`);
+                    const targetZoom = fabricObject.customInteraction.panZoomLevel || 1.5;
+                    viewerApp.state.panZoomTargetObject = fabricObject; 
+
+                    animatePanZoom(fabricObject, targetZoom);
                 }
                 break;
             case 'reveal':
@@ -688,6 +676,103 @@
                 console.log("Unknown interaction action:", interaction.action);
         }
     }
+
+    function animatePanZoom(targetObject, targetZoom) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || !targetObject) return;
+
+        const objectCenter = targetObject.getCenterPoint();
+        const animationDuration = 500; // ms
+
+        const currentTransform = fabric.util.qrDecompose(canvas.viewportTransform);
+        const currentZoom = currentTransform.scaleX; 
+
+        fabric.util.animate({
+            startValue: currentZoom,
+            endValue: targetZoom,
+            duration: animationDuration,
+            onChange: function(value) {
+                canvas.zoomToPoint(new fabric.Point(objectCenter.x, objectCenter.y), value);
+            },
+            onComplete: function() {
+                viewerApp.state.isCanvasPannedOrZoomed = true;
+                canvas.zoomToPoint(new fabric.Point(objectCenter.x, objectCenter.y), targetZoom);
+                canvas.renderAll();
+                console.log("Pan/Zoom animation complete.");
+            },
+            easing: fabric.util.ease.easeInOutQuad
+        });
+    }
+
+    function resetPanZoomWithAnimation(immediate = false) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || !viewerApp.state.isCanvasPannedOrZoomed || !viewerApp.state.originalViewportTransform) {
+            console.log("ResetPanZoom: Conditions not met.");
+            if (canvas && viewerApp.state.originalViewportTransform) { // If only isCanvasPannedOrZoomed is false, still attempt reset if original exists
+                 const ovpt = viewerApp.state.originalViewportTransform;
+                 const finalVPT = [ovpt.scaleX, 0, 0, ovpt.scaleY, ovpt.translateX, ovpt.translateY];
+                 canvas.setViewportTransform(finalVPT);
+                 canvas.renderAll();
+                 viewerApp.state.isCanvasPannedOrZoomed = false;
+                 viewerApp.state.panZoomTargetObject = null;
+                 viewerApp.state.originalViewportTransform = null;
+            }
+            return;
+        }
+
+        const animDuration = immediate ? 0 : 500;
+        const startZoom = canvas.getZoom();
+        const endZoom = viewerApp.state.originalViewportTransform.scaleX; 
+
+        const startVPT = canvas.viewportTransform.slice();
+        const endVPT_tx = viewerApp.state.originalViewportTransform.translateX;
+        const endVPT_ty = viewerApp.state.originalViewportTransform.translateY;
+
+        const finalVPT = [endZoom, 0, 0, endZoom, endVPT_tx, endVPT_ty];
+
+        if (immediate) {
+            canvas.setViewportTransform(finalVPT);
+            viewerApp.state.isCanvasPannedOrZoomed = false;
+            viewerApp.state.panZoomTargetObject = null;
+            viewerApp.state.originalViewportTransform = null; 
+            canvas.renderAll();
+            console.log("Pan/Zoom reset immediately.");
+            return;
+        }
+        
+        // Animate viewport transform components
+        // This is a simplified approach; true multi-property animation is more complex with fabric.util.animate
+        // We'll animate zoom and then set the final viewport transform.
+        // A better approach would involve animating the viewportTransform array elements.
+        fabric.util.animate({
+            startValue: startZoom,
+            endValue: endZoom,
+            duration: animDuration,
+            onChange: function(value) {
+                // During zoom animation, we need to adjust pan to keep it smooth
+                // This is tricky; for now, just animate zoom and then snap pan.
+                // A more advanced solution interpolates the entire viewport matrix or uses zoomToPoint iteratively.
+                const interimVPT = canvas.viewportTransform;
+                // Calculate interpolated pan based on zoom progress
+                const progress = (value - startZoom) / (endZoom - startZoom || 1); // Avoid div by zero
+                interimVPT[4] = startVPT[4] + (endVPT_tx - startVPT[4]) * progress;
+                interimVPT[5] = startVPT[5] + (endVPT_ty - startVPT[5]) * progress;
+                canvas.setZoom(value);
+                canvas.setViewportTransform(interimVPT); // Apply interpolated pan
+                canvas.renderAll();
+            },
+            onComplete: function() {
+                viewerApp.state.isCanvasPannedOrZoomed = false;
+                viewerApp.state.panZoomTargetObject = null;
+                viewerApp.state.originalViewportTransform = null; 
+                canvas.setViewportTransform(finalVPT); // Ensure final state
+                canvas.renderAll();
+                console.log("Pan/Zoom reset animation complete.");
+            },
+            easing: fabric.util.ease.easeInOutQuad
+        });
+    }
+
 
     function showViewerModal(htmlContent) {
         if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;
@@ -767,7 +852,7 @@
 
      // --- Spotlight SVG Functions ---
     function showSpotlightSVG(targetFabricObject, interactionData) {
-        hideSpotlightSVG(); // Remove any existing spotlight
+        hideSpotlightSVG(); 
 
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas || !targetFabricObject) {
@@ -776,37 +861,24 @@
         }
 
         console.log(`[WebApp] Spotlight SVG requested for Fabric object:`, targetFabricObject);
+        const targetRect = targetFabricObject.getBoundingRect(true); 
+        const canvasRect = viewerFabricCanvasEl.getBoundingClientRect(); 
 
-        // Get target's position and dimensions relative to the canvas
-        // Fabric's getBoundingRect() gives coordinates relative to canvas top-left
-        // We need to ensure these are correctly translated if the canvas itself has an offset
-        // For simplicity now, assume canvas container (viewerMediaContainerEl) is the reference.
-
-        const targetRect = targetFabricObject.getBoundingRect(true); // true for absolute coords within canvas
-        const canvasRect = viewerFabricCanvasEl.getBoundingClientRect(); // Screen coords of canvas element
-
-        // Calculate position for the SVG cutout relative to the viewport
         const viewportLeft = canvasRect.left + targetRect.left;
         const viewportTop = canvasRect.top + targetRect.top;
         const viewportWidth = targetRect.width;
         const viewportHeight = targetRect.height;
 
-        console.log(`  Target BBox (canvas relative): L${targetRect.left}, T${targetRect.top}, W${targetRect.width}, H${targetRect.height}`);
-        console.log(`  Canvas BBox (screen relative): L${canvasRect.left}, T${canvasRect.top}`);
-        console.log(`  Cutout Coords (viewport): L${viewportLeft}, T${viewportTop}, W${viewportWidth}, H${viewportHeight}`);
-
-
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, "svg");
         svg.setAttribute("id", "spotlightSVG");
-        // Style the SVG to cover the entire viewport
         svg.style.position = "fixed";
         svg.style.top = "0";
         svg.style.left = "0";
-        svg.style.width = "100vw"; // Use viewport units
+        svg.style.width = "100vw"; 
         svg.style.height = "100vh";
-        svg.style.zIndex = "9990"; // High z-index
-        svg.style.pointerEvents = "none"; // SVG itself doesn't catch clicks initially
+        svg.style.zIndex = "9990"; 
+        svg.style.pointerEvents = "none"; 
 
         const mask = document.createElementNS(svgNS, "mask");
         mask.setAttribute("id", "spotlightMask");
@@ -824,10 +896,7 @@
         cutoutRect.setAttribute("y", viewportTop);
         cutoutRect.setAttribute("width", viewportWidth);
         cutoutRect.setAttribute("height", viewportHeight);
-        cutoutRect.setAttribute("fill", "black"); // Black makes this part of the mask transparent
-        // Optional: Add rounded corners to the cutout if desired
-        // cutoutRect.setAttribute("rx", "5");
-        // cutoutRect.setAttribute("ry", "5");
+        cutoutRect.setAttribute("fill", "black"); 
         mask.appendChild(cutoutRect);
         svg.appendChild(mask);
 
@@ -842,7 +911,6 @@
 
         document.body.appendChild(svg);
 
-        // Click Catcher (full screen, below SVG mask visually, but catches clicks)
         const clickCatcher = document.createElement('div');
         clickCatcher.id = 'spotlightClickCatcher';
         clickCatcher.style.position = 'fixed';
@@ -850,35 +918,21 @@
         clickCatcher.style.left = '0';
         clickCatcher.style.width = '100vw';
         clickCatcher.style.height = '100vh';
-        clickCatcher.style.zIndex = '9989'; // Just below SVG
-        clickCatcher.style.cursor = 'pointer'; // Indicate it's clickable
+        clickCatcher.style.zIndex = '9989'; 
+        clickCatcher.style.cursor = 'pointer'; 
         clickCatcher.addEventListener('click', function(event) {
             console.log("Spotlight click catcher clicked.");
             hideSpotlightSVG();
-            event.stopPropagation(); // Prevent further bubbling
+            event.stopPropagation(); 
         });
         document.body.appendChild(clickCatcher);
 
-        // Store info
         viewerApp.state.isSpotlightActive = true;
         viewerApp.state.currentSpotlightInfo = {
             svg: svg,
             clickCatcher: clickCatcher,
             targetFabricObject: targetFabricObject,
-            // textBubble: null, // For later text/notes
-            // notesPanel: null
         };
-
-        // Make the target Fabric object temporarily non-evented IF we don't want it to
-        // trigger its own spotlight removal on a second click.
-        // For now, allow clicking target again to remove.
-        // targetFabricObject.set('evented', false); // Optional
-
-        // Optional: Add a visual highlight to the Fabric object itself (e.g., temp stroke)
-        // targetFabricObject.set('stroke', 'rgba(255, 255, 0, 0.7)');
-        // targetFabricObject.set('strokeWidth', 3);
-        // canvas.renderAll();
-
         displayMessageViewer("Spotlight active. Click anywhere to dismiss.", true);
         console.log("[WebApp] SVG Spotlight activated for Fabric object:", targetFabricObject);
     }
@@ -895,20 +949,8 @@
         if (viewerApp.state.currentSpotlightInfo.clickCatcher) {
             document.body.removeChild(viewerApp.state.currentSpotlightInfo.clickCatcher);
         }
-
-        // Restore target Fabric object's eventing if changed
-        // if (viewerApp.state.currentSpotlightInfo.targetFabricObject) {
-        //     viewerApp.state.currentSpotlightInfo.targetFabricObject.set('evented', true);
-            // Remove temporary highlight
-        //     viewerApp.state.currentSpotlightInfo.targetFabricObject.set('stroke', viewerApp.state.currentSpotlightInfo.originalStroke || null);
-        //     viewerApp.state.currentSpotlightInfo.targetFabricObject.set('strokeWidth', viewerApp.state.currentSpotlightInfo.originalStrokeWidth || 0);
-        //     if(viewerApp.state.viewerFabricCanvas) viewerApp.state.viewerFabricCanvas.renderAll();
-        // }
-
-
         viewerApp.state.isSpotlightActive = false;
         viewerApp.state.currentSpotlightInfo = null;
-        // displayMessageViewer("", true); // Clear message
     }
     // --- Slide Navigation ---
     function updateSlideNavigationUI() {
@@ -1087,24 +1129,21 @@
     }
 
     // --- UPDATED Spotlight Functions (Step 23 - Cutout Overlay) ---
-    function applySpotlightEffect(targetObject) {
+    function applySpotlightEffect(targetObject) { // This is the older version, SVG one is preferred
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas) {
             console.log("Spotlight not applied: Canvas not available.");
             return;
         }
-        // If a spotlight is already active, remove it first.
-        // This handles cases where another object is clicked for spotlight or the same object is clicked again.
         if (viewerApp.state.spotlightOverlayObject) {
             console.log("Spotlight already active, removing previous one first.");
             removeSpotlightEffect();
         }
 
         console.log("Applying spotlight (cutout) effect to:", targetObject);
-        viewerApp.state.spotlightOverlayObject = {}; // Initialize as an object to indicate it's active
-        viewerApp.state.spotlightOverlayObject.target = targetObject; // Store the actual target
+        viewerApp.state.spotlightOverlayObject = {}; 
+        viewerApp.state.spotlightOverlayObject.target = targetObject; 
 
-        // Create the dimming overlay
         const overlayRect = new fabric.Rect({
             left: 0,
             top: 0,
@@ -1112,50 +1151,36 @@
             originY: 'top',
             width: canvas.width,
             height: canvas.height,
-            fill: 'rgba(0, 0, 0, 0.75)', // Adjust color and alpha as needed
+            fill: 'rgba(0, 0, 0, 0.75)', 
             selectable: false,
-            evented: true, // Make overlay evented to catch clicks for removal
+            evented: true, 
             hoverCursor: 'default',
-            // Add a custom property to identify it as our spotlight overlay
             customInteraction: { isSpotlightDimOverlay: true }
         });
-        // Add a mousedown listener to the overlay itself to remove the spotlight
         overlayRect.on('mousedown', function(options) {
              console.log("Spotlight dim overlay clicked, removing spotlight.");
-             if (options.e) options.e.stopPropagation(); // Stop event from bubbling further
+             if (options.e) options.e.stopPropagation(); 
              removeSpotlightEffect();
         });
 
-
-        // Add overlay and bring target object to front
         canvas.add(overlayRect);
-        canvas.bringToFront(targetObject); // Bring the clicked object above the overlay
-
-        // Store reference to the overlay rectangle
+        canvas.bringToFront(targetObject); 
         viewerApp.state.spotlightOverlayObject.rect = overlayRect;
-
         canvas.renderAll();
         displayMessageViewer("Spotlight active. Click outside the object (on the dim area) to remove.", true);
     }
 
-    function removeSpotlightEffect() {
+    function removeSpotlightEffect() { // Older version
         const canvas = viewerApp.state.viewerFabricCanvas;
-        // Check the rect property specifically
         const overlayRect = viewerApp.state.spotlightOverlayObject ? viewerApp.state.spotlightOverlayObject.rect : null;
 
         if (!canvas || !overlayRect) {
-            // console.log(`Spotlight not removed: canvas=${!!canvas}, overlayRectExists=${!!overlayRect}`);
-            return; // Nothing to remove
+            return; 
         }
-
         console.log("Removing spotlight (cutout) effect.");
-
-        canvas.remove(overlayRect); // Remove the overlay rectangle
-        viewerApp.state.spotlightOverlayObject = null; // Clear the state reference
-
+        canvas.remove(overlayRect); 
+        viewerApp.state.spotlightOverlayObject = null; 
         canvas.renderAll();
-        // Optionally clear the message
-        // displayMessageViewer("", true);
     }
     // --- End UPDATED Spotlight Functions ---
 

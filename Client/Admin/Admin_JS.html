@@ -19,8 +19,8 @@
       lastUploadedDriveId: null, // Temp store for image uploads before base64 fetch
       lastUploadedMimeType: null,
       lastUploadedFileName: null,
-      isPasteListenerActive: false // To manage listener attachment for pasting images
-      // REMOVED: Picker state variables
+      isPasteListenerActive: false, // To manage listener attachment for pasting images
+      activePopoverId: null // To track the currently open popover
     };
 
     // --- DOM Element References ---
@@ -32,25 +32,26 @@
     let addRectangleButtonEl, addCircleButtonEl;
     let addTextboxButtonEl;
 
+    // Toolbar Elements (existing and new)
     let overlayPropertiesToolbarEl, objXEl, objYEl, objWidthEl, objHeightEl, objAngleEl,
-        objInteractionTriggerEl, objInteractionActionEl,
-        modalContentConfigEl, objModalContentEl,
-        navigateToConfigEl, objNavigateToEl,
-        panZoomConfigEl, objPanZoomLevelEl, 
-        // THIS IS THE START OF THE LIKELY DUPLICATE DECLARATION AREA
-        objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl,
-        objShadowAffectStrokeEl, objShadowNonScalingEl,
-        // New Animation DOM elements
-        objAnimationTriggerEl, objAnimationTypeEl, animationParamsConfigEl,
-        objAnimationDurationEl, objAnimationStrengthEl, objAnimationStrengthUnitEl,
-        // Step 20 Media Elements
-        youtubeUrlInputEl, setYoutubeBackgroundButtonEl,
-        audioUploaderEl, /* attachAudioButtonEl, */ attachedAudioNameEl, removeAudioButtonEl, 
-        adminMediaPlaceholderEl,
-        // Existing properties
         objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl,
-        textSpecificControlsEl, objTextContentEl,
-        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl;
+        textSpecificControlsEl, objTextContentEl, // Text specific row
+        objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl, // Core text inputs (some hidden, some direct)
+        objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl, objShadowAffectStrokeEl, objShadowNonScalingEl, // Shadow inputs
+        objInteractionTriggerEl, objInteractionActionEl, modalContentConfigEl, objModalContentEl, navigateToConfigEl, objNavigateToEl, panZoomConfigEl, objPanZoomLevelEl, // Interaction inputs
+        objAnimationTriggerEl, objAnimationTypeEl, animationParamsConfigEl, objAnimationDurationEl, objAnimationStrengthEl, objAnimationStrengthUnitEl; // Animation inputs
+
+    // New Popover and Toolbar Button DOM elements
+    let fillColorButtonEl, strokeColorButtonEl, opacityButtonEl, // Direct action buttons for color/opacity that might reveal inputs
+        shadowSettingsButtonEl, interactionSettingsButtonEl, animationSettingsButtonEl, fontFamilyButtonEl, // Popover triggers
+        shadowPopoverEl, interactionPopoverEl, animationPopoverEl, fontFamilyPopoverEl, // Popover containers
+        fontWeightButtonEl, fontStyleButtonEl, textAlignGroupEl; // Text style toggle buttons
+
+    // Step 20 Media Elements
+    let youtubeUrlInputEl, setYoutubeBackgroundButtonEl,
+        audioUploaderEl, attachedAudioNameEl, removeAudioButtonEl,
+        adminMediaPlaceholderEl;
+
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -59,11 +60,8 @@
       adminApp.attachEventListeners();
       switchToListView();
       loadAdminProjectsList();
-      // REMOVED: Picker API load trigger
       console.log("Admin_JS: Initialization complete.");
     });
-
-    // REMOVED: handleGoogleApiLoad and initializePickerApi functions
 
     // --- Setup and Listeners ---
     adminApp.setupDOMReferences = function() {
@@ -86,44 +84,50 @@
       addCircleButtonEl = document.getElementById('addCircleButton');
       addTextboxButtonEl = document.getElementById('addTextboxButton');
 
+      // Main Toolbar container
       overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar');
+
+      // Direct input elements (some might be hidden or styled differently)
       objXEl = document.getElementById('objX');
       objYEl = document.getElementById('objY');
       objWidthEl = document.getElementById('objWidth');
       objHeightEl = document.getElementById('objHeight');
       objAngleEl = document.getElementById('objAngle');
-      objFillEl = document.getElementById('objFill');
-      objStrokeColorEl = document.getElementById('objStrokeColor');
+      objFillEl = document.getElementById('objFill'); // The color input itself
+      objStrokeColorEl = document.getElementById('objStrokeColor'); // The color input itself
       objStrokeWidthEl = document.getElementById('objStrokeWidth');
-      objOpacityEl = document.getElementById('objOpacity');
+      objOpacityEl = document.getElementById('objOpacity'); // The range input itself
+
+      // Text specific controls row and core inputs
       textSpecificControlsEl = document.getElementById('textSpecificControls');
       objTextContentEl = document.getElementById('objTextContent');
+      objFontFamilyEl = document.getElementById('objFontFamily'); // The <select> for fonts (likely in a popover)
+      objFontSizeEl = document.getElementById('objFontSize');
+      objFontWeightEl = document.getElementById('objFontWeight'); // Hidden <select>
+      objFontStyleEl = document.getElementById('objFontStyle');   // Hidden <select>
+      objTextAlignEl = document.getElementById('objTextAlign');   // Hidden <select>
+      objLineHeightEl = document.getElementById('objLineHeight');
+      objCharSpacingEl = document.getElementById('objCharSpacing');
+
+      // Shadow inputs (will be in shadowPopoverEl)
       objShadowColorEl = document.getElementById('objShadowColor');
       objShadowBlurEl = document.getElementById('objShadowBlur');
       objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
       objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
+      objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
+      objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
 
+      // Interaction inputs (will be in interactionPopoverEl)
       objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
       objInteractionActionEl = document.getElementById('objInteractionAction');
       modalContentConfigEl = document.getElementById('modalContentConfig');
       objModalContentEl = document.getElementById('objModalContent');
       navigateToConfigEl = document.getElementById('navigateToConfig');
       objNavigateToEl = document.getElementById('objNavigateTo');
-      panZoomConfigEl = document.getElementById('panZoomConfigEl');
+      panZoomConfigEl = document.getElementById('panZoomConfigEl'); // Corrected from panZoomConfigEl to panZoomConfigEl
       objPanZoomLevelEl = document.getElementById('objPanZoomLevel');
 
-      objFontFamilyEl = document.getElementById('objFontFamily');
-      objFontSizeEl = document.getElementById('objFontSize');
-      objFontWeightEl = document.getElementById('objFontWeight');
-      objFontStyleEl = document.getElementById('objFontStyle');
-      objTextAlignEl = document.getElementById('objTextAlign');
-      objLineHeightEl = document.getElementById('objLineHeight');
-      objCharSpacingEl = document.getElementById('objCharSpacing');
-      objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
-      objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
-
-
-
+      // Animation inputs (will be in animationPopoverEl)
       objAnimationTriggerEl = document.getElementById('objAnimationTrigger');
       objAnimationTypeEl = document.getElementById('objAnimationType');
       animationParamsConfigEl = document.getElementById('animationParamsConfig');
@@ -131,16 +135,34 @@
       objAnimationStrengthEl = document.getElementById('objAnimationStrength');
       objAnimationStrengthUnitEl = document.getElementById('objAnimationStrengthUnit');
 
+      // New Popover Trigger Buttons
+      fillColorButtonEl = document.getElementById('fillColorButton');
+      strokeColorButtonEl = document.getElementById('strokeColorButton');
+      opacityButtonEl = document.getElementById('opacityButton');
+      shadowSettingsButtonEl = document.getElementById('shadowSettingsButton');
+      interactionSettingsButtonEl = document.getElementById('interactionSettingsButton');
+      animationSettingsButtonEl = document.getElementById('animationSettingsButton');
+      fontFamilyButtonEl = document.getElementById('fontFamilyButton');
+
+      // New Popover Container Elements
+      shadowPopoverEl = document.getElementById('shadowPopover');
+      interactionPopoverEl = document.getElementById('interactionPopover');
+      animationPopoverEl = document.getElementById('animationPopover');
+      fontFamilyPopoverEl = document.getElementById('fontFamilyPopover');
+
+      // New Text Style Toggle Buttons
+      fontWeightButtonEl = document.getElementById('fontWeightButton'); // Bold
+      fontStyleButtonEl = document.getElementById('fontStyleButton');   // Italic
+      textAlignGroupEl = document.getElementById('textAlignGroup');     // Container for align buttons
+
+
       // Step 20 Elements
       youtubeUrlInputEl = document.getElementById('youtubeUrlInput');
       setYoutubeBackgroundButtonEl = document.getElementById('setYoutubeBackgroundButton');
       audioUploaderEl = document.getElementById('audioUploader');
-      // attachAudioButtonEl = document.getElementById('attachAudioButton'); // Removed
       attachedAudioNameEl = document.getElementById('attachedAudioName');
       removeAudioButtonEl = document.getElementById('removeAudioButton');
       adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
-
-      // REMOVED: attachFromDriveButtonEl assignment
 
       // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
@@ -148,7 +170,10 @@
       if (!listViewContainerEl) console.warn("setupDOMReferences: listViewContainerEl not found.");
       if (!editViewContainerEl) console.warn("setupDOMReferences: editViewContainerEl not found.");
       if (!createProjectButtonEl) console.warn("setupDOMReferences: createProjectButtonEl not found.");
-      // REMOVED: attachFromDriveButtonEl check
+      if (!overlayPropertiesToolbarEl) console.warn("setupDOMReferences: overlayPropertiesToolbarEl (new toolbar) not found.");
+      if (!shadowPopoverEl || !interactionPopoverEl || !animationPopoverEl || !fontFamilyPopoverEl) {
+          console.warn("setupDOMReferences: One or more popover elements not found.");
+      }
 
       console.log("Admin_JS: DOM references set up.");
     };
@@ -158,13 +183,34 @@
           if (element) {
               element.addEventListener(eventType, handler);
           } else {
-              // Log warning only if element is expected globally (like create button)
               if (elementName === 'createProjectButtonEl') console.warn(`Could not attach listener - ${elementName} not found initially.`);
           }
       };
       safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
-      // Listeners for edit view elements will be attached/re-attached in switchToEditView
       console.log("Admin_JS: Initial event listeners attached.");
+      // Edit view listeners attached in switchToEditView
+
+      // Global listener for closing popovers when clicking outside
+      document.addEventListener('click', function(event) {
+        if (adminApp.state.activePopoverId && adminApp.state.currentView === 'edit') {
+            const popover = document.getElementById(adminApp.state.activePopoverId);
+            // Construct potential trigger button IDs (e.g., shadowPopover -> shadowSettingsButton or shadowButton)
+            let triggerButton = null;
+            const baseId = adminApp.state.activePopoverId.replace('Popover', ''); // e.g., "shadow"
+            const possibleTriggerIds = [
+                baseId + 'SettingsButton', // shadowSettingsButton
+                baseId + 'Button'         // fontFamilyButton
+            ];
+            for (const id of possibleTriggerIds) {
+                triggerButton = document.getElementById(id);
+                if (triggerButton) break;
+            }
+
+            if (popover && !popover.contains(event.target) && (!triggerButton || !triggerButton.contains(event.target))) {
+                hideActivePopover();
+            }
+        }
+      }, true); // Use capture phase to catch clicks early
     };
 
     // --- UI View Management ---
@@ -174,7 +220,7 @@
       adminApp.state.currentProjectId = null;
       adminApp.state.projectData = null;
       adminApp.state.currentSlideIndex = -1;
-      // REMOVED: Picker token/state clear
+      hideActivePopover(); // Ensure popovers are closed
 
       if (adminApp.state.fabricCanvasInstance) {
           adminApp.state.fabricCanvasInstance.dispose();
@@ -200,6 +246,7 @@
         adminApp.state.currentProjectId = projectIdToEdit;
         adminApp.state.projectData = null; // Clear previous project data
         adminApp.state.currentSlideIndex = -1; // Reset slide index
+        hideActivePopover(); // Ensure popovers are closed
 
         if(listViewContainerEl) listViewContainerEl.style.display = 'none';
         if(editViewContainerEl) editViewContainerEl.style.display = 'block';
@@ -217,25 +264,20 @@
         if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; // Clear old thumbnails
 
         // Helper to ensure elements are found and listeners attached ONLY ONCE for edit view
-        const ensureEditViewListener = (elementVar, id, eventType, handler) => {
+        const ensureEditViewListener = (elementVar, id, eventType, handler, critical = false) => {
             // Assign element reference if not already assigned in setupDOMReferences (might be null initially)
-             if (!window[elementVar]) {
+             if (!window[elementVar]) { // Check if the global variable (e.g., backToProjectsListButtonEl) is already set
                 window[elementVar] = document.getElementById(id);
              }
-            const element = window[elementVar];
+            const element = window[elementVar]; // Use the global variable
             // Ensure listener isn't attached multiple times if view is switched back and forth rapidly
             const listenerAttribute = `listener-${eventType}-attached`;
             if (element && !element.hasAttribute(listenerAttribute)) {
                 element.addEventListener(eventType, handler);
                 element.setAttribute(listenerAttribute, 'true');
                 console.log(`Listener attached for ${eventType} on #${id} in switchToEditView.`);
-            } else if (!element) {
-                // It's expected some elements won't be found if AdminView.html is incomplete, log but don't stop
-                 // Only log warning for elements we absolutely expect to be there always
-                 const criticalElements = ['backToProjectsListButton', 'imageUploader', 'addSlideButton', 'saveProjectButton', 'addRectangleButton', 'addCircleButton', 'addTextboxButton', 'setYoutubeBackgroundButton', 'audioUploader', 'removeAudioButton'];
-                 if (criticalElements.includes(id)) {
-                    console.warn(`WARN: Element #${id} not found in switchToEditView! Cannot attach listener.`);
-                 }
+            } else if (!element && critical) { // Log warning only for elements we absolutely expect
+                 console.warn(`CRITICAL WARN: Element #${id} not found in switchToEditView! Cannot attach listener.`);
             }
         };
 
@@ -243,23 +285,19 @@
         fabricCanvasEl = document.getElementById('fabricCanvasElement');
         slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
         adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
-        overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar');
-        // REMOVED: attachFromDriveButtonEl assignment
+        overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar'); // Ensure this is fresh
 
         // Attach listeners for edit view buttons and controls
-        ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView);
-        ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload);
-        ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide);
-        ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject);
-        ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle);
-        ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle);
-        ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox);
-        // Step 20 Listeners
-        ensureEditViewListener('setYoutubeBackgroundButtonEl', 'setYoutubeBackgroundButton', 'click', handleSetYoutubeBackground);
-        ensureEditViewListener('audioUploaderEl', 'audioUploader', 'change', handleAudioUpload); // Auto-upload on change
-        ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio);
-
-        // REMOVED: Picker Listener attachment
+        ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView, true);
+        ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload, true);
+        ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide, true);
+        ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject, true);
+        ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle, true);
+        ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle, true);
+        ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox, true);
+        ensureEditViewListener('setYoutubeBackgroundButtonEl', 'setYoutubeBackgroundButton', 'click', handleSetYoutubeBackground, true);
+        ensureEditViewListener('audioUploaderEl', 'audioUploader', 'change', handleAudioUpload, true); // Auto-upload on change
+        ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio, true);
 
         // Initialize Fabric Canvas with defaults
         if (typeof fabric !== 'undefined' && fabricCanvasEl) {
@@ -273,9 +311,7 @@
             fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
             console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
 
-            // Initialize toolbar listeners (only needs to happen once if structure is static)
-            // If toolbar elements were dynamically added/removed, initToolbar might need calling here
-            initToolbar(); // Assuming it's safe to call again or checks internally
+            initToolbar(); // IMPORTANT: Initialize new toolbar structure and listeners
 
             // Attach Fabric canvas event listeners
             adminApp.state.fabricCanvasInstance.off(); // Remove previous listeners first
@@ -294,8 +330,9 @@
               populateToolbar(null);
             });
 
-            // Initially hide toolbar
+            // Initially hide toolbar (new one)
             if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none';
+            hideActivePopover(); // Make sure all popovers are hidden initially
 
             // Attach paste listener for images
             if (!adminApp.state.isPasteListenerActive) {
@@ -304,13 +341,56 @@
                 console.log("Admin_JS: Paste event listener for images attached to document.");
             }
 
-            // ** NOW CALL LOAD PROJECT DATA **
             loadProjectForEditing(projectIdToEdit); // Load the actual project data
 
         } else {
             console.error("Fabric.js library or canvas element #fabricCanvasElement not found in switchToEditView.");
             displayMessage("Critical error: Editor canvas could not be initialized.", false);
             showLoading(false); // Ensure spinner hidden
+        }
+    }
+
+    // --- Popover Management ---
+    function togglePopover(popoverId, triggerButtonEl) {
+        if (adminApp.state.activePopoverId === popoverId) {
+            hideActivePopover();
+        } else {
+            hideActivePopover(); // Hide any currently open popover
+            const popover = document.getElementById(popoverId);
+            if (popover && triggerButtonEl) {
+                popover.style.display = 'block';
+                // Basic positioning: below the trigger button
+                const btnRect = triggerButtonEl.getBoundingClientRect();
+                // Ensure overlayPropertiesToolbarEl is valid and visible for accurate toolbarRect
+                let toolbarTop = 0;
+                let toolbarLeft = 0;
+                if (overlayPropertiesToolbarEl && overlayPropertiesToolbarEl.offsetParent !== null) { // Check if visible/in layout
+                    const toolbarRect = overlayPropertiesToolbarEl.getBoundingClientRect();
+                    toolbarTop = toolbarRect.top;
+                    toolbarLeft = toolbarRect.left;
+                }
+
+                popover.style.position = 'absolute'; // Make sure it's absolute for positioning
+                popover.style.top = (btnRect.bottom - toolbarTop + 5) + 'px'; // 5px offset, relative to toolbar
+                popover.style.left = (btnRect.left - toolbarLeft) + 'px';       // Relative to toolbar
+                // Ensure it doesn't go off-screen (simple check)
+                if ((btnRect.left - toolbarLeft + popover.offsetWidth) > overlayPropertiesToolbarEl.offsetWidth) {
+                    popover.style.left = (btnRect.right - toolbarLeft - popover.offsetWidth) + 'px';
+                }
+
+
+                adminApp.state.activePopoverId = popoverId;
+            } else {
+                console.warn("togglePopover: Popover or trigger button not found for ID:", popoverId);
+            }
+        }
+    }
+
+    function hideActivePopover() {
+        if (adminApp.state.activePopoverId) {
+            const popover = document.getElementById(adminApp.state.activePopoverId);
+            if (popover) popover.style.display = 'none';
+            adminApp.state.activePopoverId = null;
         }
     }
 
@@ -333,7 +413,6 @@
           showLoading(false);
           console.error("onProjectDataLoaded: Received null data string from server (Project or data file likely not found).");
           displayMessage("Error: Could not load project data. Project or its data file may not exist.", false);
-          // Set minimal state to avoid errors, allow going back
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
           adminApp.state.currentSlideIndex = -1;
           if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
@@ -353,7 +432,6 @@
                loadedData.slides = [];
           }
 
-          // Ensure slideMedia exists on all loaded slides
           loadedData.slides.forEach(slide => {
               if (!slide.slideMedia) {
                   slide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
@@ -382,7 +460,6 @@
           console.error("onProjectDataLoaded: Error parsing JSON data or invalid structure:", e);
           console.error("Received JSON string that failed parsing:", jsonString);
           displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
-          // Set minimal state
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
           adminApp.state.currentSlideIndex = -1;
           if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`;
@@ -398,20 +475,15 @@
         try {
           const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
           const canvas = adminApp.state.fabricCanvasInstance;
-          // Ensure custom props are included when saving canvas state
           const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder'];
           currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
-          // Also save current canvas dimensions to the slide object
           currentSlide.canvasWidth = canvas.getWidth();
           currentSlide.canvasHeight = canvas.getHeight();
-          // Ensure slideMedia object exists
           if (!currentSlide.slideMedia) {
                currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
           }
-          // Ensure base64 image URL is removed from slideMedia if type is not 'image' before saving
-          // (It's mainly for immediate admin preview, not permanent storage if background changed)
           if(currentSlide.slideMedia.type !== 'image' && currentSlide.slideMedia.url && currentSlide.slideMedia.url.startsWith('data:image')) {
-              currentSlide.slideMedia.url = null; // Remove potentially large base64 if not the active type
+              currentSlide.slideMedia.url = null;
           }
 
           console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Media:`, JSON.stringify(currentSlide.slideMedia));
@@ -429,10 +501,8 @@
 
         showLoading(true); displayMessage("Saving project...", true);
         try {
-            // Make a deep copy to avoid potential issues if state changes during async call
             const projectDataToSave = JSON.parse(JSON.stringify(adminApp.state.projectData));
 
-            // Remove potentially large base64 image URLs from non-image slides before saving
              projectDataToSave.slides.forEach(slide => {
                  if (slide.slideMedia && slide.slideMedia.type !== 'image' && slide.slideMedia.url && slide.slideMedia.url.startsWith('data:image')) {
                      slide.slideMedia.url = null;
@@ -465,13 +535,12 @@
         if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
         saveCurrentSlideState(); // Save previous slide first
         const newSlideId = 'slide_' + Utilities.getUuid();
-        // Initialize new slide with empty slideMedia object including originalName
         const newSlide = {
             slideId: newSlideId,
             canvasWidth: adminApp.state.defaultCanvasWidth,
             canvasHeight: adminApp.state.defaultCanvasHeight,
             fabricCanvasJSON: null,
-            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null } // Initialize fully
+            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null }
         };
         if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
@@ -484,8 +553,6 @@
         if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid index or slides array missing.", slideIndex); return; }
         console.log(`Selecting slide ${slideIndex + 1}`);
 
-        // Make sure previous slide state (including potentially removed media) is saved
-        // Check if the current slide is valid before saving
         if (adminApp.state.currentSlideIndex !== -1 && adminApp.state.currentSlideIndex < adminApp.state.projectData.slides.length) {
              saveCurrentSlideState();
         }
@@ -495,7 +562,6 @@
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
 
-        // Ensure slideMedia object exists
         if (!selectedSlideData.slideMedia) {
             selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
         }
@@ -507,12 +573,10 @@
         if (fabricCanvasEl) { fabricCanvasEl.width = slideWidth; fabricCanvasEl.height = slideHeight; }
         console.log(`Canvas set to dimensions for slide ${slideIndex + 1}: ${slideWidth}x${slideHeight}`);
 
-        // Clear canvas objects and background
         canvas.clear();
         canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
-        canvas.backgroundColor = '#e9e9e9'; // Default background
+        canvas.backgroundColor = '#e9e9e9';
 
-        // Reset Admin UI inputs for media
         if (imageUploaderEl) imageUploaderEl.value = null;
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
         if (audioUploaderEl) audioUploaderEl.value = null;
@@ -520,9 +584,8 @@
         if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
         if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
 
-        // Load media for the selected slide
         const media = selectedSlideData.slideMedia;
-        if (media && media.type === 'image' && (media.url || media.driveFileId)) { // Check both URL (base64) and driveId
+        if (media && media.type === 'image' && (media.url || media.driveFileId)) {
             if (media.url && media.url.startsWith('data:image')) {
                 console.log("Loading background from base64 data URI.");
                 fabric.Image.fromURL(media.url, function(img) {
@@ -538,7 +601,6 @@
                      showLoading(false);
                      if (adminApp.state.currentSlideIndex !== slideIndex) { console.log("Slide changed before background could be fetched for index", slideIndex); return; }
                      if (response && response.success && response.base64Data) {
-                          // Store base64 in slide data for future loads within this session
                           media.url = response.base64Data;
                          fabric.Image.fromURL(response.base64Data, function(img) {
                              if (!adminApp.state.fabricCanvasInstance) return;
@@ -549,39 +611,31 @@
                      } else { console.error("Failed to re-fetch background", response); displayMessage("Error loading slide background image.", false); canvas.renderAll(); }
                  }).withFailureHandler(onServerError).getImageAsBase64(media.driveFileId);
              } else { console.warn("Slide media URL/ID not suitable for loading:", media); canvas.renderAll(); }
-
-
         } else if (media && media.type === 'youtube' && media.url) {
-            // Show YouTube placeholder on admin canvas
             console.log("Displaying YouTube placeholder for URL:", media.url);
              if (adminMediaPlaceholderEl) {
                  adminMediaPlaceholderEl.textContent = `YouTube BG: ${media.url}`;
                  adminMediaPlaceholderEl.style.display = 'block';
              }
-             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url; // Populate input field
-             canvas.backgroundColor = '#444'; // Darken canvas slightly
+             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
+             canvas.backgroundColor = '#444';
              canvas.renderAll();
-
-        } else if (media && media.type === 'audio' && (media.driveFileId)) { // Primarily check driveId for audio now
-             // Show Audio indicator in UI
+        } else if (media && media.type === 'audio' && (media.driveFileId)) {
              console.log("Indicating attached audio:", media.originalName || media.driveFileId);
              if (attachedAudioNameEl) attachedAudioNameEl.textContent = `Attached: ${media.originalName || 'Audio File'}`;
              if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
-             if (adminMediaPlaceholderEl) { // Optionally show placeholder on canvas too
+             if (adminMediaPlaceholderEl) {
                  adminMediaPlaceholderEl.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
                  adminMediaPlaceholderEl.style.display = 'block';
              }
              canvas.renderAll();
-
         } else {
-            // No media or unknown type
             console.log("No background media found or configured for slide", slideIndex);
              if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
-             canvas.backgroundColor = '#e9e9e9'; // Reset background color
+             canvas.backgroundColor = '#e9e9e9';
              canvas.renderAll();
         }
 
-        // Load fabric objects (overlays)
         if (selectedSlideData.fabricCanvasJSON) {
           console.log("Loading fabricCanvasJSON for slide", slideIndex);
           canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
@@ -589,12 +643,12 @@
               adminApp.state.fabricCanvasInstance.renderAll();
               console.log("Finished loading canvas JSON for slide", slideIndex);
               const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
-              populateToolbar(activeObj);
+              populateToolbar(activeObj); // Update new toolbar
             }, function(o, object) { /* Revival function if needed */ });
             } else {
             console.log("No fabricCanvasJSON to load for slide", slideIndex);
             canvas.renderAll();
-            populateToolbar(null);
+            populateToolbar(null); // Clear new toolbar
         }
         updateSlideThumbnailsUI();
     }
@@ -623,13 +677,13 @@
         const indexToSelect = (slideIndex === 0 && adminApp.state.projectData.slides.length > 0) ? 0 : Math.max(0, slideIndex - 1);
 
         if (adminApp.state.currentSlideIndex === slideIndex) {
-            adminApp.state.currentSlideIndex = -1; // Force re-selection logic
+            adminApp.state.currentSlideIndex = -1;
             selectSlide(indexToSelect);
         } else if (adminApp.state.currentSlideIndex > slideIndex) {
-            adminApp.state.currentSlideIndex--; // Adjust index if deletion was before current
-            updateSlideThumbnailsUI(); // Just update thumbnails, no need to reload canvas
+            adminApp.state.currentSlideIndex--;
+            updateSlideThumbnailsUI();
         } else {
-             updateSlideThumbnailsUI(); // Deletion was after current, just update thumbs
+             updateSlideThumbnailsUI();
         }
     }
 
@@ -819,7 +873,7 @@
         const file = event.target.files[0];
         if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
 
-        saveCurrentSlideState(); // Save state before potential background change
+        saveCurrentSlideState();
 
         showLoading(true); displayMessage("Uploading image...", true);
         const reader = new FileReader();
@@ -833,13 +887,12 @@
     }
 
     function onImageUploaded(response) {
-        // Called AFTER Drive upload (direct or Picker copy), before fetching base64 for images
         showLoading(false);
-        if (imageUploaderEl) imageUploaderEl.value = null; // Clear input
+        if (imageUploaderEl) imageUploaderEl.value = null;
         if (response && response.success && response.driveFileId) {
             displayMessage("Image processed. Fetching for preview...", true);
             showLoading(true);
-            adminApp.state.lastUploadedDriveId = response.driveFileId; // Store ID
+            adminApp.state.lastUploadedDriveId = response.driveFileId;
             adminApp.state.lastUploadedMimeType = response.mimeType;
             adminApp.state.lastUploadedFileName = response.fileName;
             google.script.run
@@ -852,19 +905,17 @@
     }
 
     function onBase64ImageReceived(response) {
-        // Called AFTER base64 fetch for image background
         showLoading(false);
         if (response && response.success && response.base64Data) {
             if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas/Slide not ready.", false); return; }
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
             if (!currentSlide) { displayMessage("Error: Slide data missing.", false); return; }
 
-            // Set background
             fabric.Image.fromURL(response.base64Data, function(img) {
                 if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) return;
                 const canvas = adminApp.state.fabricCanvasInstance;
                 const imgWidth = img.width; const imgHeight = img.height;
-                const maxWidth = 960; // Max width constraint
+                const maxWidth = 960;
                 let cvWidth = imgWidth; let cvHeight = imgHeight; const ratio = imgWidth / imgHeight;
                 if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / ratio); }
 
@@ -874,26 +925,23 @@
                 canvas.renderAll();
                 displayMessage("Background image set.", true);
 
-                // Update slideMedia state AFTER setting background
                 if (!currentSlide.slideMedia) currentSlide.slideMedia = {};
                 currentSlide.slideMedia.type = 'image';
-                currentSlide.slideMedia.url = response.base64Data; // Store base64 for immediate load
+                currentSlide.slideMedia.url = response.base64Data;
                 currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null;
-                currentSlide.slideMedia.mimeType = adminApp.state.lastUploadedMimeType || response.mimeType; // Use stored mime if available
+                currentSlide.slideMedia.mimeType = adminApp.state.lastUploadedMimeType || response.mimeType;
                 currentSlide.slideMedia.originalName = adminApp.state.lastUploadedFileName || null;
-                currentSlide.canvasWidth = cvWidth; // Update slide dimensions
+                currentSlide.canvasWidth = cvWidth;
                 currentSlide.canvasHeight = cvHeight;
 
                 console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated for image.`);
                 updateSlideThumbnailsUI();
 
-                // Clear other media UI/placeholders
                 if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
                 if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
                 if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
                 if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
 
-                // Clean up temporary state
                 delete adminApp.state.lastUploadedDriveId;
                 delete adminApp.state.lastUploadedMimeType;
                 delete adminApp.state.lastUploadedFileName;
@@ -901,14 +949,11 @@
             }, { crossOrigin: 'anonymous' });
         } else {
             onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." });
-            // Clean up temporary state on error too
             delete adminApp.state.lastUploadedDriveId;
             delete adminApp.state.lastUploadedMimeType;
             delete adminApp.state.lastUploadedFileName;
         }
     }
-
-    // -- NEW MEDIA HANDLERS --
 
     function handleSetYoutubeBackground() {
         if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) {
@@ -918,13 +963,12 @@
             displayMessage("Please enter a YouTube URL.", false); return;
         }
         const url = youtubeUrlInputEl.value.trim();
-        // Basic validation - more robust parsing could be added
         if (!url.includes("youtube.com/") && !url.includes("youtu.be/")) {
             displayMessage("Please enter a valid YouTube URL.", false);
             return;
         }
 
-        saveCurrentSlideState(); // Save current state before changing media
+        saveCurrentSlideState();
 
         const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
         if (!currentSlide.slideMedia) {
@@ -932,23 +976,21 @@
         }
         currentSlide.slideMedia.type = 'youtube';
         currentSlide.slideMedia.url = url;
-        currentSlide.slideMedia.driveFileId = null; // Clear Drive ID if switching to YouTube
-        currentSlide.slideMedia.mimeType = 'video/youtube'; // Use custom mime type
-        currentSlide.slideMedia.originalName = null; // No original name for URL
+        currentSlide.slideMedia.driveFileId = null;
+        currentSlide.slideMedia.mimeType = 'video/youtube';
+        currentSlide.slideMedia.originalName = null;
 
         console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
 
-        // Update Admin UI immediately
         if(adminApp.state.fabricCanvasInstance) {
              adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
-             adminApp.state.fabricCanvasInstance.backgroundColor = '#444'; // Darken canvas slightly
-             adminApp.state.fabricCanvasInstance.renderAll(); // Render the background color change
+             adminApp.state.fabricCanvasInstance.backgroundColor = '#444';
+             adminApp.state.fabricCanvasInstance.renderAll();
         }
        if (adminMediaPlaceholderEl) {
            adminMediaPlaceholderEl.textContent = `YouTube BG: ${url}`;
            adminMediaPlaceholderEl.style.display = 'block';
        }
-       // Clear other media inputs/indicators
        if (imageUploaderEl) imageUploaderEl.value = null;
        if (audioUploaderEl) audioUploaderEl.value = null;
        if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
@@ -970,7 +1012,7 @@
              return;
         }
 
-        saveCurrentSlideState(); // Save state before upload
+        saveCurrentSlideState();
 
         showLoading(true); displayMessage("Uploading audio...", true);
         const reader = new FileReader();
@@ -981,9 +1023,9 @@
                 data: e.target.result.split(',')[1]
             };
             google.script.run
-                .withSuccessHandler(onAudioUploaded) // Use the same handler for direct & Picker uploads
+                .withSuccessHandler(onAudioUploaded)
                 .withFailureHandler(onServerError)
-                .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'audio'); // Pass 'audio' type
+                .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'audio');
         };
         reader.onerror = function(error) {
             showLoading(false);
@@ -994,14 +1036,13 @@
         reader.readAsDataURL(file);
     }
 
-     function onAudioUploaded(response) { // Handles both direct upload and Picker copy
+     function onAudioUploaded(response) {
         showLoading(false);
-        if (audioUploaderEl) audioUploaderEl.value = null; // Clear input regardless of success
+        if (audioUploaderEl) audioUploaderEl.value = null;
 
         if (response && response.success && response.driveFileId) {
             displayMessage("Audio processed successfully.", true);
 
-            // Update slideMedia state
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
              if (!currentSlide.slideMedia) {
                 currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
@@ -1014,15 +1055,14 @@
 
             console.log(`Audio attached for slide ${adminApp.state.currentSlideIndex + 1}:`, currentSlide.slideMedia);
 
-            // Update Admin UI
             if (attachedAudioNameEl) attachedAudioNameEl.textContent = `Attached: ${response.fileName}`;
             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
-            if (youtubeUrlInputEl) youtubeUrlInputEl.value = ''; // Clear YouTube input
-            if (imageUploaderEl) imageUploaderEl.value = null; // Clear image input
-            if(adminApp.state.fabricCanvasInstance) { // Clear other backgrounds
+            if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
+            if (imageUploaderEl) imageUploaderEl.value = null;
+            if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9';
-                adminApp.state.fabricCanvasInstance.renderAll(); // Render changes
+                adminApp.state.fabricCanvasInstance.renderAll();
             }
             if (adminMediaPlaceholderEl) {
                  adminMediaPlaceholderEl.textContent = `Audio Attached: ${response.fileName}`;
@@ -1041,66 +1081,54 @@
         if (currentSlide.slideMedia && currentSlide.slideMedia.type === 'audio') {
             console.log(`Removing audio from slide ${adminApp.state.currentSlideIndex + 1}`);
 
-            // Update state first
             currentSlide.slideMedia.type = null;
             currentSlide.slideMedia.url = null;
             currentSlide.slideMedia.driveFileId = null;
             currentSlide.slideMedia.mimeType = null;
             currentSlide.slideMedia.originalName = null;
 
-            // Update UI
             if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
             if (audioUploaderEl) audioUploaderEl.value = null;
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             if(adminApp.state.fabricCanvasInstance) {
-                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; // Reset BG color
+                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9';
                 adminApp.state.fabricCanvasInstance.renderAll();
              }
             displayMessage("Audio removed from this slide.", true);
-            // Optional: Could add server call here to delete Drive file if desired
         }
     }
 
-    // --- Step 22: Paste Image Handler ---
     function handlePasteImage(event) {
         if (adminApp.state.currentView !== 'edit' || !adminApp.state.currentProjectId || adminApp.state.isLoading) {
-            // Not in edit view, no project, or already processing something
             return;
         }
-
         const items = (event.clipboardData || event.originalEvent.clipboardData).items;
         let imageFound = false;
-
         for (let i = 0; i < items.length; i++) {
             if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
                 imageFound = true;
                 const blob = items[i].getAsFile();
                 if (!blob) continue;
-
-                event.preventDefault(); // Prevent default paste behavior for the image
+                event.preventDefault();
                 console.log("Image pasted from clipboard:", blob.name, blob.type);
-
-                saveCurrentSlideState(); // Save current slide state before processing new image
-
+                saveCurrentSlideState();
                 showLoading(true);
                 displayMessage("Processing pasted image...", true);
-
                 const reader = new FileReader();
                 reader.onload = function(e_reader) {
                     const fileData = {
-                        fileName: 'pasted_image.png', // Default name
+                        fileName: 'pasted_image.png',
                         mimeType: blob.type,
-                        data: e_reader.target.result.split(',')[1] // Base64 data
+                        data: e_reader.target.result.split(',')[1]
                     };
-
                     if (!adminApp.state.currentProjectId) {
                         showLoading(false);
                         displayMessage("Error: No project selected for pasted image.", false);
                         return;
                     }
                     google.script.run
-                        .withSuccessHandler(onImageUploaded) // Existing handler
+                        .withSuccessHandler(onImageUploaded)
                         .withFailureHandler(onServerError)
                         .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
                 };
@@ -1110,7 +1138,7 @@
                     console.error("FileReader error:", error);
                 };
                 reader.readAsDataURL(blob);
-                break; // Handle only the first image found
+                break;
             }
         }
         if (imageFound) {
@@ -1120,9 +1148,7 @@
         }
     }
 
-    // REMOVED: Google Drive Picker Functions (showDrivePicker, createPickerWithToken, pickerCallback, onDriveFileCopied)
-
-    // --- Overlay Creation & Toolbar ---
+    // --- Overlay Creation ---
     function addRectangle() {
       if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
       const canvas = adminApp.state.fabricCanvasInstance;
@@ -1151,6 +1177,7 @@
       canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
     }
 
+    // --- Toolbar Logic (Significantly Reworked) ---
     function toHexColor(fabricColor) {
       if (!fabricColor) return '#000000';
       try {
@@ -1167,91 +1194,182 @@
     }
 
     function initToolbar() {
-      console.log("initToolbar: Attaching listeners to toolbar inputs.");
-      if(objFontFamilyEl) {
-          // Clear existing options before adding new ones
-          objFontFamilyEl.innerHTML = '';
-          FONT_FAMILIES.forEach(font => {
-              const option = document.createElement('option'); option.value = font; option.textContent = font; objFontFamilyEl.appendChild(option);
-          });
-      } else { console.warn("initToolbar: objFontFamilyEl not found, cannot populate fonts."); }
+        console.log("initToolbar: Attaching listeners to NEW toolbar inputs and popovers.");
+        hideActivePopover(); // Ensure all popovers start hidden
 
-      const inputs = [
-        {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
-        {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
-        {el: objAngleEl, prop: 'angle', type: 'number'}, {el: objFillEl, prop: 'fill', type: 'color'},
-        {el: objStrokeColorEl, prop: 'stroke', type: 'color'}, {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
-        {el: objOpacityEl, prop: 'opacity', type: 'range'}, {el: objTextContentEl, prop: 'text', type: 'textarea'},
-        {el: objFontFamilyEl, prop: 'fontFamily', type: 'select'}, {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
-        {el: objFontWeightEl, prop: 'fontWeight', type: 'select'}, {el: objFontStyleEl, prop: 'fontStyle', type: 'select'},
-        {el: objTextAlignEl, prop: 'textAlign', type: 'select'}, {el: objLineHeightEl, prop: 'lineHeight', type: 'number'},
-        {el: objCharSpacingEl, prop: 'charSpacing', type: 'number'}, {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
-        {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'}, {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
-        {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'}, {el: objShadowAffectStrokeEl, prop: 'shadow.affectStroke', type: 'checkbox'},
-        {el: objShadowNonScalingEl, prop: 'shadow.nonScaling', type: 'checkbox'}
-      ];
+        // Populate Font Family Select (inside its popover)
+        if(objFontFamilyEl) {
+            objFontFamilyEl.innerHTML = ''; // Clear existing options
+            FONT_FAMILIES.forEach(font => {
+                const option = document.createElement('option'); option.value = font; option.textContent = font; objFontFamilyEl.appendChild(option);
+            });
+             // Listener for the font family select itself
+            if (!objFontFamilyEl.hasAttribute('listener-attached')) {
+                objFontFamilyEl.addEventListener('change', (e) => updateFabricObjectFromToolbar('fontFamily', e.target.value));
+                objFontFamilyEl.setAttribute('listener-attached', 'true');
+            }
+        } else { console.warn("initToolbar: objFontFamilyEl not found for populating fonts."); }
 
-      inputs.forEach(inputConfig => {
-        if (inputConfig.el) {
-            const eventType = (inputConfig.el.tagName === 'SELECT' || inputConfig.el.type === 'color' || inputConfig.el.type === 'checkbox') ? 'change' : 'input';
-            // Check if listener already exists to avoid duplicates (simple check)
-            if (!inputConfig.el.hasAttribute('listener-attached')) {
-                 inputConfig.el.addEventListener(eventType, (e) => {
-                     const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
-                     updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type);
-                 });
-                 inputConfig.el.setAttribute('listener-attached', 'true');
-             }
-        } else { console.warn(`initToolbar: Element for property "${inputConfig.prop}" not found.`); }
-      });
 
-      // Interaction listeners only need to be attached once too
-      if (objInteractionTriggerEl && !objInteractionTriggerEl.hasAttribute('listener-attached')) {
-           objInteractionTriggerEl.addEventListener('change', handleInteractionChange);
-           objInteractionTriggerEl.setAttribute('listener-attached', 'true');
-       }
-       if (objInteractionActionEl && !objInteractionActionEl.hasAttribute('listener-attached')) {
-            objInteractionActionEl.addEventListener('change', handleInteractionChange);
-            objInteractionActionEl.setAttribute('listener-attached', 'true');
-       }
-       if (objModalContentEl && !objModalContentEl.hasAttribute('listener-attached')) {
-           objModalContentEl.addEventListener('input', handleInteractionChange);
-           objModalContentEl.setAttribute('listener-attached', 'true');
-       }
-       if (objNavigateToEl && !objNavigateToEl.hasAttribute('listener-attached')) {
-            objNavigateToEl.addEventListener('input', handleInteractionChange);
-            objNavigateToEl.setAttribute('listener-attached', 'true');
-       }
-       if (objPanZoomLevelEl && !objPanZoomLevelEl.hasAttribute('listener-attached')) {
-            objPanZoomLevelEl.addEventListener('input', handleInteractionChange);
-            objPanZoomLevelEl.setAttribute('listener-attached', 'true');
-        }
+        // --- Event Listeners for Popover Trigger Buttons ---
+        const popoverTriggers = [
+            { buttonEl: shadowSettingsButtonEl, popoverId: 'shadowPopover' },
+            { buttonEl: interactionSettingsButtonEl, popoverId: 'interactionPopover' },
+            { buttonEl: animationSettingsButtonEl, popoverId: 'animationPopover' },
+            { buttonEl: fontFamilyButtonEl, popoverId: 'fontFamilyPopover' }
+        ];
+        popoverTriggers.forEach(item => {
+            if (item.buttonEl && !item.buttonEl.hasAttribute('listener-attached')) {
+                item.buttonEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent this click from immediately closing popover via document listener
+                    togglePopover(item.popoverId, item.buttonEl);
+                });
+                item.buttonEl.setAttribute('listener-attached', 'true');
+            } else if (!item.buttonEl) {
+                console.warn(`initToolbar: Popover trigger button for ${item.popoverId} not found.`);
+            }
+        });
 
-      // Animation listeners
-      if (objAnimationTriggerEl && !objAnimationTriggerEl.hasAttribute('listener-attached')) {
-           objAnimationTriggerEl.addEventListener('change', handleAnimationChange);
-           objAnimationTriggerEl.setAttribute('listener-attached', 'true');
-       }
-       if (objAnimationTypeEl && !objAnimationTypeEl.hasAttribute('listener-attached')) {
-            objAnimationTypeEl.addEventListener('change', handleAnimationChange);
-            objAnimationTypeEl.setAttribute('listener-attached', 'true');
-       }
-       if (objAnimationDurationEl && !objAnimationDurationEl.hasAttribute('listener-attached')) {
-            objAnimationDurationEl.addEventListener('input', handleAnimationChange);
-            objAnimationDurationEl.setAttribute('listener-attached', 'true');
-       }
-       if (objAnimationStrengthEl && !objAnimationStrengthEl.hasAttribute('listener-attached')) {
-            objAnimationStrengthEl.addEventListener('input', handleAnimationChange);
-            objAnimationStrengthEl.setAttribute('listener-attached', 'true');
-       }
+        // --- Event Listeners for Direct Toolbar Inputs (X, Y, Width, Height, Angle, StrokeWidth, Opacity, FontSize, LineHeight, CharSpacing) ---
+        const directInputs = [
+            {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
+            {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'},
+            {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
+            {el: objAngleEl, prop: 'angle', type: 'number'},
+            {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
+            {el: objOpacityEl, prop: 'opacity', type: 'range'}, // Range input for opacity
+            {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
+            {el: objLineHeightEl, prop: 'lineHeight', type: 'number', isFloat: true}, // lineHeight can be float
+            {el: objCharSpacingEl, prop: 'charSpacing', type: 'number'},
+            {el: objTextContentEl, prop: 'text', type: 'textarea'} // Textarea for content
+        ];
+        directInputs.forEach(inputConfig => {
+            if (inputConfig.el && !inputConfig.el.hasAttribute('listener-attached')) {
+                const eventType = (inputConfig.el.type === 'range' || inputConfig.el.type === 'textarea') ? 'input' : 'change'; // Use 'input' for live updates on range/textarea
+                inputConfig.el.addEventListener(eventType, (e) => {
+                    let value = e.target.value;
+                    // For width/height, updateFabricObjectFromToolbar handles scaling
+                    updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type); // Pass type for parsing
+                });
+                inputConfig.el.setAttribute('listener-attached', 'true');
+            } else if (!inputConfig.el) {
+                 console.warn(`initToolbar: Direct input element for prop "${inputConfig.prop}" not found.`);
+            }
+        });
+
+        // --- Event Listeners for Color Inputs (Fill, Stroke) ---
+        const colorInputs = [
+            {el: objFillEl, prop: 'fill'},
+            {el: objStrokeColorEl, prop: 'stroke'}
+        ];
+        colorInputs.forEach(inputConfig => {
+            if (inputConfig.el && !inputConfig.el.hasAttribute('listener-attached')) {
+                inputConfig.el.addEventListener('input', (e) => updateFabricObjectFromToolbar(inputConfig.prop, e.target.value)); // Use 'input' for live color update
+                inputConfig.el.setAttribute('listener-attached', 'true');
+            } else if (!inputConfig.el) {
+                console.warn(`initToolbar: Color input element for prop "${inputConfig.prop}" not found.`);
+            }
+        });
+
+
+        // --- Event Listeners for Text Style Toggle Buttons (Bold, Italic, Align) ---
+        if (fontWeightButtonEl && !fontWeightButtonEl.hasAttribute('listener-attached')) { // Bold
+            fontWeightButtonEl.addEventListener('click', () => {
+                const activeObject = adminApp.state.fabricCanvasInstance.getActiveObject();
+                if (!activeObject) return;
+                const newValue = activeObject.fontWeight === 'bold' ? 'normal' : 'bold';
+                updateFabricObjectFromToolbar('fontWeight', newValue);
+                populateToolbar(activeObject);
+            });
+            fontWeightButtonEl.setAttribute('listener-attached', 'true');
+        } else if(!fontWeightButtonEl) { console.warn("initToolbar: fontWeightButtonEl not found."); }
+
+        if (fontStyleButtonEl && !fontStyleButtonEl.hasAttribute('listener-attached')) { // Italic
+            fontStyleButtonEl.addEventListener('click', () => {
+                const activeObject = adminApp.state.fabricCanvasInstance.getActiveObject();
+                if (!activeObject) return;
+                const newValue = activeObject.fontStyle === 'italic' ? 'normal' : 'italic';
+                updateFabricObjectFromToolbar('fontStyle', newValue);
+                populateToolbar(activeObject);
+            });
+            fontStyleButtonEl.setAttribute('listener-attached', 'true');
+        } else if(!fontStyleButtonEl) { console.warn("initToolbar: fontStyleButtonEl not found."); }
+
+        if (textAlignGroupEl && !textAlignGroupEl.hasAttribute('listener-attached')) { // Text Align
+            const alignButtons = textAlignGroupEl.querySelectorAll('.toolbar-button');
+            alignButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const alignValue = button.dataset.align;
+                    updateFabricObjectFromToolbar('textAlign', alignValue);
+                    populateToolbar(adminApp.state.fabricCanvasInstance.getActiveObject());
+                });
+            });
+            textAlignGroupEl.setAttribute('listener-attached', 'true');
+        } else if(!textAlignGroupEl) { console.warn("initToolbar: textAlignGroupEl not found."); }
+
+
+        // --- Event Listeners for Inputs INSIDE Popovers (Shadow, Interaction, Animation) ---
+        const shadowInputs = [
+            {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
+            {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'},
+            {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
+            {el: objShadowOffsetYEl, prop: 'shadow.offsetY', type: 'number'},
+            {el: objShadowAffectStrokeEl, prop: 'shadow.affectStroke', type: 'checkbox'},
+            {el: objShadowNonScalingEl, prop: 'shadow.nonScaling', type: 'checkbox'}
+        ];
+        shadowInputs.forEach(inputConfig => {
+            if (inputConfig.el && !inputConfig.el.hasAttribute('listener-attached')) {
+                const eventType = (inputConfig.el.type === 'color' || inputConfig.el.type === 'checkbox' || inputConfig.el.type === 'range') ? 'change' : 'input';
+                inputConfig.el.addEventListener(eventType, (e) => {
+                    const value = inputConfig.el.type === 'checkbox' ? e.target.checked : e.target.value;
+                    updateFabricObjectFromToolbar(inputConfig.prop, value, inputConfig.type);
+                });
+                inputConfig.el.setAttribute('listener-attached', 'true');
+            } else if(!inputConfig.el) { console.warn(`initToolbar: Shadow input element for prop "${inputConfig.prop}" not found.`);}
+        });
+
+        if (objInteractionTriggerEl && !objInteractionTriggerEl.hasAttribute('listener-attached')) {
+            objInteractionTriggerEl.addEventListener('change', handleInteractionChange); objInteractionTriggerEl.setAttribute('listener-attached', 'true');
+        } else if(!objInteractionTriggerEl) { console.warn("initToolbar: objInteractionTriggerEl not found.");}
+        if (objInteractionActionEl && !objInteractionActionEl.hasAttribute('listener-attached')) {
+            objInteractionActionEl.addEventListener('change', handleInteractionChange); objInteractionActionEl.setAttribute('listener-attached', 'true');
+        } else if(!objInteractionActionEl) { console.warn("initToolbar: objInteractionActionEl not found.");}
+        if (objModalContentEl && !objModalContentEl.hasAttribute('listener-attached')) {
+            objModalContentEl.addEventListener('input', handleInteractionChange); objModalContentEl.setAttribute('listener-attached', 'true');
+        } else if(!objModalContentEl) { console.warn("initToolbar: objModalContentEl not found.");}
+        if (objNavigateToEl && !objNavigateToEl.hasAttribute('listener-attached')) {
+            objNavigateToEl.addEventListener('input', handleInteractionChange); objNavigateToEl.setAttribute('listener-attached', 'true');
+        } else if(!objNavigateToEl) { console.warn("initToolbar: objNavigateToEl not found.");}
+        if (objPanZoomLevelEl && !objPanZoomLevelEl.hasAttribute('listener-attached')) {
+             objPanZoomLevelEl.addEventListener('input', handleInteractionChange); objPanZoomLevelEl.setAttribute('listener-attached', 'true');
+        } else if(!objPanZoomLevelEl) { console.warn("initToolbar: objPanZoomLevelEl not found.");}
+
+        if (objAnimationTriggerEl && !objAnimationTriggerEl.hasAttribute('listener-attached')) {
+            objAnimationTriggerEl.addEventListener('change', handleAnimationChange); objAnimationTriggerEl.setAttribute('listener-attached', 'true');
+        } else if(!objAnimationTriggerEl) { console.warn("initToolbar: objAnimationTriggerEl not found.");}
+        if (objAnimationTypeEl && !objAnimationTypeEl.hasAttribute('listener-attached')) {
+            objAnimationTypeEl.addEventListener('change', handleAnimationChange); objAnimationTypeEl.setAttribute('listener-attached', 'true');
+        } else if(!objAnimationTypeEl) { console.warn("initToolbar: objAnimationTypeEl not found.");}
+        if (objAnimationDurationEl && !objAnimationDurationEl.hasAttribute('listener-attached')) {
+            objAnimationDurationEl.addEventListener('input', handleAnimationChange); objAnimationDurationEl.setAttribute('listener-attached', 'true');
+        } else if(!objAnimationDurationEl) { console.warn("initToolbar: objAnimationDurationEl not found.");}
+        if (objAnimationStrengthEl && !objAnimationStrengthEl.hasAttribute('listener-attached')) {
+            objAnimationStrengthEl.addEventListener('input', handleAnimationChange); objAnimationStrengthEl.setAttribute('listener-attached', 'true');
+        } else if(!objAnimationStrengthEl) { console.warn("initToolbar: objAnimationStrengthEl not found.");}
+        console.log("initToolbar: All new toolbar listeners attached or verified.");
     }
 
     function populateToolbar(activeObject) {
         if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
-        if (!activeObject) { overlayPropertiesToolbarEl.style.display = 'none'; return; }
+        hideActivePopover();
+
+        if (!activeObject) {
+            overlayPropertiesToolbarEl.style.display = 'none';
+            if (textSpecificControlsEl) textSpecificControlsEl.style.display = 'none';
+            return;
+        }
         overlayPropertiesToolbarEl.style.display = 'block';
 
-        // --- Basic Properties ---
         if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
         if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
         if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
@@ -1262,23 +1380,30 @@
         if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
         if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
 
-        // --- Text Properties (Conditional Display) ---
         const isTextObject = activeObject.type === 'textbox' || activeObject.type === 'i-text';
         if (textSpecificControlsEl) {
-            textSpecificControlsEl.style.display = isTextObject ? 'block' : 'none';
+            textSpecificControlsEl.style.display = isTextObject ? 'flex' : 'none';
             if (isTextObject) {
                 if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
                 if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial';
                 if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
+                if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight || 1.16;
+                if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing || 0;
+
+                if (fontWeightButtonEl) fontWeightButtonEl.classList.toggle('active', activeObject.fontWeight === 'bold');
+                if (fontStyleButtonEl) fontStyleButtonEl.classList.toggle('active', activeObject.fontStyle === 'italic');
+
+                if (textAlignGroupEl) {
+                    textAlignGroupEl.querySelectorAll('.toolbar-button').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.align === activeObject.textAlign);
+                    });
+                }
                 if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
                 if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
                 if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
-                if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight || 1.16;
-                if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing || 0;
             }
         }
 
-        // --- Shadow Properties ---
         const shadow = activeObject.shadow;
         if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000';
         if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
@@ -1286,74 +1411,71 @@
         if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
         if (objShadowAffectStrokeEl) objShadowAffectStrokeEl.checked = shadow ? !!shadow.affectStroke : false;
         if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
+        if (shadowSettingsButtonEl) shadowSettingsButtonEl.classList.toggle('active', !!shadow && (shadow.blur > 0 || shadow.offsetX !== 0 || shadow.offsetY !== 0 || shadow.color !== '#000000'));
 
-        // --- Interaction Properties ---
-        const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "" };
+
+        const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
         if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
         if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
         if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
         if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
+        if (objPanZoomLevelEl) objPanZoomLevelEl.value = interaction.panZoomLevel === undefined ? 1.5 : interaction.panZoomLevel;
         updateInteractionConfigVisibility(interaction.action);
+        if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(interaction.trigger && interaction.action));
 
-        // --- Animation Properties ---
+
         const animation = activeObject.customAnimation || { trigger: "", type: "", duration: 500, strength: 5 };
         if (objAnimationTriggerEl) objAnimationTriggerEl.value = animation.trigger || "";
         if (objAnimationTypeEl) objAnimationTypeEl.value = animation.type || "";
-
         const showAnimParams = !!(animation.trigger && animation.type);
         if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none';
-
         if (showAnimParams) {
-        if (objAnimationDurationEl) objAnimationDurationEl.value = animation.duration || 500;
-        if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
-        updateAnimationStrengthUnit(animation.type);
+            if (objAnimationDurationEl) objAnimationDurationEl.value = animation.duration || 500;
+            if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
+            updateAnimationStrengthUnit(animation.type);
         }
+        if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
     }
+
     function handleInteractionChange() {
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) return;
         const activeObject = canvas.getActiveObject();
         if (!activeObject) return;
-        if (!activeObject.customInteraction) { activeObject.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "" }; }
+        if (!activeObject.customInteraction) { activeObject.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 }; }
+
         if (objInteractionTriggerEl) activeObject.customInteraction.trigger = objInteractionTriggerEl.value;
         if (objInteractionActionEl) activeObject.customInteraction.action = objInteractionActionEl.value;
         if (objModalContentEl) activeObject.customInteraction.modalContent = objModalContentEl.value;
         if (objNavigateToEl) activeObject.customInteraction.navigateTo = objNavigateToEl.value;
+        if (objPanZoomLevelEl) activeObject.customInteraction.panZoomLevel = parseFloat(objPanZoomLevelEl.value) || 1.5;
+
         updateInteractionConfigVisibility(activeObject.customInteraction.action);
+        if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(activeObject.customInteraction.trigger && activeObject.customInteraction.action));
         console.log("Interaction data updated for object:", activeObject.customInteraction);
     }
 
     function updateInteractionConfigVisibility(action) {
         const showModal = action === 'showModal';
         const showNavigate = action === 'navigateToSlide' || action === 'navigateToURL';
-        // Pan/Zoom currently has no specific config fields
-        // const showPanZoomConfig = action === 'panZoomToTarget';
+        const showPanZoomConfig = action === 'panZoomToTarget';
 
         if (modalContentConfigEl) modalContentConfigEl.style.display = showModal ? 'block' : 'none';
         if (navigateToConfigEl) navigateToConfigEl.style.display = showNavigate ? 'block' : 'none';
-
-        // Hide all specific config sections if not relevant
-        if (!showModal && modalContentConfigEl) modalContentConfigEl.style.display = 'none';
-        if (!showNavigate && navigateToConfigEl) navigateToConfigEl.style.display = 'none';
-
-        // Add similar logic here later if Spotlight/Reveal get specific parameters requiring UI elements
-        // For instance, if "spotlight" had a color input, it would be handled here.
+        if (panZoomConfigEl) panZoomConfigEl.style.display = showPanZoomConfig ? 'block' : 'none';
     }
-    
+
     function handleAnimationChange() {
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) return;
         const activeObject = canvas.getActiveObject();
         if (!activeObject) return;
-
-        if (!activeObject.customAnimation) {
-            activeObject.customAnimation = { trigger: "", type: "", duration: 500, strength: 5 };
-        }
+        if (!activeObject.customAnimation) { activeObject.customAnimation = { trigger: "", type: "", duration: 500, strength: 5 }; }
 
         if (objAnimationTriggerEl) activeObject.customAnimation.trigger = objAnimationTriggerEl.value;
         if (objAnimationTypeEl) activeObject.customAnimation.type = objAnimationTypeEl.value;
-
         const showAnimParams = !!(activeObject.customAnimation.trigger && activeObject.customAnimation.type);
+
         if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none';
 
         if (showAnimParams) {
@@ -1361,67 +1483,98 @@
             if (objAnimationStrengthEl) activeObject.customAnimation.strength = parseFloat(objAnimationStrengthEl.value) || 5;
             updateAnimationStrengthUnit(activeObject.customAnimation.type);
         } else {
-            // If trigger or type is none, effectively clear other params for consistency
-            activeObject.customAnimation.duration = 500; // Reset to default
-            activeObject.customAnimation.strength = 5;  // Reset to default
+            activeObject.customAnimation.duration = 500;
+            activeObject.customAnimation.strength = 5;
         }
+        if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
         console.log("Animation data updated for object:", activeObject.customAnimation);
     }
 
     function updateAnimationStrengthUnit(animationType) {
         if (!objAnimationStrengthUnitEl) return;
-        let unitText = "(pixels/degrees/scale)"; // Default generic
+        let unitText = "(pixels/degrees/scale)";
             switch(animationType) {
-                case 'wiggle':
-                    unitText = "(degrees)";
-            break;
-                case 'float':
-                    unitText = "(pixels)";
-            break;
-                case 'growShrink':
-                    unitText = "(scale factor e.g., 1.2)";
-            break;
+                case 'wiggle': unitText = "(degrees)"; break;
+                case 'float': unitText = "(pixels)"; break;
+                case 'growShrink': unitText = "(scale factor e.g., 1.2)"; break;
             }
         objAnimationStrengthUnitEl.textContent = unitText;
     }
 
-    function updateFabricObjectFromToolbar(propertyName, value, inputType) {
+    function updateFabricObjectFromToolbar(propertyName, value, inputType) { // inputType is still useful for parsing
       const canvas = adminApp.state.fabricCanvasInstance;
       if (!canvas) return;
       const activeObject = canvas.getActiveObject();
       if (!activeObject) return;
+
       let parsedValue = value;
-      if (inputType === 'number' || inputType === 'range') {
-          if (propertyName === 'lineHeight') { parsedValue = parseFloat(value); }
-          else { parsedValue = parseInt(value, 10); }
+      if (inputType === 'number') {
+          parsedValue = parseInt(value, 10);
           if (isNaN(parsedValue)) {
-              if (propertyName === 'strokeWidth' && value === '') parsedValue = 0;
-              else if (propertyName === 'charSpacing' && value === '') parsedValue = 0;
-              else if (value === '') return;
-              else return;
+              if ((propertyName === 'strokeWidth' || propertyName === 'charSpacing') && value === '') parsedValue = 0;
+              else if (value === '') return; // Don't set if empty and not a special case
+              else return; // Don't set if NaN
           }
-      } else if (inputType === 'checkbox') { parsedValue = !!value; }
+      } else if (inputType === 'number' && inputType === 'float') { // My HTML used 'isFloat' not inputType='float'
+          parsedValue = parseFloat(value);
+           if (isNaN(parsedValue)) return;
+      } else if (inputType === 'range') { // Opacity, shadow.blur
+          parsedValue = parseFloat(value);
+          if (isNaN(parsedValue)) return;
+      } else if (inputType === 'checkbox') {
+          parsedValue = !!value;
+      }
+      // For properties like 'fontWeight', 'fontStyle', 'textAlign', 'fontFamily', 'fill', 'stroke', 'text' value is string and used directly.
 
       if (propertyName === 'width') { activeObject.scaleX = parsedValue > 0 ? (parsedValue / activeObject.width) : (activeObject.width > 0 ? 0.0001 / activeObject.width : 0.0001); }
       else if (propertyName === 'height') { activeObject.scaleY = parsedValue > 0 ? (parsedValue / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001); }
       else if (propertyName.startsWith('shadow.')) {
         const shadowProp = propertyName.split('.')[1];
         let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
-        shadowOptions[shadowProp] = parsedValue;
-        shadowOptions.color = objShadowColorEl.value || '#000000';
-        shadowOptions.blur = parseInt(objShadowBlurEl.value, 10) || 0;
-        shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
-        shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
-        shadowOptions.affectStroke = objShadowAffectStrokeEl.checked;
-        shadowOptions.nonScaling = objShadowNonScalingEl.checked;
-        if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0) { activeObject.set('shadow', new fabric.Shadow(shadowOptions)); }
-        else { activeObject.set('shadow', null); }
+
+        // Always re-read all shadow properties from the popover to build the shadow object
+        if (objShadowColorEl) shadowOptions.color = objShadowColorEl.value || '#000000';
+        if (objShadowBlurEl) shadowOptions.blur = parseFloat(objShadowBlurEl.value) || 0;
+        if (objShadowOffsetXEl) shadowOptions.offsetX = parseInt(objShadowOffsetXEl.value, 10) || 0;
+        if (objShadowOffsetYEl) shadowOptions.offsetY = parseInt(objShadowOffsetYEl.value, 10) || 0;
+        if (objShadowAffectStrokeEl) shadowOptions.affectStroke = objShadowAffectStrokeEl.checked;
+        if (objShadowNonScalingEl) shadowOptions.nonScaling = objShadowNonScalingEl.checked;
+
+        // Update the specific property that triggered this call if it's different
+        if (shadowOptions[shadowProp] !== parsedValue) {
+            shadowOptions[shadowProp] = parsedValue;
+        }
+        
+        // Only set shadow if it has meaningful values
+        if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0 || (shadowOptions.color && shadowOptions.color !== '#000000' && shadowOptions.color !== 'rgb(0,0,0)')) {
+            activeObject.set('shadow', new fabric.Shadow(shadowOptions));
+        } else {
+            activeObject.set('shadow', null);
+        }
+        // Update active state of main shadow button
+        if (shadowSettingsButtonEl) shadowSettingsButtonEl.classList.toggle('active', !!activeObject.shadow);
+
       } else {
-        if (!propertyName.startsWith('interaction.')) { activeObject.set(propertyName, parsedValue); }
+        // Exclude interaction and animation properties as they are handled by their specific functions
+        // (handleInteractionChange, handleAnimationChange) which update the object's custom properties directly.
+        if (!propertyName.startsWith('interaction.') && !propertyName.startsWith('animation.')) {
+             activeObject.set(propertyName, parsedValue);
+             // Sync hidden selects for text properties
+             if (propertyName === 'fontWeight' && objFontWeightEl) objFontWeightEl.value = parsedValue;
+             if (propertyName === 'fontStyle' && objFontStyleEl) objFontStyleEl.value = parsedValue;
+             if (propertyName === 'textAlign' && objTextAlignEl) objTextAlignEl.value = parsedValue;
+        }
       }
-      if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') && ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'width'].includes(propertyName)) { activeObject.initDimensions(); }
+
+      if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') &&
+          ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'width', 'textAlign'].includes(propertyName)) {
+          activeObject.initDimensions();
+      }
       activeObject.setCoords();
       canvas.renderAll();
+      // Repopulate toolbar to reflect any dependent changes or active states (e.g. button active states)
+      // Be careful with calling this too often, can lead to infinite loops or sluggishness.
+      // populateToolbar(activeObject); // Better to call this from the primary event handler (bold button click, etc.)
     }
 
     Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };

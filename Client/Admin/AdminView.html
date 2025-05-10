@@ -4,34 +4,33 @@
     <base target="_top">
     <title>Admin Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
-    <!-- Add YouTube Player API script (Needed if you ever add YT previews here) -->
-    <!-- <script src="https://www.youtube.com/iframe_api"></script> -->
+    <!-- Add Material Symbols (recommended) -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <style>
       body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
       .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
       h1, h2 { color: #333; }
       label { display: inline-block; margin-bottom: 5px; font-weight: bold;}
-      input[type="text"], input[type="file"], input[type="number"], select, textarea { padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; width: auto; /* Let them size naturally or control below */ }
+      /* input[type="text"], input[type="file"], input[type="number"], select, textarea { padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; width: auto; } */ /* Default input styling, will be overridden by toolbar specific styles */
       button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; margin-right: 5px; }
       button:hover { background-color: #0056b3; }
       button.edit-button { background-color: #28a745; }
       button.edit-button:hover { background-color: #1e7e34; }
       button.danger-button { background-color: #dc3545; }
       button.danger-button:hover { background-color: #c82333; }
-      input[type="checkbox"] { margin-right: 5px; } /* Spacing for checkboxes */
-
+      input[type="checkbox"] { margin-right: 5px; }
 
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
       .success { border-color: green; background-color: #d4edda; color: #155724; }
       .error { border-color: red; background-color: #f8d7da; color: #721c24; }
 
       #adminProjectListContainer { margin-top: 15px; }
-      .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;} /* Allow wrap */
-      .project-item > div:first-child { flex-basis: 60%; min-width: 200px;} /* Title/Status area */
-      .project-item > div:last-child { flex-basis: 35%; min-width: 200px; display: flex; justify-content: flex-end; align-items: center;} /* Controls area */
-      .project-item span { font-size: 1.1em; display: block; } /* Make title/status block */
+      .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;}
+      .project-item > div:first-child { flex-basis: 60%; min-width: 200px;}
+      .project-item > div:last-child { flex-basis: 35%; min-width: 200px; display: flex; justify-content: flex-end; align-items: center;}
+      .project-item span { font-size: 1.1em; display: block; }
       .project-item .status-text { font-style: italic; color: #555; font-size: 0.9em;}
-      .project-item .project-status-select { font-size: 0.9em; padding: 5px; margin-right: 10px; border: 1px solid #ccc; border-radius: 3px; } /* Added specific styles */
+      .project-item .project-status-select { font-size: 0.9em; padding: 5px; margin-right: 10px; border: 1px solid #ccc; border-radius: 3px; }
 
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
       .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
@@ -44,192 +43,183 @@
         border-radius: 5px;
         background-color: #f9f9f9;
       }
-      .edit-controls-group label {
-          margin-right: 10px;
-          display: block; /* Make labels block for better spacing */
-          margin-bottom: 5px;
-      }
+      .edit-controls-group label { margin-right: 10px; display: block; margin-bottom: 5px; }
       .edit-controls-group input[type="text"],
-      .edit-controls-group input[type="file"] {
-          display: block; /* Make inputs block */
-          width: calc(100% - 22px); /* Full width within padding */
-          margin-bottom: 15px; /* More space between items */
-      }
-       .edit-controls-group button {
-           margin-top: -5px; /* Adjust button spacing relative to input */
-           margin-bottom: 15px;
-       }
+      .edit-controls-group input[type="file"] { display: block; width: calc(100% - 22px); margin-bottom: 15px; }
+      .edit-controls-group button { margin-top: -5px; margin-bottom: 15px; }
 
+      #fabricCanvasContainer { display: flex; justify-content: center; align-items: flex-start; max-height: 70vh; overflow: auto; border: 1px dashed #ccc; min-height: 300px; margin-top: 15px; position: relative; }
+      #fabricCanvasElement { border: 1px solid #000; }
+      .media-placeholder { position: absolute; top: 10px; left: 10px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 5px 10px; font-size: 0.9em; border-radius: 3px; pointer-events: none; z-index: 5; }
 
-      #fabricCanvasContainer {
-        display: flex;
-        justify-content: center;
-        align-items: flex-start;
-        max-height: 70vh;
-        overflow: auto;
-        border: 1px dashed #ccc;
-        min-height: 300px;
-        margin-top: 15px;
-        position: relative; /* Needed for absolute positioning of placeholder */
-      }
-      #fabricCanvasElement {
-        border: 1px solid #000;
-      }
+      #slideManagementPanel { margin-top: 20px; padding: 10px; background-color: #f0f8ff; border-radius: 5px; border: 1px solid #d1e0ff; }
+      #slideThumbnailsContainer { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; min-height: 60px; padding: 5px; border: 1px solid #b0c4de; background-color: #fff; }
+      .slide-thumbnail { width: 100px; height: 75px; border: 2px solid #778899; background-color: #e6e6fa; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 0.8em; text-align: center; position: relative; }
+      .slide-thumbnail.active-slide { border-color: #ff4500; box-shadow: 0 0 5px #ff4500; }
+      .slide-thumbnail:hover { border-color: #007bff; }
+      .delete-slide-btn { position: absolute; top: -8px; right: -8px; background-color: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; line-height: 20px; text-align: center; cursor: pointer; display: none; }
+      .slide-thumbnail:hover .delete-slide-btn { display: block; }
 
-       /* Style for media placeholder on admin canvas */
-       .media-placeholder {
-          position: absolute;
-          top: 10px;
-          left: 10px;
-          background-color: rgba(0, 0, 0, 0.7);
-          color: white;
-          padding: 5px 10px;
-          font-size: 0.9em;
-          border-radius: 3px;
-          pointer-events: none; /* Don't interfere with canvas interaction */
-          z-index: 5; /* Above background, below fabric objects */
-       }
-
-      #slideManagementPanel {
-        margin-top: 20px;
-        padding: 10px;
-        background-color: #f0f8ff;
-        border-radius: 5px;
-        border: 1px solid #d1e0ff;
-      }
-      #slideThumbnailsContainer {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 10px;
-        min-height: 60px;
+      /* --- NEW TOOLBAR STYLES --- */
+      #overlayPropertiesToolbar { /* This is the main container for the new toolbar */
         padding: 5px;
-        border: 1px solid #b0c4de;
-        background-color: #fff;
-      }
-      .slide-thumbnail {
-        width: 100px;
-        height: 75px;
-        border: 2px solid #778899;
-        background-color: #e6e6fa;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-        font-size: 0.8em;
-        text-align: center;
-        position: relative;
-      }
-      .slide-thumbnail.active-slide {
-        border-color: #ff4500;
-        box-shadow: 0 0 5px #ff4500;
-      }
-      .slide-thumbnail:hover {
-        border-color: #007bff;
-      }
-      .delete-slide-btn {
-        position: absolute;
-        top: -8px;
-        right: -8px;
-        background-color: #dc3545;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        font-size: 12px;
-        line-height: 20px;
-        text-align: center;
-        cursor: pointer;
-        display: none;
-      }
-      .slide-thumbnail:hover .delete-slide-btn {
-        display: block;
-      }
-
-      #overlayPropertiesToolbar {
-        padding: 15px;
         border: 1px solid #ccc;
-        background-color: #f9f9f9;
+        background-color: #f0f0f0; /* Lighter grey for toolbar */
         border-radius: 5px;
         margin-bottom: 15px;
+        display: none; /* Keep JS control over visibility */
       }
-      #overlayPropertiesToolbar h3 {
-          margin-top: 0;
-          margin-bottom: 15px;
-          border-bottom: 1px solid #e0e0e0;
-          padding-bottom: 10px;
-      }
-      .toolbar-sections-container {
+      .fabric-toolbar-row {
         display: flex;
-        flex-wrap: wrap;
-        gap: 20px;
+        align-items: center;
+        gap: 5px; /* Spacing between groups/items */
+        padding: 5px 0;
+        flex-wrap: wrap; /* Allow wrapping if too many items */
       }
-      .toolbar-section {
-        padding-bottom: 10px;
-        /* Optional: Add a min-width or flex-basis if sections are too narrow */
-        /* flex-basis: 250px; */ 
+      .fabric-toolbar-row:not(:last-child) {
+        border-bottom: 1px solid #e0e0e0; /* Separator between rows */
       }
-       .toolbar-section label {
-          display: inline-block;
-          width: 110px; /* Consider adjusting if text wraps oddly */
-          margin-bottom: 8px;
-          vertical-align: middle;
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 2px; /* Spacing between items in a group */
+        padding: 0 5px;
+        border-right: 1px solid #d0d0d0;
       }
-       .toolbar-section input[type="number"],
-       .toolbar-section input[type="color"],
-       .toolbar-section input[type="text"],
-       .toolbar-section select,
-       .toolbar-section textarea {
-          display: inline-block;
-          width: 150px; /* Default width */
-          max-width: 180px; /* Max width */
-          padding: 6px;
-          margin-bottom: 8px;
-          border: 1px solid #ddd;
-          border-radius: 3px;
-          box-sizing: border-box;
-          font-size: 0.9em;
-          vertical-align: middle;
+      .toolbar-group:last-child {
+        border-right: none;
       }
-       .toolbar-section input[type="range"] {
-          width: 150px;
-          max-width: 180px;
-          margin-bottom: 8px;
-          vertical-align: middle;
+      .toolbar-button {
+        background: none;
+        border: 1px solid transparent;
+        color: #333;
+        padding: 4px;
+        margin: 0;
+        border-radius: 3px;
+        min-width: 30px; /* Ensure buttons have some width */
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
-      .toolbar-section textarea {
-        min-height: 60px;
-        width: 200px; /* Textareas can be wider */
-        vertical-align: top;
+      .toolbar-button:hover {
+        background-color: #e0e0e0;
+        border-color: #ccc;
       }
-       .toolbar-section input[type="checkbox"] {
-            width: auto;
-            vertical-align: middle;
-            margin-left: 5px;
+      .toolbar-button.active {
+        background-color: #cce5ff; /* Light blue for active toggles */
+        border-color: #99c7ff;
+      }
+      .toolbar-button .material-symbols-outlined {
+        font-size: 20px; /* Adjust icon size */
+      }
+      .toolbar-input-compact {
+        width: 45px;
+        padding: 4px;
+        font-size: 0.9em;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        margin: 0 2px;
+        text-align: right;
+        height: 28px;
+        box-sizing: border-box;
+      }
+      input[type="color"].toolbar-color-input {
+        width: 30px;
+        height: 28px;
+        padding: 1px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        background: none;
+        vertical-align: middle;
+        margin: 0 2px;
+      }
+       #objOpacity { /* Range input might need specific styling */
+         width: 80px;
+         height: 20px;
+         vertical-align: middle;
        }
-        .toolbar-section .checkbox-label {
-           width: auto;
-           margin-left: 5px;
-           font-weight: normal; /* Make checkbox labels normal weight */
+      .toolbar-select-compact {
+        padding: 4px;
+        font-size: 0.9em;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        height: 28px;
+        margin-left: 2px;
+        max-width: 120px; /* For font family */
+      }
+       #objTextContent { /* Textarea in text controls */
+           width: 150px;
+           height: 28px; /* Start small, can be expanded by JS or focus */
+           padding: 4px;
+           font-size: 0.9em;
+           border: 1px solid #ccc;
+           border-radius: 3px;
+           vertical-align: middle;
+           resize: vertical; /* Allow vertical resize */
        }
 
-      .toolbar-section h4 {
+
+      /* Popover Styles */
+      .toolbar-popover {
+        position: absolute; /* Position relative to a container or viewport later */
+        background-color: #fff;
+        border: 1px solid #ccc;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        padding: 15px;
+        border-radius: 4px;
+        z-index: 100; /* Above other toolbar items */
+        display: none; /* Hidden by default */
+        min-width: 250px; /* Ensure popovers have some width */
+      }
+      .toolbar-popover h4 {
         margin-top: 0;
         margin-bottom: 10px;
-        color: #555;
-        font-size: 0.9em;
-        text-transform: uppercase;
-        width: 100%; /* Make section titles span full width of section */
+        font-size: 1em;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
       }
+      .toolbar-popover label {
+        display: inline-block; /* Or block if preferred for layout */
+        width: 90px;
+        margin-bottom: 8px;
+        font-weight: normal;
+        font-size: 0.9em;
+      }
+      .toolbar-popover input[type="number"],
+      .toolbar-popover input[type="color"],
+      .toolbar-popover input[type="text"],
+      .toolbar-popover select,
+      .toolbar-popover textarea {
+        padding: 6px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box; font-size: 0.9em;
+        width: calc(100% - 100px); /* Adjust based on label width */
+        max-width: 150px;
+      }
+      .toolbar-popover input[type="range"] { width: calc(100% - 100px); max-width: 150px;}
+      .toolbar-popover input[type="checkbox"] { vertical-align: middle; }
+      .toolbar-popover .checkbox-label { width: auto; margin-left: 5px; font-weight: normal; }
+
       .config-section { /* For conditional sub-sections like modal content */
         margin-top: 10px;
         padding-left: 10px;
         border-left: 2px solid #007bff;
-        width: 100%; /* Make config section take full width of its parent toolbar-section */
       }
-       .config-section label { width: auto; } /* Let labels in config sections size naturally */
-       .config-section input, .config-section textarea { width: calc(100% - 10px); max-width: none; } /* Full width within config section */
+      .config-section label { width: auto; }
+      .config-section input, .config-section textarea { width: calc(100% - 10px); max-width: none; }
+
+      /* Helper for visually hidden labels, but accessible */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+      }
+
     </style>
   </head>
   <body>
@@ -252,7 +242,6 @@
     </div> <!-- End of listViewContainer -->
 
     <!-- View Container for Editing a Project -->
-    <!-- ALL EDITING UI MUST BE INSIDE THIS DIV -->
     <div class="container" id="editViewContainer" style="display:none;">
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
@@ -277,78 +266,112 @@
             <button id="addRectangleButton">Add Rectangle</button>
             <button id="addCircleButton">Add Circle</button>
             <button id="addTextboxButton">Add Text</button>
+            <!-- Delete selected object button can go here or on toolbar -->
+            <!-- <button id="deleteSelectedObjectButton">Delete Selected</button> -->
         </div>
 
+        <!-- NEW TOOLBAR STRUCTURE - REPLACES OLD #overlayPropertiesToolbar content -->
         <div id="overlayPropertiesToolbar" style="display:none;">
-            <h3>Overlay Properties</h3>
-            <div class="toolbar-sections-container">
-                <!-- Position & Size Section -->
-                <div class="toolbar-section">
-                    <h4>Position & Size</h4>
-                    <label for="objX">X:</label> <input type="number" id="objX" class="sidebar-input"><br>
-                    <label for="objY">Y:</label> <input type="number" id="objY" class="sidebar-input"><br>
-                    <label for="objWidth">Width:</label> <input type="number" id="objWidth" class="sidebar-input"><br>
-                    <label for="objHeight">Height:</label> <input type="number" id="objHeight" class="sidebar-input"><br>
-                    <label for="objAngle">Angle:</label> <input type="number" id="objAngle" class="sidebar-input">
+            <!-- Main Toolbar Row -->
+            <div class="fabric-toolbar-row">
+                <div class="toolbar-group">
+                    <label for="objX" class="sr-only">X</label><input type="number" id="objX" class="toolbar-input-compact" title="Position X">
+                    <label for="objY" class="sr-only">Y</label><input type="number" id="objY" class="toolbar-input-compact" title="Position Y">
                 </div>
+                <div class="toolbar-group">
+                    <label for="objWidth" class="sr-only">Width</label><input type="number" id="objWidth" class="toolbar-input-compact" title="Width">
+                    <label for="objHeight" class="sr-only">Height</label><input type="number" id="objHeight" class="toolbar-input-compact" title="Height">
+                </div>
+                <div class="toolbar-group">
+                    <label for="objAngle" class="sr-only">Angle</label><input type="number" id="objAngle" class="toolbar-input-compact" title="Angle">
+                </div>
+                <div class="toolbar-group">
+                    <button class="toolbar-button" id="fillColorButton" title="Fill Color"><span class="material-symbols-outlined">format_paint</span></button>
+                    <input type="color" id="objFill" class="toolbar-color-input" value="#ff0000">
+                    <button class="toolbar-button" id="strokeColorButton" title="Stroke Color"><span class="material-symbols-outlined">border_color</span></button>
+                    <input type="color" id="objStrokeColor" class="toolbar-color-input" value="#000000">
+                    <label for="objStrokeWidth" class="sr-only">Stroke Width</label><input type="number" id="objStrokeWidth" min="0" class="toolbar-input-compact" title="Stroke Width" value="1">
+                </div>
+                <div class="toolbar-group">
+                    <button class="toolbar-button" id="opacityButton" title="Opacity"><span class="material-symbols-outlined">opacity</span></button>
+                    <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" title="Opacity">
+                </div>
+                 <div class="toolbar-group">
+                    <button class="toolbar-button" id="shadowSettingsButton" title="Shadow Settings"><span class="material-symbols-outlined">blur_on</span></button>
+                    <button class="toolbar-button" id="interactionSettingsButton" title="Interaction Settings"><span class="material-symbols-outlined">touch_app</span></button>
+                    <button class="toolbar-button" id="animationSettingsButton" title="Animation Settings"><span class="material-symbols-outlined">animation</span></button>
+                </div>
+            </div>
 
-                <!-- Appearance Section -->
-                <div class="toolbar-section">
-                    <h4>Appearance</h4>
-                    <label for="objFill">Fill Color:</label> <input type="color" id="objFill" class="sidebar-input" value="#ff0000"><br>
-                    <label for="objStrokeColor">Stroke Color:</label> <input type="color" id="objStrokeColor" class="sidebar-input" value="#000000"><br>
-                    <label for="objStrokeWidth">Stroke Width:</label> <input type="number" id="objStrokeWidth" min="0" class="sidebar-input" value="1"><br>
-                    <label for="objOpacity">Opacity:</label> <input type="range" id="objOpacity" min="0" max="1" step="0.01" class="sidebar-input" value="1.0">
+            <!-- Text Specific Toolbar Row (conditionally shown by JS) -->
+            <div class="fabric-toolbar-row" id="textSpecificControls" style="display:none;">
+                 <div class="toolbar-group">
+                    <button class="toolbar-button" id="fontFamilyButton" title="Font Family"><span class="material-symbols-outlined">font_download</span></button>
+                    <!-- The actual select will be in a popover, or shown near this button -->
+                    <label for="objFontSize" class="sr-only">Font Size</label><input type="number" id="objFontSize" min="1" class="toolbar-input-compact" title="Font Size">
                 </div>
+                <div class="toolbar-group">
+                    <button class="toolbar-button" id="fontWeightButton" title="Bold"><span class="material-symbols-outlined">format_bold</span></button> <!-- This will toggle 'bold'/'normal' for objFontWeight -->
+                    <button class="toolbar-button" id="fontStyleButton" title="Italic"><span class="material-symbols-outlined">format_italic</span></button> <!-- This will toggle 'italic'/'normal' for objFontStyle -->
+                </div>
+                <div class="toolbar-group" id="textAlignGroup">
+                    <button class="toolbar-button" data-align="left" title="Align Left"><span class="material-symbols-outlined">format_align_left</span></button>
+                    <button class="toolbar-button" data-align="center" title="Align Center"><span class="material-symbols-outlined">format_align_center</span></button>
+                    <button class="toolbar-button" data-align="right" title="Align Right"><span class="material-symbols-outlined">format_align_right</span></button>
+                    <button class="toolbar-button" data-align="justify" title="Align Justify"><span class="material-symbols-outlined">format_align_justify</span></button>
+                     <!-- Actual <select id="objTextAlign"> will be hidden, controlled by these buttons -->
+                </div>
+                 <div class="toolbar-group">
+                    <label for="objLineHeight" class="sr-only">Line Height</label><input type="number" id="objLineHeight" step="0.1" min="0" class="toolbar-input-compact" title="Line Height">
+                    <label for="objCharSpacing" class="sr-only">Character Spacing</label><input type="number" id="objCharSpacing" class="toolbar-input-compact" title="Character Spacing">
+                </div>
+                <div class="toolbar-group">
+                     <label for="objTextContent" class="sr-only">Text Content</label>
+                     <textarea id="objTextContent" rows="1" title="Text Content" style="width: 200px; vertical-align:middle;"></textarea>
+                </div>
+            </div>
 
-                <!-- Text Styling Section (conditional) -->
-                <div class="toolbar-section" id="textSpecificControls" style="display:none;">
-                    <h4>Text Styling</h4>
-                    <label for="objTextContent">Content:</label><br>
-                    <textarea id="objTextContent" rows="3" class="sidebar-input"></textarea><br>
-                    <label for="objFontFamily">Font Family:</label> <select id="objFontFamily" class="sidebar-input"></select><br>
-                    <label for="objFontSize">Font Size:</label> <input type="number" id="objFontSize" min="1" class="sidebar-input"><br>
-                    <label for="objFontWeight">Font Weight:</label> <select id="objFontWeight" class="sidebar-input"><option value="normal">Normal</option><option value="bold">Bold</option></select><br>
-                    <label for="objFontStyle">Font Style:</label> <select id="objFontStyle" class="sidebar-input"><option value="normal">Normal</option><option value="italic">Italic</option></select><br>
-                    <label for="objTextAlign">Text Align:</label> <select id="objTextAlign" class="sidebar-input"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option><option value="justify">Justify</option></select><br>
-                    <label for="objLineHeight">Line Height:</label> <input type="number" id="objLineHeight" step="0.1" min="0" class="sidebar-input"><br>
-                    <label for="objCharSpacing">Char Spacing:</label> <input type="number" id="objCharSpacing" class="sidebar-input">
-                </div>
+            <!-- Popovers - Position these absolutely via JS later, or keep them flow for now -->
+            <div id="shadowPopover" class="toolbar-popover">
+                <h4>Shadow</h4>
+                <label for="objShadowColor">Color:</label> <input type="color" id="objShadowColor" value="#000000"><br>
+                <label for="objShadowBlur">Blur:</label> <input type="range" id="objShadowBlur" min="0" max="50" step="1" value="0"><br>
+                <label for="objShadowOffsetX">Offset X:</label> <input type="number" id="objShadowOffsetX" value="0"><br>
+                <label for="objShadowOffsetY">Offset Y:</label> <input type="number" id="objShadowOffsetY" value="0"><br>
+                <input type="checkbox" id="objShadowAffectStroke"> <label for="objShadowAffectStroke" class="checkbox-label">Affects Stroke</label><br>
+                <input type="checkbox" id="objShadowNonScaling"> <label for="objShadowNonScaling" class="checkbox-label">Non-Scaling</label>
+            </div>
 
-                <!-- Shadow Section -->
-                <div class="toolbar-section">
-                    <h4>Shadow</h4>
-                    <label for="objShadowColor">Color:</label> <input type="color" id="objShadowColor" class="sidebar-input" value="#000000"><br>
-                    <label for="objShadowBlur">Blur:</label> <input type="range" id="objShadowBlur" min="0" max="50" step="1" class="sidebar-input" value="0"><br>
-                    <label for="objShadowOffsetX">Offset X:</label> <input type="number" id="objShadowOffsetX" class="sidebar-input" value="0"><br>
-                    <label for="objShadowOffsetY">Offset Y:</label> <input type="number" id="objShadowOffsetY" class="sidebar-input" value="0"><br>
-                    <input type="checkbox" id="objShadowAffectStroke" class="sidebar-input"> <label for="objShadowAffectStroke" class="checkbox-label">Affects Stroke</label><br>
-                    <input type="checkbox" id="objShadowNonScaling" class="sidebar-input"> <label for="objShadowNonScaling" class="checkbox-label">Non-Scaling</label>
-                </div>
+            <div id="interactionPopover" class="toolbar-popover">
+                <h4>Interactions</h4>
+                <label for="objInteractionTrigger">Trigger:</label> <select id="objInteractionTrigger"><option value="">None</option><option value="click">On Click</option><option value="hover">On Hover</option><option value="clickAndHold">Click and Hold</option></select><br>
+                <label for="objInteractionAction">Action:</label> <select id="objInteractionAction"><option value="">None</option><option value="showModal">Show Modal</option><option value="navigateToSlide">Navigate to Slide</option><option value="navigateToURL">Navigate to URL</option><option value="spotlight">Spotlight</option><option value="reveal">Reveal</option><option value="panZoomToTarget">Pan/Zoom to Target</option></select>
+                <div id="modalContentConfig" class="config-section" style="display:none;"><label for="objModalContent">Modal Content:</label><br><textarea id="objModalContent" rows="3"></textarea></div>
+                <div id="navigateToConfig" class="config-section" style="display:none;"><label for="objNavigateTo">Target (Slide ID/URL):</label><input type="text" id="objNavigateTo"></div>
+                <div id="panZoomConfigEl" class="config-section" style="display:none;"><label for="objPanZoomLevel">Zoom Level (e.g., 1.5):</label><input type="number" id="objPanZoomLevel" step="0.1" min="0.1" value="1.5"></div>
+            </div>
 
-                <!-- Interactions Section -->
-                <div class="toolbar-section">
-                    <h4>Interactions</h4>
-                    <label for="objInteractionTrigger">Trigger:</label> <select id="objInteractionTrigger" class="sidebar-input"><option value="">None</option><option value="click">On Click</option><option value="hover">On Hover</option><option value="clickAndHold">Click and Hold</option></select><br>
-                    <label for="objInteractionAction">Action:</label> <select id="objInteractionAction" class="sidebar-input"><option value="">None</option><option value="showModal">Show Modal</option><option value="navigateToSlide">Navigate to Slide</option><option value="navigateToURL">Navigate to URL</option><option value="spotlight">Spotlight</option><option value="reveal">Reveal</option><option value="panZoomToTarget">Pan/Zoom to Target</option></select>
-                    <div id="modalContentConfig" class="config-section" style="display:none;"><label for="objModalContent">Modal Content:</label><br><textarea id="objModalContent" rows="3" class="sidebar-input"></textarea></div>
-                    <div id="navigateToConfig" class="config-section" style="display:none;"><label for="objNavigateTo">Target (Slide ID/URL):</label><input type="text" id="objNavigateTo" class="sidebar-input"></div>
-                    <div id="panZoomConfigEl" class="config-section" style="display:none;"><label for="objPanZoomLevel">Zoom Level (e.g., 1.5):</label><input type="number" id="objPanZoomLevel" class="sidebar-input" step="0.1" min="0.1" value="1.5"></div>
-                </div>
+            <div id="animationPopover" class="toolbar-popover">
+               <h4>Animations</h4>
+               <label for="objAnimationTrigger">Anim. Trigger:</label> <select id="objAnimationTrigger"><option value="">None</option><option value="onLoad">On Slide Load</option><option value="onHover">On Hover</option><option value="onClick">On Click</option></select><br>
+               <label for="objAnimationType">Anim. Type:</label> <select id="objAnimationType"><option value="">None</option><option value="wiggle">Wiggle</option><option value="float">Float</option><option value="growShrink">Grow/Shrink</option></select><br>
+               <div id="animationParamsConfig" class="config-section" style="display:none;">
+                   <label for="objAnimationDuration">Duration (ms):</label> <input type="number" id="objAnimationDuration" min="100" step="50" value="500"><br>
+                   <label for="objAnimationStrength">Strength:</label> <input type="number" id="objAnimationStrength" step="0.1" value="5"> <span id="objAnimationStrengthUnit" style="font-size:0.8em; margin-left:5px;">(pixels/degrees/scale)</span>
+               </div>
+            </div>
 
-                <!-- Animation Section -->
-                <div class="toolbar-section">
-                   <h4>Animations</h4>
-                   <label for="objAnimationTrigger">Anim. Trigger:</label> <select id="objAnimationTrigger" class="sidebar-input"><option value="">None</option><option value="onLoad">On Slide Load</option><option value="onHover">On Hover</option><option value="onClick">On Click</option></select><br>
-                   <label for="objAnimationType">Anim. Type:</label> <select id="objAnimationType" class="sidebar-input"><option value="">None</option><option value="wiggle">Wiggle</option><option value="float">Float</option><option value="growShrink">Grow/Shrink</option></select><br>
-                   <div id="animationParamsConfig" style="display:none;">
-                       <label for="objAnimationDuration">Duration (ms):</label> <input type="number" id="objAnimationDuration" class="sidebar-input" min="100" step="50" value="500"><br>
-                       <label for="objAnimationStrength">Strength:</label> <input type="number" id="objAnimationStrength" class="sidebar-input" step="0.1" value="5"> <span id="objAnimationStrengthUnit" style="font-size:0.8em; margin-left:5px;">(pixels/degrees/scale)</span>
-                   </div>
-                </div>
-                <!-- Removed premature "Actions" section for now -->
-            </div> <!-- End of toolbar-sections-container -->
-        </div> <!-- End of overlayPropertiesToolbar -->
+            <div id="fontFamilyPopover" class="toolbar-popover">
+                <h4>Font Family</h4>
+                <select id="objFontFamily" class="toolbar-select-compact" style="width: 100%;"></select>
+                <!-- Font weight and style selects are hidden, controlled by B/I buttons -->
+                <select id="objFontWeight" style="display:none;"><option value="normal">Normal</option><option value="bold">Bold</option></select>
+                <select id="objFontStyle" style="display:none;"><option value="normal">Normal</option><option value="italic">Italic</option></select>
+                <select id="objTextAlign" style="display:none;"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option><option value="justify">Justify</option></select>
+            </div>
+
+        </div> <!-- End of NEW #overlayPropertiesToolbar -->
+
 
         <div id="fabricCanvasContainer">
             <div id="adminMediaPlaceholder" class="media-placeholder" style="display: none;"></div>

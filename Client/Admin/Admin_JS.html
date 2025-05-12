@@ -39,7 +39,8 @@
         objFontFamilyEl, objFontSizeEl, objFontWeightEl, objFontStyleEl, objTextAlignEl, objLineHeightEl, objCharSpacingEl, // Core text inputs (some hidden, some direct)
         objShadowColorEl, objShadowBlurEl, objShadowOffsetXEl, objShadowOffsetYEl, objShadowAffectStrokeEl, objShadowNonScalingEl, // Shadow inputs
         objInteractionTriggerEl, objInteractionActionEl, modalContentConfigEl, objModalContentEl, navigateToConfigEl, objNavigateToEl, panZoomConfigEl, objPanZoomLevelEl, // Interaction inputs
-        objAnimationTriggerEl, objAnimationTypeEl, animationParamsConfigEl, objAnimationDurationEl, objAnimationStrengthEl, objAnimationStrengthUnitEl; // Animation inputs
+        objAnimationTriggerEl, objAnimationTypeEl, animationParamsConfigEl, objAnimationDurationEl, objAnimationStrengthEl, objAnimationStrengthUnitEl, // Animation inputs
+        objAnimationLoopEl, animationLoopCountConfigEl, objAnimationLoopCountEl, objAnimationLoopDelayEl;
 
     // New Popover and Toolbar Button DOM elements
     let fillColorButtonEl, strokeColorButtonEl, opacityButtonEl, // Direct action buttons for color/opacity that might reveal inputs
@@ -134,6 +135,10 @@
       objAnimationDurationEl = document.getElementById('objAnimationDuration');
       objAnimationStrengthEl = document.getElementById('objAnimationStrength');
       objAnimationStrengthUnitEl = document.getElementById('objAnimationStrengthUnit');
+      objAnimationLoopEl = document.getElementById('objAnimationLoop');
+      animationLoopCountConfigEl = document.getElementById('animationLoopCountConfig');
+      objAnimationLoopCountEl = document.getElementById('objAnimationLoopCount');
+      objAnimationLoopDelayEl = document.getElementById('objAnimationLoopDelay');
 
       // New Popover Trigger Buttons
       fillColorButtonEl = document.getElementById('fillColorButton');
@@ -1353,10 +1358,19 @@
         if (objAnimationDurationEl && !objAnimationDurationEl.hasAttribute('listener-attached')) {
             objAnimationDurationEl.addEventListener('input', handleAnimationChange); objAnimationDurationEl.setAttribute('listener-attached', 'true');
         } else if(!objAnimationDurationEl) { console.warn("initToolbar: objAnimationDurationEl not found.");}
-        if (objAnimationStrengthEl && !objAnimationStrengthEl.hasAttribute('listener-attached')) {
-            objAnimationStrengthEl.addEventListener('input', handleAnimationChange); objAnimationStrengthEl.setAttribute('listener-attached', 'true');
-        } else if(!objAnimationStrengthEl) { console.warn("initToolbar: objAnimationStrengthEl not found.");}
-        console.log("initToolbar: All new toolbar listeners attached or verified.");
+        
+        if (objAnimationLoopEl && !objAnimationLoopEl.hasAttribute('listener-attached')) {
+            objAnimationLoopEl.addEventListener('change', handleAnimationChange);
+            objAnimationLoopEl.setAttribute('listener-attached', 'true');
+        }
+        if (objAnimationLoopCountEl && !objAnimationLoopCountEl.hasAttribute('listener-attached')) {
+            objAnimationLoopCountEl.addEventListener('input', handleAnimationChange);
+            objAnimationLoopCountEl.setAttribute('listener-attached', 'true');
+        }
+        if (objAnimationLoopDelayEl && !objAnimationLoopDelayEl.hasAttribute('listener-attached')) {
+            objAnimationLoopDelayEl.addEventListener('input', handleAnimationChange);
+            objAnimationLoopDelayEl.setAttribute('listener-attached', 'true');
+        }
     }
 
     function populateToolbar(activeObject) {
@@ -1433,7 +1447,22 @@
             if (objAnimationDurationEl) objAnimationDurationEl.value = animation.duration || 500;
             if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
             updateAnimationStrengthUnit(animation.type);
-        }
+                // Loop properties
+            if (objAnimationLoopEl) {
+                if (animation.loop === true) { // Check for explicit true for infinite
+                    objAnimationLoopEl.value = "true";
+                } else if (typeof animation.loopCount === 'number' && animation.loopCount > 0) {
+                    objAnimationLoopEl.value = "count";
+                } else {
+                    objAnimationLoopEl.value = "false"; // Default to No
+                }
+            }
+        const showLoopCount = objAnimationLoopEl && objAnimationLoopEl.value === "count";
+        if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = showLoopCount ? 'block' : 'none';
+        
+        if (objAnimationLoopCountEl) objAnimationLoopCountEl.value = animation.loopCount || 3;
+        if (objAnimationLoopDelayEl) objAnimationLoopDelayEl.value = animation.loopDelay === undefined ? 100 : animation.loopDelay;
+            }
         if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
     }
 
@@ -1470,23 +1499,64 @@
         if (!canvas) return;
         const activeObject = canvas.getActiveObject();
         if (!activeObject) return;
-        if (!activeObject.customAnimation) { activeObject.customAnimation = { trigger: "", type: "", duration: 500, strength: 5 }; }
+
+        if (!activeObject.customAnimation) {
+            activeObject.customAnimation = { 
+                trigger: "", 
+                type: "", 
+                duration: 500, 
+                strength: 5,
+                loop: false, // Default loop state
+                loopDelay: 100 // Default loop delay
+                // loopCount is undefined by default
+            };
+        }
 
         if (objAnimationTriggerEl) activeObject.customAnimation.trigger = objAnimationTriggerEl.value;
         if (objAnimationTypeEl) activeObject.customAnimation.type = objAnimationTypeEl.value;
+        
         const showAnimParams = !!(activeObject.customAnimation.trigger && activeObject.customAnimation.type);
-
         if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none';
 
         if (showAnimParams) {
             if (objAnimationDurationEl) activeObject.customAnimation.duration = parseInt(objAnimationDurationEl.value, 10) || 500;
             if (objAnimationStrengthEl) activeObject.customAnimation.strength = parseFloat(objAnimationStrengthEl.value) || 5;
             updateAnimationStrengthUnit(activeObject.customAnimation.type);
+
+            // Loop properties
+            if (objAnimationLoopEl) {
+                const loopType = objAnimationLoopEl.value;
+                if (loopType === "true") {
+                    activeObject.customAnimation.loop = true; // Explicitly true for infinite
+                    delete activeObject.customAnimation.loopCount; 
+                } else if (loopType === "count") {
+                    activeObject.customAnimation.loop = false; // Not infinitely looping but count-based
+                    activeObject.customAnimation.loopCount = parseInt(objAnimationLoopCountEl.value, 10) || 3;
+                } else { // "false" or empty
+                    activeObject.customAnimation.loop = false;
+                    delete activeObject.customAnimation.loopCount;
+                }
+            }
+            // Update visibility of loop count input based on selection
+            const showLoopCount = objAnimationLoopEl && objAnimationLoopEl.value === "count";
+            if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = showLoopCount ? 'block' : 'none';
+            
+            if (objAnimationLoopDelayEl) activeObject.customAnimation.loopDelay = parseInt(objAnimationLoopDelayEl.value, 10);
+            // Ensure loopDelay is a non-negative number, default to 0 if invalid
+            if (isNaN(activeObject.customAnimation.loopDelay) || activeObject.customAnimation.loopDelay < 0) {
+                 activeObject.customAnimation.loopDelay = 0; 
+            }
+
         } else {
-            activeObject.customAnimation.duration = 500;
-            activeObject.customAnimation.strength = 5;
+            // If trigger or type is none, effectively clear/reset animation params for consistency
+            activeObject.customAnimation.duration = 500; // Reset to default
+            activeObject.customAnimation.strength = 5;  // Reset to default
+            activeObject.customAnimation.loop = false;
+            delete activeObject.customAnimation.loopCount;
+            activeObject.customAnimation.loopDelay = 100; // Default loop delay
+            if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = 'none'; // Hide count config
+            updateAnimationStrengthUnit(""); // Reset unit display
         }
-        if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
         console.log("Animation data updated for object:", activeObject.customAnimation);
     }
 

@@ -262,11 +262,17 @@
       if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
       // Hide the old media and overlay sections if they still exist
-      const oldMediaSection = document.querySelector('.edit-controls-group h3:contains("Current Slide Settings / Media")')?.closest('.edit-controls-group');
-      if (oldMediaSection) oldMediaSection.style.display = 'none';
-
-      const oldOverlaySection = document.querySelector('.edit-controls-group h3:contains("Overlay Tools")')?.closest('.edit-controls-group');
-      if (oldOverlaySection) oldOverlaySection.style.display = 'none';
+      const h3Elements = document.querySelectorAll('.edit-controls-group h3');
+      h3Elements.forEach(h3 => {
+          if (h3.textContent.includes('Current Slide Settings / Media')) {
+              const oldMediaSection = h3.closest('.edit-controls-group');
+              if (oldMediaSection) oldMediaSection.style.display = 'none';
+          }
+          if (h3.textContent.includes('Overlay Tools')) {
+              const oldOverlaySection = h3.closest('.edit-controls-group');
+              if (oldOverlaySection) oldOverlaySection.style.display = 'none';
+          }
+      });
 
       // Remove paste listener if it was active
       if (adminApp.state.isPasteListenerActive) {
@@ -1848,53 +1854,5 @@
     }
 
     Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
-    // Add a custom selector method for jQuery-like :contains functionality
-    // This is needed for the selector that finds headings by text content
-    if (!document.querySelector.prototype) {
-        document.querySelector.prototype = {};
-    }
 
-    // Polyfill Element.closest if needed
-    if (!Element.prototype.matches) {
-        Element.prototype.matches = Element.prototype.msMatchesSelector || 
-                                    Element.prototype.webkitMatchesSelector;
-    }
-    
-    if (!Element.prototype.closest) {
-        Element.prototype.closest = function(s) {
-            var el = this;
-            do {
-                if (el.matches(s)) return el;
-                el = el.parentElement || el.parentNode;
-            } while (el !== null && el.nodeType === 1);
-            return null;
-        };
-    }
-
-    // Add :contains selector functionality
-    document.querySelectorAll = (function(native) {
-        return function(selector) {
-            if (selector.indexOf(':contains') > -1) {
-                const parts = selector.split(':contains(');
-                if (parts.length !== 2) return native.call(this, selector);
-                
-                const baseSelector = parts[0];
-                let textToFind = parts[1].slice(0, -1); // Remove closing parenthesis
-                
-                // Handle quoted text
-                if ((textToFind.startsWith('"') && textToFind.endsWith('"')) || 
-                    (textToFind.startsWith("'") && textToFind.endsWith("'"))) {
-                    textToFind = textToFind.slice(1, -1);
-                }
-                
-                const allElements = native.call(this, baseSelector);
-                const result = Array.from(allElements).filter(el => 
-                    el.textContent.indexOf(textToFind) > -1
-                );
-                
-                return result;
-            }
-            return native.call(this, selector);
-        };
-    })(document.querySelectorAll);
 </script>

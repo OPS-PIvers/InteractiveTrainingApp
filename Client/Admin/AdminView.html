@@ -219,7 +219,167 @@
         white-space: nowrap;
         border-width: 0;
       }
+      /* Add these CSS styles after the existing toolbar styles */
+      .media-tabs {
+        display: flex;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 15px;
+      }
 
+      .media-tab-btn {
+        background: none;
+        border: none;
+        padding: 8px 15px;
+        cursor: pointer;
+        font-size: 14px;
+        opacity: 0.7;
+        transition: all 0.2s;
+        border-bottom: 2px solid transparent;
+      }
+
+      .media-tab-btn.active {
+        opacity: 1;
+        border-bottom: 2px solid #007bff;
+        font-weight: bold;
+      }
+
+      .media-tab-pane {
+        display: none;
+        padding: 10px 5px;
+      }
+
+      .media-tab-pane.active {
+        display: block;
+      }
+
+      .media-upload-zone {
+        border: 2px dashed #ccc;
+        border-radius: 5px;
+        padding: 30px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin: 10px 0;
+        background-color: #f9f9f9;
+      }
+
+      .media-upload-zone:hover {
+        border-color: #007bff;
+        background-color: #f0f7ff;
+      }
+
+      .media-upload-zone.drag-over {
+        border-color: #28a745;
+        background-color: #e8f5e9;
+      }
+
+      .upload-prompt {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: #666;
+      }
+
+      .upload-prompt .material-symbols-outlined {
+        font-size: 36px;
+        margin-bottom: 10px;
+        color: #999;
+      }
+
+      .youtube-input-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .youtube-input-group input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+
+      .shapes-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .shape-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 15px;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        cursor: pointer;
+        min-width: 80px;
+        transition: all 0.2s;
+      }
+
+      .shape-button:hover {
+        background: #e9e9e9;
+        border-color: #bbb;
+      }
+
+      .shape-button .material-symbols-outlined {
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
+
+      .position-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .position-control-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .position-control-row label {
+        flex: 1;
+        text-align: right;
+      }
+
+      .position-control-row input {
+        flex: 1;
+        min-width: 80px;
+      }
+
+      /* Fix the toolbar popover positioning */
+      .toolbar-popover {
+        max-width: 350px;
+        min-width: 280px;
+        z-index: 200; /* Ensure it's above other UI elements */
+      }
+
+      /* Ensure toolbar buttons with active popovers show a visual indicator */
+      .toolbar-button.popover-active {
+        background-color: #e0e0e0;
+        border-color: #ccc;
+      }
+
+      /* Main action toolbar */
+      .toolbar-main-actions {
+        background-color: #f8f8f8;
+        padding: 8px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+
+      .toolbar-main-actions .toolbar-button {
+        padding: 8px 12px;
+        margin-right: 5px;
+      }
+
+      .toolbar-main-actions .material-symbols-outlined {
+        font-size: 24px;
+      }
     </style>
   </head>
   <body>
@@ -246,28 +406,112 @@
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
 
-        <div class="edit-controls-group">
-            <h3>Current Slide Settings / Media</h3>
-            <label for="imageUploader">Image Background (Upload):</label>
-            <input type="file" id="imageUploader" accept="image/*">
-            <hr style="margin: 20px 0;">
-            <label for="youtubeUrlInput">YouTube URL Background:</label>
-            <input type="text" id="youtubeUrlInput" placeholder="Paste YouTube video URL here">
-            <button id="setYoutubeBackgroundButton">Set YouTube BG</button>
-            <hr style="margin: 20px 0;">
-            <label for="audioUploader">Attach Slide Audio (Upload):</label>
-            <input type="file" id="audioUploader" accept="audio/*">
-            <span id="attachedAudioName" style="margin-left: 10px; font-style: italic;"></span>
-            <button id="removeAudioButton" style="display:none; margin-left: 5px; background-color: #ffc107; color: black; padding: 5px 8px; font-size: 0.8em;">Remove Audio</button>
+        <!-- Main Toolbar Row - Now includes media, shapes, and position buttons -->
+        <div class="fabric-toolbar-row toolbar-main-actions">
+            <div class="toolbar-group">
+                <button class="toolbar-button" id="mediaToolsButton" title="Media Tools">
+                    <span class="material-symbols-outlined">perm_media</span>
+                </button>
+                <button class="toolbar-button" id="addShapeButton" title="Add Shapes">
+                    <span class="material-symbols-outlined">shapes</span>
+                </button>
+                <button class="toolbar-button" id="positionToolsButton" title="Position Tools">
+                    <span class="material-symbols-outlined">straighten</span>
+                </button>
+            </div>
+            <!-- Keep existing toolbar groups here -->
         </div>
 
-        <div class="edit-controls-group">
-            <h3>Overlay Tools</h3>
-            <button id="addRectangleButton">Add Rectangle</button>
-            <button id="addCircleButton">Add Circle</button>
-            <button id="addTextboxButton">Add Text</button>
-            <!-- Delete selected object button can go here or on toolbar -->
-            <!-- <button id="deleteSelectedObjectButton">Delete Selected</button> -->
+        <!-- New Media Tools Popover -->
+        <div id="mediaToolsPopover" class="toolbar-popover">
+            <h4>Media Settings</h4>
+            <div class="media-tabs">
+                <button class="media-tab-btn active" data-tab="image-tab">Image</button>
+                <button class="media-tab-btn" data-tab="audio-tab">Audio</button>
+                <button class="media-tab-btn" data-tab="youtube-tab">YouTube</button>
+            </div>
+            <div class="media-tab-content">
+                <!-- Image Tab -->
+                <div id="image-tab" class="media-tab-pane active">
+                    <p>Click here and paste an image, click the upload button, or drag a file into the square.</p>
+                    <div class="media-upload-zone" id="imageDropZone">
+                        <input type="file" id="imageUploader" accept="image/*" style="display:none">
+                        <div class="upload-prompt">
+                            <span class="material-symbols-outlined">image</span>
+                            <p>Drop image here or click to upload</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Audio Tab -->
+                <div id="audio-tab" class="media-tab-pane">
+                    <p>Click the upload button or drag an audio file into this square.</p>
+                    <div class="media-upload-zone" id="audioDropZone">
+                        <input type="file" id="audioUploader" accept="audio/*" style="display:none">
+                        <div class="upload-prompt">
+                            <span class="material-symbols-outlined">audio_file</span>
+                            <p>Drop audio here or click to upload</p>
+                        </div>
+                    </div>
+                    <div id="audioControls" style="display: none; margin-top: 15px;">
+                        <span id="attachedAudioName" style="margin-right: 10px; font-style: italic;"></span>
+                        <button id="removeAudioButton" style="background-color: #ffc107; color: black; padding: 5px 8px; font-size: 0.8em;">Remove Audio</button>
+                    </div>
+                </div>
+                <!-- YouTube Tab -->
+                <div id="youtube-tab" class="media-tab-pane">
+                    <p>Paste a YouTube video link below and click Set.</p>
+                    <div class="youtube-input-group">
+                        <input type="text" id="youtubeUrlInput" placeholder="Paste YouTube URL here">
+                        <button id="setYoutubeBackgroundButton">Set YouTube BG</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shapes Popover -->
+        <div id="shapesPopover" class="toolbar-popover">
+            <h4>Add Shape</h4>
+            <div class="shapes-buttons">
+                <button id="addRectangleButton" class="shape-button">
+                    <span class="material-symbols-outlined">rectangle</span>
+                    <span>Rectangle</span>
+                </button>
+                <button id="addCircleButton" class="shape-button">
+                    <span class="material-symbols-outlined">circle</span>
+                    <span>Circle</span>
+                </button>
+                <button id="addTextboxButton" class="shape-button">
+                    <span class="material-symbols-outlined">text_fields</span>
+                    <span>Text</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Position Controls Popover -->
+        <div id="positionToolsPopover" class="toolbar-popover">
+            <h4>Position & Size</h4>
+            <div class="position-controls">
+                <div class="position-control-row">
+                    <label for="objX">X Position:</label>
+                    <input type="number" id="objX" class="toolbar-input-compact">
+                </div>
+                <div class="position-control-row">
+                    <label for="objY">Y Position:</label>
+                    <input type="number" id="objY" class="toolbar-input-compact">
+                </div>
+                <div class="position-control-row">
+                    <label for="objWidth">Width:</label>
+                    <input type="number" id="objWidth" class="toolbar-input-compact">
+                </div>
+                <div class="position-control-row">
+                    <label for="objHeight">Height:</label>
+                    <input type="number" id="objHeight" class="toolbar-input-compact">
+                </div>
+                <div class="position-control-row">
+                    <label for="objAngle">Rotation:</label>
+                    <input type="number" id="objAngle" class="toolbar-input-compact">
+                </div>
+            </div>
         </div>
 
         <!-- NEW TOOLBAR STRUCTURE - REPLACES OLD #overlayPropertiesToolbar content -->

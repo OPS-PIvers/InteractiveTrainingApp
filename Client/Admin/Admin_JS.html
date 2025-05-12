@@ -52,7 +52,15 @@
     let youtubeUrlInputEl, setYoutubeBackgroundButtonEl,
         audioUploaderEl, attachedAudioNameEl, removeAudioButtonEl,
         adminMediaPlaceholderEl;
-
+    
+    // New toolbar buttons
+    let mediaToolsButtonEl, addShapeButtonEl, positionToolsButtonEl;
+    // New popovers
+    let mediaToolsPopoverEl, shapesPopoverEl, positionToolsPopoverEl;
+    // Media tab elements
+    let mediaTabButtonsEl, mediaTabPanesEl;
+    // Drag and drop zones
+    let imageDropZoneEl, audioDropZoneEl;
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -169,6 +177,24 @@
       removeAudioButtonEl = document.getElementById('removeAudioButton');
       adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
 
+      // New toolbar buttons
+      mediaToolsButtonEl = document.getElementById('mediaToolsButton');
+      addShapeButtonEl = document.getElementById('addShapeButton');
+      positionToolsButtonEl = document.getElementById('positionToolsButton');
+
+      // New popovers
+      mediaToolsPopoverEl = document.getElementById('mediaToolsPopover');
+      shapesPopoverEl = document.getElementById('shapesPopover');
+      positionToolsPopoverEl = document.getElementById('positionToolsPopover');
+
+      // Media tab elements
+      mediaTabButtonsEl = document.querySelectorAll('.media-tab-btn');
+      mediaTabPanesEl = document.querySelectorAll('.media-tab-pane');
+
+      // Drag and drop zones
+      imageDropZoneEl = document.getElementById('imageDropZone');
+      audioDropZoneEl = document.getElementById('audioDropZone');
+
       // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
       if (!loadingSpinnerEl) console.warn("setupDOMReferences: loadingSpinnerEl not found.");
@@ -235,6 +261,12 @@
       if(listViewContainerEl) listViewContainerEl.style.display = 'block';
       if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
+      // Hide the old media and overlay sections if they still exist
+      const oldMediaSection = document.querySelector('.edit-controls-group h3:contains("Current Slide Settings / Media")')?.closest('.edit-controls-group');
+      if (oldMediaSection) oldMediaSection.style.display = 'none';
+
+      const oldOverlaySection = document.querySelector('.edit-controls-group h3:contains("Overlay Tools")')?.closest('.edit-controls-group');
+      if (oldOverlaySection) oldOverlaySection.style.display = 'none';
 
       // Remove paste listener if it was active
       if (adminApp.state.isPasteListenerActive) {
@@ -363,28 +395,46 @@
             hideActivePopover(); // Hide any currently open popover
             const popover = document.getElementById(popoverId);
             if (popover && triggerButtonEl) {
+                // First, reset any positioning to get natural size
                 popover.style.display = 'block';
-                // Basic positioning: below the trigger button
+                popover.style.position = 'absolute';
+                popover.style.top = 'auto';
+                popover.style.left = 'auto';
+                
+                // Get positions after element is visible
                 const btnRect = triggerButtonEl.getBoundingClientRect();
-                // Ensure overlayPropertiesToolbarEl is valid and visible for accurate toolbarRect
-                let toolbarTop = 0;
-                let toolbarLeft = 0;
-                if (overlayPropertiesToolbarEl && overlayPropertiesToolbarEl.offsetParent !== null) { // Check if visible/in layout
-                    const toolbarRect = overlayPropertiesToolbarEl.getBoundingClientRect();
-                    toolbarTop = toolbarRect.top;
-                    toolbarLeft = toolbarRect.left;
+                const popoverRect = popover.getBoundingClientRect();
+                
+                // Get viewport dimensions
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                // Calculate initial position (below button)
+                let posTop = btnRect.bottom + 5;
+                let posLeft = btnRect.left;
+                
+                // Adjust if popover would go off-screen
+                if (posLeft + popoverRect.width > viewportWidth) {
+                    posLeft = btnRect.right - popoverRect.width;
                 }
-
-                popover.style.position = 'absolute'; // Make sure it's absolute for positioning
-                popover.style.top = (btnRect.bottom - toolbarTop + 5) + 'px'; // 5px offset, relative to toolbar
-                popover.style.left = (btnRect.left - toolbarLeft) + 'px';       // Relative to toolbar
-                // Ensure it doesn't go off-screen (simple check)
-                if ((btnRect.left - toolbarLeft + popover.offsetWidth) > overlayPropertiesToolbarEl.offsetWidth) {
-                    popover.style.left = (btnRect.right - toolbarLeft - popover.offsetWidth) + 'px';
+                
+                // If popover would go below viewport, position it above the button instead
+                if (posTop + popoverRect.height > viewportHeight) {
+                    posTop = btnRect.top - popoverRect.height - 5;
                 }
-
-
+                
+                // Apply final position
+                popover.style.top = posTop + 'px';
+                popover.style.left = posLeft + 'px';
+                
+                // Set active states
                 adminApp.state.activePopoverId = popoverId;
+                
+                // Add active class to button
+                document.querySelectorAll('.toolbar-button').forEach(btn => {
+                    btn.classList.remove('popover-active');
+                });
+                triggerButtonEl.classList.add('popover-active');
             } else {
                 console.warn("togglePopover: Popover or trigger button not found for ID:", popoverId);
             }
@@ -397,6 +447,47 @@
             if (popover) popover.style.display = 'none';
             adminApp.state.activePopoverId = null;
         }
+    }
+
+    function switchMediaTab(tabId) {
+        // Hide all tab panes
+        document.querySelectorAll('.media-tab-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+        
+        // Remove active class from all tab buttons
+        document.querySelectorAll('.media-tab-btn').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Show the selected tab pane
+        const tabPane = document.getElementById(tabId);
+        if (tabPane) tabPane.classList.add('active');
+        
+        // Add active class to the clicked tab button
+        const activeTabBtn = document.querySelector(`.media-tab-btn[data-tab="${tabId}"]`);
+        if (activeTabBtn) activeTabBtn.classList.add('active');
+        
+        // Display audio controls if we're on the audio tab and there's an attached audio
+        if (tabId === 'audio-tab') {
+            const currentSlide = getCurrentSlide();
+            const hasAudio = currentSlide && currentSlide.slideMedia && 
+                            currentSlide.slideMedia.type === 'audio' && 
+                            currentSlide.slideMedia.driveFileId;
+            if (document.getElementById('audioControls')) {
+                document.getElementById('audioControls').style.display = hasAudio ? 'block' : 'none';
+            }
+        }
+    }
+
+    // Helper function to get current slide
+    function getCurrentSlide() {
+        if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.projectData || 
+            !adminApp.state.projectData.slides || 
+            !adminApp.state.projectData.slides[adminApp.state.currentSlideIndex]) {
+            return null;
+        }
+        return adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
     }
 
     // --- Project Loading/Saving ---
@@ -629,6 +720,9 @@
              console.log("Indicating attached audio:", media.originalName || media.driveFileId);
              if (attachedAudioNameEl) attachedAudioNameEl.textContent = `Attached: ${media.originalName || 'Audio File'}`;
              if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
+             if (document.getElementById('audioControls')) {
+                 document.getElementById('audioControls').style.display = 'block';
+             }
              if (adminMediaPlaceholderEl) {
                  adminMediaPlaceholderEl.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
                  adminMediaPlaceholderEl.style.display = 'block';
@@ -945,6 +1039,9 @@
                 if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
                 if (attachedAudioNameEl) attachedAudioNameEl.textContent = '';
                 if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
+                if (document.getElementById('audioControls')) {
+                    document.getElementById('audioControls').style.display = 'none';
+                }
                 if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
 
                 delete adminApp.state.lastUploadedDriveId;
@@ -1234,6 +1331,109 @@
                 console.warn(`initToolbar: Popover trigger button for ${item.popoverId} not found.`);
             }
         });
+
+        // Add the new toolbar buttons to the popover triggers array
+        const newTriggers = [
+            { buttonEl: mediaToolsButtonEl, popoverId: 'mediaToolsPopover' },
+            { buttonEl: addShapeButtonEl, popoverId: 'shapesPopover' },
+            { buttonEl: positionToolsButtonEl, popoverId: 'positionToolsPopover' }
+        ];
+
+        newTriggers.forEach(item => {
+            if (item.buttonEl && !item.buttonEl.hasAttribute('listener-attached')) {
+                item.buttonEl.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent this click from immediately closing popover via document listener
+                    togglePopover(item.popoverId, item.buttonEl);
+                });
+                item.buttonEl.setAttribute('listener-attached', 'true');
+            } else if (!item.buttonEl) {
+                console.warn(`initToolbar: Popover trigger button for ${item.popoverId} not found.`);
+            }
+        });
+
+        // Media tab buttons event listeners
+        if (mediaTabButtonsEl && mediaTabButtonsEl.length > 0) {
+            mediaTabButtonsEl.forEach(tab => {
+                if (!tab.hasAttribute('listener-attached')) {
+                    tab.addEventListener('click', () => {
+                        const tabId = tab.dataset.tab;
+                        switchMediaTab(tabId);
+                    });
+                    tab.setAttribute('listener-attached', 'true');
+                }
+            });
+        }
+
+        // Drag and drop zone event listeners
+        if (imageDropZoneEl && !imageDropZoneEl.hasAttribute('listener-attached')) {
+            // Click to open file selector
+            imageDropZoneEl.addEventListener('click', () => {
+                if (imageUploaderEl) imageUploaderEl.click();
+            });
+            
+            // Drag and drop events
+            imageDropZoneEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                imageDropZoneEl.classList.add('drag-over');
+            });
+            
+            imageDropZoneEl.addEventListener('dragleave', () => {
+                imageDropZoneEl.classList.remove('drag-over');
+            });
+            
+            imageDropZoneEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                imageDropZoneEl.classList.remove('drag-over');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.type.startsWith('image/')) {
+                        // Create a mock event with files property for the handler
+                        const mockEvent = { target: { files: [file] } };
+                        handleImageUpload(mockEvent);
+                    } else {
+                        displayMessage("Please drop an image file.", false);
+                    }
+                }
+            });
+            
+            imageDropZoneEl.setAttribute('listener-attached', 'true');
+        }
+
+        if (audioDropZoneEl && !audioDropZoneEl.hasAttribute('listener-attached')) {
+            // Click to open file selector
+            audioDropZoneEl.addEventListener('click', () => {
+                if (audioUploaderEl) audioUploaderEl.click();
+            });
+            
+            // Drag and drop events
+            audioDropZoneEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                audioDropZoneEl.classList.add('drag-over');
+            });
+            
+            audioDropZoneEl.addEventListener('dragleave', () => {
+                audioDropZoneEl.classList.remove('drag-over');
+            });
+            
+            audioDropZoneEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                audioDropZoneEl.classList.remove('drag-over');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.type.startsWith('audio/')) {
+                        // Create a mock event with files property for the handler
+                        const mockEvent = { target: { files: [file] } };
+                        handleAudioUpload(mockEvent);
+                    } else {
+                        displayMessage("Please drop an audio file.", false);
+                    }
+                }
+            });
+            
+            audioDropZoneEl.setAttribute('listener-attached', 'true');
+        }
 
         // --- Event Listeners for Direct Toolbar Inputs (X, Y, Width, Height, Angle, StrokeWidth, Opacity, FontSize, LineHeight, CharSpacing) ---
         const directInputs = [
@@ -1648,5 +1848,53 @@
     }
 
     Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
+    // Add a custom selector method for jQuery-like :contains functionality
+    // This is needed for the selector that finds headings by text content
+    if (!document.querySelector.prototype) {
+        document.querySelector.prototype = {};
+    }
 
+    // Polyfill Element.closest if needed
+    if (!Element.prototype.matches) {
+        Element.prototype.matches = Element.prototype.msMatchesSelector || 
+                                    Element.prototype.webkitMatchesSelector;
+    }
+    
+    if (!Element.prototype.closest) {
+        Element.prototype.closest = function(s) {
+            var el = this;
+            do {
+                if (el.matches(s)) return el;
+                el = el.parentElement || el.parentNode;
+            } while (el !== null && el.nodeType === 1);
+            return null;
+        };
+    }
+
+    // Add :contains selector functionality
+    document.querySelectorAll = (function(native) {
+        return function(selector) {
+            if (selector.indexOf(':contains') > -1) {
+                const parts = selector.split(':contains(');
+                if (parts.length !== 2) return native.call(this, selector);
+                
+                const baseSelector = parts[0];
+                let textToFind = parts[1].slice(0, -1); // Remove closing parenthesis
+                
+                // Handle quoted text
+                if ((textToFind.startsWith('"') && textToFind.endsWith('"')) || 
+                    (textToFind.startsWith("'") && textToFind.endsWith("'"))) {
+                    textToFind = textToFind.slice(1, -1);
+                }
+                
+                const allElements = native.call(this, baseSelector);
+                const result = Array.from(allElements).filter(el => 
+                    el.textContent.indexOf(textToFind) > -1
+                );
+                
+                return result;
+            }
+            return native.call(this, selector);
+        };
+    })(document.querySelectorAll);
 </script>

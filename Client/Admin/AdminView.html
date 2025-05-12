@@ -159,7 +159,20 @@
            resize: vertical; /* Allow vertical resize */
        }
 
+       /* Toolbar spacing for integrated main tools */
+      .toolbar-group:first-child {
+        margin-right: 10px;
+        border-right: 1px solid #ccc;
+        padding-right: 10px;
+      }
 
+      .toolbar-group:first-child .toolbar-button {
+        margin-right: 5px;
+      }
+
+      .toolbar-button .material-symbols-outlined {
+        font-size: 20px;
+      }
       /* Popover Styles */
       .toolbar-popover {
         position: absolute; /* Position relative to a container or viewport later */
@@ -406,22 +419,6 @@
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
 
-        <!-- Main Toolbar Row - Now includes media, shapes, and position buttons -->
-        <div class="fabric-toolbar-row toolbar-main-actions">
-            <div class="toolbar-group">
-                <button class="toolbar-button" id="mediaToolsButton" title="Media Tools">
-                    <span class="material-symbols-outlined">perm_media</span>
-                </button>
-                <button class="toolbar-button" id="addShapeButton" title="Add Shapes">
-                    <span class="material-symbols-outlined">shapes</span>
-                </button>
-                <button class="toolbar-button" id="positionToolsButton" title="Position Tools">
-                    <span class="material-symbols-outlined">straighten</span>
-                </button>
-            </div>
-            <!-- Keep existing toolbar groups here -->
-        </div>
-
         <!-- New Media Tools Popover -->
         <div id="mediaToolsPopover" class="toolbar-popover">
             <h4>Media Settings</h4>
@@ -516,18 +513,18 @@
 
         <!-- NEW TOOLBAR STRUCTURE - REPLACES OLD #overlayPropertiesToolbar content -->
         <div id="overlayPropertiesToolbar" style="display:none;">
-            <!-- Main Toolbar Row -->
+            <!-- Main Toolbar Row - Now includes media, shapes, and position tools -->
             <div class="fabric-toolbar-row">
                 <div class="toolbar-group">
-                    <label for="objX" class="sr-only">X</label><input type="number" id="objX" class="toolbar-input-compact" title="Position X">
-                    <label for="objY" class="sr-only">Y</label><input type="number" id="objY" class="toolbar-input-compact" title="Position Y">
-                </div>
-                <div class="toolbar-group">
-                    <label for="objWidth" class="sr-only">Width</label><input type="number" id="objWidth" class="toolbar-input-compact" title="Width">
-                    <label for="objHeight" class="sr-only">Height</label><input type="number" id="objHeight" class="toolbar-input-compact" title="Height">
-                </div>
-                <div class="toolbar-group">
-                    <label for="objAngle" class="sr-only">Angle</label><input type="number" id="objAngle" class="toolbar-input-compact" title="Angle">
+                    <button class="toolbar-button" id="mediaToolsButton" title="Media Tools">
+                        <span class="material-symbols-outlined">perm_media</span>
+                    </button>
+                    <button class="toolbar-button" id="addShapeButton" title="Add Shapes">
+                        <span class="material-symbols-outlined">shapes</span>
+                    </button>
+                    <button class="toolbar-button" id="positionToolsButton" title="Position Tools">
+                        <span class="material-symbols-outlined">straighten</span>
+                    </button>
                 </div>
                 <div class="toolbar-group">
                     <button class="toolbar-button" id="fillColorButton" title="Fill Color"><span class="material-symbols-outlined">format_paint</span></button>

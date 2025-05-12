@@ -304,6 +304,17 @@
             adminApp.state.fabricCanvasInstance = null;
         }
         if (messageAreaEl) messageAreaEl.innerHTML = '';
+        const h3Elements = document.querySelectorAll('.edit-controls-group h3');
+        h3Elements.forEach(h3 => {
+            if (h3.textContent.includes('Current Slide Settings / Media')) {
+                const oldMediaSection = h3.closest('.edit-controls-group');
+                if (oldMediaSection) oldMediaSection.style.display = 'none';
+            }
+            if (h3.textContent.includes('Overlay Tools')) {
+                const oldOverlaySection = h3.closest('.edit-controls-group');
+                if (oldOverlaySection) oldOverlaySection.style.display = 'none';
+            }
+        });
         if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; // Clear old thumbnails
 
         // Helper to ensure elements are found and listeners attached ONLY ONCE for edit view
@@ -1590,11 +1601,13 @@
         }
         overlayPropertiesToolbarEl.style.display = 'block';
 
-        if (objXEl) objXEl.value = activeObject.left ? activeObject.left.toFixed(0) : 0;
-        if (objYEl) objYEl.value = activeObject.top ? activeObject.top.toFixed(0) : 0;
-        if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
-        if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
-        if (objAngleEl) objAngleEl.value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
+        // We still need to initialize the values in the position popover
+        // but we'll only set them if the elements exist
+        if (document.getElementById('objX')) document.getElementById('objX').value = activeObject.left ? activeObject.left.toFixed(0) : 0;
+        if (document.getElementById('objY')) document.getElementById('objY').value = activeObject.top ? activeObject.top.toFixed(0) : 0;
+        if (document.getElementById('objWidth')) document.getElementById('objWidth').value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
+        if (document.getElementById('objHeight')) document.getElementById('objHeight').value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
+        if (document.getElementById('objAngle')) document.getElementById('objAngle').value = activeObject.angle ? activeObject.angle.toFixed(0) : 0;
         if (objFillEl) objFillEl.value = toHexColor(activeObject.fill);
         if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
         if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;

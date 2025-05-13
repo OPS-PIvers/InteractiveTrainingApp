@@ -344,7 +344,11 @@
         font-size: 24px; /* Adjusted icon size */
         margin-bottom: 5px; /* Adjusted margin */
       }
-
+      .shape-button, 
+        .shape-button .material-symbols-outlined,
+        .shape-button span {
+          color: #333 !important; /* Dark grey color for text and icons */
+      }
       .position-controls {
         display: flex;
         flex-direction: column;
@@ -607,6 +611,11 @@
                     <button class="toolbar-button" id="shadowSettingsButton" title="Shadow Settings"><span class="material-symbols-outlined">blur_on</span></button>
                     <button class="toolbar-button" id="interactionSettingsButton" title="Interaction Settings"><span class="material-symbols-outlined">touch_app</span></button>
                     <button class="toolbar-button" id="animationSettingsButton" title="Animation Settings"><span class="material-symbols-outlined">animation</span></button>
+                </div>
+                <div class="toolbar-group">
+                    <button class="toolbar-button" id="undoButton" title="Undo"><span class="material-symbols-outlined">undo</span></button>
+                    <button class="toolbar-button" id="redoButton" title="Redo"><span class="material-symbols-outlined">redo</span></button>
+                    <button class="toolbar-button danger-button" id="deleteObjectButton" title="Delete Selected Object"><span class="material-symbols-outlined">delete</span></button>
                 </div>
             </div>
 

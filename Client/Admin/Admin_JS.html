@@ -20,7 +20,10 @@
       lastUploadedMimeType: null,
       lastUploadedFileName: null,
       isPasteListenerActive: false, // To manage listener attachment for pasting images
-      activePopoverId: null // To track the currently open popover
+      activePopoverId: null, // To track the currently open popover
+      history: [],
+      historyIndex: -1,
+      isApplyingHistory: false // Flag to prevent re-saving state during undo/redo
     };
 
     // --- DOM Element References ---
@@ -168,6 +171,10 @@
       fontWeightButtonEl = document.getElementById('fontWeightButton'); // Bold
       fontStyleButtonEl = document.getElementById('fontStyleButton');   // Italic
       textAlignGroupEl = document.getElementById('textAlignGroup');     // Container for align buttons
+
+      undoButtonEl = document.getElementById('undoButton');
+      redoButtonEl = document.getElementById('redoButton');
+      deleteObjectButtonEl = document.getElementById('deleteObjectButton');
 
 
       // Step 20 Elements
@@ -700,6 +707,40 @@
         }
     }
 
+    function saveCanvasStateForHistory() {
+        if (!adminApp.state.fabricCanvasInstance || adminApp.state.isApplyingHistory) {
+            return;
+        }
+        const canvas = adminApp.state.fabricCanvasInstance;
+        // Only save state if it has changed since the last save or if explicitly needed
+        // For simplicity now, we save on object modification and additions/deletions.
+
+        const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; // Match saveCurrentSlideState
+        const currentState = canvas.toJSON(propsToInclude);
+
+        // If we are at an older history point and make a new change, clear the "redo" future.
+        if (adminApp.state.historyIndex < adminApp.state.history.length - 1) {
+            adminApp.state.history = adminApp.state.history.slice(0, adminApp.state.historyIndex + 1);
+        }
+
+        adminApp.state.history.push(currentState);
+        adminApp.state.historyIndex = adminApp.state.history.length - 1;
+
+        // Limit history size (optional)
+        const maxHistorySize = 20;
+        if (adminApp.state.history.length > maxHistorySize) {
+            adminApp.state.history.shift(); // Remove the oldest state
+            adminApp.state.historyIndex--;
+        }
+        console.log("Canvas state saved to history. Index:", adminApp.state.historyIndex, "Total states:", adminApp.state.history.length);
+        updateUndoRedoButtonStates();
+    }
+
+    function updateUndoRedoButtonStates() {
+        if (undoButtonEl) undoButtonEl.disabled = adminApp.state.historyIndex <= 0;
+        if (redoButtonEl) redoButtonEl.disabled = adminApp.state.historyIndex >= adminApp.state.history.length - 1;
+    }
+
     function onProjectSaved(response) {
         showLoading(false);
         if (response && response.success) {
@@ -869,6 +910,14 @@
             populateToolbar(null); // Clear new toolbar as no objects are selected
         }
         updateSlideThumbnailsUI();
+        // Initialize/Reset history for the current slide
+        adminApp.state.history = [];
+        adminApp.state.historyIndex = -1;
+        // A short timeout to ensure canvas is fully rendered before saving initial state
+        setTimeout(() => {
+            saveCanvasStateForHistory();
+            updateUndoRedoButtonStates();
+        }, 100); // Adjust timeout if needed
     }
 
     function updateSlideThumbnailsUI() {
@@ -1492,7 +1541,76 @@
         }
     }
 
+    // Place these with other toolbar action functions
+    function handleUndo() {
+        if (adminApp.state.historyIndex <= 0) return; // Cannot undo further than the initial state
 
+        adminApp.state.isApplyingHistory = true;
+        adminApp.state.historyIndex--;
+        const canvas = adminApp.state.fabricCanvasInstance;
+        const stateToLoad = adminApp.state.history[adminApp.state.historyIndex];
+
+        canvas.loadFromJSON(stateToLoad, () => {
+            canvas.renderAll();
+            // Ensure custom properties are revived correctly after load (if necessary)
+            canvas.getObjects().forEach(obj => {
+                const originalObjState = stateToLoad.objects.find(sObj => sObj.slideId === obj.slideId /* or another unique id if you have one */);
+                if (originalObjState) { // This matching needs to be robust
+                    obj.customInteraction = originalObjState.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
+                    obj.customAnimation = originalObjState.customAnimation || { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
+                }
+            });
+            populateToolbar(canvas.getActiveObject()); // Update toolbar based on current selection
+            adminApp.state.isApplyingHistory = false;
+            updateUndoRedoButtonStates();
+            console.log("Undo applied. History index:", adminApp.state.historyIndex);
+        });
+    }
+
+    function handleRedo() {
+        if (adminApp.state.historyIndex >= adminApp.state.history.length - 1) return;
+
+        adminApp.state.isApplyingHistory = true;
+        adminApp.state.historyIndex++;
+        const canvas = adminApp.state.fabricCanvasInstance;
+        const stateToLoad = adminApp.state.history[adminApp.state.historyIndex];
+
+        canvas.loadFromJSON(stateToLoad, () => {
+            canvas.renderAll();
+            // Ensure custom properties are revived
+            canvas.getObjects().forEach(obj => {
+                const originalObjState = stateToLoad.objects.find(sObj => sObj.slideId === obj.slideId);
+                if (originalObjState) {
+                    obj.customInteraction = originalObjState.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
+                    obj.customAnimation = originalObjState.customAnimation || { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
+                }
+            });
+            populateToolbar(canvas.getActiveObject());
+            adminApp.state.isApplyingHistory = false;
+            updateUndoRedoButtonStates();
+            console.log("Redo applied. History index:", adminApp.state.historyIndex);
+        });
+    }
+
+    function handleDeleteObject() {
+        const canvas = adminApp.state.fabricCanvasInstance;
+        if (!canvas) return;
+        const activeObject = canvas.getActiveObject();
+        if (activeObject) {
+            canvas.remove(activeObject);
+            // If it was a group, also remove individual items if needed, or handle groups directly
+            if (activeObject.type === 'activeSelection') { // Fabric's term for a multi-selection group
+                activeObject.forEachObject(obj => canvas.remove(obj));
+                canvas.discardActiveObject(); // Clear the activeSelection object
+            }
+            canvas.renderAll();
+            saveCanvasStateForHistory(); // Save state after deletion
+            populateToolbar(null); // Update toolbar since object is gone
+            showNotification("Object deleted", "info");
+        } else {
+            showNotification("No object selected to delete.", "info");
+        }
+    }
     // --- Overlay Creation ---
     function addRectangle() {
       if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
@@ -1504,8 +1622,10 @@
           customAnimation: { trigger: "", type: "", speed: "normal", strength: 5, loop: false }, 
           sequenceOrder: null 
       });
-      canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll(); console.log("Rectangle added to canvas:", rect);
-      hideActivePopover(); // Close shapes popover if open
+    canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll();
+    saveCanvasStateForHistory(); // <-- ADD
+    console.log("Rectangle added to canvas:", rect);
+    hideActivePopover();
     }
 
     function addCircle() {
@@ -1518,8 +1638,10 @@
           customAnimation: { trigger: "", type: "", speed: "normal", strength: 5, loop: false }, 
           sequenceOrder: null 
       });
-      canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll(); console.log("Circle added to canvas:", circle);
-      hideActivePopover(); // Close shapes popover if open
+    canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll();
+    saveCanvasStateForHistory(); // <-- ADD
+    console.log("Circle added to canvas:", circle);
+    hideActivePopover();
     }
 
     function addTextbox() {
@@ -1533,9 +1655,11 @@
           customAnimation: { trigger: "", type: "", speed: "normal", strength: 5, loop: false },
           sequenceOrder: null
       });
-      canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll(); canvas.bringToFront(textbox); console.log("Textbox added to canvas:", textbox);
-      hideActivePopover(); // Close shapes popover if open
-    }
+        canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll();
+        saveCanvasStateForHistory(); // <-- ADD
+        console.log("Textbox added to canvas:", textbox);
+        hideActivePopover();
+        }
 
     // --- Toolbar Logic (Significantly Reworked) ---
     function toHexColor(fabricColor) {
@@ -1752,6 +1876,22 @@
             } else if(!inputConfig.el) { console.warn(`initToolbar: Shadow input element for prop "${inputConfig.prop}" not found.`);}
         });
 
+        const editActionButtons = [
+            { el: undoButtonEl, handler: handleUndo, critical: false },
+            { el: redoButtonEl, handler: handleRedo, critical: false },
+            { el: deleteObjectButtonEl, handler: handleDeleteObject, critical: true }
+        ];
+
+        editActionButtons.forEach(config => {
+            if (config.el && !config.el.hasAttribute('listener-attached')) {
+                config.el.addEventListener('click', config.handler);
+                config.el.setAttribute('listener-attached', 'true');
+            } else if (!config.el && config.critical) {
+                console.warn(`initToolbar: Critical edit action button element not found (e.g., delete).`);
+            }
+        });
+        updateUndoRedoButtonStates(); // Set initial state of undo/redo buttons
+
         // Interaction inputs (inside interactionPopover)
         if (objInteractionTriggerEl && !objInteractionTriggerEl.hasAttribute('listener-attached')) {
             objInteractionTriggerEl.addEventListener('change', handleInteractionChange); objInteractionTriggerEl.setAttribute('listener-attached', 'true');
@@ -1806,6 +1946,8 @@
 
         const isObjectSelected = !!activeObject;
         const isTextObject = isObjectSelected && (activeObject.type === 'textbox' || activeObject.type === 'i-text');
+
+        if (deleteObjectButtonEl) deleteObjectButtonEl.disabled = !isObjectSelected;
 
         // --- Manage Enabled/Disabled States ---
 

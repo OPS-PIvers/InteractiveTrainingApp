@@ -964,53 +964,50 @@
 
     // Improved notification system
     function showNotification(message, type = 'info', duration = 5000) {
-    const container = document.getElementById('notificationContainer');
-    if (!container) {
-        console.warn("showNotification: notificationContainer not found");
-        // Fall back to old display method
-        displayMessage(message, type === 'success');
-        return;
-    }
-    
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    
-    container.appendChild(notification);
-    
-    // Animate in
-    setTimeout(() => notification.classList.add('visible'), 10);
-    
-    // Remove after duration
-    setTimeout(() => {
-        notification.classList.remove('visible');
-        setTimeout(() => notification.remove(), 300); // After fade out transition
-    }, duration);
+        // Create notification container if it doesn't exist
+        let container = document.getElementById('notificationContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'notificationContainer';
+            document.body.appendChild(container);
+        }
+        
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        
+        container.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => notification.classList.add('visible'), 10);
+        
+        // Remove after duration
+        setTimeout(() => {
+            notification.classList.remove('visible');
+            setTimeout(() => notification.remove(), 300); // After fade out transition
+        }, duration);
     }
 
     function displayMessage(message, isSuccess) {
-    // Show in the new notification system if available
-    if (document.getElementById('notificationContainer')) {
+        // Show in the new notification system
         showNotification(message, isSuccess ? 'success' : 'error');
-        return;
-    }
-    
-    // Fallback to old message area
-    if (messageAreaEl) { 
-        messageAreaEl.innerHTML = ''; 
-        const p = document.createElement('p'); 
-        p.textContent = message; 
-        messageAreaEl.appendChild(p); 
-        messageAreaEl.className = isSuccess ? 'success' : 'error'; 
-        setTimeout(() => { 
+        
+        // Also update the original message area for backward compatibility
         if (messageAreaEl) { 
             messageAreaEl.innerHTML = ''; 
-            messageAreaEl.className = ''; 
-        } 
-        }, 7000); 
-    } else { 
-        console.warn("displayMessage messageAreaEl not found. Message:", message); 
-    }
+            const p = document.createElement('p'); 
+            p.textContent = message; 
+            messageAreaEl.appendChild(p); 
+            messageAreaEl.className = isSuccess ? 'success' : 'error'; 
+            setTimeout(() => { 
+            if (messageAreaEl) { 
+                messageAreaEl.innerHTML = ''; 
+                messageAreaEl.className = ''; 
+            } 
+            }, 7000); 
+        } else { 
+            console.warn("displayMessage messageAreaEl not found. Message:", message); 
+        }
     }
 
     function onServerError(errorObject) {
@@ -1828,61 +1825,61 @@
 
     // Setup the shapes dropdown menu
     function setupShapesMenu() {
-    const addShapeButton = document.getElementById('addShapeButton');
-    
-    if (addShapeButton && !addShapeButton.hasAttribute('shapes-listener-attached')) {
-        addShapeButton.addEventListener('click', function(e) {
-        e.stopPropagation();
+        const addShapeButton = document.getElementById('addShapeButton');
         
-        // Create shapes menu if it doesn't exist yet
-        let shapesMenu = document.getElementById('shapesMenu');
-        if (!shapesMenu) {
-            shapesMenu = document.createElement('div');
-            shapesMenu.id = 'shapesMenu';
-            shapesMenu.className = 'shapes-dropdown';
-            shapesMenu.innerHTML = `
-            <div class="shape-option" data-shape="rectangle">
-                <span class="material-symbols-outlined">rectangle</span>
-                <span>Rectangle</span>
-            </div>
-            <div class="shape-option" data-shape="circle">
-                <span class="material-symbols-outlined">circle</span>
-                <span>Circle</span>
-            </div>
-            `;
-            document.body.appendChild(shapesMenu);
+        if (addShapeButton && !addShapeButton.hasAttribute('shapes-listener-attached')) {
+            addShapeButton.addEventListener('click', function(e) {
+            e.stopPropagation();
             
-            // Add shape option click handlers
-            const shapeOptions = shapesMenu.querySelectorAll('.shape-option');
-            shapeOptions.forEach(option => {
-            option.addEventListener('click', function() {
-                const shapeType = this.dataset.shape;
-                if (shapeType === 'rectangle') {
-                addRectangle();
-                } else if (shapeType === 'circle') {
-                addCircle();
+            // Create shapes menu if it doesn't exist yet
+            let shapesMenu = document.getElementById('shapesMenu');
+            if (!shapesMenu) {
+                shapesMenu = document.createElement('div');
+                shapesMenu.id = 'shapesMenu';
+                shapesMenu.className = 'shapes-dropdown';
+                shapesMenu.innerHTML = `
+                <div class="shape-option" data-shape="rectangle">
+                    <span class="material-symbols-outlined">rectangle</span>
+                    <span>Rectangle</span>
+                </div>
+                <div class="shape-option" data-shape="circle">
+                    <span class="material-symbols-outlined">circle</span>
+                    <span>Circle</span>
+                </div>
+                `;
+                document.body.appendChild(shapesMenu);
+                
+                // Add shape option click handlers
+                const shapeOptions = shapesMenu.querySelectorAll('.shape-option');
+                shapeOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    const shapeType = this.dataset.shape;
+                    if (shapeType === 'rectangle') {
+                    addRectangle();
+                    } else if (shapeType === 'circle') {
+                    addCircle();
+                    }
+                    shapesMenu.style.display = 'none';
+                });
+                });
+                
+                // Close shapes menu when clicking elsewhere
+                document.addEventListener('click', function(e) {
+                if (shapesMenu && !shapesMenu.contains(e.target) && e.target !== addShapeButton) {
+                    shapesMenu.style.display = 'none';
                 }
-                shapesMenu.style.display = 'none';
-            });
+                });
+            }
+            
+            // Position and show the menu relative to the button
+            const buttonRect = addShapeButton.getBoundingClientRect();
+            shapesMenu.style.top = (buttonRect.bottom + 5) + 'px';
+            shapesMenu.style.left = buttonRect.left + 'px';
+            shapesMenu.style.display = shapesMenu.style.display === 'none' ? 'block' : 'none';
             });
             
-            // Close shapes menu when clicking elsewhere
-            document.addEventListener('click', function(e) {
-            if (shapesMenu && !shapesMenu.contains(e.target) && e.target !== addShapeButton) {
-                shapesMenu.style.display = 'none';
-            }
-            });
+            addShapeButton.setAttribute('shapes-listener-attached', 'true');
         }
-        
-        // Position and show the menu relative to the button
-        const buttonRect = addShapeButton.getBoundingClientRect();
-        shapesMenu.style.top = (buttonRect.bottom + 5) + 'px';
-        shapesMenu.style.left = buttonRect.left + 'px';
-        shapesMenu.style.display = shapesMenu.style.display === 'none' ? 'block' : 'none';
-        });
-        
-        addShapeButton.setAttribute('shapes-listener-attached', 'true');
-    }
     }
 
     // Properties Panel Initialization

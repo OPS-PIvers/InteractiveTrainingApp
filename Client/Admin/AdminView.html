@@ -395,6 +395,69 @@
       .toolbar-main-actions .material-symbols-outlined {
         font-size: 24px;
       }
+      /* Notification system styling */
+      #notificationContainer {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        max-width: 300px;
+      }
+
+      .notification {
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        transform: translateX(120%);
+        transition: transform 0.3s ease;
+        color: white;
+        opacity: 0.9;
+      }
+
+      .notification.visible {
+        transform: translateX(0);
+      }
+
+      .notification.success {
+        background-color: #28a745;
+      }
+
+      .notification.error {
+        background-color: #dc3545;
+      }
+
+      .notification.info {
+        background-color: #007bff;
+      }
+
+      /* Shapes menu dropdown */
+      .shapes-dropdown {
+        position: absolute;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        z-index: 1000;
+        padding: 5px 0;
+      }
+
+      .shape-option {
+        display: flex;
+        align-items: center;
+        padding: 8px 15px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .shape-option:hover {
+        background-color: #f0f0f0;
+      }
+
+      .shape-option .material-symbols-outlined {
+        margin-right: 8px;
+        font-size: 18px;
+      }
     </style>
   </head>
   <body>

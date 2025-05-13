@@ -545,13 +545,13 @@
                                     handleOverlayInteraction(this, 'hover');
                                 }
                                 // Animation on hover (if also configured)
-                                if (this.customAnimation && this.customAnimation.trigger === 'onHover' && this.customAnimation.type) {
+                                if (this.customAnimation && this.customAnimation.trigger === 'hover' && this.customAnimation.type) {
                                     executeAnimation(this, this.customAnimation);
                                 }
                             });
                             // Optionally, add mouseout to stop/reset hover animations if needed
                             obj.on('mouseout', function() {
-                                if (this.customAnimation && this.customAnimation.trigger === 'onHover' && this.customAnimation.type) {
+                                if (this.customAnimation && this.customAnimation.trigger === 'hover' && this.customAnimation.type) {
                                     stopAnimation(this); // Implement stopAnimation if needed
                                 }
                             });
@@ -776,10 +776,10 @@
             console.log("Animation stopped for object", fabricObject);
 
             // Option: Reset to original state if defined
-            // if (fabricObject._originalState) {
-            //     fabricObject.set(fabricObject._originalState);
-            //     viewerApp.state.viewerFabricCanvas.renderAll();
-            // }
+            if (fabricObject._originalState) {
+                fabricObject.set(fabricObject._originalState);
+                viewerApp.state.viewerFabricCanvas.renderAll();
+            }
         }
     }
 

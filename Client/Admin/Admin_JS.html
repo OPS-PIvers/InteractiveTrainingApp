@@ -355,6 +355,7 @@
         ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio, true);
 
         // Initialize Fabric Canvas with defaults
+        // Initialize Fabric Canvas with defaults
         if (typeof fabric !== 'undefined' && fabricCanvasEl) {
             adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
                 width: adminApp.state.defaultCanvasWidth,
@@ -366,8 +367,8 @@
             fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
             console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
 
-            initToolbar(); // IMPORTANT: Initialize new toolbar structure and listeners
-            initPropertiesPanel(); // Initialize the new properties panel
+            initToolbar(); // Initialize existing toolbar structure and listeners
+            setupShapesMenu(); // Setup the shapes dropdown menu
             
             // Initialize media menu
             const addMediaButton = document.getElementById('addMediaButton');
@@ -956,9 +957,9 @@
 
     // --- Error Handling & UI Utils ---
     function showLoading(show) {
-    adminApp.state.isLoading = show;
-    if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
-    else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
+        adminApp.state.isLoading = show;
+        if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+        else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
     }
 
     // Improved notification system
@@ -1823,6 +1824,65 @@
             objAnimationLoopDelayEl.addEventListener('input', handleAnimationChange);
             objAnimationLoopDelayEl.setAttribute('listener-attached', 'true');
         }
+    }
+
+    // Setup the shapes dropdown menu
+    function setupShapesMenu() {
+    const addShapeButton = document.getElementById('addShapeButton');
+    
+    if (addShapeButton && !addShapeButton.hasAttribute('shapes-listener-attached')) {
+        addShapeButton.addEventListener('click', function(e) {
+        e.stopPropagation();
+        
+        // Create shapes menu if it doesn't exist yet
+        let shapesMenu = document.getElementById('shapesMenu');
+        if (!shapesMenu) {
+            shapesMenu = document.createElement('div');
+            shapesMenu.id = 'shapesMenu';
+            shapesMenu.className = 'shapes-dropdown';
+            shapesMenu.innerHTML = `
+            <div class="shape-option" data-shape="rectangle">
+                <span class="material-symbols-outlined">rectangle</span>
+                <span>Rectangle</span>
+            </div>
+            <div class="shape-option" data-shape="circle">
+                <span class="material-symbols-outlined">circle</span>
+                <span>Circle</span>
+            </div>
+            `;
+            document.body.appendChild(shapesMenu);
+            
+            // Add shape option click handlers
+            const shapeOptions = shapesMenu.querySelectorAll('.shape-option');
+            shapeOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                const shapeType = this.dataset.shape;
+                if (shapeType === 'rectangle') {
+                addRectangle();
+                } else if (shapeType === 'circle') {
+                addCircle();
+                }
+                shapesMenu.style.display = 'none';
+            });
+            });
+            
+            // Close shapes menu when clicking elsewhere
+            document.addEventListener('click', function(e) {
+            if (shapesMenu && !shapesMenu.contains(e.target) && e.target !== addShapeButton) {
+                shapesMenu.style.display = 'none';
+            }
+            });
+        }
+        
+        // Position and show the menu relative to the button
+        const buttonRect = addShapeButton.getBoundingClientRect();
+        shapesMenu.style.top = (buttonRect.bottom + 5) + 'px';
+        shapesMenu.style.left = buttonRect.left + 'px';
+        shapesMenu.style.display = shapesMenu.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        addShapeButton.setAttribute('shapes-listener-attached', 'true');
+    }
     }
 
     // Properties Panel Initialization

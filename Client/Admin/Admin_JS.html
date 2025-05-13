@@ -1881,100 +1881,6 @@
             addShapeButton.setAttribute('shapes-listener-attached', 'true');
         }
     }
-
-    // Properties Panel Initialization
-    function initPropertiesPanel() {
-    console.log("initPropertiesPanel: Setting up the unified properties panel");
-    
-    // Get references to elements
-    const propertiesPanel = document.getElementById('propertiesPanel');
-    const closeButton = document.getElementById('closePropertiesButton');
-    const propertiesButton = document.getElementById('propertiesButton');
-    const tabButtons = document.querySelectorAll('.properties-panel .tab-button');
-    const tabContents = document.querySelectorAll('.properties-panel .tab-content');
-    const textStyleControls = document.getElementById('textStyleControls');
-    const opacityInput = document.getElementById('objOpacity');
-    const opacityValue = document.getElementById('opacityValue');
-    
-    if (!propertiesPanel) {
-        console.warn("initPropertiesPanel: Properties panel not found!");
-        return;
-    }
-    
-    // Tab switching logic
-    tabButtons.forEach(button => {
-        if (!button.hasAttribute('listener-attached')) {
-        button.addEventListener('click', () => {
-            const tabName = button.dataset.tab;
-            
-            // Update active tab button
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            
-            // Show active tab content
-            tabContents.forEach(content => content.classList.remove('active'));
-            const activeTab = document.getElementById(`${tabName}-tab`);
-            if (activeTab) activeTab.classList.add('active');
-        });
-        button.setAttribute('listener-attached', 'true');
-        }
-    });
-    
-    // Close button logic
-    if (closeButton && !closeButton.hasAttribute('listener-attached')) {
-        closeButton.addEventListener('click', () => {
-        propertiesPanel.style.display = 'none';
-        });
-        closeButton.setAttribute('listener-attached', 'true');
-    }
-    
-    // Properties button to show panel
-    if (propertiesButton && !propertiesButton.hasAttribute('listener-attached')) {
-        propertiesButton.addEventListener('click', () => {
-        propertiesPanel.style.display = propertiesPanel.style.display === 'none' ? 'block' : 'none';
-        });
-        propertiesButton.setAttribute('listener-attached', 'true');
-    }
-    
-    // Text alignment buttons
-    const alignmentButtons = document.querySelectorAll('.alignment-buttons .alignment-button');
-    alignmentButtons.forEach(button => {
-        if (!button.hasAttribute('listener-attached')) {
-        button.addEventListener('click', () => {
-            const alignValue = button.dataset.align;
-            updateFabricObjectFromToolbar('textAlign', alignValue);
-            
-            // Update button states
-            alignmentButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-        });
-        button.setAttribute('listener-attached', 'true');
-        }
-    });
-    
-    // Update opacity value display
-    if (opacityInput && opacityValue && !opacityInput.hasAttribute('opacity-listener-attached')) {
-        opacityInput.addEventListener('input', () => {
-        const percentage = Math.round(opacityInput.value * 100);
-        opacityValue.textContent = `${percentage}%`;
-        });
-        opacityInput.setAttribute('opacity-listener-attached', 'true');
-    }
-    
-    console.log("initPropertiesPanel: Setup complete");
-    }
-
-    // Update Properties Panel with current object values
-    function populatePropertiesPanel(activeObject) {
-    if (!activeObject) return;
-    
-    const propertiesPanel = document.getElementById('propertiesPanel');
-    const textStyleControls = document.getElementById('textStyleControls');
-    
-    if (!propertiesPanel) {
-        console.warn("populatePropertiesPanel: Properties panel not found!");
-        return;
-    }
     
     // First, populate all the common properties that may be in both panels for compatibility
     // This ensures that our existing updateFabricObjectFromToolbar still works
@@ -2007,13 +1913,7 @@
         const percentage = Math.round((activeObject.opacity || 1) * 100);
         opacityValue.textContent = `${percentage}%`;
     }
-    
-    // Show the panel if it was hidden
-    propertiesPanel.style.display = 'block';
-    }
 
-    // Enhanced selection management
-    function updateSelectionUI(activeObject) {
     // Update toolbar state based on selection
     const deleteButton = document.getElementById('deleteButton');
     const propertiesButton = document.getElementById('propertiesButton');
@@ -2027,7 +1927,6 @@
     } else {
         const propertiesPanel = document.getElementById('propertiesPanel');
         if (propertiesPanel) propertiesPanel.style.display = 'none';
-    }
     }
 
     function populateToolbar(activeObject) {

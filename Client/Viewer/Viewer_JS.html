@@ -6,6 +6,12 @@
     let ytPlayer; // Global variable to hold the YouTube player instance
     let isYouTubeApiReady = false; // Flag to track API readiness
     const CLICK_AND_HOLD_DURATION = 750; // Milliseconds for click and hold
+    // Animation speed presets - duration for a complete animation cycle
+    const ANIMATION_SPEED_PRESETS = {
+      slow: { duration: 1500 },     // 1.5 seconds per cycle
+      normal: { duration: 1000 },   // 1 second per cycle
+      fast: { duration: 500 }       // 0.5 seconds per cycle
+    };
 
     // --- Application State ---
     viewerApp.state = {
@@ -706,39 +712,59 @@
         if (!fabricObject || !animConfig || !animConfig.type) return;
         console.log(`Executing animation: ${animConfig.type} for object`, fabricObject);
 
-        // Stop any existing animation on this object first (optional, but good for hover)
-        stopAnimation(fabricObject); // You'll need to implement stopAnimation
+        // Stop any existing animation on this object first
+        stopAnimation(fabricObject);
 
-        // Store original properties for reset, if animation is not looping or needs reset
+        // Store original properties for reset
         if (!fabricObject._originalState) {
             fabricObject._originalState = {
                 angle: fabricObject.angle,
                 top: fabricObject.top,
-                left: fabricObject.left, // For float if it moves horizontally too
+                left: fabricObject.left,
                 scaleX: fabricObject.scaleX,
-                scaleY: fabricObject.scaleY, 
-                _currentLoopIteration: 0 // Initialize loop counter
+                scaleY: fabricObject.scaleY
             };
         }
+        
+        // Translate speed setting to duration
+        let duration = 1000; // Default: normal
+        if (animConfig.speed) {
+            duration = ANIMATION_SPEED_PRESETS[animConfig.speed]?.duration || 1000;
+        } else if (animConfig.duration) {
+            // Backward compatibility for direct duration setting
+            duration = animConfig.duration;
+        }
+        
+        // Default strength values by animation type
+        let strength = animConfig.strength || getDefaultStrength(animConfig.type);
         
         // Simple AbortController-like mechanism for stopping
         const controller = { aborted: false };
         viewerApp.state.activeAnimations.set(fabricObject, controller);
 
-
         switch (animConfig.type) {
             case 'wiggle':
-                animateWiggle(fabricObject, animConfig.duration, animConfig.strength, controller);
+                animateWiggle(fabricObject, duration, strength, controller, animConfig.loop);
                 break;
             case 'float':
-                animateFloat(fabricObject, animConfig.duration, animConfig.strength, controller);
+                animateFloat(fabricObject, duration, strength, controller, animConfig.loop);
                 break;
             case 'growShrink':
-                animateGrowShrink(fabricObject, animConfig.duration, animConfig.strength, controller);
+                animateGrowShrink(fabricObject, duration, strength, controller, animConfig.loop);
                 break;
             default:
                 console.warn("Unknown animation type:", animConfig.type);
-                viewerApp.state.activeAnimations.delete(fabricObject); // Clean up if type unknown
+                viewerApp.state.activeAnimations.delete(fabricObject);
+        }
+    }
+
+    // Helper to get default strength values by animation type
+    function getDefaultStrength(animationType) {
+        switch (animationType) {
+            case 'wiggle': return 5;      // 5 degrees
+            case 'float': return 10;      // 10 pixels
+            case 'growShrink': return 1.2; // 20% scale
+            default: return 5;
         }
     }
 
@@ -757,185 +783,235 @@
         }
     }
 
-    function animateWiggle(fabricObject, duration = 500, strength = 5, controller) {
+    function animateWiggle(fabricObject, duration, strength, controller, shouldLoop) {
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas) return;
         const originalAngle = fabricObject._originalState ? fabricObject._originalState.angle : fabricObject.angle;
         strength = parseFloat(strength) || 5; // degrees
-
+        
+        // Step 1: Animate from center to left
         fabricObject.animate('angle', originalAngle - strength, {
-            duration: duration / 4,
+            duration: duration / 3,
             onChange: canvas.renderAll.bind(canvas),
             abort: () => controller.aborted,
             onComplete: function() {
-                    if (controller.aborted) { 
-                        fabricObject.set('angle', originalAngle); 
-                        canvas.renderAll(); 
-                        viewerApp.state.activeAnimations.delete(fabricObject);
-                        return; 
-                    }
-
-                    const animConfig = fabricObject.customAnimation;
-                    // Ensure _originalState and its properties exist before incrementing
-                    if (!fabricObject._originalState) fabricObject._originalState = { angle: originalAngle };
-                    fabricObject._originalState._currentLoopIteration = (fabricObject._originalState._currentLoopIteration || 0) + 1;
-
-                    let shouldLoop = false;
-                    if (animConfig.loop === true) { // Infinite loop
-                        shouldLoop = true;
-                    } else if (typeof animConfig.loopCount === 'number' && animConfig.loopCount > 0) { // Fixed count
-                        if (fabricObject._originalState._currentLoopIteration < animConfig.loopCount) {
-                            shouldLoop = true;
-                        }
-                    }
-
-                    if (shouldLoop) {
-                        console.log(`Looping ${animConfig.type}, iteration: ${fabricObject._originalState._currentLoopIteration} of ${animConfig.loop === true ? 'infinite' : animConfig.loopCount}`);
-                        const delay = animConfig.loopDelay || 0;
-                        setTimeout(() => {
-                            // Check abort again, in case stopAnimation was called during the delay
-                            if (viewerApp.state.activeAnimations.has(fabricObject) && viewerApp.state.activeAnimations.get(fabricObject).aborted) {
-                                console.log("Loop restart aborted during delay for:", fabricObject);
-                                fabricObject.set('angle', originalAngle); // Reset if aborted
-                                canvas.renderAll();
-                                viewerApp.state.activeAnimations.delete(fabricObject);
-                                return;
-                            }
-                            // For the next loop iteration, we need a new controller instance
-                            // or to reset the 'aborted' flag on the current one if it's reused.
-                            // Creating a new one is cleaner for managing abort state per loop instance.
-                            const newLoopController = { aborted: false };
-                            viewerApp.state.activeAnimations.set(fabricObject, newLoopController); // Update map with new controller for the new loop
-                            animateWiggle(fabricObject, animConfig.duration, animConfig.strength, newLoopController);
-                        }, delay);
-                    } else {
-                        viewerApp.state.activeAnimations.delete(fabricObject);
-                        // Ensure it rests at original angle if not looping further or loopCount met
-                        fabricObject.set('angle', originalAngle);
-                        canvas.renderAll();
-                        console.log(`Animation ${animConfig.type} finished all loops or was not set to loop.`);
-                    }
-                }
-        });
-    }
-
-    function animateFloat(fabricObject, duration = 1000, strength = 10, controller) {
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas) return;
-        const originalTop = fabricObject._originalState ? fabricObject._originalState.top : fabricObject.top;
-        strength = parseFloat(strength) || 10; // pixels
-
-        fabricObject.animate('top', originalTop - strength, {
-            duration: duration / 2,
-            onChange: canvas.renderAll.bind(canvas),
-            abort: () => controller.aborted,
-            onComplete: function() {
-                // Controller is from the scope of animateFloat call
                 if (controller.aborted) { 
-                    if (fabricObject._originalState) fabricObject.set('top', fabricObject._originalState.top); 
+                    fabricObject.set('angle', originalAngle); 
                     canvas.renderAll(); 
                     viewerApp.state.activeAnimations.delete(fabricObject);
                     return; 
                 }
-
-                const animConfig = fabricObject.customAnimation;
-                if (!fabricObject._originalState) fabricObject._originalState = { top: fabricObject.top, _currentLoopIteration: 0 };
-                fabricObject._originalState._currentLoopIteration = (fabricObject._originalState._currentLoopIteration || 0) + 1;
-
-                let shouldLoop = false;
-                if (animConfig.loop === true) {
-                    shouldLoop = true;
-                } else if (typeof animConfig.loopCount === 'number' && animConfig.loopCount > 0) {
-                    if (fabricObject._originalState._currentLoopIteration < animConfig.loopCount) {
-                        shouldLoop = true;
-                    }
-                }
-
-                if (shouldLoop) {
-                    console.log(`Looping ${animConfig.type}, iteration: ${fabricObject._originalState._currentLoopIteration} of ${animConfig.loop === true ? 'infinite' : animConfig.loopCount}`);
-                    const delay = animConfig.loopDelay || 0;
-                    setTimeout(() => {
-                        if (viewerApp.state.activeAnimations.has(fabricObject) && viewerApp.state.activeAnimations.get(fabricObject).aborted) {
-                            if (fabricObject._originalState) fabricObject.set('top', fabricObject._originalState.top);
-                            canvas.renderAll();
+                
+                // Step 2: Animate from left to right
+                fabricObject.animate('angle', originalAngle + strength, {
+                    duration: duration / 3 * 2,
+                    onChange: canvas.renderAll.bind(canvas),
+                    abort: () => controller.aborted,
+                    onComplete: function() {
+                        if (controller.aborted) { 
+                            fabricObject.set('angle', originalAngle); 
+                            canvas.renderAll(); 
                             viewerApp.state.activeAnimations.delete(fabricObject);
-                            return;
+                            return; 
                         }
-                        const newLoopController = { aborted: false };
-                        viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
-                        animateFloat(fabricObject, animConfig.duration, animConfig.strength, newLoopController);
-                    }, delay);
-                } else {
-                    viewerApp.state.activeAnimations.delete(fabricObject);
-                    if (fabricObject._originalState) fabricObject.set('top', fabricObject._originalState.top);
-                    canvas.renderAll();
-                    console.log(`Animation ${animConfig.type} finished all loops or was not set to loop.`);
-                }
+                        
+                        // Step 3: Animate from right back to center
+                        fabricObject.animate('angle', originalAngle, {
+                            duration: duration / 3,
+                            onChange: canvas.renderAll.bind(canvas),
+                            abort: () => controller.aborted,
+                            onComplete: function() {
+                                if (controller.aborted) { 
+                                    fabricObject.set('angle', originalAngle); 
+                                    canvas.renderAll(); 
+                                    viewerApp.state.activeAnimations.delete(fabricObject);
+                                    return; 
+                                }
+                                
+                                // One complete cycle finished
+                                console.log(`Wiggle cycle complete, shouldLoop: ${shouldLoop}`);
+                                
+                                if (shouldLoop === true) {
+                                    // Start a new cycle with a small delay
+                                    setTimeout(() => {
+                                        // Check abort again during the delay
+                                        if (viewerApp.state.activeAnimations.has(fabricObject) && 
+                                            viewerApp.state.activeAnimations.get(fabricObject).aborted) {
+                                            fabricObject.set('angle', originalAngle);
+                                            canvas.renderAll();
+                                            viewerApp.state.activeAnimations.delete(fabricObject);
+                                            return;
+                                        }
+                                        
+                                        // Create new controller for the next cycle
+                                        const newLoopController = { aborted: false };
+                                        viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
+                                        animateWiggle(fabricObject, duration, strength, newLoopController, shouldLoop);
+                                    }, 50); // Small delay between cycles
+                                } else {
+                                    // Animation completed, clean up
+                                    viewerApp.state.activeAnimations.delete(fabricObject);
+                                    console.log(`Animation wiggle finished.`);
+                                }
+                            }
+                        });
+                    }
+                });
             }
         });
     }
 
-    function animateGrowShrink(fabricObject, duration = 500, strength = 1.2, controller) {
+    function animateFloat(fabricObject, duration, strength, controller, shouldLoop) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas) return;
+        const originalTop = fabricObject._originalState ? fabricObject._originalState.top : fabricObject.top;
+        strength = parseFloat(strength) || 10; // pixels
+        
+        // Step 1: Animate from original position upward
+        fabricObject.animate('top', originalTop - strength, {
+            duration: duration / 3,
+            onChange: canvas.renderAll.bind(canvas),
+            abort: () => controller.aborted,
+            onComplete: function() {
+                if (controller.aborted) { 
+                    fabricObject.set('top', originalTop); 
+                    canvas.renderAll(); 
+                    viewerApp.state.activeAnimations.delete(fabricObject);
+                    return; 
+                }
+                
+                // Step 2: Animate from up position to down position
+                fabricObject.animate('top', originalTop + (strength/2), {
+                    duration: duration / 3 * 2,
+                    onChange: canvas.renderAll.bind(canvas),
+                    abort: () => controller.aborted,
+                    onComplete: function() {
+                        if (controller.aborted) { 
+                            fabricObject.set('top', originalTop); 
+                            canvas.renderAll(); 
+                            viewerApp.state.activeAnimations.delete(fabricObject);
+                            return; 
+                        }
+                        
+                        // Step 3: Animate from down position back to original
+                        fabricObject.animate('top', originalTop, {
+                            duration: duration / 3,
+                            onChange: canvas.renderAll.bind(canvas),
+                            abort: () => controller.aborted,
+                            onComplete: function() {
+                                if (controller.aborted) { 
+                                    fabricObject.set('top', originalTop); 
+                                    canvas.renderAll(); 
+                                    viewerApp.state.activeAnimations.delete(fabricObject);
+                                    return; 
+                                }
+                                
+                                // One complete cycle finished
+                                console.log(`Float cycle complete, shouldLoop: ${shouldLoop}`);
+                                
+                                if (shouldLoop === true) {
+                                    // Start a new cycle with a small delay
+                                    setTimeout(() => {
+                                        // Check abort again during the delay
+                                        if (viewerApp.state.activeAnimations.has(fabricObject) && 
+                                            viewerApp.state.activeAnimations.get(fabricObject).aborted) {
+                                            fabricObject.set('top', originalTop);
+                                            canvas.renderAll();
+                                            viewerApp.state.activeAnimations.delete(fabricObject);
+                                            return;
+                                        }
+                                        
+                                        // Create new controller for the next cycle
+                                        const newLoopController = { aborted: false };
+                                        viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
+                                        animateFloat(fabricObject, duration, strength, newLoopController, shouldLoop);
+                                    }, 50); // Small delay between cycles
+                                } else {
+                                    // Animation completed, clean up
+                                    viewerApp.state.activeAnimations.delete(fabricObject);
+                                    console.log(`Animation float finished.`);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    function animateGrowShrink(fabricObject, duration, strength, controller, shouldLoop) {
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas) return;
         const originalScaleX = fabricObject._originalState ? fabricObject._originalState.scaleX : fabricObject.scaleX;
         const originalScaleY = fabricObject._originalState ? fabricObject._originalState.scaleY : fabricObject.scaleY;
         strength = parseFloat(strength) || 1.2; // scale factor
-
-        // Animate scaleX and scaleY together by animating a dummy property and setting both in onChange
-        fabricObject.animate({ // Animate a dummy property, or use an object
-            dummy: strength 
-        },{
-            duration: duration / 2,
-            onChange: function(value) {
-                fabricObject.set({ scaleX: originalScaleX * value, scaleY: originalScaleY * value });
-                canvas.renderAll();
-            },
-            abort: () => controller.aborted,
-            onComplete: function() {
-                // Controller is from the scope of animateGrowShrink call
-                if (controller.aborted) { 
-                    if (fabricObject._originalState) fabricObject.set({scaleX: fabricObject._originalState.scaleX, scaleY: fabricObject._originalState.scaleY});
-                    canvas.renderAll(); 
-                    viewerApp.state.activeAnimations.delete(fabricObject);
-                    return; 
-                }
-
-                const animConfig = fabricObject.customAnimation;
-                if (!fabricObject._originalState) fabricObject._originalState = { scaleX: fabricObject.scaleX, scaleY: fabricObject.scaleY, _currentLoopIteration: 0 };
-                fabricObject._originalState._currentLoopIteration = (fabricObject._originalState._currentLoopIteration || 0) + 1;
-
-                let shouldLoop = false;
-                if (animConfig.loop === true) {
-                    shouldLoop = true;
-                } else if (typeof animConfig.loopCount === 'number' && animConfig.loopCount > 0) {
-                    if (fabricObject._originalState._currentLoopIteration < animConfig.loopCount) {
-                        shouldLoop = true;
-                    }
-                }
-
-                if (shouldLoop) {
-                    console.log(`Looping ${animConfig.type}, iteration: ${fabricObject._originalState._currentLoopIteration} of ${animConfig.loop === true ? 'infinite' : animConfig.loopCount}`);
-                    const delay = animConfig.loopDelay || 0;
-                    setTimeout(() => {
-                        if (viewerApp.state.activeAnimations.has(fabricObject) && viewerApp.state.activeAnimations.get(fabricObject).aborted) {
-                            if (fabricObject._originalState) fabricObject.set({scaleX: fabricObject._originalState.scaleX, scaleY: fabricObject._originalState.scaleY});
-                            canvas.renderAll();
-                            viewerApp.state.activeAnimations.delete(fabricObject);
-                            return;
-                        }
-                        const newLoopController = { aborted: false };
-                        viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
-                        animateGrowShrink(fabricObject, animConfig.duration, animConfig.strength, newLoopController);
-                    }, delay);
-                } else {
-                    viewerApp.state.activeAnimations.delete(fabricObject);
-                    if (fabricObject._originalState) fabricObject.set({scaleX: fabricObject._originalState.scaleX, scaleY: fabricObject._originalState.scaleY});
+        
+        // Step 1: Animate from original size to grown size
+        animateScale(strength);
+        
+        function animateScale(targetScale) {
+            fabric.util.animate({
+                startValue: 1,
+                endValue: targetScale,
+                duration: duration / 2,
+                onChange: function(value) {
+                    if (controller.aborted) return;
+                    // Apply scale relative to original scale
+                    fabricObject.set({
+                        scaleX: originalScaleX * value,
+                        scaleY: originalScaleY * value
+                    });
                     canvas.renderAll();
-                    console.log(`Animation ${animConfig.type} finished all loops or was not set to loop.`);
-                }
-            }
-        });
+                },
+                abort: () => controller.aborted,
+                onComplete: function() {
+                    if (controller.aborted) {
+                        fabricObject.set({
+                            scaleX: originalScaleX,
+                            scaleY: originalScaleY
+                        });
+                        canvas.renderAll();
+                        viewerApp.state.activeAnimations.delete(fabricObject);
+                        return;
+                    }
+                    
+                    if (targetScale > 1) {
+                        // Step 2: Animate from grown size back to original
+                        animateScale(1);
+                    } else {
+                        // Complete cycle finished
+                        console.log(`GrowShrink cycle complete, shouldLoop: ${shouldLoop}`);
+                        
+                        if (shouldLoop === true) {
+                            // Start a new cycle with a small delay
+                            setTimeout(() => {
+                                // Check abort again during the delay
+                                if (viewerApp.state.activeAnimations.has(fabricObject) && 
+                                    viewerApp.state.activeAnimations.get(fabricObject).aborted) {
+                                    fabricObject.set({
+                                        scaleX: originalScaleX,
+                                        scaleY: originalScaleY
+                                    });
+                                    canvas.renderAll();
+                                    viewerApp.state.activeAnimations.delete(fabricObject);
+                                    return;
+                                }
+                                
+                                // Create new controller for the next cycle
+                                const newLoopController = { aborted: false };
+                                viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
+                                animateGrowShrink(fabricObject, duration, strength, newLoopController, shouldLoop);
+                            }, 50); // Small delay between cycles
+                        } else {
+                            // Animation completed, clean up
+                            viewerApp.state.activeAnimations.delete(fabricObject);
+                            console.log(`Animation growShrink finished.`);
+                        }
+                    }
+                },
+                easing: fabric.util.ease.easeInOutQuad
+            });
+        }
     }
 
     function animatePanZoom(targetObject, targetZoom) {

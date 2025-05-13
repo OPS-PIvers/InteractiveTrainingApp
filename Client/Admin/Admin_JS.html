@@ -1731,6 +1731,17 @@
         if (panZoomConfigEl) panZoomConfigEl.style.display = showPanZoomConfig ? 'block' : 'none';
     }
 
+    function updateAnimationStrengthUnit(animationType) {
+        if (!objAnimationStrengthUnitEl) return;
+        let unitText = "(pixels/degrees/scale)";
+        switch(animationType) {
+            case 'wiggle': unitText = "(degrees)"; break;
+            case 'float': unitText = "(pixels)"; break;
+            case 'growShrink': unitText = "(scale factor e.g., 1.2)"; break;
+        }
+        objAnimationStrengthUnitEl.textContent = unitText;
+    }
+
     function handleAnimationChange() {
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) return;

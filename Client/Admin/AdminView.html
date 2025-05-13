@@ -458,6 +458,69 @@
         margin-right: 8px;
         font-size: 18px;
       }
+      /* Notification system styling */
+      #notificationContainer {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        max-width: 300px;
+      }
+
+      .notification {
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        transform: translateX(120%);
+        transition: transform 0.3s ease;
+        color: white;
+        opacity: 0.9;
+      }
+
+      .notification.visible {
+        transform: translateX(0);
+      }
+
+      .notification.success {
+        background-color: #28a745;
+      }
+
+      .notification.error {
+        background-color: #dc3545;
+      }
+
+      .notification.info {
+        background-color: #007bff;
+      }
+
+      /* Shapes menu dropdown */
+      .shapes-dropdown {
+        position: absolute;
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        z-index: 1000;
+        padding: 5px 0;
+      }
+
+      .shape-option {
+        display: flex;
+        align-items: center;
+        padding: 8px 15px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .shape-option:hover {
+        background-color: #f0f0f0;
+      }
+
+      .shape-option .material-symbols-outlined {
+        margin-right: 8px;
+        font-size: 18px;
+      }
     </style>
   </head>
   <body>
@@ -480,154 +543,13 @@
     </div> <!-- End of listViewContainer -->
 
     <!-- View Container for Editing a Project -->
+
     <div class="container" id="editViewContainer" style="display:none;">
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
         
         <!-- Notification Container -->
         <div id="notificationContainer"></div>
-        
-        <!-- New Toolbar Structure -->
-        <div class="toolbar-main">
-          <div class="toolbar-group">
-            <button id="undoButton" class="toolbar-button" title="Undo" disabled>
-              <span class="material-symbols-outlined">undo</span>
-            </button>
-            <button id="redoButton" class="toolbar-button" title="Redo" disabled>
-              <span class="material-symbols-outlined">redo</span>
-            </button>
-            <button id="deleteButton" class="toolbar-button" title="Delete Selected" disabled>
-              <span class="material-symbols-outlined">delete</span>
-            </button>
-          </div>
-          
-          <div class="toolbar-group">
-            <button id="addTextButton" class="toolbar-button" title="Add Text">
-              <span class="material-symbols-outlined">text_fields</span>
-            </button>
-            <button id="addShapesButton" class="toolbar-button" title="Add Shapes">
-              <span class="material-symbols-outlined">shapes</span>
-            </button>
-            <button id="addMediaButton" class="toolbar-button" title="Add Media">
-              <span class="material-symbols-outlined">perm_media</span>
-            </button>
-          </div>
-          
-          <div class="toolbar-group">
-            <button id="propertiesButton" class="toolbar-button" title="Properties" disabled>
-              <span class="material-symbols-outlined">tune</span>
-            </button>
-            <button id="saveProjectButton" class="toolbar-button primary-button" title="Save Project">
-              <span class="material-symbols-outlined">save</span> Save
-            </button>
-          </div>
-        </div>
-        
-        <!-- Media Menu Dropdown -->
-        <div id="mediaMenu" style="display:none;">
-          <div class="media-option" data-type="image">
-            <span class="material-symbols-outlined">image</span>
-            <span>Image</span>
-          </div>
-          <div class="media-option" data-type="audio">
-            <span class="material-symbols-outlined">audio_file</span>
-            <span>Audio</span>
-          </div>
-          <div class="media-option" data-type="youtube">
-            <span class="material-symbols-outlined">smart_display</span>
-            <span>YouTube</span>
-          </div>
-        </div>
-        
-        <!-- New Properties Panel -->
-        <div id="propertiesPanel" class="properties-panel">
-          <div class="properties-header">
-            <h4>Properties</h4>
-            <button id="closePropertiesButton" class="close-button">&times;</button>
-          </div>
-          
-          <div class="properties-tabs">
-            <button class="tab-button active" data-tab="position">Position</button>
-            <button class="tab-button" data-tab="style">Style</button>
-            <button class="tab-button" data-tab="effects">Effects</button>
-            <button class="tab-button" data-tab="actions">Actions</button>
-          </div>
-          
-          <div class="tab-content active" id="position-tab">
-            <div class="property-group">
-              <div class="property-row">
-                <label class="property-label">X Position:</label>
-                <input type="number" id="objX" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Y Position:</label>
-                <input type="number" id="objY" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Width:</label>
-                <input type="number" id="objWidth" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Height:</label>
-                <input type="number" id="objHeight" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Rotation:</label>
-                <input type="number" id="objAngle" class="property-input">
-              </div>
-            </div>
-          </div>
-          
-          <div class="tab-content" id="style-tab">
-            <div class="property-group">
-              <div class="property-row">
-                <label class="property-label">Fill Color:</label>
-                <input type="color" id="objFill" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Stroke Color:</label>
-                <input type="color" id="objStrokeColor" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Stroke Width:</label>
-                <input type="number" id="objStrokeWidth" min="0" class="property-input">
-              </div>
-            </div>
-            
-            <!-- Text-specific controls (shown conditionally) -->
-            <div id="textStyleControls">
-              <div class="property-group">
-                <div class="property-row">
-                  <label class="property-label">Font:</label>
-                  <select id="objFontFamily" class="property-input"></select>
-                </div>
-                <div class="property-row">
-                  <label class="property-label">Font Size:</label>
-                  <input type="number" id="objFontSize" min="1" class="property-input">
-                </div>
-                <div class="property-row">
-                  <label class="property-label">Alignment:</label>
-                  <div class="alignment-buttons">
-                    <button data-align="left" class="alignment-button"><span class="material-symbols-outlined">format_align_left</span></button>
-                    <button data-align="center" class="alignment-button"><span class="material-symbols-outlined">format_align_center</span></button>
-                    <button data-align="right" class="alignment-button"><span class="material-symbols-outlined">format_align_right</span></button>
-                    <button data-align="justify" class="alignment-button"><span class="material-symbols-outlined">format_align_justify</span></button>
-                  </div>
-                </div>
-                <div class="property-row">
-                  <label class="property-label">Text Style:</label>
-                  <div class="style-buttons">
-                    <button id="fontWeightButton" class="style-button"><span class="material-symbols-outlined">format_bold</span></button>
-                    <button id="fontStyleButton" class="style-button"><span class="material-symbols-outlined">format_italic</span></button>
-                  </div>
-                </div>
-                <div class="property-row">
-                  <label class="property-label">Text:</label>
-                  <textarea id="objTextContent" rows="3" class="property-input"></textarea>
-                </div>
-              </div>
-            </div>
-          </div>
           
           <div class="tab-content" id="effects-tab">
             <div class="property-group">

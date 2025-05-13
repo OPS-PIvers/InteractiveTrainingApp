@@ -383,8 +383,9 @@
                populateToolbar(null);
             });
 
-            // Initially hide toolbar (new one)
-            if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'none';
+            // Make toolbar visible and set initial state for no selection
+            if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'block';
+            populateToolbar(null); // Set initial state for an empty canvas
             hideActivePopover(); // Make sure all popovers are hidden initially
 
             // Attach paste listener for images
@@ -1801,63 +1802,108 @@
     
     function populateToolbar(activeObject) {
         if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
-        // Do NOT hide popovers here, as this function is called on object modification
-        // and might be triggered by an input within an already open popover.
-        // hideActivePopover(); 
+        overlayPropertiesToolbarEl.style.display = 'block'; // Toolbar container always visible
 
-        if (!activeObject) {
-            overlayPropertiesToolbarEl.style.display = 'none';
-            if (textSpecificControlsEl) textSpecificControlsEl.style.display = 'none';
-            // Ensure all popover trigger buttons are not in 'active' state
-            document.querySelectorAll('.toolbar-button.popover-active').forEach(btn => btn.classList.remove('popover-active'));
-            return;
+        const isObjectSelected = !!activeObject;
+        const isTextObject = isObjectSelected && (activeObject.type === 'textbox' || activeObject.type === 'i-text');
+
+        // --- Manage Enabled/Disabled States ---
+
+        // Buttons for adding elements or slide-level changes - always enabled in edit view
+        if (mediaToolsButtonEl) mediaToolsButtonEl.disabled = false;
+        if (addShapeButtonEl) addShapeButtonEl.disabled = false;
+
+        // Text-specific controls row visibility
+        if (textSpecificControlsEl) {
+            textSpecificControlsEl.style.display = isTextObject ? 'flex' : 'none';
         }
-        overlayPropertiesToolbarEl.style.display = 'block';
 
-        // Populate Position Popover Inputs (objX, objY, etc.)
-        // These are direct properties.
+        // General object property controls (inputs and popover triggers)
+        const generalObjectControlsAndTriggers = [
+            objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl, // Direct inputs
+            positionToolsButtonEl, shadowSettingsButtonEl, interactionSettingsButtonEl, animationSettingsButtonEl // Popover triggers
+        ];
+        generalObjectControlsAndTriggers.forEach(control => {
+            if (control) control.disabled = !isObjectSelected;
+        });
+
+        // Text-specific property controls (font family popover trigger and inputs/buttons within textSpecificControls row)
+        const textPropertyControlsAndTriggers = [
+            fontFamilyButtonEl, // Popover trigger
+            objFontSizeEl, objLineHeightEl, objCharSpacingEl, objTextContentEl, // Inputs in text row
+            fontWeightButtonEl, fontStyleButtonEl // Buttons in text row
+        ];
+        if (textAlignGroupEl) { // Buttons in text row
+            textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(btn => textPropertyControlsAndTriggers.push(btn));
+        }
+        textPropertyControlsAndTriggers.forEach(control => {
+            if (control) control.disabled = !isTextObject;
+        });
+
+
+        // --- If NO object is selected, clean up and return ---
+        if (!isObjectSelected) {
+            hideActivePopover(); // Close any object-property popovers
+
+            // Visually deactivate popover trigger buttons
+            const popoverTriggerButtons = [positionToolsButtonEl, shadowSettingsButtonEl, interactionSettingsButtonEl, animationSettingsButtonEl, fontFamilyButtonEl];
+            popoverTriggerButtons.forEach(btn => {
+                if (btn) btn.classList.remove('active', 'popover-active');
+            });
+
+            // Visually deactivate text style buttons
+            if (fontWeightButtonEl) fontWeightButtonEl.classList.remove('active');
+            if (fontStyleButtonEl) fontStyleButtonEl.classList.remove('active');
+            if (textAlignGroupEl) {
+                textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(btn => btn.classList.remove('active'));
+            }
+            
+            // Optionally, reset some input values to defaults or placeholders if they are not disabled styling enough
+            // For example:
+            // if (objFillEl) objFillEl.value = '#dddddd'; 
+            // if (objOpacityEl) objOpacityEl.value = 1;
+
+            return; // Stop further population
+        }
+
+        // --- If an object IS selected, proceed to populate its properties into the (now enabled) controls ---
+        
+        // Populate Position Popover Inputs (objX, objY, etc.) - these are enabled if isObjectSelected
         if (objXEl) objXEl.value = activeObject.left !== undefined ? activeObject.left.toFixed(0) : 0;
         if (objYEl) objYEl.value = activeObject.top !== undefined ? activeObject.top.toFixed(0) : 0;
         if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
         if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
         if (objAngleEl) objAngleEl.value = activeObject.angle !== undefined ? activeObject.angle.toFixed(0) : 0;
         
-        // Populate Main Toolbar Direct Inputs
+        // Populate Main Toolbar Direct Inputs - these are enabled if isObjectSelected
         if (objFillEl) objFillEl.value = toHexColor(activeObject.fill);
         if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
         if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
         if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
 
-        // Text Specific Controls
-        const isTextObject = activeObject.type === 'textbox' || activeObject.type === 'i-text';
-        if (textSpecificControlsEl) {
-            textSpecificControlsEl.style.display = isTextObject ? 'flex' : 'none';
-            if (isTextObject) {
-                if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
-                if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial'; // Inside fontFamilyPopover
-                if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
-                if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight === undefined ? 1.16 : activeObject.lineHeight;
-                if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing === undefined ? 0 : activeObject.charSpacing;
+        // Populate Text Specific Controls (if applicable and visible)
+        if (isTextObject) { // These controls are already enabled if isTextObject is true
+            if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
+            if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial'; // Inside fontFamilyPopover
+            if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
+            if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight === undefined ? 1.16 : activeObject.lineHeight;
+            if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing === undefined ? 0 : activeObject.charSpacing;
 
-                // Update button states for bold/italic
-                if (fontWeightButtonEl) fontWeightButtonEl.classList.toggle('active', activeObject.fontWeight === 'bold');
-                if (fontStyleButtonEl) fontStyleButtonEl.classList.toggle('active', activeObject.fontStyle === 'italic');
-
-                // Update button states for text align
-                if (textAlignGroupEl) {
-                    textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(btn => {
-                        btn.classList.toggle('active', btn.dataset.align === activeObject.textAlign);
-                    });
-                }
-                // Sync hidden selects (inside fontFamilyPopover)
-                if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
-                if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
-                if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
+            if (fontWeightButtonEl) fontWeightButtonEl.classList.toggle('active', activeObject.fontWeight === 'bold');
+            if (fontStyleButtonEl) fontStyleButtonEl.classList.toggle('active', activeObject.fontStyle === 'italic');
+            if (textAlignGroupEl) {
+                textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.align === activeObject.textAlign);
+                });
             }
+            // Sync hidden selects (inside fontFamilyPopover)
+            if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
+            if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
+            if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
         }
 
-        // Shadow Popover Inputs
-        const shadow = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow : null; // Ensure it's a Fabric.Shadow object or null
+        // Populate Shadow Popover Inputs - shadowSettingsButtonEl is enabled if isObjectSelected
+        const shadow = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow : null;
         if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000';
         if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
         if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
@@ -1867,34 +1913,32 @@
         if (shadowSettingsButtonEl) shadowSettingsButtonEl.classList.toggle('active', !!shadow);
 
 
-        // Interaction Popover Inputs
+        // Populate Interaction Popover Inputs - interactionSettingsButtonEl is enabled if isObjectSelected
         const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
         if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
         if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
-        if (objModalContentEl) objModalContentEl.value = interaction.modalContent || ""; // Inside interactionPopover
-        if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";       // Inside interactionPopover
-        if (objPanZoomLevelEl) objPanZoomLevelEl.value = interaction.panZoomLevel === undefined ? 1.5 : interaction.panZoomLevel; // Inside interactionPopover
-        updateInteractionConfigVisibility(interaction.action); // Updates visibility of sections within the popover
+        if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
+        if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
+        if (objPanZoomLevelEl) objPanZoomLevelEl.value = interaction.panZoomLevel === undefined ? 1.5 : interaction.panZoomLevel;
+        updateInteractionConfigVisibility(interaction.action);
         if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(interaction.trigger && interaction.action));
 
-
-        // Animation Popover Inputs
+        // Populate Animation Popover Inputs - animationSettingsButtonEl is enabled if isObjectSelected
         const animation = activeObject.customAnimation || { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
         if (objAnimationTriggerEl) objAnimationTriggerEl.value = animation.trigger || "";
         if (objAnimationTypeEl) objAnimationTypeEl.value = animation.type || "";
         const showAnimParams = !!(animation.trigger && animation.type);
-        if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none'; // Section in popover
+        const animParamsConfig = animationPopoverEl ? animationPopoverEl.querySelector('#animationParamsConfig') : null;
+        if (animParamsConfig) animParamsConfig.style.display = showAnimParams ? 'block' : 'none';
         
         if (showAnimParams) {
             if (objAnimationSpeedEl) objAnimationSpeedEl.value = animation.speed || "normal";
             if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
-            updateAnimationStrengthUnit(animation.type); // Updates a span in the popover
+            updateAnimationStrengthUnit(animation.type);
             if (objAnimationLoopEl) objAnimationLoopEl.value = animation.loop ? "true" : "false";
         }
-        // Hidden config elements are not directly populated here as they are hidden.
         if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
     }
-
     function handleInteractionChange() {
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) return;

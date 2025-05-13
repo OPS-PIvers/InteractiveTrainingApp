@@ -140,10 +140,11 @@
       objAnimationTriggerEl = document.getElementById('objAnimationTrigger');
       objAnimationTypeEl = document.getElementById('objAnimationType');
       animationParamsConfigEl = document.getElementById('animationParamsConfig');
-      objAnimationDurationEl = document.getElementById('objAnimationDuration');
+      objAnimationSpeedEl = document.getElementById('objAnimationSpeed'); // New speed dropdown
       objAnimationStrengthEl = document.getElementById('objAnimationStrength');
       objAnimationStrengthUnitEl = document.getElementById('objAnimationStrengthUnit');
       objAnimationLoopEl = document.getElementById('objAnimationLoop');
+      // Keep references for backward compatibility
       animationLoopCountConfigEl = document.getElementById('animationLoopCountConfig');
       objAnimationLoopCountEl = document.getElementById('objAnimationLoopCount');
       objAnimationLoopDelayEl = document.getElementById('objAnimationLoopDelay');
@@ -1572,14 +1573,16 @@
         if (objAnimationTypeEl && !objAnimationTypeEl.hasAttribute('listener-attached')) {
             objAnimationTypeEl.addEventListener('change', handleAnimationChange); objAnimationTypeEl.setAttribute('listener-attached', 'true');
         } else if(!objAnimationTypeEl) { console.warn("initToolbar: objAnimationTypeEl not found.");}
-        if (objAnimationDurationEl && !objAnimationDurationEl.hasAttribute('listener-attached')) {
-            objAnimationDurationEl.addEventListener('input', handleAnimationChange); objAnimationDurationEl.setAttribute('listener-attached', 'true');
-        } else if(!objAnimationDurationEl) { console.warn("initToolbar: objAnimationDurationEl not found.");}
-        
+        if (objAnimationSpeedEl && !objAnimationSpeedEl.hasAttribute('listener-attached')) {
+            objAnimationSpeedEl.addEventListener('change', handleAnimationChange); objAnimationSpeedEl.setAttribute('listener-attached', 'true');
+        } else if(!objAnimationSpeedEl) { console.warn("initToolbar: objAnimationSpeedEl not found.");}
+
         if (objAnimationLoopEl && !objAnimationLoopEl.hasAttribute('listener-attached')) {
             objAnimationLoopEl.addEventListener('change', handleAnimationChange);
             objAnimationLoopEl.setAttribute('listener-attached', 'true');
         }
+
+        // These elements still exist but are hidden - keep listeners for backward compatibility
         if (objAnimationLoopCountEl && !objAnimationLoopCountEl.hasAttribute('listener-attached')) {
             objAnimationLoopCountEl.addEventListener('input', handleAnimationChange);
             objAnimationLoopCountEl.setAttribute('listener-attached', 'true');
@@ -1657,31 +1660,46 @@
         if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(interaction.trigger && interaction.action));
 
 
-        const animation = activeObject.customAnimation || { trigger: "", type: "", duration: 500, strength: 5 };
+        const animation = activeObject.customAnimation || { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
         if (objAnimationTriggerEl) objAnimationTriggerEl.value = animation.trigger || "";
         if (objAnimationTypeEl) objAnimationTypeEl.value = animation.type || "";
         const showAnimParams = !!(animation.trigger && animation.type);
         if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none';
         if (showAnimParams) {
-            if (objAnimationDurationEl) objAnimationDurationEl.value = animation.duration || 500;
-            if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
-            updateAnimationStrengthUnit(animation.type);
-                // Loop properties
-            if (objAnimationLoopEl) {
-                if (animation.loop === true) { // Check for explicit true for infinite
-                    objAnimationLoopEl.value = "true";
-                } else if (typeof animation.loopCount === 'number' && animation.loopCount > 0) {
-                    objAnimationLoopEl.value = "count";
+            // Set speed dropdown based on speed property or map from duration for backward compatibility
+            if (objAnimationSpeedEl) {
+                if (animation.speed) {
+                    objAnimationSpeedEl.value = animation.speed;
+                } else if (animation.duration) {
+                    // Map duration back to speed for older projects
+                    if (animation.duration <= 500) objAnimationSpeedEl.value = "fast";
+                    else if (animation.duration >= 1500) objAnimationSpeedEl.value = "slow";
+                    else objAnimationSpeedEl.value = "normal";
                 } else {
-                    objAnimationLoopEl.value = "false"; // Default to No
+                    objAnimationSpeedEl.value = "normal"; // Default
                 }
             }
-        const showLoopCount = objAnimationLoopEl && objAnimationLoopEl.value === "count";
-        if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = showLoopCount ? 'block' : 'none';
-        
-        if (objAnimationLoopCountEl) objAnimationLoopCountEl.value = animation.loopCount || 3;
-        if (objAnimationLoopDelayEl) objAnimationLoopDelayEl.value = animation.loopDelay === undefined ? 100 : animation.loopDelay;
+            
+            if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
+            updateAnimationStrengthUnit(animation.type);
+            
+            // Set loop toggle - simplify from complex options
+            if (objAnimationLoopEl) {
+                // Map any kind of looping to true, no looping to false
+                if (animation.loop === true || (typeof animation.loopCount === 'number' && animation.loopCount > 0)) {
+                    objAnimationLoopEl.value = "true";
+                } else {
+                    objAnimationLoopEl.value = "false";
+                }
             }
+            
+            // Always hide the loop count config
+            if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = 'none';
+            
+            // Keep these populated for backward compatibility
+            if (objAnimationLoopCountEl) objAnimationLoopCountEl.value = animation.loopCount || 3;
+            if (objAnimationLoopDelayEl) objAnimationLoopDelayEl.value = animation.loopDelay === undefined ? 50 : animation.loopDelay;
+        }
         if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
     }
 
@@ -1723,11 +1741,9 @@
             activeObject.customAnimation = { 
                 trigger: "", 
                 type: "", 
-                duration: 500, 
+                speed: "normal", // Default to normal speed
                 strength: 5,
-                loop: false, // Default loop state
-                loopDelay: 100 // Default loop delay
-                // loopCount is undefined by default
+                loop: false // Simplified loop property
             };
         }
 
@@ -1738,56 +1754,47 @@
         if (animationParamsConfigEl) animationParamsConfigEl.style.display = showAnimParams ? 'block' : 'none';
 
         if (showAnimParams) {
-            if (objAnimationDurationEl) activeObject.customAnimation.duration = parseInt(objAnimationDurationEl.value, 10) || 500;
+            // Set the speed property from the dropdown
+            if (objAnimationSpeedEl) activeObject.customAnimation.speed = objAnimationSpeedEl.value;
+            
+            // Map speed to duration for backward compatibility
+            if (activeObject.customAnimation.speed) {
+                switch(activeObject.customAnimation.speed) {
+                    case 'slow': activeObject.customAnimation.duration = 1500; break;
+                    case 'fast': activeObject.customAnimation.duration = 500; break;
+                    default: activeObject.customAnimation.duration = 1000; // Normal
+                }
+            }
+            
             if (objAnimationStrengthEl) activeObject.customAnimation.strength = parseFloat(objAnimationStrengthEl.value) || 5;
             updateAnimationStrengthUnit(activeObject.customAnimation.type);
 
-            // Loop properties
+            // Simplified loop handling - just true or false
             if (objAnimationLoopEl) {
-                const loopType = objAnimationLoopEl.value;
-                if (loopType === "true") {
-                    activeObject.customAnimation.loop = true; // Explicitly true for infinite
-                    delete activeObject.customAnimation.loopCount; 
-                } else if (loopType === "count") {
-                    activeObject.customAnimation.loop = false; // Not infinitely looping but count-based
-                    activeObject.customAnimation.loopCount = parseInt(objAnimationLoopCountEl.value, 10) || 3;
-                } else { // "false" or empty
-                    activeObject.customAnimation.loop = false;
-                    delete activeObject.customAnimation.loopCount;
-                }
+                activeObject.customAnimation.loop = objAnimationLoopEl.value === "true";
             }
-            // Update visibility of loop count input based on selection
-            const showLoopCount = objAnimationLoopEl && objAnimationLoopEl.value === "count";
-            if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = showLoopCount ? 'block' : 'none';
             
-            if (objAnimationLoopDelayEl) activeObject.customAnimation.loopDelay = parseInt(objAnimationLoopDelayEl.value, 10);
-            // Ensure loopDelay is a non-negative number, default to 0 if invalid
-            if (isNaN(activeObject.customAnimation.loopDelay) || activeObject.customAnimation.loopDelay < 0) {
-                 activeObject.customAnimation.loopDelay = 0; 
-            }
+            // Hide the loop count config (no longer used but kept for backward compatibility)
+            if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = 'none';
+            
+            // For backward compatibility, we maintain loopDelay but set it to a default value
+            activeObject.customAnimation.loopDelay = 50; // Small fixed delay between loops
+            
+            // Remove loop count property for cleaner data
+            delete activeObject.customAnimation.loopCount;
 
         } else {
-            // If trigger or type is none, effectively clear/reset animation params for consistency
-            activeObject.customAnimation.duration = 500; // Reset to default
-            activeObject.customAnimation.strength = 5;  // Reset to default
+            // If trigger or type is none, reset all properties to defaults
+            activeObject.customAnimation.speed = "normal";
+            activeObject.customAnimation.duration = 1000; // Normal speed mapped to 1000ms
+            activeObject.customAnimation.strength = 5;
             activeObject.customAnimation.loop = false;
             delete activeObject.customAnimation.loopCount;
-            activeObject.customAnimation.loopDelay = 100; // Default loop delay
-            if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = 'none'; // Hide count config
+            activeObject.customAnimation.loopDelay = 50;
+            if (animationLoopCountConfigEl) animationLoopCountConfigEl.style.display = 'none';
             updateAnimationStrengthUnit(""); // Reset unit display
         }
         console.log("Animation data updated for object:", activeObject.customAnimation);
-    }
-
-    function updateAnimationStrengthUnit(animationType) {
-        if (!objAnimationStrengthUnitEl) return;
-        let unitText = "(pixels/degrees/scale)";
-            switch(animationType) {
-                case 'wiggle': unitText = "(degrees)"; break;
-                case 'float': unitText = "(pixels)"; break;
-                case 'growShrink': unitText = "(scale factor e.g., 1.2)"; break;
-            }
-        objAnimationStrengthUnitEl.textContent = unitText;
     }
 
     function updateFabricObjectFromToolbar(propertyName, value, inputType) { // inputType is still useful for parsing

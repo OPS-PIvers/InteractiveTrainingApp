@@ -599,24 +599,20 @@
                <label for="objAnimationTrigger">Anim. Trigger:</label> <select id="objAnimationTrigger"><option value="">None</option><option value="onLoad">On Slide Load</option><option value="onHover">On Hover</option><option value="onClick">On Click</option></select><br>
                <label for="objAnimationType">Anim. Type:</label> <select id="objAnimationType"><option value="">None</option><option value="wiggle">Wiggle</option><option value="float">Float</option><option value="growShrink">Grow/Shrink</option></select><br>
                <div id="animationParamsConfig" class="config-section" style="display:none;">
-                   <label for="objAnimationDuration">Duration (ms):</label> <input type="number" id="objAnimationDuration" min="100" step="50" value="500"><br>
+                   <label for="objAnimationSpeed">Speed:</label>
+                   <select id="objAnimationSpeed" class="sidebar-input">
+                       <option value="slow">Slow</option>
+                       <option value="normal" selected>Normal</option>
+                       <option value="fast">Fast</option>
+                   </select><br>
                    <label for="objAnimationStrength">Strength:</label> <input type="number" id="objAnimationStrength" step="0.1" value="5"> <span id="objAnimationStrengthUnit" style="font-size:0.8em; margin-left:5px;">(pixels/degrees/scale)</span>
 
                    <label for="objAnimationLoop">Loop:</label>
                    <select id="objAnimationLoop" class="sidebar-input">
                        <option value="false">No</option>
-                       <option value="true">Yes (Infinite)</option>
-                       <option value="count">Fixed Count</option>
+                       <option value="true">Yes</option>
                    </select><br>
-
-                   <div id="animationLoopCountConfig" style="display:none;">
-                       <label for="objAnimationLoopCount">Loop Count:</label>
-                       <input type="number" id="objAnimationLoopCount" class="sidebar-input" min="1" value="3"><br>
-                   </div>
-
-                   <label for="objAnimationLoopDelay">Loop Delay (ms):</label>
-                   <input type="number" id="objAnimationLoopDelay" class="sidebar-input" min="0" step="50" value="100">
-                </div>
+                 </div>
             </div>
 
             <div id="fontFamilyPopover" class="toolbar-popover">

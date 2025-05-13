@@ -106,7 +106,7 @@
         background-color: #e0e0e0;
         border-color: #ccc;
       }
-      .toolbar-button.active {
+      .toolbar-button.active, .toolbar-button.popover-active { /* popover-active is key for visual feedback */
         background-color: #cce5ff; /* Light blue for active toggles */
         border-color: #99c7ff;
       }
@@ -162,17 +162,14 @@
        /* Toolbar spacing for integrated main tools */
       .toolbar-group:first-child {
         margin-right: 10px;
-        border-right: 1px solid #ccc;
-        padding-right: 10px;
+        /* border-right: 1px solid #ccc; */ /* Removed this to make it look more integrated */
+        padding-right: 5px; /* Reduced padding */
       }
 
       .toolbar-group:first-child .toolbar-button {
-        margin-right: 5px;
+        margin-right: 2px; /* Reduced margin */
       }
 
-      .toolbar-button .material-symbols-outlined {
-        font-size: 20px;
-      }
       /* Popover Styles */
       .toolbar-popover {
         position: absolute; /* Position relative to a container or viewport later */
@@ -181,9 +178,10 @@
         box-shadow: 0 2px 5px rgba(0,0,0,0.15);
         padding: 15px;
         border-radius: 4px;
-        z-index: 100; /* Above other toolbar items */
+        z-index: 200; /* Ensure it's above other UI elements, was 100 */
         display: none; /* Hidden by default */
-        min-width: 250px; /* Ensure popovers have some width */
+        min-width: 280px; /* Was 250px */
+        max-width: 350px; /* Added for consistency */
       }
       .toolbar-popover h4 {
         margin-top: 0;
@@ -209,15 +207,17 @@
         max-width: 150px;
       }
       .toolbar-popover input[type="range"] { width: calc(100% - 100px); max-width: 150px;}
-      .toolbar-popover input[type="checkbox"] { vertical-align: middle; }
-      .toolbar-popover .checkbox-label { width: auto; margin-left: 5px; font-weight: normal; }
+      .toolbar-popover input[type="checkbox"] { vertical-align: middle; margin-right: 3px;} /* Added margin */
+      .toolbar-popover .checkbox-label { width: auto; margin-left: 0; font-weight: normal; } /* Removed margin-left */
 
       .config-section { /* For conditional sub-sections like modal content */
         margin-top: 10px;
+        padding-top: 10px; /* Added padding top */
         padding-left: 10px;
         border-left: 2px solid #007bff;
+        border-top: 1px dashed #eee; /* Added separator */
       }
-      .config-section label { width: auto; }
+      .config-section label { width: auto; } /* Let it flow naturally */
       .config-section input, .config-section textarea { width: calc(100% - 10px); max-width: none; }
 
       /* Helper for visually hidden labels, but accessible */
@@ -232,7 +232,7 @@
         white-space: nowrap;
         border-width: 0;
       }
-      /* Add these CSS styles after the existing toolbar styles */
+      
       .media-tabs {
         display: flex;
         border-bottom: 1px solid #ddd;
@@ -244,7 +244,7 @@
         border: none;
         padding: 8px 15px;
         cursor: pointer;
-        color: #666;
+        color: #333; /* Darker for better readability */
         font-size: 14px;
         opacity: 0.7;
         transition: all 0.2s;
@@ -254,7 +254,7 @@
       .media-tab-btn.active {
         opacity: 1;
         border-bottom: 2px solid #007bff;
-        color: #fff;
+        color: #007bff; /* Use theme color */
         font-weight: bold;
       }
 
@@ -314,23 +314,25 @@
         border-radius: 4px;
       }
 
-      .shapes-buttons {
+      .shapes-buttons { /* Container for buttons inside shapesPopover */
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
+        justify-content: space-around; /* Better distribution */
       }
 
-      .shape-button {
+      .shape-button { /* Buttons like "Rectangle", "Circle" inside shapesPopover */
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 15px;
+        padding: 10px; /* Reduced padding */
         background: #f5f5f5;
         border: 1px solid #ddd;
         border-radius: 5px;
         cursor: pointer;
-        min-width: 80px;
+        min-width: 70px; /* Adjusted min-width */
         transition: all 0.2s;
+        font-size: 0.9em;
       }
 
       .shape-button:hover {
@@ -339,14 +341,14 @@
       }
 
       .shape-button .material-symbols-outlined {
-        font-size: 28px;
-        margin-bottom: 8px;
+        font-size: 24px; /* Adjusted icon size */
+        margin-bottom: 5px; /* Adjusted margin */
       }
 
       .position-controls {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px; /* Increased gap */
       }
 
       .position-control-row {
@@ -357,30 +359,19 @@
       }
 
       .position-control-row label {
-        flex: 1;
+        flex: 0 0 70px; /* Fixed label width */
         text-align: right;
+        font-size: 0.9em; /* Match other popover labels */
       }
 
-      .position-control-row input {
+      .position-control-row input { /* Refers to .toolbar-input-compact used here */
         flex: 1;
-        min-width: 80px;
+        min-width: auto; /* Allow shrinking */
+        width: 60px; /* Specific width */
       }
-
-      /* Fix the toolbar popover positioning */
-      .toolbar-popover {
-        max-width: 350px;
-        min-width: 280px;
-        z-index: 200; /* Ensure it's above other UI elements */
-      }
-
-      /* Ensure toolbar buttons with active popovers show a visual indicator */
-      .toolbar-button.popover-active {
-        background-color: #e0e0e0;
-        border-color: #ccc;
-      }
-
-      /* Main action toolbar */
-      .toolbar-main-actions {
+      
+      /* Main action toolbar - This was from the original and seems like a duplicate or unused concept */
+      /* .toolbar-main-actions {
         background-color: #f8f8f8;
         padding: 8px;
         border-radius: 4px;
@@ -394,7 +385,8 @@
 
       .toolbar-main-actions .material-symbols-outlined {
         font-size: 24px;
-      }
+      } */
+
       /* Notification system styling */
       #notificationContainer {
         position: fixed;
@@ -412,7 +404,7 @@
         transform: translateX(120%);
         transition: transform 0.3s ease;
         color: white;
-        opacity: 0.9;
+        opacity: 0.95; /* Slightly more opaque */
       }
 
       .notification.visible {
@@ -431,81 +423,20 @@
         background-color: #007bff;
       }
 
-      /* Shapes menu dropdown */
-      .shapes-dropdown {
+      /* Shapes menu dropdown (dynamic menu, not the shapesPopover) */
+      /* This is distinct from shapesPopover and its .shapes-buttons styling */
+      .shapes-dropdown { 
         position: absolute;
         background-color: white;
         border: 1px solid #ccc;
         border-radius: 4px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        z-index: 1000;
+        z-index: 1000; /* Ensure it's above most things but below popovers if they overlap */
         padding: 5px 0;
+        /* display: none; /* JS would control this */
       }
 
-      .shape-option {
-        display: flex;
-        align-items: center;
-        padding: 8px 15px;
-        cursor: pointer;
-        white-space: nowrap;
-      }
-
-      .shape-option:hover {
-        background-color: #f0f0f0;
-      }
-
-      .shape-option .material-symbols-outlined {
-        margin-right: 8px;
-        font-size: 18px;
-      }
-      /* Notification system styling */
-      #notificationContainer {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 9999;
-        max-width: 300px;
-      }
-
-      .notification {
-        padding: 12px 15px;
-        margin-bottom: 10px;
-        border-radius: 4px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        transform: translateX(120%);
-        transition: transform 0.3s ease;
-        color: white;
-        opacity: 0.9;
-      }
-
-      .notification.visible {
-        transform: translateX(0);
-      }
-
-      .notification.success {
-        background-color: #28a745;
-      }
-
-      .notification.error {
-        background-color: #dc3545;
-      }
-
-      .notification.info {
-        background-color: #007bff;
-      }
-
-      /* Shapes menu dropdown */
-      .shapes-dropdown {
-        position: absolute;
-        background-color: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        z-index: 1000;
-        padding: 5px 0;
-      }
-
-      .shape-option {
+      .shape-option { /* For items in a dynamic .shapes-dropdown if used elsewhere */
         display: flex;
         align-items: center;
         padding: 8px 15px;
@@ -543,7 +474,6 @@
     </div> <!-- End of listViewContainer -->
 
     <!-- View Container for Editing a Project -->
-
     <div class="container" id="editViewContainer" style="display:none;">
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
@@ -551,135 +481,9 @@
         <!-- Notification Container -->
         <div id="notificationContainer"></div>
           
-          <div class="tab-content" id="effects-tab">
-            <div class="property-group">
-              <div class="property-row">
-                <label class="property-label">Opacity:</label>
-                <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" class="property-input">
-                <span id="opacityValue">100%</span>
-              </div>
-            </div>
-            
-            <div class="property-group">
-              <h5>Shadow</h5>
-              <div class="property-row">
-                <label class="property-label">Color:</label>
-                <input type="color" id="objShadowColor" value="#000000" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Blur:</label>
-                <input type="range" id="objShadowBlur" min="0" max="50" step="1" value="0" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Offset X:</label>
-                <input type="number" id="objShadowOffsetX" value="0" class="property-input">
-              </div>
-              <div class="property-row">
-                <label class="property-label">Offset Y:</label>
-                <input type="number" id="objShadowOffsetY" value="0" class="property-input">
-              </div>
-              <div class="property-row">
-                <input type="checkbox" id="objShadowAffectStroke">
-                <label for="objShadowAffectStroke">Affects Stroke</label>
-              </div>
-            </div>
-          </div>
-          
-          <div class="tab-content" id="actions-tab">
-            <div class="property-group">
-              <h5>Interaction</h5>
-              <div class="property-row">
-                <label class="property-label">Trigger:</label>
-                <select id="objInteractionTrigger" class="property-input">
-                  <option value="">None</option>
-                  <option value="click">On Click</option>
-                  <option value="hover">On Hover</option>
-                  <option value="clickAndHold">Click and Hold</option>
-                </select>
-              </div>
-              <div class="property-row">
-                <label class="property-label">Action:</label>
-                <select id="objInteractionAction" class="property-input">
-                  <option value="">None</option>
-                  <option value="showModal">Show Modal</option>
-                  <option value="navigateToSlide">Navigate to Slide</option>
-                  <option value="navigateToURL">Navigate to URL</option>
-                  <option value="spotlight">Spotlight</option>
-                  <option value="reveal">Reveal</option>
-                  <option value="panZoomToTarget">Pan/Zoom to Target</option>
-                </select>
-              </div>
-              
-              <div id="modalContentConfig" style="display:none;">
-                <div class="property-row">
-                  <label class="property-label">Modal Content:</label>
-                  <textarea id="objModalContent" rows="3" class="property-input"></textarea>
-                </div>
-              </div>
-              
-              <div id="navigateToConfig" style="display:none;">
-                <div class="property-row">
-                  <label class="property-label">Target:</label>
-                  <input type="text" id="objNavigateTo" class="property-input">
-                </div>
-              </div>
-              
-              <div id="panZoomConfigEl" style="display:none;">
-                <div class="property-row">
-                  <label class="property-label">Zoom Level:</label>
-                  <input type="number" id="objPanZoomLevel" step="0.1" min="0.1" value="1.5" class="property-input">
-                </div>
-              </div>
-            </div>
-            
-            <div class="property-group">
-              <h5>Animation</h5>
-              <div class="property-row">
-                <label class="property-label">Trigger:</label>
-                <select id="objAnimationTrigger" class="property-input">
-                  <option value="">None</option>
-                  <option value="onLoad">On Slide Load</option>
-                  <option value="Hover">On Hover</option>
-                  <option value="onClick">On Click</option>
-                </select>
-              </div>
-              <div class="property-row">
-                <label class="property-label">Type:</label>
-                <select id="objAnimationType" class="property-input">
-                  <option value="">None</option>
-                  <option value="wiggle">Wiggle</option>
-                  <option value="float">Float</option>
-                  <option value="growShrink">Grow/Shrink</option>
-                </select>
-              </div>
-              
-              <div id="animationParamsConfig" style="display:none;">
-                <div class="property-row">
-                  <label class="property-label">Speed:</label>
-                  <select id="objAnimationSpeed" class="property-input">
-                    <option value="slow">Slow</option>
-                    <option value="normal" selected>Normal</option>
-                    <option value="fast">Fast</option>
-                  </select>
-                </div>
-                <div class="property-row">
-                  <label class="property-label">Strength:</label>
-                  <input type="number" id="objAnimationStrength" step="0.1" value="5" class="property-input">
-                  <span id="objAnimationStrengthUnit">(pixels)</span>
-                </div>
-                <div class="property-row">
-                  <label class="property-label">Loop:</label>
-                  <select id="objAnimationLoop" class="property-input">
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- OLD TABBED UI (effects-tab, actions-tab) REMOVED as their controls are now in popovers -->
         
-        <!-- Keep the existing Media Tools Popover for now (to be phased out) -->
+        <!-- Media Tools Popover (triggered by mediaToolsButton in toolbar) -->
         <div id="mediaToolsPopover" class="toolbar-popover">
             <h4>Media Settings</h4>
             <div class="media-tabs">
@@ -690,45 +494,45 @@
             <div class="media-tab-content">
                 <!-- Image Tab -->
                 <div id="image-tab" class="media-tab-pane active">
-                    <p>Click here and paste an image, click the upload button, or drag a file into the square.</p>
+                    <p>Paste an image, drag a file, or click to upload.</p>
                     <div class="media-upload-zone" id="imageDropZone">
                         <input type="file" id="imageUploader" accept="image/*" style="display:none">
                         <div class="upload-prompt">
                             <span class="material-symbols-outlined">image</span>
-                            <p>Drop image here or click to upload</p>
+                            <p>Drop image or click</p>
                         </div>
                     </div>
                 </div>
                 <!-- Audio Tab -->
                 <div id="audio-tab" class="media-tab-pane">
-                    <p>Click the upload button or drag an audio file into this square.</p>
+                    <p>Drag an audio file or click to upload.</p>
                     <div class="media-upload-zone" id="audioDropZone">
                         <input type="file" id="audioUploader" accept="audio/*" style="display:none">
                         <div class="upload-prompt">
                             <span class="material-symbols-outlined">audio_file</span>
-                            <p>Drop audio here or click to upload</p>
+                            <p>Drop audio or click</p>
                         </div>
                     </div>
                     <div id="audioControls" style="display: none; margin-top: 15px;">
                         <span id="attachedAudioName" style="margin-right: 10px; font-style: italic;"></span>
-                        <button id="removeAudioButton" style="background-color: #ffc107; color: black; padding: 5px 8px; font-size: 0.8em;">Remove Audio</button>
+                        <button id="removeAudioButton" class="danger-button" style="padding: 5px 8px; font-size: 0.8em;">Remove Audio</button>
                     </div>
                 </div>
                 <!-- YouTube Tab -->
                 <div id="youtube-tab" class="media-tab-pane">
-                    <p>Paste a YouTube video link below and click Set.</p>
+                    <p>Paste a YouTube video link below.</p>
                     <div class="youtube-input-group">
                         <input type="text" id="youtubeUrlInput" placeholder="Paste YouTube URL here">
-                        <button id="setYoutubeBackgroundButton">Set YouTube BG</button>
+                        <button id="setYoutubeBackgroundButton">Set BG</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Shapes Popover -->
+        <!-- Shapes Popover (triggered by addShapeButton in toolbar) -->
         <div id="shapesPopover" class="toolbar-popover">
             <h4>Add Shape</h4>
-            <div class="shapes-buttons">
+            <div class="shapes-buttons"> <!-- This class styles the container for shape-button items -->
                 <button id="addRectangleButton" class="shape-button">
                     <span class="material-symbols-outlined">rectangle</span>
                     <span>Rectangle</span>
@@ -744,60 +548,62 @@
             </div>
         </div>
 
-        <!-- Position Controls Popover -->
+        <!-- Position Controls Popover (triggered by positionToolsButton in toolbar) -->
         <div id="positionToolsPopover" class="toolbar-popover">
             <h4>Position & Size</h4>
             <div class="position-controls">
                 <div class="position-control-row">
-                    <label for="objX">X Position:</label>
+                    <label for="objX">X:</label>
                     <input type="number" id="objX" class="toolbar-input-compact">
                 </div>
                 <div class="position-control-row">
-                    <label for="objY">Y Position:</label>
+                    <label for="objY">Y:</label>
                     <input type="number" id="objY" class="toolbar-input-compact">
                 </div>
                 <div class="position-control-row">
                     <label for="objWidth">Width:</label>
-                    <input type="number" id="objWidth" class="toolbar-input-compact">
+                    <input type="number" id="objWidth" class="toolbar-input-compact" min="0">
                 </div>
                 <div class="position-control-row">
                     <label for="objHeight">Height:</label>
-                    <input type="number" id="objHeight" class="toolbar-input-compact">
+                    <input type="number" id="objHeight" class="toolbar-input-compact" min="0">
                 </div>
                 <div class="position-control-row">
-                    <label for="objAngle">Rotation:</label>
+                    <label for="objAngle">Angle:</label>
                     <input type="number" id="objAngle" class="toolbar-input-compact">
                 </div>
             </div>
         </div>
 
-        <!-- NEW TOOLBAR STRUCTURE - REPLACES OLD #overlayPropertiesToolbar content -->
+        <!-- MAIN OVERLAY PROPERTIES TOOLBAR -->
         <div id="overlayPropertiesToolbar" style="display:none;">
-            <!-- Main Toolbar Row - Now includes media, shapes, and position tools -->
+            <!-- Main Toolbar Row - Includes media, shapes, position, and common style tools -->
             <div class="fabric-toolbar-row">
-                <div class="toolbar-group">
+                <div class="toolbar-group"> <!-- Group 1: Add Media, Shapes, Position -->
                     <button class="toolbar-button" id="mediaToolsButton" title="Media Tools">
                         <span class="material-symbols-outlined">perm_media</span>
                     </button>
-                    <button class="toolbar-button" id="addShapeButton" title="Add Shapes">
+                    <button class="toolbar-button" id="addShapeButton" title="Add Shapes"> <!-- singular ID -->
                         <span class="material-symbols-outlined">shapes</span>
                     </button>
-                    <button class="toolbar-button" id="positionToolsButton" title="Position Tools">
+                    <button class="toolbar-button" id="positionToolsButton" title="Position & Size Tools">
                         <span class="material-symbols-outlined">straighten</span>
                     </button>
                 </div>
-                <div class="toolbar-group">
+                <div class="toolbar-group"> <!-- Group 2: Fill, Stroke -->
                     <button class="toolbar-button" id="fillColorButton" title="Fill Color"><span class="material-symbols-outlined">format_paint</span></button>
                     <input type="color" id="objFill" class="toolbar-color-input" value="#ff0000">
+                    
                     <button class="toolbar-button" id="strokeColorButton" title="Stroke Color"><span class="material-symbols-outlined">border_color</span></button>
                     <input type="color" id="objStrokeColor" class="toolbar-color-input" value="#000000">
                     <label for="objStrokeWidth" class="sr-only">Stroke Width</label><input type="number" id="objStrokeWidth" min="0" class="toolbar-input-compact" title="Stroke Width" value="1">
                 </div>
-                <div class="toolbar-group">
+                <div class="toolbar-group"> <!-- Group 3: Opacity -->
                     <button class="toolbar-button" id="opacityButton" title="Opacity"><span class="material-symbols-outlined">opacity</span></button>
-                    <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" title="Opacity">
+                    <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" title="Opacity" style="width: 70px;"> 
+                    <!-- Optional: <span id="objOpacityValueDisplay" style="font-size:0.8em; width:30px; text-align:right;">100%</span> -->
                 </div>
-                 <div class="toolbar-group">
+                 <div class="toolbar-group"> <!-- Group 4: Effects & Actions -->
                     <button class="toolbar-button" id="shadowSettingsButton" title="Shadow Settings"><span class="material-symbols-outlined">blur_on</span></button>
                     <button class="toolbar-button" id="interactionSettingsButton" title="Interaction Settings"><span class="material-symbols-outlined">touch_app</span></button>
                     <button class="toolbar-button" id="animationSettingsButton" title="Animation Settings"><span class="material-symbols-outlined">animation</span></button>
@@ -806,37 +612,35 @@
 
             <!-- Text Specific Toolbar Row (conditionally shown by JS) -->
             <div class="fabric-toolbar-row" id="textSpecificControls" style="display:none;">
-                 <div class="toolbar-group">
+                 <div class="toolbar-group"> <!-- Text Group 1: Font Family, Size -->
                     <button class="toolbar-button" id="fontFamilyButton" title="Font Family"><span class="material-symbols-outlined">font_download</span></button>
-                    <!-- The actual select will be in a popover, or shown near this button -->
-                    <label for="objFontSize" class="sr-only">Font Size</label><input type="number" id="objFontSize" min="1" class="toolbar-input-compact" title="Font Size">
+                    <label for="objFontSize" class="sr-only">Font Size</label><input type="number" id="objFontSize" min="1" class="toolbar-input-compact" title="Font Size" value="24">
                 </div>
-                <div class="toolbar-group">
-                    <button class="toolbar-button" id="fontWeightButton" title="Bold"><span class="material-symbols-outlined">format_bold</span></button> <!-- This will toggle 'bold'/'normal' for objFontWeight -->
-                    <button class="toolbar-button" id="fontStyleButton" title="Italic"><span class="material-symbols-outlined">format_italic</span></button> <!-- This will toggle 'italic'/'normal' for objFontStyle -->
+                <div class="toolbar-group"> <!-- Text Group 2: Styles -->
+                    <button class="toolbar-button" id="fontWeightButton" title="Bold"><span class="material-symbols-outlined">format_bold</span></button>
+                    <button class="toolbar-button" id="fontStyleButton" title="Italic"><span class="material-symbols-outlined">format_italic</span></button>
                 </div>
-                <div class="toolbar-group" id="textAlignGroup">
+                <div class="toolbar-group" id="textAlignGroup"> <!-- Text Group 3: Alignment -->
                     <button class="toolbar-button" data-align="left" title="Align Left"><span class="material-symbols-outlined">format_align_left</span></button>
                     <button class="toolbar-button" data-align="center" title="Align Center"><span class="material-symbols-outlined">format_align_center</span></button>
                     <button class="toolbar-button" data-align="right" title="Align Right"><span class="material-symbols-outlined">format_align_right</span></button>
                     <button class="toolbar-button" data-align="justify" title="Align Justify"><span class="material-symbols-outlined">format_align_justify</span></button>
-                     <!-- Actual <select id="objTextAlign"> will be hidden, controlled by these buttons -->
                 </div>
-                 <div class="toolbar-group">
-                    <label for="objLineHeight" class="sr-only">Line Height</label><input type="number" id="objLineHeight" step="0.1" min="0" class="toolbar-input-compact" title="Line Height">
-                    <label for="objCharSpacing" class="sr-only">Character Spacing</label><input type="number" id="objCharSpacing" class="toolbar-input-compact" title="Character Spacing">
+                 <div class="toolbar-group"> <!-- Text Group 4: Spacing -->
+                    <label for="objLineHeight" class="sr-only">Line Height</label><input type="number" id="objLineHeight" step="0.1" min="0" class="toolbar-input-compact" title="Line Height" value="1.16">
+                    <label for="objCharSpacing" class="sr-only">Character Spacing</label><input type="number" id="objCharSpacing" class="toolbar-input-compact" title="Character Spacing" value="0">
                 </div>
-                <div class="toolbar-group">
+                <div class="toolbar-group"> <!-- Text Group 5: Content -->
                      <label for="objTextContent" class="sr-only">Text Content</label>
                      <textarea id="objTextContent" rows="1" title="Text Content" style="width: 200px; vertical-align:middle;"></textarea>
                 </div>
             </div>
 
-            <!-- Popovers - Position these absolutely via JS later, or keep them flow for now -->
+            <!-- Popovers for detailed settings -->
             <div id="shadowPopover" class="toolbar-popover">
                 <h4>Shadow</h4>
                 <label for="objShadowColor">Color:</label> <input type="color" id="objShadowColor" value="#000000"><br>
-                <label for="objShadowBlur">Blur:</label> <input type="range" id="objShadowBlur" min="0" max="50" step="1" value="0"><br>
+                <label for="objShadowBlur">Blur:</label> <input type="range" id="objShadowBlur" min="0" max="50" step="1" value="0" style="vertical-align: middle;"><br>
                 <label for="objShadowOffsetX">Offset X:</label> <input type="number" id="objShadowOffsetX" value="0"><br>
                 <label for="objShadowOffsetY">Offset Y:</label> <input type="number" id="objShadowOffsetY" value="0"><br>
                 <input type="checkbox" id="objShadowAffectStroke"> <label for="objShadowAffectStroke" class="checkbox-label">Affects Stroke</label><br>
@@ -847,42 +651,57 @@
                 <h4>Interactions</h4>
                 <label for="objInteractionTrigger">Trigger:</label> <select id="objInteractionTrigger"><option value="">None</option><option value="click">On Click</option><option value="hover">On Hover</option><option value="clickAndHold">Click and Hold</option></select><br>
                 <label for="objInteractionAction">Action:</label> <select id="objInteractionAction"><option value="">None</option><option value="showModal">Show Modal</option><option value="navigateToSlide">Navigate to Slide</option><option value="navigateToURL">Navigate to URL</option><option value="spotlight">Spotlight</option><option value="reveal">Reveal</option><option value="panZoomToTarget">Pan/Zoom to Target</option></select>
-                <div id="modalContentConfig" class="config-section" style="display:none;"><label for="objModalContent">Modal Content:</label><br><textarea id="objModalContent" rows="3"></textarea></div>
-                <div id="navigateToConfig" class="config-section" style="display:none;"><label for="objNavigateTo">Target (Slide ID/URL):</label><input type="text" id="objNavigateTo"></div>
-                <div id="panZoomConfigEl" class="config-section" style="display:none;"><label for="objPanZoomLevel">Zoom Level (e.g., 1.5):</label><input type="number" id="objPanZoomLevel" step="0.1" min="0.1" value="1.5"></div>
+                
+                <div id="modalContentConfig" class="config-section" style="display:none;">
+                  <label for="objModalContent">Modal Content:</label><br>
+                  <textarea id="objModalContent" rows="3"></textarea>
+                </div>
+                <div id="navigateToConfig" class="config-section" style="display:none;">
+                  <label for="objNavigateTo">Target (Slide ID/URL):</label>
+                  <input type="text" id="objNavigateTo">
+                </div>
+                <div id="panZoomConfigEl" class="config-section" style="display:none;"> <!-- ID matches JS -->
+                  <label for="objPanZoomLevel">Zoom Level (e.g., 1.5):</label>
+                  <input type="number" id="objPanZoomLevel" step="0.1" min="0.1" value="1.5">
+                </div>
             </div>
 
             <div id="animationPopover" class="toolbar-popover">
                <h4>Animations</h4>
                <label for="objAnimationTrigger">Anim. Trigger:</label> <select id="objAnimationTrigger"><option value="">None</option><option value="onLoad">On Slide Load</option><option value="Hover">On Hover</option><option value="onClick">On Click</option></select><br>
                <label for="objAnimationType">Anim. Type:</label> <select id="objAnimationType"><option value="">None</option><option value="wiggle">Wiggle</option><option value="float">Float</option><option value="growShrink">Grow/Shrink</option></select><br>
+               
                <div id="animationParamsConfig" class="config-section" style="display:none;">
                    <label for="objAnimationSpeed">Speed:</label>
-                   <select id="objAnimationSpeed" class="sidebar-input">
+                   <select id="objAnimationSpeed"> <!-- Removed .sidebar-input class -->
                        <option value="slow">Slow</option>
                        <option value="normal" selected>Normal</option>
                        <option value="fast">Fast</option>
                    </select><br>
-                   <label for="objAnimationStrength">Strength:</label> <input type="number" id="objAnimationStrength" step="0.1" value="5"> <span id="objAnimationStrengthUnit" style="font-size:0.8em; margin-left:5px;">(pixels/degrees/scale)</span>
-
+                   <label for="objAnimationStrength">Strength:</label> <input type="number" id="objAnimationStrength" step="0.1" value="5"> <span id="objAnimationStrengthUnit" style="font-size:0.8em; margin-left:5px;">(pixels/degrees/scale)</span><br>
                    <label for="objAnimationLoop">Loop:</label>
-                   <select id="objAnimationLoop" class="sidebar-input">
+                   <select id="objAnimationLoop"> <!-- Removed .sidebar-input class -->
                        <option value="false">No</option>
                        <option value="true">Yes</option>
                    </select><br>
+                   <!-- Hidden legacy controls, kept for JS variable existence but not displayed -->
+                   <div id="animationLoopCountConfig" style="display:none;"> <!-- This ID is referenced by Admin_JS.html -->
+                       <label for="objAnimationLoopCount">Loop Count:</label><input type="number" id="objAnimationLoopCount" min="1" value="3">
+                   </div>
+                   <div style="display:none;"><label for="objAnimationLoopDelay">Loop Delay (ms):</label><input type="number" id="objAnimationLoopDelay" min="0" value="500"></div>
                  </div>
             </div>
 
             <div id="fontFamilyPopover" class="toolbar-popover">
                 <h4>Font Family</h4>
-                <select id="objFontFamily" class="toolbar-select-compact" style="width: 100%;"></select>
-                <!-- Font weight and style selects are hidden, controlled by B/I buttons -->
+                <select id="objFontFamily" class="toolbar-select-compact" style="width: 100%; margin-bottom:10px;"></select>
+                <!-- Hidden selects controlled by toolbar buttons B/I and Align -->
                 <select id="objFontWeight" style="display:none;"><option value="normal">Normal</option><option value="bold">Bold</option></select>
                 <select id="objFontStyle" style="display:none;"><option value="normal">Normal</option><option value="italic">Italic</option></select>
                 <select id="objTextAlign" style="display:none;"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option><option value="justify">Justify</option></select>
             </div>
 
-        </div> <!-- End of NEW #overlayPropertiesToolbar -->
+        </div> <!-- End of #overlayPropertiesToolbar -->
 
 
         <div id="fabricCanvasContainer">

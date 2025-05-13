@@ -395,6 +395,317 @@
       .toolbar-main-actions .material-symbols-outlined {
         font-size: 24px;
       }
+      /* Responsive improvements for Admin UI */
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Improved notification system */
+    #notificationContainer {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      max-width: 300px;
+    }
+
+    .notification {
+      padding: 12px 15px;
+      margin-bottom: 10px;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      transform: translateX(120%);
+      transition: transform 0.3s ease;
+      color: white;
+      opacity: 0.9;
+    }
+
+    .notification.visible {
+      transform: translateX(0);
+    }
+
+    .notification.success {
+      background-color: #28a745;
+    }
+
+    .notification.error {
+      background-color: #dc3545;
+    }
+
+    .notification.info {
+      background-color: #007bff;
+    }
+
+    /* Properties panel styling */
+    .properties-panel {
+      position: fixed;
+      right: 20px;
+      top: 100px;
+      width: 300px;
+      max-width: 90vw;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      display: none;
+    }
+
+    .properties-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .properties-header h4 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .close-button {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .properties-tabs {
+      display: flex;
+      border-bottom: 1px solid #eee;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 8px 0;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      transition: all 0.2s;
+    }
+
+    .tab-button.active {
+      color: #007bff;
+      border-bottom-color: #007bff;
+      font-weight: bold;
+    }
+
+    .tab-content {
+      padding: 15px;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .property-group {
+      margin-bottom: 15px;
+    }
+
+    .property-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .property-label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .property-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .property-row .property-label {
+      flex: 0 0 90px;
+      margin-bottom: 0;
+    }
+
+    .property-row input,
+    .property-row select {
+      flex: 1;
+    }
+
+    /* Improved toolbar */
+    .toolbar-main {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+
+    .toolbar-main .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 5px;
+      border-right: 1px solid #d0d0d0;
+    }
+
+    .toolbar-main .toolbar-group:last-child {
+      border-right: none;
+    }
+
+    .toolbar-main .toolbar-button {
+      background: none;
+      border: 1px solid transparent;
+      color: #333;
+      padding: 8px;
+      margin: 0;
+      border-radius: 3px;
+      min-width: 36px;
+      height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toolbar-main .toolbar-button:hover {
+      background-color: #e0e0e0;
+      border-color: #ccc;
+    }
+
+    .toolbar-main .toolbar-button.active {
+      background-color: #cce5ff;
+      border-color: #99c7ff;
+    }
+
+    .toolbar-main .toolbar-button.primary-button {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .toolbar-main .toolbar-button.primary-button:hover {
+      background-color: #0069d9;
+    }
+
+    .toolbar-main .toolbar-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Media menu dropdown */
+    #mediaMenu {
+      position: absolute;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+      display: none;
+    }
+
+    .media-option {
+      padding: 8px 15px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .media-option:hover {
+      background-color: #f0f0f0;
+    }
+
+    .media-option .material-symbols-outlined {
+      font-size: 18px;
+    }
+
+    /* Enhanced slide management */
+    #slideThumbnailsContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      min-height: 60px;
+      padding: 15px;
+      border: 1px solid #b0c4de;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+    }
+
+    .slide-thumbnail {
+      width: 120px;
+      height: 80px;
+      border: 2px solid #778899;
+      background-color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      font-size: 0.8em;
+      text-align: center;
+      position: relative;
+      border-radius: 3px;
+      transition: all 0.2s;
+    }
+
+    .slide-thumbnail .thumbnail-preview {
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .slide-thumbnail .thumbnail-number {
+      position: absolute;
+      bottom: 3px;
+      right: 3px;
+      background-color: rgba(0,0,0,0.5);
+      color: white;
+      font-size: 10px;
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+
+    /* Responsive breakpoints */
+    @media (max-width: 768px) {
+      .toolbar-main .toolbar-group {
+        width: 100%;
+        justify-content: center;
+        border-right: none;
+        border-bottom: 1px solid #d0d0d0;
+        padding: 5px 0;
+      }
+      
+      .toolbar-main .toolbar-group:last-child {
+        border-bottom: none;
+      }
+      
+      .properties-panel {
+        width: 100%;
+        max-width: 100%;
+        right: 0;
+        top: auto;
+        bottom: 0;
+        border-radius: 5px 5px 0 0;
+      }
+      
+      .slide-thumbnail {
+        width: 100px;
+        height: 70px;
+      }
+    }
     </style>
   </head>
   <body>
@@ -420,8 +731,288 @@
     <div class="container" id="editViewContainer" style="display:none;">
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
+        
+        <!-- Notification Container -->
+        <div id="notificationContainer"></div>
+        
+        <!-- New Toolbar Structure -->
+        <div class="toolbar-main">
+          <div class="toolbar-group">
+            <button id="undoButton" class="toolbar-button" title="Undo" disabled>
+              <span class="material-symbols-outlined">undo</span>
+            </button>
+            <button id="redoButton" class="toolbar-button" title="Redo" disabled>
+              <span class="material-symbols-outlined">redo</span>
+            </button>
+            <button id="deleteButton" class="toolbar-button" title="Delete Selected" disabled>
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+          </div>
+          
+          <div class="toolbar-group">
+            <button id="addTextButton" class="toolbar-button" title="Add Text">
+              <span class="material-symbols-outlined">text_fields</span>
+            </button>
+            <button id="addShapesButton" class="toolbar-button" title="Add Shapes">
+              <span class="material-symbols-outlined">shapes</span>
+            </button>
+            <button id="addMediaButton" class="toolbar-button" title="Add Media">
+              <span class="material-symbols-outlined">perm_media</span>
+            </button>
+          </div>
+          
+          <div class="toolbar-group">
+            <button id="propertiesButton" class="toolbar-button" title="Properties" disabled>
+              <span class="material-symbols-outlined">tune</span>
+            </button>
+            <button id="saveProjectButton" class="toolbar-button primary-button" title="Save Project">
+              <span class="material-symbols-outlined">save</span> Save
+            </button>
+          </div>
+        </div>
+        
+        <!-- Media Menu Dropdown -->
+        <div id="mediaMenu" style="display:none;">
+          <div class="media-option" data-type="image">
+            <span class="material-symbols-outlined">image</span>
+            <span>Image</span>
+          </div>
+          <div class="media-option" data-type="audio">
+            <span class="material-symbols-outlined">audio_file</span>
+            <span>Audio</span>
+          </div>
+          <div class="media-option" data-type="youtube">
+            <span class="material-symbols-outlined">smart_display</span>
+            <span>YouTube</span>
+          </div>
+        </div>
+        
+        <!-- New Properties Panel -->
+        <div id="propertiesPanel" class="properties-panel">
+          <div class="properties-header">
+            <h4>Properties</h4>
+            <button id="closePropertiesButton" class="close-button">&times;</button>
+          </div>
+          
+          <div class="properties-tabs">
+            <button class="tab-button active" data-tab="position">Position</button>
+            <button class="tab-button" data-tab="style">Style</button>
+            <button class="tab-button" data-tab="effects">Effects</button>
+            <button class="tab-button" data-tab="actions">Actions</button>
+          </div>
+          
+          <div class="tab-content active" id="position-tab">
+            <div class="property-group">
+              <div class="property-row">
+                <label class="property-label">X Position:</label>
+                <input type="number" id="objX" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Y Position:</label>
+                <input type="number" id="objY" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Width:</label>
+                <input type="number" id="objWidth" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Height:</label>
+                <input type="number" id="objHeight" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Rotation:</label>
+                <input type="number" id="objAngle" class="property-input">
+              </div>
+            </div>
+          </div>
+          
+          <div class="tab-content" id="style-tab">
+            <div class="property-group">
+              <div class="property-row">
+                <label class="property-label">Fill Color:</label>
+                <input type="color" id="objFill" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Stroke Color:</label>
+                <input type="color" id="objStrokeColor" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Stroke Width:</label>
+                <input type="number" id="objStrokeWidth" min="0" class="property-input">
+              </div>
+            </div>
+            
+            <!-- Text-specific controls (shown conditionally) -->
+            <div id="textStyleControls">
+              <div class="property-group">
+                <div class="property-row">
+                  <label class="property-label">Font:</label>
+                  <select id="objFontFamily" class="property-input"></select>
+                </div>
+                <div class="property-row">
+                  <label class="property-label">Font Size:</label>
+                  <input type="number" id="objFontSize" min="1" class="property-input">
+                </div>
+                <div class="property-row">
+                  <label class="property-label">Alignment:</label>
+                  <div class="alignment-buttons">
+                    <button data-align="left" class="alignment-button"><span class="material-symbols-outlined">format_align_left</span></button>
+                    <button data-align="center" class="alignment-button"><span class="material-symbols-outlined">format_align_center</span></button>
+                    <button data-align="right" class="alignment-button"><span class="material-symbols-outlined">format_align_right</span></button>
+                    <button data-align="justify" class="alignment-button"><span class="material-symbols-outlined">format_align_justify</span></button>
+                  </div>
+                </div>
+                <div class="property-row">
+                  <label class="property-label">Text Style:</label>
+                  <div class="style-buttons">
+                    <button id="fontWeightButton" class="style-button"><span class="material-symbols-outlined">format_bold</span></button>
+                    <button id="fontStyleButton" class="style-button"><span class="material-symbols-outlined">format_italic</span></button>
+                  </div>
+                </div>
+                <div class="property-row">
+                  <label class="property-label">Text:</label>
+                  <textarea id="objTextContent" rows="3" class="property-input"></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="tab-content" id="effects-tab">
+            <div class="property-group">
+              <div class="property-row">
+                <label class="property-label">Opacity:</label>
+                <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" class="property-input">
+                <span id="opacityValue">100%</span>
+              </div>
+            </div>
+            
+            <div class="property-group">
+              <h5>Shadow</h5>
+              <div class="property-row">
+                <label class="property-label">Color:</label>
+                <input type="color" id="objShadowColor" value="#000000" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Blur:</label>
+                <input type="range" id="objShadowBlur" min="0" max="50" step="1" value="0" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Offset X:</label>
+                <input type="number" id="objShadowOffsetX" value="0" class="property-input">
+              </div>
+              <div class="property-row">
+                <label class="property-label">Offset Y:</label>
+                <input type="number" id="objShadowOffsetY" value="0" class="property-input">
+              </div>
+              <div class="property-row">
+                <input type="checkbox" id="objShadowAffectStroke">
+                <label for="objShadowAffectStroke">Affects Stroke</label>
+              </div>
+            </div>
+          </div>
+          
+          <div class="tab-content" id="actions-tab">
+            <div class="property-group">
+              <h5>Interaction</h5>
+              <div class="property-row">
+                <label class="property-label">Trigger:</label>
+                <select id="objInteractionTrigger" class="property-input">
+                  <option value="">None</option>
+                  <option value="click">On Click</option>
+                  <option value="hover">On Hover</option>
+                  <option value="clickAndHold">Click and Hold</option>
+                </select>
+              </div>
+              <div class="property-row">
+                <label class="property-label">Action:</label>
+                <select id="objInteractionAction" class="property-input">
+                  <option value="">None</option>
+                  <option value="showModal">Show Modal</option>
+                  <option value="navigateToSlide">Navigate to Slide</option>
+                  <option value="navigateToURL">Navigate to URL</option>
+                  <option value="spotlight">Spotlight</option>
+                  <option value="reveal">Reveal</option>
+                  <option value="panZoomToTarget">Pan/Zoom to Target</option>
+                </select>
+              </div>
+              
+              <div id="modalContentConfig" style="display:none;">
+                <div class="property-row">
+                  <label class="property-label">Modal Content:</label>
+                  <textarea id="objModalContent" rows="3" class="property-input"></textarea>
+                </div>
+              </div>
+              
+              <div id="navigateToConfig" style="display:none;">
+                <div class="property-row">
+                  <label class="property-label">Target:</label>
+                  <input type="text" id="objNavigateTo" class="property-input">
+                </div>
+              </div>
+              
+              <div id="panZoomConfigEl" style="display:none;">
+                <div class="property-row">
+                  <label class="property-label">Zoom Level:</label>
+                  <input type="number" id="objPanZoomLevel" step="0.1" min="0.1" value="1.5" class="property-input">
+                </div>
+              </div>
+            </div>
+            
+            <div class="property-group">
+              <h5>Animation</h5>
+              <div class="property-row">
+                <label class="property-label">Trigger:</label>
+                <select id="objAnimationTrigger" class="property-input">
+                  <option value="">None</option>
+                  <option value="onLoad">On Slide Load</option>
+                  <option value="Hover">On Hover</option>
+                  <option value="onClick">On Click</option>
+                </select>
+              </div>
+              <div class="property-row">
+                <label class="property-label">Type:</label>
+                <select id="objAnimationType" class="property-input">
+                  <option value="">None</option>
+                  <option value="wiggle">Wiggle</option>
+                  <option value="float">Float</option>
+                  <option value="growShrink">Grow/Shrink</option>
+                </select>
+              </div>
+              
+              <div id="animationParamsConfig" style="display:none;">
+                <div class="property-row">
+                  <label class="property-label">Speed:</label>
+                  <select id="objAnimationSpeed" class="property-input">
+                    <option value="slow">Slow</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="fast">Fast</option>
+                  </select>
+                </div>
+                <div class="property-row">
+                  <label class="property-label">Strength:</label>
+                  <input type="number" id="objAnimationStrength" step="0.1" value="5" class="property-input">
+                  <span id="objAnimationStrengthUnit">(pixels)</span>
+                </div>
+                <div class="property-row">
+                  <label class="property-label">Loop:</label>
+                  <select id="objAnimationLoop" class="property-input">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <!-- New Media Tools Popover -->
+        <!-- Keep existing hidden inputs needed for backward compatibility -->
+        <div style="display:none;">
+          <select id="objFontWeight"><option value="normal">Normal</option><option value="bold">Bold</option></select>
+          <select id="objFontStyle"><option value="normal">Normal</option><option value="italic">Italic</option></select>
+          <select id="objTextAlign"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option><option value="justify">Justify</option></select>
+        </div>
+        
+        <!-- Keep the existing Media Tools Popover for now (to be phased out) -->
         <div id="mediaToolsPopover" class="toolbar-popover">
             <h4>Media Settings</h4>
             <div class="media-tabs">

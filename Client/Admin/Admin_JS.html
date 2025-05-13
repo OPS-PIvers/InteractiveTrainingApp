@@ -133,7 +133,7 @@
       objModalContentEl = document.getElementById('objModalContent');
       navigateToConfigEl = document.getElementById('navigateToConfig');
       objNavigateToEl = document.getElementById('objNavigateTo');
-      panZoomConfigEl = document.getElementById('panZoomConfigEl'); // Corrected from panZoomConfigEl to panZoomConfigEl
+      panZoomConfigEl = document.getElementById('panZoomConfigEl'); 
       objPanZoomLevelEl = document.getElementById('objPanZoomLevel');
 
       // Animation inputs (will be in animationPopoverEl)
@@ -367,22 +367,98 @@
             console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
 
             initToolbar(); // IMPORTANT: Initialize new toolbar structure and listeners
-
+            initPropertiesPanel(); // Initialize the new properties panel
+            
+            // Initialize media menu
+            const addMediaButton = document.getElementById('addMediaButton');
+            const mediaMenu = document.getElementById('mediaMenu');
+            if (addMediaButton && !addMediaButton.hasAttribute('listener-attached')) {
+                addMediaButton.addEventListener('click', (e) => {
+                    if (!mediaMenu) return;
+                    
+                    // Position the menu below the button
+                    const buttonRect = addMediaButton.getBoundingClientRect();
+                    mediaMenu.style.top = (buttonRect.bottom + 5) + 'px';
+                    mediaMenu.style.left = buttonRect.left + 'px';
+                    
+                    mediaMenu.style.display = mediaMenu.style.display === 'none' ? 'block' : 'none';
+                    e.stopPropagation();
+                });
+                addMediaButton.setAttribute('listener-attached', 'true');
+                
+                // Close the media menu when clicking elsewhere
+                document.addEventListener('click', (e) => {
+                    if (mediaMenu && !mediaMenu.contains(e.target) && e.target !== addMediaButton) {
+                        mediaMenu.style.display = 'none';
+                    }
+                });
+            }
+            
+            // Media options click handlers
+            const mediaOptions = document.querySelectorAll('.media-option');
+            mediaOptions.forEach(option => {
+                if (!option.hasAttribute('listener-attached')) {
+                    option.addEventListener('click', () => {
+                        const mediaType = option.dataset.type;
+                        handleMediaSelection(mediaType);
+                        if (mediaMenu) mediaMenu.style.display = 'none';
+                    });
+                    option.setAttribute('listener-attached', 'true');
+                }
+            });
+            
+            // Initialize shape buttons
+            const addTextButton = document.getElementById('addTextButton');
+            const addShapesButton = document.getElementById('addShapesButton');
+            
+            if (addTextButton && !addTextButton.hasAttribute('listener-attached')) {
+                addTextButton.addEventListener('click', addTextbox);
+                addTextButton.setAttribute('listener-attached', 'true');
+            }
+            
+            if (addShapesButton && !addShapesButton.hasAttribute('listener-attached')) {
+                addShapesButton.addEventListener('click', (e) => {
+                    const rect = {top: e.clientY, right: e.clientX + 150};
+                    showShapesMenu(rect);
+                });
+                addShapesButton.setAttribute('listener-attached', 'true');
+            }
+            
+            // Delete button handler
+            const deleteButton = document.getElementById('deleteButton');
+            if (deleteButton && !deleteButton.hasAttribute('listener-attached')) {
+                deleteButton.addEventListener('click', () => {
+                    const activeObject = adminApp.state.fabricCanvasInstance.getActiveObject();
+                    if (activeObject) {
+                        adminApp.state.fabricCanvasInstance.remove(activeObject);
+                        updateSelectionUI(null);
+                        showNotification("Object deleted", "info");
+                    }
+                });
+                deleteButton.setAttribute('listener-attached', 'true');
+            }
+            
             // Attach Fabric canvas event listeners
             adminApp.state.fabricCanvasInstance.off(); // Remove previous listeners first
             adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
-              if (e.target) populateToolbar(e.target);
+            if (e.target) {
+                populateToolbar(e.target);
+                updateSelectionUI(e.target);
+            }
             });
             adminApp.state.fabricCanvasInstance.on('selection:created', (e) => {
-              if (e.selected && e.selected.length === 1) populateToolbar(e.selected[0]);
-              else populateToolbar(null); // Handle multi-select or empty selection
+                const activeObject = e.selected && e.selected.length === 1 ? e.selected[0] : null;
+                populateToolbar(activeObject);
+                updateSelectionUI(activeObject);
             });
             adminApp.state.fabricCanvasInstance.on('selection:updated', (e) => {
-               if (e.selected && e.selected.length === 1) populateToolbar(e.selected[0]);
-               else populateToolbar(null);
+                const activeObject = e.selected && e.selected.length === 1 ? e.selected[0] : null;
+                populateToolbar(activeObject);
+                updateSelectionUI(activeObject);
             });
             adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
-              populateToolbar(null);
+               populateToolbar(null);
+               updateSelectionUI(null);
             });
 
             // Initially hide toolbar (new one)
@@ -639,8 +715,11 @@
 
     function onProjectSaved(response) {
         showLoading(false);
-        if (response && response.success) { displayMessage(response.message || "Project saved!", true); }
-        else { onServerError((response && response.error) ? response.error : "Failed to save."); }
+        if (response && response.success) {
+            showNotification(response.message || "Project saved successfully!", "success");
+        } else {
+            onServerError((response && response.error) ? response.error : "Failed to save.");
+        }
     }
 
     // --- Slide Management ---
@@ -877,12 +956,60 @@
 
     // --- Error Handling & UI Utils ---
     function showLoading(show) {
-      adminApp.state.isLoading = show;
-      if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
-      else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
+    adminApp.state.isLoading = show;
+    if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
+    else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
     }
+
+    // Improved notification system
+    function showNotification(message, type = 'info', duration = 5000) {
+    const container = document.getElementById('notificationContainer');
+    if (!container) {
+        console.warn("showNotification: notificationContainer not found");
+        // Fall back to old display method
+        displayMessage(message, type === 'success');
+        return;
+    }
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    container.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => notification.classList.add('visible'), 10);
+    
+    // Remove after duration
+    setTimeout(() => {
+        notification.classList.remove('visible');
+        setTimeout(() => notification.remove(), 300); // After fade out transition
+    }, duration);
+    }
+
     function displayMessage(message, isSuccess) {
-        if (messageAreaEl) { messageAreaEl.innerHTML = ''; const p = document.createElement('p'); p.textContent = message; messageAreaEl.appendChild(p); messageAreaEl.className = isSuccess ? 'success' : 'error'; setTimeout(() => { if (messageAreaEl) { messageAreaEl.innerHTML = ''; messageAreaEl.className = ''; } }, 7000); } else { console.warn("displayMessage messageAreaEl not found. Message:", message); }
+    // Show in the new notification system if available
+    if (document.getElementById('notificationContainer')) {
+        showNotification(message, isSuccess ? 'success' : 'error');
+        return;
+    }
+    
+    // Fallback to old message area
+    if (messageAreaEl) { 
+        messageAreaEl.innerHTML = ''; 
+        const p = document.createElement('p'); 
+        p.textContent = message; 
+        messageAreaEl.appendChild(p); 
+        messageAreaEl.className = isSuccess ? 'success' : 'error'; 
+        setTimeout(() => { 
+        if (messageAreaEl) { 
+            messageAreaEl.innerHTML = ''; 
+            messageAreaEl.className = ''; 
+        } 
+        }, 7000); 
+    } else { 
+        console.warn("displayMessage messageAreaEl not found. Message:", message); 
+    }
     }
 
     function onServerError(errorObject) {
@@ -1268,6 +1395,111 @@
         }
     }
 
+    // Unified media handling
+    function handleMediaSelection(mediaType) {
+        if (adminApp.state.currentView !== 'edit' || !adminApp.state.currentProjectId || adminApp.state.isLoading) {
+            showNotification("Cannot add media now. Please wait...", "error");
+            return;
+        }
+        
+        switch(mediaType) {
+            case 'image':
+                if (imageUploaderEl) {
+                    imageUploaderEl.click();
+                } else {
+                    showNotification("Image upload not available", "error");
+                }
+                break;
+            case 'audio':
+                if (audioUploaderEl) {
+                    audioUploaderEl.click();
+                } else {
+                    showNotification("Audio upload not available", "error");
+                }
+                break;
+            case 'youtube':
+                // Show YouTube input dialog
+                const youtubeUrl = prompt("Enter YouTube URL:");
+                if (youtubeUrl) {
+                    if (youtubeUrlInputEl) {
+                        youtubeUrlInputEl.value = youtubeUrl;
+                        handleSetYoutubeBackground();
+                    } else {
+                        showNotification("YouTube background functionality not available", "error");
+                    }
+                }
+                break;
+            default:
+                showNotification("Unknown media type: " + mediaType, "error");
+        }
+    }
+
+    // Show shapes menu
+    function showShapesMenu(position) {
+        // Create shapes menu if it doesn't exist
+        let shapesMenu = document.getElementById('shapesMenu');
+        if (!shapesMenu) {
+            shapesMenu = document.createElement('div');
+            shapesMenu.id = 'shapesMenu';
+            shapesMenu.className = 'media-menu';
+            shapesMenu.style.position = 'absolute';
+            shapesMenu.innerHTML = `
+                <div class="media-option" data-shape="rectangle">
+                    <span class="material-symbols-outlined">rectangle</span>
+                    <span>Rectangle</span>
+                </div>
+                <div class="media-option" data-shape="circle">
+                    <span class="material-symbols-outlined">circle</span>
+                    <span>Circle</span>
+                </div>
+            `;
+            document.body.appendChild(shapesMenu);
+            
+            // Add event listeners to shape options
+            const shapeOptions = shapesMenu.querySelectorAll('.media-option');
+            shapeOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    const shapeType = option.dataset.shape;
+                    addShape(shapeType);
+                    shapesMenu.style.display = 'none';
+                });
+            });
+            
+            // Close the shapes menu when clicking elsewhere
+            document.addEventListener('click', (e) => {
+                if (shapesMenu && !shapesMenu.contains(e.target) && e.target !== document.getElementById('addShapesButton')) {
+                    shapesMenu.style.display = 'none';
+                }
+            });
+        }
+        
+        // Position and show the menu
+        shapesMenu.style.top = position.top + 'px';
+        shapesMenu.style.left = (position.right - 150) + 'px';
+        shapesMenu.style.display = 'block';
+    }
+
+    // Add a shape based on type
+    function addShape(shapeType) {
+        if (!adminApp.state.fabricCanvasInstance) {
+            showNotification("Canvas not ready to add shapes", "error");
+            return;
+        }
+        
+        const canvas = adminApp.state.fabricCanvasInstance;
+        
+        switch(shapeType) {
+            case 'rectangle':
+                addRectangle();
+                break;
+            case 'circle':
+                addCircle();
+                break;
+            default:
+                showNotification("Unknown shape type: " + shapeType, "error");
+        }
+    }
+
     // --- Overlay Creation ---
     function addRectangle() {
       if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
@@ -1593,6 +1825,154 @@
         }
     }
 
+    // Properties Panel Initialization
+    function initPropertiesPanel() {
+    console.log("initPropertiesPanel: Setting up the unified properties panel");
+    
+    // Get references to elements
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    const closeButton = document.getElementById('closePropertiesButton');
+    const propertiesButton = document.getElementById('propertiesButton');
+    const tabButtons = document.querySelectorAll('.properties-panel .tab-button');
+    const tabContents = document.querySelectorAll('.properties-panel .tab-content');
+    const textStyleControls = document.getElementById('textStyleControls');
+    const opacityInput = document.getElementById('objOpacity');
+    const opacityValue = document.getElementById('opacityValue');
+    
+    if (!propertiesPanel) {
+        console.warn("initPropertiesPanel: Properties panel not found!");
+        return;
+    }
+    
+    // Tab switching logic
+    tabButtons.forEach(button => {
+        if (!button.hasAttribute('listener-attached')) {
+        button.addEventListener('click', () => {
+            const tabName = button.dataset.tab;
+            
+            // Update active tab button
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            
+            // Show active tab content
+            tabContents.forEach(content => content.classList.remove('active'));
+            const activeTab = document.getElementById(`${tabName}-tab`);
+            if (activeTab) activeTab.classList.add('active');
+        });
+        button.setAttribute('listener-attached', 'true');
+        }
+    });
+    
+    // Close button logic
+    if (closeButton && !closeButton.hasAttribute('listener-attached')) {
+        closeButton.addEventListener('click', () => {
+        propertiesPanel.style.display = 'none';
+        });
+        closeButton.setAttribute('listener-attached', 'true');
+    }
+    
+    // Properties button to show panel
+    if (propertiesButton && !propertiesButton.hasAttribute('listener-attached')) {
+        propertiesButton.addEventListener('click', () => {
+        propertiesPanel.style.display = propertiesPanel.style.display === 'none' ? 'block' : 'none';
+        });
+        propertiesButton.setAttribute('listener-attached', 'true');
+    }
+    
+    // Text alignment buttons
+    const alignmentButtons = document.querySelectorAll('.alignment-buttons .alignment-button');
+    alignmentButtons.forEach(button => {
+        if (!button.hasAttribute('listener-attached')) {
+        button.addEventListener('click', () => {
+            const alignValue = button.dataset.align;
+            updateFabricObjectFromToolbar('textAlign', alignValue);
+            
+            // Update button states
+            alignmentButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+        });
+        button.setAttribute('listener-attached', 'true');
+        }
+    });
+    
+    // Update opacity value display
+    if (opacityInput && opacityValue && !opacityInput.hasAttribute('opacity-listener-attached')) {
+        opacityInput.addEventListener('input', () => {
+        const percentage = Math.round(opacityInput.value * 100);
+        opacityValue.textContent = `${percentage}%`;
+        });
+        opacityInput.setAttribute('opacity-listener-attached', 'true');
+    }
+    
+    console.log("initPropertiesPanel: Setup complete");
+    }
+
+    // Update Properties Panel with current object values
+    function populatePropertiesPanel(activeObject) {
+    if (!activeObject) return;
+    
+    const propertiesPanel = document.getElementById('propertiesPanel');
+    const textStyleControls = document.getElementById('textStyleControls');
+    
+    if (!propertiesPanel) {
+        console.warn("populatePropertiesPanel: Properties panel not found!");
+        return;
+    }
+    
+    // First, populate all the common properties that may be in both panels for compatibility
+    // This ensures that our existing updateFabricObjectFromToolbar still works
+    populateToolbar(activeObject);
+    
+    // Show/hide text-specific controls
+    const isTextObject = activeObject.type === 'textbox' || activeObject.type === 'i-text';
+    if (textStyleControls) {
+        textStyleControls.style.display = isTextObject ? 'block' : 'none';
+    }
+    
+    // Update alignment button states
+    if (isTextObject) {
+        const alignmentButtons = document.querySelectorAll('.alignment-buttons .alignment-button');
+        alignmentButtons.forEach(button => {
+        button.classList.toggle('active', button.dataset.align === activeObject.textAlign);
+        });
+        
+        // Update style button states
+        const fontWeightButton = document.getElementById('fontWeightButton');
+        const fontStyleButton = document.getElementById('fontStyleButton');
+        
+        if (fontWeightButton) fontWeightButton.classList.toggle('active', activeObject.fontWeight === 'bold');
+        if (fontStyleButton) fontStyleButton.classList.toggle('active', activeObject.fontStyle === 'italic');
+    }
+    
+    // Update opacity display value
+    const opacityValue = document.getElementById('opacityValue');
+    if (opacityValue) {
+        const percentage = Math.round((activeObject.opacity || 1) * 100);
+        opacityValue.textContent = `${percentage}%`;
+    }
+    
+    // Show the panel if it was hidden
+    propertiesPanel.style.display = 'block';
+    }
+
+    // Enhanced selection management
+    function updateSelectionUI(activeObject) {
+    // Update toolbar state based on selection
+    const deleteButton = document.getElementById('deleteButton');
+    const propertiesButton = document.getElementById('propertiesButton');
+    
+    if (deleteButton) deleteButton.disabled = !activeObject;
+    if (propertiesButton) propertiesButton.disabled = !activeObject;
+    
+    // Show properties panel for selected object
+    if (activeObject) {
+        populatePropertiesPanel(activeObject);
+    } else {
+        const propertiesPanel = document.getElementById('propertiesPanel');
+        if (propertiesPanel) propertiesPanel.style.display = 'none';
+    }
+    }
+
     function populateToolbar(activeObject) {
         if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
         hideActivePopover();
@@ -1822,9 +2202,9 @@
               else if (value === '') return; // Don't set if empty and not a special case
               else return; // Don't set if NaN
           }
-      } else if (inputType === 'number' && inputType === 'float') { // My HTML used 'isFloat' not inputType='float'
+      } else if (inputType === 'number' && inputConfig.isFloat) { // Fix condition to use isFloat flag
           parsedValue = parseFloat(value);
-           if (isNaN(parsedValue)) return;
+          if (isNaN(parsedValue)) return;
       } else if (inputType === 'range') { // Opacity, shadow.blur
           parsedValue = parseFloat(value);
           if (isNaN(parsedValue)) return;

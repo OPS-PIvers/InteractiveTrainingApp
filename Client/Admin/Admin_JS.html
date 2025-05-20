@@ -2606,8 +2606,6 @@ function onYouTubeIframeAPIReady() {
                 if (!Array.isArray(currentSlide.slideMedia.videoQuestions)) {
                     currentSlide.slideMedia.videoQuestions = [];
                 }
-                
-                console.log("Saving question:", questionData); // Added console.log
 
                 if (editIndex === -1) { // New question
                     currentSlide.slideMedia.videoQuestions.push(questionData);
@@ -2617,6 +2615,7 @@ function onYouTubeIframeAPIReady() {
                 
                 // Sort questions by timestamp
                 currentSlide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp);
+
                 console.log("videoQuestions array after save:", currentSlide.slideMedia.videoQuestions); // Added console.log
 
                 displayMessage("Question saved!", true);
@@ -2668,8 +2667,8 @@ function onYouTubeIframeAPIReady() {
         }
 
         const questions = currentSlide.slideMedia.videoQuestions;
+
         console.log("Rendering questions list:", questions); // Added console.log
-        // Questions should already be sorted by timestamp from the save logic
 
         questions.forEach((question, index) => {
             const li = document.createElement('li');
@@ -2696,6 +2695,7 @@ function onYouTubeIframeAPIReady() {
             editBtn.className = 'edit-button'; 
             editBtn.onclick = function() {
                 console.log("Editing question index:", index, questions[index]); // Added console.log
+
                 if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
                     adminApp.state.adminYouTubePlayer.pauseVideo();
                 }
@@ -2725,6 +2725,7 @@ function onYouTubeIframeAPIReady() {
             deleteBtn.onclick = function() {
                 if (confirm(`Are you sure you want to delete the question: "${question.questionText.substring(0,30)}..."?`)) {
                     console.log("Deleting question index:", index); // Added console.log
+
                     currentSlide.slideMedia.videoQuestions.splice(index, 1);
                     renderVideoQuestionsList(); 
                     displayMessage("Question deleted.", true);

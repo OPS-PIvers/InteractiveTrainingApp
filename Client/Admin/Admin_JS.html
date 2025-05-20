@@ -23,7 +23,8 @@
       activePopoverId: null, // To track the currently open popover
       history: [],
       historyIndex: -1,
-      isApplyingHistory: false // Flag to prevent re-saving state during undo/redo
+      isApplyingHistory: false, // Flag to prevent re-saving state during undo/redo
+      adminYouTubePlayer: null // Reference to the admin's YouTube player instance
     };
 
     // --- DOM Element References ---
@@ -56,7 +57,7 @@
     // Step 20 Media Elements
     let youtubeUrlInputEl, setYoutubeBackgroundButtonEl,
         audioUploaderEl, attachedAudioNameEl, removeAudioButtonEl,
-        adminMediaPlaceholderEl;
+        adminMediaPlaceholderEl, adminYouTubePlayerContainerEl; // Added adminYouTubePlayerContainerEl
     
     // New toolbar buttons
     let mediaToolsButtonEl, addShapeButtonEl, positionToolsButtonEl;
@@ -67,11 +68,20 @@
     // Drag and drop zones
     let imageDropZoneEl, audioDropZoneEl;
 
+    // Video Question/Timeline Elements
+    let videoTimelineControlsEl, videoTimelineSliderEl, videoCurrentTimeDisplayEl, videoTotalDurationDisplayEl,
+        addQuestionBtnEl, questionModalEl, questionTimestampDisplayEl, questionTextEl,
+        saveQuestionBtnEl, cancelQuestionBtnEl, editingQuestionIndexEl,
+        videoQuestionsListContainerEl, videoQuestionsListEl; // Added question list elements
+    let optionInputsEl = [], correctAnswerRadiosEl = [];
+
+
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
       console.log("Admin_JS: DOMContentLoaded event fired!");
       adminApp.setupDOMReferences();
       adminApp.attachEventListeners();
+      adminApp.attachVideoQuestionEventListeners(); // New function call
       switchToListView();
       loadAdminProjectsList();
       console.log("Admin_JS: Initialization complete.");
@@ -238,6 +248,7 @@
       attachedAudioNameEl = document.getElementById('attachedAudioName');
       removeAudioButtonEl = document.getElementById('removeAudioButton');
       adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
+      adminYouTubePlayerContainerEl = document.getElementById('adminYouTubePlayerContainer'); // Added adminYouTubePlayerContainerEl
 
       // New toolbar buttons
       mediaToolsButtonEl = document.getElementById('mediaToolsButton');
@@ -256,6 +267,26 @@
       // Drag and drop zones
       imageDropZoneEl = document.getElementById('imageDropZone');
       audioDropZoneEl = document.getElementById('audioDropZone');
+
+      // Video Question/Timeline elements
+      videoTimelineControlsEl = document.getElementById('videoTimelineControls');
+      videoTimelineSliderEl = document.getElementById('videoTimelineSlider');
+      videoCurrentTimeDisplayEl = document.getElementById('videoCurrentTimeDisplay');
+      videoTotalDurationDisplayEl = document.getElementById('videoTotalDurationDisplay');
+      addQuestionBtnEl = document.getElementById('addQuestionBtn');
+      questionModalEl = document.getElementById('questionModal');
+      questionTimestampDisplayEl = document.getElementById('questionTimestampDisplay');
+      questionTextEl = document.getElementById('questionText');
+      saveQuestionBtnEl = document.getElementById('saveQuestionBtn');
+      cancelQuestionBtnEl = document.getElementById('cancelQuestionBtn');
+      editingQuestionIndexEl = document.getElementById('editingQuestionIndex');
+      videoQuestionsListContainerEl = document.getElementById('videoQuestionsListContainer'); // Added
+      videoQuestionsListEl = document.getElementById('videoQuestionsList'); // Added
+      for (let i = 0; i < 4; i++) {
+          optionInputsEl.push(document.getElementById(`option${i+1}`));
+          correctAnswerRadiosEl.push(document.getElementById(`correctAnswer${i}`));
+      }
+
 
       // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
@@ -820,7 +851,7 @@
             canvasWidth: adminApp.state.defaultCanvasWidth,
             canvasHeight: adminApp.state.defaultCanvasHeight,
             fabricCanvasJSON: null, // Will be empty JSON for a new slide
-            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null }
+            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] } // Added videoQuestions
         };
         if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
@@ -843,8 +874,24 @@
         if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
 
         if (!selectedSlideData.slideMedia) {
-            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
+            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] };
+        } else if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
+            selectedSlideData.slideMedia.videoQuestions = [];
         }
+
+        // Destroy existing YouTube player if any
+        if (adminApp.state.adminYouTubePlayer) {
+            adminApp.state.adminYouTubePlayer.destroy();
+            adminApp.state.adminYouTubePlayer = null;
+        }
+        if (adminYouTubePlayerContainerEl) {
+            adminYouTubePlayerContainerEl.style.display = 'none';
+            adminYouTubePlayerContainerEl.innerHTML = ''; // Clear any previous player
+        }
+        if(fabricCanvasEl) { // Ensure canvas is visible by default
+            fabricCanvasEl.style.opacity = '1';
+        }
+
 
         canvas.clear(); // Clears objects
         canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); // Clears background image
@@ -867,7 +914,11 @@
 
 
         const media = selectedSlideData.slideMedia;
+        // Update video tools visibility - hide by default
+        updateVideoToolsVisibility(false);
+
         if (media && media.type === 'image' && (media.url || media.driveFileId)) {
+            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             if (media.url && media.url.startsWith('data:image')) {
                 console.log("Loading background from base64 data URI.");
                 fabric.Image.fromURL(media.url, function(img) {
@@ -875,7 +926,6 @@
                     adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
                     console.log("Background loaded for slide", slideIndex);
                 }, { crossOrigin: 'anonymous' });
-                 if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             } else if (media.driveFileId) {
                  console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
                  showLoading(true); displayMessage("Loading slide background...", true);
@@ -889,7 +939,6 @@
                              adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
                              console.log("Background fetched and loaded for slide", slideIndex);
                          }, { crossOrigin: 'anonymous' });
-                         if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
                      } else { 
                         console.error("Failed to re-fetch background", response); 
                         displayMessage("Error loading slide background image.", false); 
@@ -903,15 +952,74 @@
                 canvas.renderAll(); 
             }
         } else if (media && media.type === 'youtube' && media.url) {
-            console.log("Displaying YouTube placeholder for URL:", media.url);
-             if (adminMediaPlaceholderEl) {
-                 adminMediaPlaceholderEl.textContent = `YouTube BG: ${media.url}`;
-                 adminMediaPlaceholderEl.style.display = 'block';
-             }
-             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
-             canvas.backgroundColor = '#444'; // Darker bg for YouTube
-             canvas.renderAll();
+            console.log("Attempting to load YouTube player for URL:", media.url);
+            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+            if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
+            
+            const videoId = extractYouTubeVideoId(media.url);
+            if (videoId && adminYouTubePlayerContainerEl && typeof YT !== 'undefined' && YT.Player) {
+                adminYouTubePlayerContainerEl.style.display = 'block';
+                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '0.5'; // Make canvas semi-transparent
+                canvas.backgroundColor = 'rgba(0,0,0,0)'; // Make canvas background transparent
+
+                adminApp.state.adminYouTubePlayer = new YT.Player('adminYouTubePlayerContainer', {
+                    height: '100%', // Fill the container
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: {
+                        'playsinline': 1,
+                        'controls': 1, // Show controls for admin
+                        'modestbranding': 1,
+                        'rel': 0
+                    },
+                    events: {
+                        'onReady': (event) => {
+                            console.log("Admin YouTube player ready.");
+                            updateVideoToolsVisibility(true);
+                            renderVideoQuestionsList(); // Render questions when player is ready
+                            const duration = event.target.getDuration();
+                            if (videoTotalDurationDisplayEl) videoTotalDurationDisplayEl.textContent = formatTime(duration);
+                            if (videoTimelineSliderEl) videoTimelineSliderEl.max = duration;
+                            event.target.playVideo();
+                        },
+                        'onStateChange': (event) => {
+                            if (adminApp.state.playerUpdateInterval) {
+                                clearInterval(adminApp.state.playerUpdateInterval);
+                                adminApp.state.playerUpdateInterval = null;
+                            }
+                            if (event.data === YT.PlayerState.PLAYING) {
+                                adminApp.state.playerUpdateInterval = setInterval(() => {
+                                    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+                                    if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
+                                    if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
+                                }, 250);
+                            }
+                        },
+                        'onError': (event) => {
+                            console.error("Admin YouTube player error", event.data);
+                            updateVideoToolsVisibility(false); // Hide timeline on error
+                            if (adminMediaPlaceholderEl) {
+                                adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Code: ${event.data}. URL: ${media.url}`;
+                                adminMediaPlaceholderEl.style.display = 'block';
+                            }
+                            if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Restore canvas opacity
+                            canvas.backgroundColor = '#444'; // Fallback
+                            canvas.renderAll();
+                        }
+                    }
+                });
+            } else {
+                console.error("YouTube Player API not ready or videoId invalid or container missing.");
+                updateVideoToolsVisibility(false); // Hide timeline if player fails to load
+                if (adminMediaPlaceholderEl) {
+                    adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Check URL or API. URL: ${media.url}`;
+                    adminMediaPlaceholderEl.style.display = 'block';
+                }
+                canvas.backgroundColor = '#444'; // Fallback
+            }
+            canvas.renderAll();
         } else if (media && media.type === 'audio' && (media.driveFileId)) {
+             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'block'; // Keep placeholder for audio
              console.log("Indicating attached audio:", media.originalName || media.driveFileId);
              if (attachedAudioNameEl) {
                 attachedAudioNameEl.textContent = `Attached: ${media.originalName || 'Audio File'}`;
@@ -2376,6 +2484,26 @@
     // --- Utilities ---
     var Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
 
+    function extractYouTubeVideoId(url) {
+        if (!url) return null;
+        let videoId = null;
+        try {
+            const urlObj = new URL(url);
+            if (urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') {
+                videoId = urlObj.searchParams.get('v');
+            } else if (urlObj.hostname === 'youtu.be') {
+                videoId = urlObj.pathname.substring(1);
+            }
+        } catch (e) {
+            console.error("Error parsing YouTube URL:", e);
+            // Fallback for simpler regex if URL parsing fails (e.g. invalid URL)
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const match = url.match(regex);
+            if (match) videoId = match[1];
+        }
+        return videoId;
+    }
+
     function debounce(func, delay) {
         let timeout;
         return function(...args) {
@@ -2393,5 +2521,218 @@
                                  null;
             adminApp.resizeCanvasToFit(currentSlide);
         }
+    }
+
+    adminApp.attachVideoQuestionEventListeners = function() {
+        if (videoTimelineSliderEl) {
+            videoTimelineSliderEl.addEventListener('input', function() {
+                if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.seekTo === 'function') {
+                    adminApp.state.adminYouTubePlayer.seekTo(this.value, true);
+                }
+            });
+        }
+
+        if (addQuestionBtnEl) {
+            addQuestionBtnEl.addEventListener('click', function() {
+                if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
+                    adminApp.state.adminYouTubePlayer.pauseVideo();
+                }
+                const currentTime = adminApp.state.adminYouTubePlayer ? adminApp.state.adminYouTubePlayer.getCurrentTime() : 0;
+                if (questionTimestampDisplayEl) {
+                    questionTimestampDisplayEl.textContent = formatTime(currentTime);
+                    // Store raw timestamp for saving, e.g., on a data attribute of the modal or a global variable
+                    if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
+                }
+
+                // Clear form fields
+                if(questionTextEl) questionTextEl.value = '';
+                optionInputsEl.forEach(input => { if(input) input.value = ''; });
+                correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
+                if(editingQuestionIndexEl) editingQuestionIndexEl.value = '-1';
+
+                if (questionModalEl) questionModalEl.style.display = 'block';
+            });
+        }
+
+        if (saveQuestionBtnEl) {
+            saveQuestionBtnEl.addEventListener('click', function() {
+                const currentSlide = getCurrentSlide();
+                if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube') {
+                    displayMessage("Not a YouTube slide or slide data missing.", false);
+                    return;
+                }
+
+                const questionText = questionTextEl ? questionTextEl.value.trim() : '';
+                if (!questionText) {
+                    displayMessage("Question text cannot be empty.", false);
+                    return;
+                }
+
+                const options = optionInputsEl.map(input => input ? input.value.trim() : '').filter(opt => opt !== '');
+                if (options.length < 2) { // Require at least 2 options
+                    displayMessage("Please provide at least two options.", false);
+                    return;
+                }
+
+                let correctOptionIndex = -1;
+                for (let i = 0; i < correctAnswerRadiosEl.length; i++) {
+                    if (correctAnswerRadiosEl[i] && correctAnswerRadiosEl[i].checked) {
+                        correctOptionIndex = i;
+                        break;
+                    }
+                }
+                if (correctOptionIndex === -1 || correctOptionIndex >= options.length) { // Ensure correct option is selected and within bounds of provided options
+                    displayMessage("Please select a correct answer from the provided options.", false);
+                    return;
+                }
+                
+                const timestamp = questionModalEl && questionModalEl.dataset.rawTimestamp ? parseFloat(questionModalEl.dataset.rawTimestamp) : 0;
+
+                const questionData = {
+                    timestamp: timestamp,
+                    questionText: questionText,
+                    options: options,
+                    correctOptionIndex: correctOptionIndex
+                };
+
+                const editIndex = editingQuestionIndexEl ? parseInt(editingQuestionIndexEl.value, 10) : -1;
+
+                if (!Array.isArray(currentSlide.slideMedia.videoQuestions)) {
+                    currentSlide.slideMedia.videoQuestions = [];
+                }
+
+                if (editIndex === -1) { // New question
+                    currentSlide.slideMedia.videoQuestions.push(questionData);
+                } else { // Editing existing question
+                    currentSlide.slideMedia.videoQuestions[editIndex] = questionData;
+                }
+                
+                // Sort questions by timestamp
+                currentSlide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp);
+
+                displayMessage("Question saved!", true);
+                if (questionModalEl) questionModalEl.style.display = 'none';
+                renderVideoQuestionsList(); // Re-render the list after saving
+            });
+        }
+
+        if (cancelQuestionBtnEl) {
+            cancelQuestionBtnEl.addEventListener('click', function() {
+                if (questionModalEl) questionModalEl.style.display = 'none';
+            });
+        }
+    };
+
+    function updateVideoToolsVisibility(show) {
+        if (videoTimelineControlsEl) {
+            videoTimelineControlsEl.style.display = show ? 'block' : 'none';
+        } else {
+            console.warn("updateVideoToolsVisibility: videoTimelineControlsEl not found.");
+        }
+        if (videoQuestionsListContainerEl) { // Also control the questions list visibility
+            videoQuestionsListContainerEl.style.display = show ? 'block' : 'none';
+        } else {
+            console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
+        }
+        if (videoQuestionsListContainerEl) { // Also control the questions list visibility
+            videoQuestionsListContainerEl.style.display = show ? 'block' : 'none';
+        } else {
+            console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
+        }
+        // The addQuestionBtnEl is inside videoTimelineControlsEl, so it's shown/hidden with its parent.
+    }
+
+    function renderVideoQuestionsList() {
+        if (!videoQuestionsListEl) {
+            console.warn("renderVideoQuestionsList: videoQuestionsListEl not found.");
+            return;
+        }
+        videoQuestionsListEl.innerHTML = ''; // Clear existing items
+
+        const currentSlide = getCurrentSlide();
+        if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube' || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = "No questions added yet.";
+            li.style.fontStyle = "italic";
+            videoQuestionsListEl.appendChild(li);
+            return;
+        }
+
+        const questions = currentSlide.slideMedia.videoQuestions;
+        // Questions should already be sorted by timestamp from the save logic
+
+        questions.forEach((question, index) => {
+            const li = document.createElement('li');
+            li.style.marginBottom = "8px";
+            li.style.padding = "5px";
+            li.style.border = "1px solid #eee"; // Light border for each item
+            li.style.borderRadius = "3px";
+            li.style.display = "flex"; // Use flexbox for alignment
+            li.style.justifyContent = "space-between"; // Space out text and buttons
+            li.style.alignItems = "center"; // Align items vertically
+
+            const questionTextSpan = document.createElement('span'); 
+            questionTextSpan.textContent = `[${formatTime(question.timestamp)}] ${question.questionText.substring(0, 40)}${question.questionText.length > 40 ? '...' : ''}`;
+            questionTextSpan.style.flexGrow = "1"; // Allow text to take available space
+            
+            const actionsDiv = document.createElement('div');
+            actionsDiv.style.whiteSpace = "nowrap"; // Prevent buttons from wrapping
+
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.style.marginLeft = '5px'; 
+            editBtn.style.padding = '3px 8px';
+            editBtn.style.fontSize = '0.8em';
+            editBtn.className = 'edit-button'; 
+            editBtn.onclick = function() {
+                if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
+                    adminApp.state.adminYouTubePlayer.pauseVideo();
+                }
+                
+                if(questionTimestampDisplayEl) questionTimestampDisplayEl.textContent = formatTime(question.timestamp);
+                if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
+                if(questionTextEl) questionTextEl.value = question.questionText;
+
+                optionInputsEl.forEach((input, i) => {
+                    if(input) input.value = question.options[i] || '';
+                });
+                // Ensure correct number of radio buttons are checked based on available options for the question
+                correctAnswerRadiosEl.forEach((radio, i) => {
+                    if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length);
+                });
+                
+                if(editingQuestionIndexEl) editingQuestionIndexEl.value = index;
+                if(questionModalEl) questionModalEl.style.display = 'block';
+            };
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'danger-button'; 
+            deleteBtn.style.marginLeft = '5px';
+            deleteBtn.style.padding = '3px 8px'; 
+            deleteBtn.style.fontSize = '0.8em';
+            deleteBtn.onclick = function() {
+                if (confirm(`Are you sure you want to delete the question: "${question.questionText.substring(0,30)}..."?`)) {
+                    currentSlide.slideMedia.videoQuestions.splice(index, 1);
+                    renderVideoQuestionsList(); 
+                    displayMessage("Question deleted.", true);
+                }
+            };
+            
+            actionsDiv.appendChild(editBtn);
+            actionsDiv.appendChild(deleteBtn);
+            
+            li.appendChild(questionTextSpan);
+            li.appendChild(actionsDiv);
+
+            videoQuestionsListEl.appendChild(li);
+        });
+    }
+
+    function formatTime(totalSeconds) {
+        totalSeconds = Math.floor(totalSeconds);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
 </script>

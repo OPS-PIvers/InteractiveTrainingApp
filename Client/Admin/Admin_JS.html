@@ -24,9 +24,15 @@
       history: [],
       historyIndex: -1,
       isApplyingHistory: false, // Flag to prevent re-saving state during undo/redo
-      adminYouTubePlayer: null // Reference to the admin's YouTube player instance
+      adminYouTubePlayer: null, // Reference to the admin's YouTube player instance
+      isYouTubeApiReady: false // Flag for YouTube API readiness
     };
 
+// --- Global function for YouTube API ---
+function onYouTubeIframeAPIReady() {
+  adminApp.state.isYouTubeApiReady = true;
+  console.log('Admin YouTube API Ready.');
+}
     // --- DOM Element References ---
     let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
     let listViewContainerEl, adminProjectListContainerEl;
@@ -2610,6 +2616,8 @@
                 // Sort questions by timestamp
                 currentSlide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp);
 
+                console.log("videoQuestions array after save:", currentSlide.slideMedia.videoQuestions); // Added console.log
+
                 displayMessage("Question saved!", true);
                 if (questionModalEl) questionModalEl.style.display = 'none';
                 renderVideoQuestionsList(); // Re-render the list after saving
@@ -2659,7 +2667,8 @@
         }
 
         const questions = currentSlide.slideMedia.videoQuestions;
-        // Questions should already be sorted by timestamp from the save logic
+
+        console.log("Rendering questions list:", questions); // Added console.log
 
         questions.forEach((question, index) => {
             const li = document.createElement('li');
@@ -2685,6 +2694,8 @@
             editBtn.style.fontSize = '0.8em';
             editBtn.className = 'edit-button'; 
             editBtn.onclick = function() {
+                console.log("Editing question index:", index, questions[index]); // Added console.log
+
                 if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
                     adminApp.state.adminYouTubePlayer.pauseVideo();
                 }
@@ -2713,6 +2724,8 @@
             deleteBtn.style.fontSize = '0.8em';
             deleteBtn.onclick = function() {
                 if (confirm(`Are you sure you want to delete the question: "${question.questionText.substring(0,30)}..."?`)) {
+                    console.log("Deleting question index:", index); // Added console.log
+
                     currentSlide.slideMedia.videoQuestions.splice(index, 1);
                     renderVideoQuestionsList(); 
                     displayMessage("Question deleted.", true);

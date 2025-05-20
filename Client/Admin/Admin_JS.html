@@ -49,6 +49,8 @@
     let fillColorButtonEl, strokeColorButtonEl, opacityButtonEl, // Direct action buttons for color/opacity that might reveal inputs
         shadowSettingsButtonEl, interactionSettingsButtonEl, animationSettingsButtonEl, fontFamilyButtonEl, // Popover triggers
         shadowPopoverEl, interactionPopoverEl, animationPopoverEl, fontFamilyPopoverEl, // Popover containers
+        fillColorPopoverEl, strokeColorPopoverEl, opacityPopoverEl, // NEW POPOVERS for color/opacity
+        objOpacityValueDisplayEl, // Span to show opacity percentage
         fontWeightButtonEl, fontStyleButtonEl, textAlignGroupEl; // Text style toggle buttons
 
     // Step 20 Media Elements
@@ -76,6 +78,51 @@
     });
 
     // --- Setup and Listeners ---
+    adminApp.resizeCanvasToFit = function(slideData) {
+        const canvas = adminApp.state.fabricCanvasInstance;
+        if (!canvas || !fabricCanvasEl) {
+            console.warn("resizeCanvasToFit: Canvas or fabricCanvasEl not ready.");
+            return;
+        }
+
+        const fabricCanvasContainer = document.getElementById('fabricCanvasContainer');
+        if (!fabricCanvasContainer) {
+            console.warn("resizeCanvasToFit: fabricCanvasContainer not found.");
+            return;
+        }
+
+        const containerWidth = fabricCanvasContainer.clientWidth;
+        const containerHeight = fabricCanvasContainer.clientHeight;
+
+        // If container has no size yet, defer (e.g. it's hidden)
+        if (containerWidth === 0 || containerHeight === 0) {
+            console.log("resizeCanvasToFit: Container has no dimensions, skipping resize.");
+            return;
+        }
+        
+        let contentWidth = (slideData && slideData.canvasWidth) ? slideData.canvasWidth : adminApp.state.defaultCanvasWidth;
+        let contentHeight = (slideData && slideData.canvasHeight) ? slideData.canvasHeight : adminApp.state.defaultCanvasHeight;
+
+        if (!contentWidth || contentWidth <= 0) contentWidth = adminApp.state.defaultCanvasWidth;
+        if (!contentHeight || contentHeight <= 0) contentHeight = adminApp.state.defaultCanvasHeight;
+
+        canvas.setWidth(contentWidth);
+        canvas.setHeight(contentHeight);
+
+        fabricCanvasEl.width = contentWidth;
+        fabricCanvasEl.height = contentHeight;
+        
+        const zoomX = containerWidth / contentWidth;
+        const zoomY = containerHeight / contentHeight;
+        // Ensure zoom is not zero or negative if content dimensions are larger than container
+        const finalZoom = Math.max(0.01, Math.min(zoomX, zoomY)); 
+
+
+        canvas.zoomToPoint(new fabric.Point(contentWidth / 2, contentHeight / 2), finalZoom);
+        
+        console.log(`Resized canvas. Logical: ${contentWidth}x${contentHeight}. Container: ${containerWidth}x${containerHeight}. Zoom: ${finalZoom}`);
+    };
+
     adminApp.setupDOMReferences = function() {
       messageAreaEl = document.getElementById('messageArea');
       loadingSpinnerEl = document.getElementById('loadingSpinner');
@@ -166,6 +213,13 @@
       interactionPopoverEl = document.getElementById('interactionPopover');
       animationPopoverEl = document.getElementById('animationPopover');
       fontFamilyPopoverEl = document.getElementById('fontFamilyPopover');
+      
+      // New Popovers for Fill, Stroke, Opacity
+      fillColorPopoverEl = document.getElementById('fillColorPopover');
+      strokeColorPopoverEl = document.getElementById('strokeColorPopover');
+      opacityPopoverEl = document.getElementById('opacityPopover');
+      objOpacityValueDisplayEl = document.getElementById('objOpacityValueDisplay');
+
 
       // New Text Style Toggle Buttons
       fontWeightButtonEl = document.getElementById('fontWeightButton'); // Bold
@@ -226,6 +280,10 @@
           }
       };
       safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
+      
+      // Window resize listener
+      window.addEventListener('resize', debounce(handleWindowResize, 250));
+
       console.log("Admin_JS: Initial event listeners attached.");
       // Edit view listeners attached in switchToEditView
 
@@ -370,6 +428,7 @@
             console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
 
             initToolbar(); // Initialize toolbar structure, popovers, and their listeners
+            adminApp.resizeCanvasToFit(null); // Initial resize before loading project
             
             // Attach Fabric canvas event listeners
             adminApp.state.fabricCanvasInstance.off(); // Remove previous listeners first
@@ -787,16 +846,12 @@
             selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
         }
 
-        const slideWidth = selectedSlideData.canvasWidth || adminApp.state.defaultCanvasWidth;
-        const slideHeight = selectedSlideData.canvasHeight || adminApp.state.defaultCanvasHeight;
-        canvas.setWidth(slideWidth);
-        canvas.setHeight(slideHeight);
-        if (fabricCanvasEl) { fabricCanvasEl.width = slideWidth; fabricCanvasEl.height = slideHeight; }
-        console.log(`Canvas set to dimensions for slide ${slideIndex + 1}: ${slideWidth}x${slideHeight}`);
-
         canvas.clear(); // Clears objects
         canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); // Clears background image
         canvas.backgroundColor = '#e9e9e9'; // Reset background color
+
+        // Resize and zoom canvas to fit the container
+        adminApp.resizeCanvasToFit(selectedSlideData);
 
         // Reset UI elements related to slide media
         if (imageUploaderEl) imageUploaderEl.value = null;
@@ -1707,7 +1762,11 @@
             // New toolbar buttons integrated here
             { buttonEl: mediaToolsButtonEl, popoverId: 'mediaToolsPopover' },
             { buttonEl: addShapeButtonEl, popoverId: 'shapesPopover' }, // Singular 'addShapeButtonEl'
-            { buttonEl: positionToolsButtonEl, popoverId: 'positionToolsPopover' }
+            { buttonEl: positionToolsButtonEl, popoverId: 'positionToolsPopover' },
+            // Popovers for Fill, Stroke, Opacity
+            { buttonEl: fillColorButtonEl, popoverId: 'fillColorPopover' },
+            { buttonEl: strokeColorButtonEl, popoverId: 'strokeColorPopover' },
+            { buttonEl: opacityButtonEl, popoverId: 'opacityPopover' }
         ];
 
         popoverTriggers.forEach(item => {
@@ -1763,10 +1822,12 @@
 
 
         // --- Event Listeners for Direct Toolbar Inputs (X, Y, Width, Height, Angle, StrokeWidth, Opacity, FontSize, LineHeight, CharSpacing, TextContent) ---
+        // Note: objFill, objStrokeColor, objStrokeWidth, objOpacity are now in popovers.
+        // Their listeners are attached here but they operate on elements within those popovers.
         const directInputs = [
             // Position inputs are inside positionToolsPopover, handled there.
-            {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'},
-            {el: objOpacityEl, prop: 'opacity', type: 'range'},
+            {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'}, // In strokeColorPopover
+            {el: objOpacityEl, prop: 'opacity', type: 'range'}, // In opacityPopover
             {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
             {el: objLineHeightEl, prop: 'lineHeight', type: 'number', isFloat: true},
             {el: objCharSpacingEl, prop: 'charSpacing', type: 'number'},
@@ -1780,9 +1841,17 @@
                 });
                 inputConfig.el.setAttribute('listener-attached', 'true');
             } else if (!inputConfig.el) {
-                 console.warn(`initToolbar: Direct input element for prop "${inputConfig.prop}" not found (this may be ok if it's in a popover).`);
+                 console.warn(`initToolbar: Direct input element for prop "${inputConfig.prop}" not found (this may be ok if it's in a popover, e.g. opacityEl).`);
             }
         });
+
+        // Listener for Opacity display update (objOpacityEl is in opacityPopover)
+        if (objOpacityEl && objOpacityValueDisplayEl && !objOpacityEl.hasAttribute('listener-opacity-display')) {
+            objOpacityEl.addEventListener('input', function(e) {
+                objOpacityValueDisplayEl.textContent = Math.round(parseFloat(e.target.value) * 100) + '%';
+            });
+            objOpacityEl.setAttribute('listener-opacity-display', 'true');
+        }
         
         // Listeners for inputs within positionToolsPopover
         const positionInputs = [
@@ -2003,7 +2072,14 @@
             // Optionally, reset some input values to defaults or placeholders if they are not disabled styling enough
             // For example:
             // if (objFillEl) objFillEl.value = '#dddddd'; 
-            // if (objOpacityEl) objOpacityEl.value = 1;
+            if (objOpacityEl) objOpacityEl.value = 1; // Reset opacity slider
+            if (objOpacityValueDisplayEl) objOpacityValueDisplayEl.textContent = '100%';
+
+            // Remove 'active' class from Fill, Stroke, Opacity buttons
+            if (fillColorButtonEl) fillColorButtonEl.classList.remove('active');
+            if (strokeColorButtonEl) strokeColorButtonEl.classList.remove('active');
+            if (opacityButtonEl) opacityButtonEl.classList.remove('active');
+
 
             return; // Stop further population
         }
@@ -2018,10 +2094,18 @@
         if (objAngleEl) objAngleEl.value = activeObject.angle !== undefined ? activeObject.angle.toFixed(0) : 0;
         
         // Populate Main Toolbar Direct Inputs - these are enabled if isObjectSelected
+        // objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl are now in popovers,
+        // but their values are still populated here.
         if (objFillEl) objFillEl.value = toHexColor(activeObject.fill);
         if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
         if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
-        if (objOpacityEl) objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
+        if (objOpacityEl) { // In opacityPopover
+            objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
+            if (objOpacityValueDisplayEl) { // Update the percentage display
+                objOpacityValueDisplayEl.textContent = Math.round(parseFloat(objOpacityEl.value) * 100) + '%';
+            }
+        }
+
 
         // Populate Text Specific Controls (if applicable and visible)
         if (isTextObject) { // These controls are already enabled if isTextObject is true
@@ -2053,6 +2137,25 @@
         if (objShadowAffectStrokeEl) objShadowAffectStrokeEl.checked = shadow ? !!shadow.affectStroke : false;
         if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
         if (shadowSettingsButtonEl) shadowSettingsButtonEl.classList.toggle('active', !!shadow);
+
+        // Fill button active state
+        if (fillColorButtonEl) {
+            const hasFill = activeObject.fill && activeObject.fill !== 'transparent' && 
+                            (typeof activeObject.fill !== 'object' || activeObject.fill.type !== 'gradient' || activeObject.fill.colorStops.length > 0);
+            fillColorButtonEl.classList.toggle('active', !!hasFill);
+        }
+
+        // Stroke button active state
+        if (strokeColorButtonEl) {
+            const hasStroke = activeObject.stroke && activeObject.strokeWidth > 0;
+            strokeColorButtonEl.classList.toggle('active', hasStroke);
+        }
+
+        // Opacity button active state
+        if (opacityButtonEl) {
+            const isTranslucent = activeObject.opacity !== undefined && activeObject.opacity < 1;
+            opacityButtonEl.classList.toggle('active', isTranslucent);
+        }
 
 
         // Populate Interaction Popover Inputs - interactionSettingsButtonEl is enabled if isObjectSelected
@@ -2273,4 +2376,22 @@
     // --- Utilities ---
     var Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
 
+    function debounce(func, delay) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), delay);
+        };
+    }
+
+    function handleWindowResize() {
+        if (adminApp.state.currentView === 'edit' && adminApp.state.fabricCanvasInstance) {
+            console.log("Window resized, attempting to refit canvas.");
+            const currentSlide = (adminApp.state.currentSlideIndex !== -1 && adminApp.state.projectData && adminApp.state.projectData.slides) ? 
+                                 adminApp.state.projectData.slides[adminApp.state.currentSlideIndex] : 
+                                 null;
+            adminApp.resizeCanvasToFit(currentSlide);
+        }
+    }
 </script>

@@ -6,23 +6,111 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <!-- Add Material Symbols (recommended) -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <!-- Add Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-      body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-      .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-      h1, h2 { color: #333; }
-      label { display: inline-block; margin-bottom: 5px; font-weight: bold;}
-      /* input[type="text"], input[type="file"], input[type="number"], select, textarea { padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; width: auto; } */ /* Default input styling, will be overridden by toolbar specific styles */
-      button { padding: 10px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px; font-size: 1em; margin-right: 5px; }
-      button:hover { background-color: #0056b3; }
-      button.edit-button { background-color: #28a745; }
-      button.edit-button:hover { background-color: #1e7e34; }
-      button.danger-button { background-color: #dc3545; }
-      button.danger-button:hover { background-color: #c82333; }
-      input[type="checkbox"] { margin-right: 5px; }
+      :root { /* Using :root for global scope */
+            --theme-primary-color: #1a73e8; /* Google Blue */
+            --theme-primary-hover: #1765cc; 
+            --theme-text-color-primary: #202124;    /* Dark grey for main text */
+            --theme-text-color-secondary: #5f6368; /* Lighter grey for secondary text/icons */
+            --theme-icon-color: #5f6368;
+            --theme-background-main: #f8f9fa;
+            --theme-background-card: #ffffff;
+            --theme-border-color: #dadce0;
+            --theme-input-border-color: #80868b; 
+            --theme-input-focus-border: #1a73e8; 
+            --theme-font-family: 'Roboto', Arial, sans-serif;
+            --theme-danger-color: #d93025; /* Google Red for danger */
+            --theme-danger-hover: #c5221f;
+            --theme-success-color: #1e8e3e; /* Google Green for success */
+            --theme-success-hover: #187332;
+        }
+      body { 
+            font-family: var(--theme-font-family);
+            margin: 0; 
+            background-color: var(--theme-background-main); 
+            color: var(--theme-text-color-primary); 
+        }
+      .main-content-wrapper {
+            padding: 20px;
+        }
+      .container { 
+            background-color: var(--theme-background-card); 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); /* Google-style shadow */
+            border: 1px solid var(--theme-border-color);
+        }
+      h1, h2 { 
+            color: var(--theme-text-color-primary); 
+            font-weight: 400; /* Lighter weight for headings, common in Material */
+        }
+        h1 { font-size: 1.8rem; margin-bottom: 1rem;} /* Adjust sizes as needed */
+        h2 { font-size: 1.4rem; margin-bottom: 0.75rem;}
+        h3 { font-size: 1.1rem; color: var(--theme-text-color-primary); font-weight: 500; margin-bottom: 0.5rem;} /* For "Slides" in slide panel */
+      label { display: inline-block; margin-bottom: 5px; font-weight: bold;} /* Will be reviewed later */
+      
+      button { 
+            padding: 8px 16px; 
+            cursor: pointer; 
+            background-color: var(--theme-primary-color); 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            font-size: 0.875rem; /* 14px if base is 16px */
+            font-weight: 500; 
+            text-transform: uppercase; 
+            letter-spacing: 0.089em; /* Material spec */
+            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); /* Subtle shadow for buttons */
+        }
+        button:hover { 
+            background-color: var(--theme-primary-hover); 
+            box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 2px 5px 2px rgba(60,64,67,0.15); /* Slightly elevated shadow on hover */
+        }
+      button.edit-button { background-color: var(--theme-success-color); }
+      button.edit-button:hover { background-color: var(--theme-success-hover); }
+      button.danger-button { background-color: var(--theme-danger-color); }
+      button.danger-button:hover { background-color: var(--theme-danger-hover); }
+      
+      /* General input styling - some of these will be overridden by more specific toolbar/popover rules */
+      input[type="text"], 
+      input[type="file"], 
+      input[type="number"], 
+      select, 
+      textarea { 
+        padding: 8px; 
+        margin-bottom: 10px; 
+        border: 1px solid var(--theme-input-border-color); 
+        border-radius: 4px; 
+        box-sizing: border-box; 
+        width: auto; 
+        font-family: var(--theme-font-family);
+        font-size: 0.875rem;
+        color: var(--theme-text-color-primary);
+        background-color: var(--theme-background-card);
+      }
+      input[type="text"]:focus, 
+      input[type="file"]:focus, 
+      input[type="number"]:focus, 
+      select:focus, 
+      textarea:focus {
+        border-color: var(--theme-input-focus-border);
+        box-shadow: 0 0 0 1px var(--theme-input-focus-border);
+        outline: none;
+      }
+      input[type="checkbox"] { 
+        margin-right: 5px; 
+        accent-color: var(--theme-primary-color);
+      }
 
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
-      .success { border-color: green; background-color: #d4edda; color: #155724; }
-      .error { border-color: red; background-color: #f8d7da; color: #721c24; }
+      .success { border-color: var(--theme-success-color); background-color: #e6f4ea; color: var(--theme-success-hover); } /* Light green bg */
+      .error { border-color: var(--theme-danger-color); background-color: #fce8e6; color: var(--theme-danger-hover); } /* Light red bg */
 
       #adminProjectListContainer { margin-top: 15px; }
       .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;}
@@ -30,197 +118,274 @@
       .project-item > div:last-child { flex-basis: 35%; min-width: 200px; display: flex; justify-content: flex-end; align-items: center;}
       .project-item span { font-size: 1.1em; display: block; }
       .project-item .status-text { font-style: italic; color: #555; font-size: 0.9em;}
-      .project-item .project-status-select { font-size: 0.9em; padding: 5px; margin-right: 10px; border: 1px solid #ccc; border-radius: 3px; }
+      .project-item .project-status-select { 
+        font-size: 0.9em; padding: 5px; margin-right: 10px; 
+        border: 1px solid var(--theme-input-border-color); 
+        border-radius: 3px; 
+        background-color: var(--theme-background-card);
+        color: var(--theme-text-color-primary);
+        -webkit-appearance: none; 
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%235f6368' class='bi bi-chevron-down' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        padding-right: 28px; 
+      }
 
       #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
-      .loader { border: 8px solid #f3f3f3; border-top: 8px solid #007bff; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
+      .loader { border: 8px solid #f3f3f3; border-top: 8px solid var(--theme-primary-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
       .edit-controls-group {
         margin-bottom: 20px;
         padding: 15px;
-        border: 1px solid #eee;
+        border: 1px solid var(--theme-border-color);
         border-radius: 5px;
-        background-color: #f9f9f9;
+        background-color: var(--theme-background-card);
       }
       .edit-controls-group label { margin-right: 10px; display: block; margin-bottom: 5px; }
       .edit-controls-group input[type="text"],
       .edit-controls-group input[type="file"] { display: block; width: calc(100% - 22px); margin-bottom: 15px; }
       .edit-controls-group button { margin-top: -5px; margin-bottom: 15px; }
 
-      #fabricCanvasContainer { display: flex; justify-content: center; align-items: flex-start; max-height: 70vh; overflow: auto; border: 1px dashed #ccc; min-height: 300px; margin-top: 15px; position: relative; }
-      #fabricCanvasElement { border: 1px solid #000; }
+      #fabricCanvasContainer { display: flex; justify-content: center; align-items: center; border: 1px dashed var(--theme-border-color); margin-top: 15px; position: relative; }
+      #fabricCanvasElement { border: 1px solid var(--theme-text-color-primary); }
       .media-placeholder { position: absolute; top: 10px; left: 10px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 5px 10px; font-size: 0.9em; border-radius: 3px; pointer-events: none; z-index: 5; }
 
-      #slideManagementPanel { margin-top: 20px; padding: 10px; background-color: #f0f8ff; border-radius: 5px; border: 1px solid #d1e0ff; }
-      #slideThumbnailsContainer { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; min-height: 60px; padding: 5px; border: 1px solid #b0c4de; background-color: #fff; }
-      .slide-thumbnail { width: 100px; height: 75px; border: 2px solid #778899; background-color: #e6e6fa; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 0.8em; text-align: center; position: relative; }
-      .slide-thumbnail.active-slide { border-color: #ff4500; box-shadow: 0 0 5px #ff4500; }
-      .slide-thumbnail:hover { border-color: #007bff; }
-      .delete-slide-btn { position: absolute; top: -8px; right: -8px; background-color: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; line-height: 20px; text-align: center; cursor: pointer; display: none; }
+      #slideManagementPanel { margin-top: 20px; padding: 10px; background-color: #e8f0fe; border-radius: 5px; border: 1px solid var(--theme-border-color); } /* Light blue for slide panel */
+      #slideThumbnailsContainer { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; min-height: 60px; padding: 5px; border: 1px solid var(--theme-border-color); background-color: var(--theme-background-main); }
+      .slide-thumbnail { width: 100px; height: 75px; border: 2px solid var(--theme-icon-color); background-color: #e6e6fa; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 0.8em; text-align: center; position: relative; border-radius: 3px; }
+      .slide-thumbnail.active-slide { border-color: var(--theme-primary-color); box-shadow: 0 0 5px var(--theme-primary-color); }
+      .slide-thumbnail:hover { border-color: var(--theme-primary-hover); }
+      .delete-slide-btn { position: absolute; top: -8px; right: -8px; background-color: var(--theme-danger-color); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; line-height: 20px; text-align: center; cursor: pointer; display: none; }
       .slide-thumbnail:hover .delete-slide-btn { display: block; }
 
       /* --- NEW TOOLBAR STYLES --- */
-      #overlayPropertiesToolbar { /* This is the main container for the new toolbar */
-        padding: 5px;
-        border: 1px solid #ccc;
-        background-color: #f0f0f0; /* Lighter grey for toolbar */
-        border-radius: 5px;
-        margin-bottom: 15px;
-        display: none; /* Keep JS control over visibility */
-      }
+      #overlayPropertiesToolbar {
+            padding: 8px 5px; 
+            border: 1px solid var(--theme-border-color);
+            background-color: var(--theme-background-card); 
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none; 
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); 
+        }
       .fabric-toolbar-row {
         display: flex;
         align-items: center;
-        gap: 5px; /* Spacing between groups/items */
+        gap: 5px; 
         padding: 5px 0;
-        flex-wrap: wrap; /* Allow wrapping if too many items */
+        flex-wrap: wrap; 
       }
       .fabric-toolbar-row:not(:last-child) {
-        border-bottom: 1px solid #e0e0e0; /* Separator between rows */
-      }
+            border-bottom: 1px solid var(--theme-border-color); 
+        }
       .toolbar-group {
         display: flex;
         align-items: center;
-        gap: 2px; /* Spacing between items in a group */
-        padding: 0 5px;
-        border-right: 1px solid #d0d0d0;
-      }
+        gap: 2px; 
+            padding: 0 8px; 
+            border-right: 1px solid var(--theme-border-color); 
+        }
       .toolbar-group:last-child {
         border-right: none;
       }
       .toolbar-button {
-        background: none;
-        border: 1px solid transparent;
-        color: #333;
-        padding: 4px;
-        margin: 0;
-        border-radius: 3px;
-        min-width: 30px; /* Ensure buttons have some width */
-        height: 30px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .toolbar-button:hover {
-        background-color: #e0e0e0;
-        border-color: #ccc;
-      }
-      .toolbar-button.active, .toolbar-button.popover-active { /* popover-active is key for visual feedback */
-        background-color: #cce5ff; /* Light blue for active toggles */
-        border-color: #99c7ff;
-      }
+            background: none;
+            border: 1px solid transparent;
+            color: var(--theme-icon-color); 
+            padding: 6px; 
+            margin: 0 2px; 
+            border-radius: 4px; 
+            min-width: 36px; 
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+        }
+        .toolbar-button:hover {
+            background-color: rgba(0,0,0,0.05); 
+            border-color: transparent; 
+        }
+        .toolbar-button.active, .toolbar-button.popover-active { 
+            background-color: var(--theme-primary-color); 
+            color: white; 
+            border-color: var(--theme-primary-color);
+        }
+        .toolbar-button.active:hover, .toolbar-button.popover-active:hover {
+            background-color: var(--theme-primary-hover);
+            border-color: var(--theme-primary-hover);
+        }
       .toolbar-button .material-symbols-outlined {
-        font-size: 20px; /* Adjust icon size */
+        font-size: 20px; 
       }
-      .toolbar-input-compact {
-        width: 45px;
-        padding: 4px;
-        font-size: 0.9em;
-        border: 1px solid #ccc;
-        border-radius: 3px;
-        margin: 0 2px;
-        text-align: right;
-        height: 28px;
-        box-sizing: border-box;
-      }
-      input[type="color"].toolbar-color-input {
-        width: 30px;
-        height: 28px;
-        padding: 1px;
-        border: 1px solid #ccc;
-        border-radius: 3px;
-        background: none;
-        vertical-align: middle;
-        margin: 0 2px;
-      }
-       #objOpacity { /* Range input might need specific styling */
-         width: 80px;
-         height: 20px;
-         vertical-align: middle;
-       }
-      .toolbar-select-compact {
-        padding: 4px;
-        font-size: 0.9em;
-        border: 1px solid #ccc;
-        border-radius: 3px;
-        height: 28px;
-        margin-left: 2px;
-        max-width: 120px; /* For font family */
-      }
-       #objTextContent { /* Textarea in text controls */
-           width: 150px;
-           height: 28px; /* Start small, can be expanded by JS or focus */
-           padding: 4px;
-           font-size: 0.9em;
-           border: 1px solid #ccc;
-           border-radius: 3px;
-           vertical-align: middle;
-           resize: vertical; /* Allow vertical resize */
-       }
+        .toolbar-button.danger-button { 
+            color: var(--theme-danger-color);
+        }
+        .toolbar-button.danger-button:hover {
+            background-color: rgba(217, 48, 37, 0.1); 
+            color: var(--theme-danger-hover);
+        }
+        .toolbar-button.danger-button.active { 
+            background-color: var(--theme-danger-color);
+            color: white;
+        }
 
-       /* Toolbar spacing for integrated main tools */
+        .toolbar-input-compact, 
+        .toolbar-popover input[type="text"],
+        .toolbar-popover input[type="number"],
+        .toolbar-popover textarea {
+            padding: 6px 8px;
+            font-size: 0.875rem;
+            border: 1px solid var(--theme-input-border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            background-color: var(--theme-background-card); 
+            color: var(--theme-text-color-primary);
+        }
+        .toolbar-input-compact:focus,
+        .toolbar-popover input[type="text"]:focus,
+        .toolbar-popover input[type="number"]:focus,
+        .toolbar-popover textarea:focus {
+            border-color: var(--theme-input-focus-border);
+            box-shadow: 0 0 0 1px var(--theme-input-focus-border); 
+            outline: none;
+        }
+
+        .toolbar-input-compact { 
+            width: 50px; 
+            height: 30px; 
+            margin: 0 2px; 
+        }
+      input[type="color"].toolbar-color-input {
+            width: 30px; 
+            height: 30px;
+            padding: 2px; 
+            border: 1px solid var(--theme-input-border-color);
+            border-radius: 4px;
+            background: none; 
+            vertical-align: middle;
+            margin: 0 2px;
+        }
+        input[type="color"].toolbar-color-input:hover {
+             border-color: var(--theme-input-focus-border); 
+        }
+       #objOpacity { 
+            width: calc(100% - 50px); 
+            height: 20px; 
+            vertical-align: middle;
+            accent-color: var(--theme-primary-color); 
+        }
+        .toolbar-select-compact,
+        .toolbar-popover select {
+            padding: 6px 8px;
+            font-size: 0.875rem;
+            border: 1px solid var(--theme-input-border-color);
+            border-radius: 4px;
+            background-color: var(--theme-background-card);
+            color: var(--theme-text-color-primary);
+            height: 30px; 
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            -webkit-appearance: none; 
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%235f6368' class='bi bi-chevron-down' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 28px; 
+        }
+        .toolbar-select-compact:focus,
+        .toolbar-popover select:focus {
+            border-color: var(--theme-input-focus-border);
+            box-shadow: 0 0 0 1px var(--theme-input-focus-border);
+            outline: none;
+        }
+       #objTextContent { 
+           height: 30px; 
+           vertical-align: middle; 
+        }
+        #objFontFamily { 
+             width: 100%; 
+        }
+        #objShadowBlur { 
+            width: calc(100% - 100px); 
+            max-width: 150px;        
+            vertical-align: middle;
+            accent-color: var(--theme-primary-color);
+        }
+
       .toolbar-group:first-child {
         margin-right: 10px;
-        /* border-right: 1px solid #ccc; */ /* Removed this to make it look more integrated */
-        padding-right: 5px; /* Reduced padding */
+        padding-right: 5px; 
       }
-
       .toolbar-group:first-child .toolbar-button {
-        margin-right: 2px; /* Reduced margin */
+        margin-right: 2px; 
       }
 
-      /* Popover Styles */
       .toolbar-popover {
-        position: absolute; /* Position relative to a container or viewport later */
-        background-color: #fff;
-        border: 1px solid #ccc;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        padding: 15px;
-        border-radius: 4px;
-        z-index: 200; /* Ensure it's above other UI elements, was 100 */
-        display: none; /* Hidden by default */
-        min-width: 280px; /* Was 250px */
-        max-width: 350px; /* Added for consistency */
-      }
-      .toolbar-popover h4 {
-        margin-top: 0;
-        margin-bottom: 10px;
-        font-size: 1em;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
-      }
+            position: absolute;
+            background-color: var(--theme-background-card);
+            border: 1px solid var(--theme-border-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1); 
+            padding: 15px;
+            border-radius: 8px; 
+            z-index: 200; 
+            display: none;
+            min-width: 280px; 
+            max-width: 350px; 
+        }
+      .toolbar-popover h4 { 
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1rem;
+            font-weight: 500; 
+            border-bottom: 1px solid var(--theme-border-color);
+            padding-bottom: 8px; 
+            color: var(--theme-text-color-primary);
+        }
       .toolbar-popover label {
-        display: inline-block; /* Or block if preferred for layout */
-        width: 90px;
-        margin-bottom: 8px;
-        font-weight: normal;
-        font-size: 0.9em;
-      }
+            display: inline-block;
+            width: auto; 
+            margin-bottom: 5px; 
+            margin-right: 8px; 
+            font-weight: 400; 
+            font-size: 0.875rem;
+            color: var(--theme-text-color-secondary);
+        }
       .toolbar-popover input[type="number"],
       .toolbar-popover input[type="color"],
       .toolbar-popover input[type="text"],
       .toolbar-popover select,
-      .toolbar-popover textarea {
-        padding: 6px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box; font-size: 0.9em;
-        width: calc(100% - 100px); /* Adjust based on label width */
-        max-width: 150px;
+      .toolbar-popover textarea { 
+        /* Default widths for popover inputs, can be overridden by specific IDs or classes if needed */
+        width: 150px; /* A reasonable default width for popover inputs */
       }
-      .toolbar-popover input[type="range"] { width: calc(100% - 100px); max-width: 150px;}
-      .toolbar-popover input[type="checkbox"] { vertical-align: middle; margin-right: 3px;} /* Added margin */
-      .toolbar-popover .checkbox-label { width: auto; margin-left: 0; font-weight: normal; } /* Removed margin-left */
+      .toolbar-popover input[type="checkbox"] {
+            margin-right: 5px; 
+            vertical-align: middle;
+            accent-color: var(--theme-primary-color); 
+        }
+      .toolbar-popover .checkbox-label { 
+            width: auto; 
+            margin-left: 0; 
+            font-weight: 400; 
+            color: var(--theme-text-color-primary); 
+            vertical-align: middle;
+        }
 
-      .config-section { /* For conditional sub-sections like modal content */
+      .config-section { 
         margin-top: 10px;
-        padding-top: 10px; /* Added padding top */
+        padding-top: 10px; 
         padding-left: 10px;
-        border-left: 2px solid #007bff;
-        border-top: 1px dashed #eee; /* Added separator */
+        border-left: 2px solid var(--theme-primary-color); 
+        border-top: 1px dashed var(--theme-border-color); 
       }
-      .config-section label { width: auto; } /* Let it flow naturally */
+      .config-section label { width: auto; } 
       .config-section input, .config-section textarea { width: calc(100% - 10px); max-width: none; }
 
-      /* Helper for visually hidden labels, but accessible */
       .sr-only {
         position: absolute;
         width: 1px;
@@ -235,70 +400,69 @@
       
       .media-tabs {
         display: flex;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--theme-border-color);
         margin-bottom: 15px;
       }
-
       .media-tab-btn {
         background: none;
         border: none;
         padding: 8px 15px;
         cursor: pointer;
-        color: #333; /* Darker for better readability */
+        color: var(--theme-text-color-secondary); 
         font-size: 14px;
         opacity: 0.7;
         transition: all 0.2s;
         border-bottom: 2px solid transparent;
       }
-
       .media-tab-btn.active {
         opacity: 1;
-        border-bottom: 2px solid #007bff;
-        color: #007bff; /* Use theme color */
+        border-bottom: 2px solid var(--theme-primary-color);
+        color: var(--theme-primary-color); 
         font-weight: bold;
       }
-
       .media-tab-pane {
         display: none;
         padding: 10px 5px;
       }
-
       .media-tab-pane.active {
         display: block;
       }
 
       .media-upload-zone {
-        border: 2px dashed #ccc;
+        border: 2px dashed var(--theme-input-border-color);
         border-radius: 5px;
         padding: 30px 20px;
         text-align: center;
         cursor: pointer;
         transition: all 0.2s;
         margin: 10px 0;
-        background-color: #f9f9f9;
+        background-color: var(--theme-background-main); 
+        min-height: 100px; 
       }
-
       .media-upload-zone:hover {
-        border-color: #007bff;
-        background-color: #f0f7ff;
+        border-color: var(--theme-primary-color);
+        background-color: #e8f0fe; 
       }
-
       .media-upload-zone.drag-over {
-        border-color: #28a745;
-        background-color: #e8f5e9;
+        border-color: var(--theme-success-color);
+        background-color: #e6f4ea; 
       }
 
       .upload-prompt {
         display: flex;
         flex-direction: column;
         align-items: center;
-        color: #666;
+        color: var(--theme-text-color-secondary);
       }
-
       .upload-prompt .material-symbols-outlined {
         font-size: 36px;
         margin-bottom: 10px;
-        color: #999;
+        color: var(--theme-icon-color);
+      }
+      .upload-prompt p { 
+        font-size: 0.9em;
+        margin-bottom: 5px;
+        margin-top: 0; 
       }
 
       .youtube-input-group {
@@ -306,92 +470,65 @@
         gap: 10px;
         margin-top: 10px;
       }
-
       .youtube-input-group input {
         flex: 1;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
       }
 
-      .shapes-buttons { /* Container for buttons inside shapesPopover */
+      .shapes-buttons { 
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
-        justify-content: space-around; /* Better distribution */
+        justify-content: space-around; 
       }
-
-      .shape-button { /* Buttons like "Rectangle", "Circle" inside shapesPopover */
+      .shape-button { 
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 10px; /* Reduced padding */
-        background: #f5f5f5;
-        border: 1px solid #ddd;
+        padding: 10px; 
+        background: var(--theme-background-main); 
+        border: 1px solid var(--theme-border-color);
         border-radius: 5px;
         cursor: pointer;
-        min-width: 70px; /* Adjusted min-width */
+        min-width: 80px; 
         transition: all 0.2s;
         font-size: 0.9em;
       }
-
       .shape-button:hover {
-        background: #e9e9e9;
-        border-color: #bbb;
+        background: #e8e8e8; 
+        border-color: var(--theme-input-border-color);
       }
-
       .shape-button .material-symbols-outlined {
-        font-size: 24px; /* Adjusted icon size */
-        margin-bottom: 5px; /* Adjusted margin */
+        font-size: 24px; 
+        margin-bottom: 5px; 
       }
       .shape-button, 
-        .shape-button .material-symbols-outlined,
-        .shape-button span {
-          color: #333 !important; /* Dark grey color for text and icons */
+      .shape-button .material-symbols-outlined,
+      .shape-button span {
+          color: var(--theme-text-color-primary) !important; 
       }
+
       .position-controls {
         display: flex;
         flex-direction: column;
-        gap: 10px; /* Increased gap */
+        gap: 10px; 
       }
-
       .position-control-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
       }
-
       .position-control-row label {
-        flex: 0 0 70px; /* Fixed label width */
+        flex: 0 0 70px; 
         text-align: right;
-        font-size: 0.9em; /* Match other popover labels */
+        font-size: 0.9em; 
       }
-
-      .position-control-row input { /* Refers to .toolbar-input-compact used here */
+      .position-control-row input { 
         flex: 1;
-        min-width: auto; /* Allow shrinking */
-        width: 60px; /* Specific width */
+        min-width: auto; 
+        width: 60px; 
       }
       
-      /* Main action toolbar - This was from the original and seems like a duplicate or unused concept */
-      /* .toolbar-main-actions {
-        background-color: #f8f8f8;
-        padding: 8px;
-        border-radius: 4px;
-        margin-bottom: 10px;
-      }
-
-      .toolbar-main-actions .toolbar-button {
-        padding: 8px 12px;
-        margin-right: 5px;
-      }
-
-      .toolbar-main-actions .material-symbols-outlined {
-        font-size: 24px;
-      } */
-
-      /* Notification system styling */
       #notificationContainer {
         position: fixed;
         top: 20px;
@@ -399,7 +536,6 @@
         z-index: 9999;
         max-width: 300px;
       }
-
       .notification {
         padding: 12px 15px;
         margin-bottom: 10px;
@@ -408,57 +544,50 @@
         transform: translateX(120%);
         transition: transform 0.3s ease;
         color: white;
-        opacity: 0.95; /* Slightly more opaque */
+        opacity: 0.95; 
       }
-
       .notification.visible {
         transform: translateX(0);
       }
-
       .notification.success {
-        background-color: #28a745;
+        background-color: var(--theme-success-color);
       }
-
       .notification.error {
-        background-color: #dc3545;
+        background-color: var(--theme-danger-color);
       }
-
       .notification.info {
-        background-color: #007bff;
+        background-color: var(--theme-primary-color);
       }
 
-      /* Shapes menu dropdown (dynamic menu, not the shapesPopover) */
-      /* This is distinct from shapesPopover and its .shapes-buttons styling */
       .shapes-dropdown { 
         position: absolute;
-        background-color: white;
-        border: 1px solid #ccc;
+        background-color: var(--theme-background-card);
+        border: 1px solid var(--theme-border-color);
         border-radius: 4px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-        z-index: 1000; /* Ensure it's above most things but below popovers if they overlap */
+        z-index: 1000; 
         padding: 5px 0;
-        /* display: none; /* JS would control this */
       }
-
-      .shape-option { /* For items in a dynamic .shapes-dropdown if used elsewhere */
+      .shape-option { 
         display: flex;
         align-items: center;
         padding: 8px 15px;
         cursor: pointer;
         white-space: nowrap;
+        color: var(--theme-text-color-primary);
       }
-
       .shape-option:hover {
-        background-color: #f0f0f0;
+        background-color: rgba(0,0,0,0.05);
       }
-
       .shape-option .material-symbols-outlined {
         margin-right: 8px;
         font-size: 18px;
+        color: var(--theme-icon-color);
       }
     </style>
   </head>
   <body>
+    <div class="main-content-wrapper">
     <h1>Admin Dashboard</h1>
 
     <!-- View Container for List/Create Projects -->
@@ -517,7 +646,7 @@
                             <p>Drop audio or click</p>
                         </div>
                     </div>
-                    <div id="audioControls" style="display: none; margin-top: 15px;">
+                    <div id="audioControls" style="display: none; margin-top: 15px; padding-top: 10px;"> {/* Added padding-top recommendation */}
                         <span id="attachedAudioName" style="margin-right: 10px; font-style: italic;"></span>
                         <button id="removeAudioButton" class="danger-button" style="padding: 5px 8px; font-size: 0.8em;">Remove Audio</button>
                     </div>
@@ -596,16 +725,10 @@
                 </div>
                 <div class="toolbar-group"> <!-- Group 2: Fill, Stroke -->
                     <button class="toolbar-button" id="fillColorButton" title="Fill Color"><span class="material-symbols-outlined">format_paint</span></button>
-                    <input type="color" id="objFill" class="toolbar-color-input" value="#ff0000">
-                    
                     <button class="toolbar-button" id="strokeColorButton" title="Stroke Color"><span class="material-symbols-outlined">border_color</span></button>
-                    <input type="color" id="objStrokeColor" class="toolbar-color-input" value="#000000">
-                    <label for="objStrokeWidth" class="sr-only">Stroke Width</label><input type="number" id="objStrokeWidth" min="0" class="toolbar-input-compact" title="Stroke Width" value="1">
                 </div>
                 <div class="toolbar-group"> <!-- Group 3: Opacity -->
                     <button class="toolbar-button" id="opacityButton" title="Opacity"><span class="material-symbols-outlined">opacity</span></button>
-                    <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" title="Opacity" style="width: 70px;"> 
-                    <!-- Optional: <span id="objOpacityValueDisplay" style="font-size:0.8em; width:30px; text-align:right;">100%</span> -->
                 </div>
                  <div class="toolbar-group"> <!-- Group 4: Effects & Actions -->
                     <button class="toolbar-button" id="shadowSettingsButton" title="Shadow Settings"><span class="material-symbols-outlined">blur_on</span></button>
@@ -710,6 +833,31 @@
                 <select id="objTextAlign" style="display:none;"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option><option value="justify">Justify</option></select>
             </div>
 
+            <!-- Popover for Fill Color -->
+            <div id="fillColorPopover" class="toolbar-popover" style="min-width: 180px;">
+                <h4>Fill Color</h4>
+                <label for="objFill" class="sr-only">Fill Color:</label>
+                <input type="color" id="objFill" class="toolbar-color-input" value="#ff0000" style="width: calc(100% - 20px); margin: 0 auto; display: block;">
+            </div>
+
+            <!-- Popover for Stroke Properties -->
+            <div id="strokeColorPopover" class="toolbar-popover" style="min-width: 220px;">
+                <h4>Stroke</h4>
+                <label for="objStrokeColor" style="display: block; margin-bottom: 5px; width: 50px;">Color:</label>
+                <input type="color" id="objStrokeColor" class="toolbar-color-input" value="#000000" style="vertical-align: middle;">
+                <br>
+                <label for="objStrokeWidth" style="display: block; margin-bottom: 5px; margin-top: 10px; width: 50px;">Width:</label>
+                <input type="number" id="objStrokeWidth" min="0" class="toolbar-input-compact" title="Stroke Width" value="1" style="width: 60px; vertical-align: middle;">
+            </div>
+
+            <!-- Popover for Opacity -->
+            <div id="opacityPopover" class="toolbar-popover" style="min-width: 200px;">
+                <h4>Opacity</h4>
+                <label for="objOpacity" class="sr-only">Opacity:</label>
+                <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" title="Opacity" style="width: calc(100% - 50px); margin: 5px 0; vertical-align: middle;">
+                <span id="objOpacityValueDisplay" style="font-size:0.9em; width: 35px; text-align: right; display: inline-block; vertical-align: middle;">100%</span>
+            </div>
+
         </div> <!-- End of #overlayPropertiesToolbar -->
 
 
@@ -721,7 +869,7 @@
         <div id="slideManagementPanel">
             <h3>Slides</h3>
             <button id="addSlideButton">Add New Slide</button>
-            <button id="saveProjectButton" style="background-color: #28a745;">Save Project</button>
+            <button id="saveProjectButton" class="edit-button">Save Project</button>
             <div id="slideThumbnailsContainer">
                  <!-- Dynamically populated -->
             </div>
@@ -732,5 +880,6 @@
 
     <?!= include('Client/Shared/LoadingSpinner'); ?>
     <?!= include('Client/Admin/Admin_JS'); ?>
+    </div> <!-- End of main-content-wrapper -->
   </body>
 </html>

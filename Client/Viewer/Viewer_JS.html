@@ -34,6 +34,9 @@
       isCanvasPannedOrZoomed: false,
       panZoomTargetObject: null, 
       activeAnimations: new Map(),
+      currentVideoQuestions: [], // Stores questions for the current video
+      playerQuestionCheckInterval: null, // Interval ID for checking video time
+      askedQuestionIndices: [], // Indices of questions already asked for the current slide view
     };
 
     // --- DOM Element References ---
@@ -284,6 +287,10 @@
                     if (!slide.slideMedia) {
                         slide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
                     }
+                    // Ensure videoQuestions array exists for YouTube slides
+                    if (slide.slideMedia && slide.slideMedia.type === 'youtube' && !Array.isArray(slide.slideMedia.videoQuestions)) {
+                        slide.slideMedia.videoQuestions = [];
+                    }
                  });
              } else {
                  throw new Error("Project data is missing slides array.");
@@ -397,7 +404,24 @@
         canvas.backgroundColor = 'transparent';
 
         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = (mediaType === 'youtube') ? 'block' : 'none';
-        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = (mediaType === 'youtube') ? 'none' : 'flex'; 
+        // For YouTube, canvas container should be visible to overlay.
+        if (viewerCanvasContainerEl) {
+            viewerCanvasContainerEl.style.display = 'flex'; // Always visible, overlays YT or shows image/audio bg
+            if (mediaType === 'youtube') {
+                viewerCanvasContainerEl.style.pointerEvents = 'none'; // Pass clicks to player by default
+                // Populate video questions for the current slide if it's a YouTube video
+                if (slideData.slideMedia && slideData.slideMedia.videoQuestions) {
+                    viewerApp.state.currentVideoQuestions = [...slideData.slideMedia.videoQuestions].sort((a, b) => a.timestamp - b.timestamp);
+                } else {
+                    viewerApp.state.currentVideoQuestions = [];
+                }
+                viewerApp.state.askedQuestionIndices = []; // Reset for new slide/video
+            } else {
+                viewerCanvasContainerEl.style.pointerEvents = 'auto'; // Allow clicks on canvas for non-YT
+                viewerApp.state.currentVideoQuestions = []; // Clear questions if not a YT video
+                viewerApp.state.askedQuestionIndices = [];
+            }
+        }
         if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'none'; 
 
         console.log(`Rendering slide ${slideIndex + 1}, media type: ${mediaType}`);
@@ -419,6 +443,9 @@
                 break;
 
             case 'youtube':
+                // Canvas container is already set to display:flex above.
+                // Fabric canvas dimensions are already set by slideWidth/slideHeight.
+                // Fabric canvas background is transparent by default from initializeViewerCanvas.
                 if (media.url) {
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
@@ -426,19 +453,21 @@
                              setupYouTubePlayer(videoId);
                         } else {
                              console.warn("YouTube API not ready yet when trying to render slide.");
+                             // Fallback if API never loads - show canvas with dark bg
+                             canvas.backgroundColor = '#333'; // Dark fallback
+                             canvas.renderAll();
                         }
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
-                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex';
-                         canvas.backgroundColor = '#555';
+                         canvas.backgroundColor = '#555'; // Error indication
                          canvas.renderAll();
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
-                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.display = 'flex'; 
-                     canvas.backgroundColor = '#e9e9e9';
+                     canvas.backgroundColor = '#e9e9e9'; // Default fallback
                      canvas.renderAll();
                 }
+                // Overlays will be loaded below, after the switch statement.
                 break;
 
             case 'audio':
@@ -481,7 +510,9 @@
                  break;
         }
 
-        if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none' && slideData.fabricCanvasJSON) {
+        // Load Fabric.js overlays for ALL slide types, including YouTube
+        // The canvas container visibility and pointer-events are managed above.
+        if (slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) return;
 
@@ -1430,6 +1461,21 @@
 
     function onPlayerStateChange(event) {
         console.log("YouTube Player State Change:", event.data);
+        if (event.data === YT.PlayerState.PLAYING) {
+            if (viewerApp.state.playerQuestionCheckInterval) {
+                clearInterval(viewerApp.state.playerQuestionCheckInterval);
+            }
+            viewerApp.state.playerQuestionCheckInterval = setInterval(checkVideoTimeForQuestions, 250);
+        } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+            // Clear interval if paused or ended, but not if paused by a question (which clears its own interval)
+            // This check might need refinement if questions can be dismissed without playing.
+             if (viewerApp.state.playerQuestionCheckInterval) { // Check if an interval exists
+                // A bit of a heuristic: if a question was just displayed, it would have cleared the interval.
+                // So, if interval still exists here, it means user paused or video ended naturally.
+                clearInterval(viewerApp.state.playerQuestionCheckInterval);
+                viewerApp.state.playerQuestionCheckInterval = null;
+            }
+        }
     }
 
     function onPlayerError(event) {
@@ -1457,6 +1503,13 @@
                  youtubePlayerContainerEl.innerHTML = '';
                  youtubePlayerContainerEl.style.display = 'none';
              }
+             // Cleanup for question checking
+            if (viewerApp.state.playerQuestionCheckInterval) {
+                clearInterval(viewerApp.state.playerQuestionCheckInterval);
+                viewerApp.state.playerQuestionCheckInterval = null;
+            }
+            viewerApp.state.currentVideoQuestions = [];
+            viewerApp.state.askedQuestionIndices = [];
         }
     }
 
@@ -1560,5 +1613,162 @@
         canvas.renderAll();
     }
     // --- End UPDATED Spotlight Functions ---
+
+    function checkVideoTimeForQuestions() {
+        if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.currentVideoQuestions) {
+            return;
+        }
+        const currentTime = ytPlayer.getCurrentTime();
+        
+        for (let i = 0; i < viewerApp.state.currentVideoQuestions.length; i++) {
+            const question = viewerApp.state.currentVideoQuestions[i];
+            if (currentTime >= question.timestamp && !viewerApp.state.askedQuestionIndices.includes(i)) {
+                if(ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+                
+                viewerApp.state.askedQuestionIndices.push(i);
+                
+                if (viewerApp.state.playerQuestionCheckInterval) {
+                    clearInterval(viewerApp.state.playerQuestionCheckInterval);
+                    viewerApp.state.playerQuestionCheckInterval = null; 
+                }
+                displayQuestion(question);
+                break; 
+            }
+        }
+    }
+
+    function displayQuestion(question) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas) return;
+
+        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
+
+        // Background overlay for the question dialog
+        const dialogWidth = canvas.width * 0.8;
+        const dialogHeight = canvas.height * 0.7; // Adjust as needed, can be dynamic later
+        const dialogBackground = new fabric.Rect({
+            left: canvas.width / 2,
+            top: canvas.height / 2,
+            originX: 'center', originY: 'center',
+            width: dialogWidth,
+            height: dialogHeight,
+            fill: 'rgba(0, 0, 0, 0.8)', // Darker fill
+            rx: 10, ry: 10, // Rounded corners
+            selectable: false, evented: false,
+            customType: 'videoQuestionOverlay'
+        });
+        canvas.add(dialogBackground);
+
+        // Question text styling
+        const questionText = new fabric.Textbox(question.questionText, {
+            left: dialogBackground.left, // Relative to dialogBackground center
+            top: dialogBackground.top - dialogBackground.height / 2 + 40, // Position near top of dialog
+            originX: 'center', originY: 'top',
+            width: dialogWidth * 0.9, // Wrap text within 90% of dialog width
+            fontSize: 24, // Suitable font size
+            fill: '#FFFFFF', // White text
+            textAlign: 'center',
+            selectable: false, evented: false,
+            customType: 'videoQuestionOverlay'
+        });
+        canvas.add(questionText);
+
+        // Answer option styling and positioning
+        const optionHeight = 40;
+        const optionMargin = 15; // Increased margin for better spacing
+        const optionsContainerWidth = dialogWidth * 0.8;
+        
+        // Calculate starting Y position for options to be centered vertically below question text
+        const totalOptionsContentHeight = question.options.length * (optionHeight + optionMargin) - optionMargin;
+        let startY = questionText.top + questionText.height + 30; // Initial Y below question
+        
+        // Adjust startY if options would overflow dialogHeight (simple centering for now)
+        const remainingDialogHeight = dialogBackground.height - (questionText.top - (dialogBackground.top - dialogBackground.height/2)) - questionText.height - 20; // 20 for bottom padding
+        if (totalOptionsContentHeight < remainingDialogHeight) {
+            startY = questionText.top + questionText.height + (remainingDialogHeight - totalOptionsContentHeight) / 2;
+        }
+
+
+        question.options.forEach((optionStr, index) => {
+            const optionGroupY = startY + index * (optionHeight + optionMargin);
+            
+            const optionRect = new fabric.Rect({
+                width: optionsContainerWidth,
+                height: optionHeight,
+                fill: 'rgba(50, 50, 50, 0.9)', // Darker individual option background
+                stroke: '#CCCCCC',
+                strokeWidth: 1,
+                rx: 5, ry: 5, // Rounded corners for options
+                originX: 'center', originY: 'top'
+            });
+
+            const optionText = new fabric.Textbox(optionStr, {
+                fontSize: 18,
+                fill: '#FFFFFF',
+                width: optionRect.width - 20, // Padding within the rect
+                textAlign: 'center',
+                originX: 'center', originY: 'center',
+                top: optionRect.height / 2 // Center text vertically in rect
+            });
+            
+            const optionGroup = new fabric.Group([optionRect, optionText], {
+                left: dialogBackground.left, // Center with dialogBackground
+                top: optionGroupY,
+                originX: 'center', originY: 'top', // Group origin for easier positioning
+                selectable: false,
+                evented: true,
+                customType: 'videoQuestionOverlay',
+                customAnswerIndex: index,
+                hoverCursor: 'pointer'
+            });
+            canvas.add(optionGroup);
+
+            optionGroup.on('mousedown', function() {
+                const isCorrect = (this.customAnswerIndex === question.correctOptionIndex);
+                // Update optionRect fill directly (it's the first object in the group)
+                this.item(0).set('fill', isCorrect ? 'rgba(0, 150, 0, 0.9)' : 'rgba(150, 0, 0, 0.9)');
+                
+                // Add checkmark or cross
+                const feedbackSymbol = new fabric.Text(isCorrect ? '✓' : '✗', {
+                    fontSize: 20,
+                    fill: isCorrect ? 'lightgreen' : 'pink',
+                    left: this.item(0).width / 2 - 25, // Position to the right of text
+                    top: this.item(0).height / 2,    // Center vertically with text
+                    originX: 'right', 
+                    originY: 'center',
+                    selectable: false,
+                    evented: false
+                });
+                // Add symbol to the group so it's positioned relative to the option
+                this.addWithUpdate(feedbackSymbol);
+                // Ensure the symbol is visible if text is long
+                this.item(1).set('width', optionRect.width - 50); // Make space for symbol
+
+                canvas.renderAll();
+
+                // Disable further clicks on options
+                canvas.getObjects('group').forEach(obj => {
+                    if (obj.customType === 'videoQuestionOverlay' && obj.customAnswerIndex !== undefined) {
+                        obj.evented = false;
+                    }
+                });
+
+                setTimeout(() => {
+                    // Remove all question elements
+                    canvas.getObjects().forEach(obj => {
+                        if (obj.customType === 'videoQuestionOverlay') {
+                            canvas.remove(obj);
+                        }
+                    });
+                    if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+                    canvas.renderAll();
+                    
+                    if(ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
+                    // Interval will be restarted by onPlayerStateChange if video plays
+                }, 1500); // Show feedback for 1.5 seconds
+            });
+        });
+        canvas.renderAll();
+    }
 
   </script>

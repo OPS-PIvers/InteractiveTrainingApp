@@ -3,6 +3,7 @@
   <head>
     <base target="_top">
     <title>Admin Dashboard</title>
+    <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame API -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <!-- Add Material Symbols (recommended) -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -861,9 +862,25 @@
         </div> <!-- End of #overlayPropertiesToolbar -->
 
 
-        <div id="fabricCanvasContainer">
-            <div id="adminMediaPlaceholder" class="media-placeholder" style="display: none;"></div>
-            <canvas id="fabricCanvasElement"></canvas>
+        <div id="fabricCanvasContainer" style="position: relative;">
+            <div id="adminYouTubePlayerContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;"></div>
+            <div id="adminMediaPlaceholder" class="media-placeholder" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center;"></div>
+            <canvas id="fabricCanvasElement" style="position: relative; z-index: 2;"></canvas>
+        </div>
+
+        <div id="videoTimelineControls" style="display:none; margin-top: 10px; padding: 10px; border: 1px solid var(--theme-border-color); border-radius: 5px; background-color: var(--theme-background-card);">
+            <h4>Video Timeline</h4>
+            <input type="range" id="videoTimelineSlider" min="0" max="100" value="0" style="width: 100%;">
+            <div>
+                <span>Current Time: <span id="videoCurrentTimeDisplay">0:00</span></span>
+                <span style="float: right;">Total Duration: <span id="videoTotalDurationDisplay">0:00</span></span>
+            </div>
+            <button id="addQuestionBtn" style="margin-top: 10px;">Add Question at Timestamp</button>
+        </div>
+
+        <div id="videoQuestionsListContainer" style="display:none; margin-top: 10px; padding: 10px; border: 1px solid var(--theme-border-color); border-radius: 5px; background-color: var(--theme-background-card);">
+            <h4>Added Questions:</h4>
+            <ul id="videoQuestionsList" style="list-style: none; padding: 0;"></ul>
         </div>
 
         <div id="slideManagementPanel">
@@ -881,5 +898,40 @@
     <?!= include('Client/Shared/LoadingSpinner'); ?>
     <?!= include('Client/Admin/Admin_JS'); ?>
     </div> <!-- End of main-content-wrapper -->
+
+    <!-- Question Modal (initially hidden) -->
+    <div id="questionModal" class="toolbar-popover" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; z-index: 1001;">
+        <h3>Add/Edit Video Question</h3>
+        <p>Question at: <span id="questionTimestampDisplay">0:00</span></p>
+        
+        <label for="questionText">Question:</label>
+        <textarea id="questionText" style="width: calc(100% - 20px); min-height: 60px; margin-bottom:10px;"></textarea>
+        
+        <div class="question-option-group" style="margin-bottom: 8px;">
+            <label for="option1">Option 1:</label>
+            <input type="text" id="option1" style="width: calc(100% - 100px); margin-right: 5px;">
+            <input type="radio" name="correctAnswer" value="0" id="correctAnswer0"> <label for="correctAnswer0" class="checkbox-label">Correct</label>
+        </div>
+        <div class="question-option-group" style="margin-bottom: 8px;">
+            <label for="option2">Option 2:</label>
+            <input type="text" id="option2" style="width: calc(100% - 100px); margin-right: 5px;">
+            <input type="radio" name="correctAnswer" value="1" id="correctAnswer1"> <label for="correctAnswer1" class="checkbox-label">Correct</label>
+        </div>
+        <div class="question-option-group" style="margin-bottom: 8px;">
+            <label for="option3">Option 3:</label>
+            <input type="text" id="option3" style="width: calc(100% - 100px); margin-right: 5px;">
+            <input type="radio" name="correctAnswer" value="2" id="correctAnswer2"> <label for="correctAnswer2" class="checkbox-label">Correct</label>
+        </div>
+        <div class="question-option-group" style="margin-bottom: 15px;">
+            <label for="option4">Option 4:</label>
+            <input type="text" id="option4" style="width: calc(100% - 100px); margin-right: 5px;">
+            <input type="radio" name="correctAnswer" value="3" id="correctAnswer3"> <label for="correctAnswer3" class="checkbox-label">Correct</label>
+        </div>
+        
+        <input type="hidden" id="editingQuestionIndex" value="-1">
+        
+        <button id="saveQuestionBtn" style="margin-right: 10px;">Save Question</button>
+        <button id="cancelQuestionBtn" class="danger-button">Cancel</button>
+    </div>
   </body>
 </html>

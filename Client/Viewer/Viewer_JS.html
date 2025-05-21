@@ -18,6 +18,7 @@
       isLoading: false,
       currentProjectData: null,
       currentSlideIndex: 0, // Default to 0, will be updated
+      currentMediaType: null, // Added to store current media type
       viewerFabricCanvas: null,
       defaultCanvasWidth: 960,
       defaultCanvasHeight: 540,
@@ -387,6 +388,7 @@
         const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
         const media = slideData.slideMedia;
         let mediaType = (media && media.type) ? media.type : 'none';
+        viewerApp.state.currentMediaType = mediaType; // Store current media type
 
         canvas.setWidth(slideWidth);
         canvas.setHeight(slideHeight);
@@ -437,12 +439,15 @@
                     }, { crossOrigin: 'anonymous' });
                 } else {
                      console.warn("Image media present but URL is missing or not base64:", media.url);
-                     canvas.backgroundColor = '#e9e9e9';
+                     // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                      canvas.renderAll();
                 }
+                if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
+                if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1';
                 break;
 
             case 'youtube':
+                if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = 'transparent';
                 // Canvas container is already set to display:flex above.
                 // Fabric canvas dimensions are already set by slideWidth/slideHeight.
                 // Fabric canvas background is transparent by default from initializeViewerCanvas.
@@ -453,27 +458,28 @@
                              setupYouTubePlayer(videoId);
                         } else {
                              console.warn("YouTube API not ready yet when trying to render slide.");
-                             // Fallback if API never loads - show canvas with dark bg
-                             canvas.backgroundColor = '#333'; // Dark fallback
+                             // Fallback if API never loads - canvas.backgroundColor handled by container or CSS
                              canvas.renderAll();
                         }
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
-                         canvas.backgroundColor = '#555'; // Error indication
+                         // canvas.backgroundColor = '#555'; // Error indication - Handled by container or CSS
                          canvas.renderAll();
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
-                     canvas.backgroundColor = '#e9e9e9'; // Default fallback
+                     // canvas.backgroundColor = '#e9e9e9'; // Default fallback - Handled by container or CSS
                      canvas.renderAll();
                 }
                 if (fabricCanvasEl) {
-                    fabricCanvasEl.style.opacity = '0'; // CHANGED: Make canvas fully transparent (was 0.5)
+                    fabricCanvasEl.style.opacity = '1'; // Ensure canvas is opaque for overlays
                 }
                 // Overlays will be loaded below, after the switch statement.
                 break;
 
             case 'audio':
+                 if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
+                 if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1';
                  if (media.driveFileId) {
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true);
@@ -484,31 +490,33 @@
                              if (audioResponse && audioResponse.success && audioResponse.base64Data) {
                                  setupAudioPlayer(audioResponse.base64Data);
                                  if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block';
-                                 canvas.backgroundColor = '#e0e0e0';
+                                 // canvas.backgroundColor = '#e0e0e0'; // Handled by viewerMediaContainerEl
                                  canvas.renderAll();
                              } else {
                                  console.error("Failed to fetch audio base64 data:", audioResponse);
                                  onServerErrorViewer(audioResponse || {error: "Failed to load audio data."});
-                                 canvas.backgroundColor = '#e9e9e9';
+                                 // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                                  canvas.renderAll();
                              }
                          })
                          .withFailureHandler(function(error) {
                              showLoadingViewer(false);
                              onServerErrorViewer(error);
-                             canvas.backgroundColor = '#e9e9e9';
+                             // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                              canvas.renderAll();
                          })
                          .getAudioAsBase64(media.driveFileId);
                  } else {
                      console.warn("Audio media type set but driveFileId is missing.");
-                     canvas.backgroundColor = '#e9e9e9';
+                     // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                      canvas.renderAll();
                  }
                  break;
 
             default: 
-                 canvas.backgroundColor = '#e9e9e9';
+                 if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
+                 if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1';
+                 // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                  canvas.renderAll();
                  break;
         }
@@ -1634,18 +1642,18 @@
                     clearInterval(viewerApp.state.playerQuestionCheckInterval);
                     viewerApp.state.playerQuestionCheckInterval = null; 
                 }
-                displayQuestion(question);
+                displayQuestion(question, viewerApp.state.currentMediaType); // Pass currentMediaType
                 break; 
             }
         }
     }
 
-    function displayQuestion(question) {
+    function displayQuestion(question, mediaType) { // Added mediaType parameter
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas) return;
 
         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
-        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // ADDED: Make canvas fully opaque for questions
+        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Make canvas fully opaque for questions
 
         // Background overlay for the question dialog
         const dialogWidth = canvas.width * 0.8;
@@ -1765,7 +1773,12 @@
                         }
                     });
                     if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                    if (fabricCanvasEl) fabricCanvasEl.style.opacity = '0';
+                    // Adjust opacity based on mediaType after question
+                    if (mediaType === 'youtube') {
+                        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Keep opaque for YouTube
+                    } else {
+                        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '0'; // Revert to transparent for non-YouTube if needed
+                    }
                     canvas.renderAll();
                     
                     if(ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();

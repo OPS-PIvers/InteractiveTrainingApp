@@ -19,7 +19,7 @@ jobs:
     - name: Authenticate clasp
       run: |
         # Create the credentials file from the secret
-        echo '${{ GOOGLE_CREDENTIALS_JSON }}' > ~/.clasprc.json
+        echo '${{ CLASPRC_JSON }}' > ~/.clasprc.json
         # Validate JSON format (fails if not valid)
         jq empty ~/.clasprc.json || { echo "Invalid JSON in credentials"; cat ~/.clasprc.json; exit 1; }
     - name: Push code to Apps Script
@@ -33,7 +33,7 @@ jobs:
         else
           clasp deploy --description "Auto-deployment $(date)"
         fi
-    # Optional: Clean up the credentials file (good practice)
+    # Optional: Clean up the credentials file (this is good practice)
     - name: Clean up credentials
       if: always() # Run even if previous steps failed
       run: rm -f ~/.clasprc.json

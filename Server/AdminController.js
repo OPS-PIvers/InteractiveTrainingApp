@@ -512,28 +512,28 @@ function deleteProject(projectId) {
       Logger.log(`getProjectDataForEditing: Attempting to load data for projectId: ${projectId}`);
       if (!projectId) {
         Logger.log("getProjectDataForEditing: ProjectID is missing.");
-        return null;
+        return { error: "ProjectID is missing." };
       }
 
       // Find row index first
        const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
        if (!rowIndex) {
             Logger.log(`getProjectDataForEditing: Project with ID "${projectId}" not found in ProjectIndex.`);
-            return null;
+            return { error: `Project with ID "${projectId}" not found in ProjectIndex.` };
        }
 
        // Get row data to find the file ID
        const rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
        if (!rowData) {
             Logger.log(`getProjectDataForEditing: Could not retrieve row data for project ${projectId} at row ${rowIndex}.`);
-            return null;
+            return { error: `Could not retrieve row data for project ${projectId} at row ${rowIndex}.` };
        }
 
       const projectDataFileId = rowData[COL_PROJECT_DATA_FILE_ID - 1];
 
       if (!projectDataFileId) {
         Logger.log(`getProjectDataForEditing: ProjectDataFileID is missing for project "${projectId}" in row ${rowIndex}.`);
-        return null;
+        return { error: `ProjectDataFileID is missing for project "${projectId}" in row ${rowIndex}.` };
       }
       Logger.log(`getProjectDataForEditing: Found ProjectDataFileID: ${projectDataFileId} for project ${projectId}.`);
 
@@ -545,8 +545,7 @@ function deleteProject(projectId) {
 
     } catch (e) {
       Logger.log(`Error in getProjectDataForEditing for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-      // Consider returning specific errors if needed, e.g., differentiate file read error from not found
-      return null;
+      return { error: `Failed to read project data from Google Drive: ${e.message}` };
     }
   }
 

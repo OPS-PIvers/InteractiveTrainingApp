@@ -660,12 +660,13 @@ function onYouTubeIframeAPIReady() {
     }
 
     function onProjectDataLoaded(jsonString) {
-      console.log("onProjectDataLoaded: Received data string length:", jsonString ? jsonString.length : 'null');
+      console.log("onProjectDataLoaded: Received data:", jsonString);
 
-      if (jsonString === null || jsonString === undefined) {
+      // Check for error object first
+      if (jsonString && typeof jsonString === 'object' && jsonString.error) {
           showLoading(false);
-          console.error("onProjectDataLoaded: Received null data string from server (Project or data file likely not found).");
-          displayMessage("Error: Could not load project data. Project or its data file may not exist.", false);
+          console.error(`onProjectDataLoaded: Received error object from server: ${jsonString.error}`);
+          displayMessage(`Error: Could not load project data. Server said: ${jsonString.error}`, false);
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
           adminApp.state.currentSlideIndex = -1;
           if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
@@ -673,7 +674,26 @@ function onYouTubeIframeAPIReady() {
           return;
       }
 
+      // Existing check for null or undefined, though the object check above should catch most errors.
+      // This handles cases where the server might return `null` for reasons other than a structured error.
+      if (jsonString === null || jsonString === undefined) {
+          showLoading(false);
+          console.error("onProjectDataLoaded: Received null or undefined data from server (Project or data file likely not found).");
+          displayMessage("Error: Could not load project data. Project or its data file may not exist or the data is empty.", false);
+          adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
+          adminApp.state.currentSlideIndex = -1;
+          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
+          updateSlideThumbnailsUI();
+          return;
+      }
+      
+      // Proceed to parse if it's a string (expected good path)
       try {
+          if (typeof jsonString !== 'string') {
+            // This case should ideally be caught by the object check above if it's an error object.
+            // If it's some other non-string, non-error-object, it's unexpected.
+            throw new Error("Received data is not a JSON string or a recognized error object.");
+          }
           const loadedData = JSON.parse(jsonString);
           console.log("Parsed project data:", loadedData);
 

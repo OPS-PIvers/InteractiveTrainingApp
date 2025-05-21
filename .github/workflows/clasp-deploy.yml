@@ -33,7 +33,7 @@ jobs:
         else
           clasp deploy --description "Auto-deployment $(date)"
         fi
-    # Optional: Clean up the credentials file (good practice.)
+    # Optional: Clean up the credentials file (good practice)
     - name: Clean up credentials
       if: always() # Run even if previous steps failed
       run: rm -f ~/.clasprc.json

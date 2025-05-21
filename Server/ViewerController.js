@@ -40,22 +40,23 @@ function getActiveProjectsList() {
   }
 }
 
+// Server/ViewerController.gs
+
 /**
  * Retrieves the project's data JSON string from its file in Google Drive for viewer.
  * Ensures the project is "Active".
  * @param {string} projectId The ID of the project.
- * @return {string|null} The JSON string content of the project data file if active, 
- *                      or null if the project is not found, not active, or an error occurs.
+ * @return {string} The JSON string content of the project data file if active.
+ *                  Throws an error if not found, not active, or other error.
  */
 function getProjectViewData(projectId) {
   try {
     Logger.log(`getProjectViewData: Attempting to load data for projectId: ${projectId}`);
     if (!projectId) {
       Logger.log("getProjectViewData: ProjectID is missing.");
-      return { success: false, error: "Project ID is required.", data: null };
+      throw new Error("Project ID is required.");
     }
 
-    // Find the ProjectDataFileID and Status from the ProjectIndex sheet
     const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
     let projectEntry = null;
     if (allProjects && Array.isArray(allProjects)) {
@@ -64,30 +65,31 @@ function getProjectViewData(projectId) {
 
     if (!projectEntry) {
       Logger.log(`getProjectViewData: Project with ID "${projectId}" not found in ProjectIndex.`);
-      return { success: false, error: "Project not found.", data: null };
+      throw new Error("Project not found.");
     }
 
     const status = projectEntry['Status'] || projectEntry[COL_STATUS - 1];
     if (status !== "Active") {
       Logger.log(`getProjectViewData: Project with ID "${projectId}" is not active (Status: ${status}).`);
-      return { success: false, error: "Project is not currently active.", data: null };
+      throw new Error("Project is not currently active.");
     }
 
     const projectDataFileId = projectEntry['ProjectDataFileID'] || projectEntry[COL_PROJECT_DATA_FILE_ID - 1];
 
     if (!projectDataFileId) {
       Logger.log(`getProjectViewData: ProjectDataFileID is missing for project "${projectId}".`);
-      return { success: false, error: "Project data file reference is missing.", data: null };
+      throw new Error("Project data file reference is missing.");
     }
     Logger.log(`getProjectViewData: Found ProjectDataFileID: ${projectDataFileId} for active project ${projectId}.`);
 
-    const jsonContent = readDriveFileContent(projectDataFileId); // From DriveService.gs
-    
+    const jsonContent = readDriveFileContent(projectDataFileId); // This can throw
+
     Logger.log(`getProjectViewData: Successfully read content for file ID ${projectDataFileId}.`);
-    return { success: true, data: jsonContent };
+    return jsonContent; // Return the JSON string directly on success
 
   } catch (e) {
     Logger.log(`Error in getProjectViewData for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-    return { success: false, error: `Server error fetching project data: ${e.message}`, data: null };
+    // Re-throw the error so it's caught by .withFailureHandler on the client side
+    throw new Error(`Server error fetching project data for viewing: ${e.message}`);
   }
 }

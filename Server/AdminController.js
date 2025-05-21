@@ -501,51 +501,54 @@ function deleteProject(projectId) {
   }
 }
 
+
   /**
    * Retrieves the project's data JSON string from its file in Google Drive.
    * @param {string} projectId The ID of the project.
-   * @return {string|null} The JSON string content of the project data file,
-   *                      or null if the project or file is not found or an error occurs.
+   * @return {string} The JSON string content of the project data file.
+   *                  Throws an error if the project/file is not found or another error occurs.
    */
   function getProjectDataForEditing(projectId) {
     try {
       Logger.log(`getProjectDataForEditing: Attempting to load data for projectId: ${projectId}`);
       if (!projectId) {
         Logger.log("getProjectDataForEditing: ProjectID is missing.");
-        return { error: "ProjectID is missing." };
+        throw new Error("ProjectID is missing.");
       }
 
       // Find row index first
-       const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
-       if (!rowIndex) {
-            Logger.log(`getProjectDataForEditing: Project with ID "${projectId}" not found in ProjectIndex.`);
-            return { error: `Project with ID "${projectId}" not found in ProjectIndex.` };
-       }
+      const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
+      if (!rowIndex) {
+          Logger.log(`getProjectDataForEditing: Project with ID "${projectId}" not found in ProjectIndex.`);
+          throw new Error(`Project index entry not found for ID: ${projectId}.`);
+      }
 
-       // Get row data to find the file ID
-       const rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
-       if (!rowData) {
-            Logger.log(`getProjectDataForEditing: Could not retrieve row data for project ${projectId} at row ${rowIndex}.`);
-            return { error: `Could not retrieve row data for project ${projectId} at row ${rowIndex}.` };
-       }
+      // Get row data to find the file ID
+      const rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
+      if (!rowData) {
+          Logger.log(`getProjectDataForEditing: Could not retrieve row data for project ${projectId} at row ${rowIndex}.`);
+          throw new Error("Could not retrieve project metadata from sheet.");
+      }
 
       const projectDataFileId = rowData[COL_PROJECT_DATA_FILE_ID - 1];
 
       if (!projectDataFileId) {
         Logger.log(`getProjectDataForEditing: ProjectDataFileID is missing for project "${projectId}" in row ${rowIndex}.`);
-        return { error: `ProjectDataFileID is missing for project "${projectId}" in row ${rowIndex}.` };
+        throw new Error("Project data file reference missing in index.");
       }
       Logger.log(`getProjectDataForEditing: Found ProjectDataFileID: ${projectDataFileId} for project ${projectId}.`);
 
-      // Read content using the found file ID
+      // Read content using the found file ID. This can throw an error.
       const jsonContent = readDriveFileContent(projectDataFileId);
 
       Logger.log(`getProjectDataForEditing: Successfully read content for file ID ${projectDataFileId}. Content length: ${jsonContent ? jsonContent.length : 0}`);
-      return jsonContent;
+      return jsonContent; // Return the string directly.
 
     } catch (e) {
       Logger.log(`Error in getProjectDataForEditing for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-      return { error: `Failed to read project data from Google Drive: ${e.message}` };
+      // Re-throw the error (or a new one with more context)
+      // This ensures it's caught by .withFailureHandler on the client side.
+      throw new Error(`Failed to get project data for editing: ${e.message}`);
     }
   }
 

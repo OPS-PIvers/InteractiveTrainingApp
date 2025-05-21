@@ -19,7 +19,7 @@ jobs:
     - name: Authenticate clasp
       run: |
         # Create the credentials file from the secret
-        echo '${{ CLASPRC_JSON }}' > ~/.clasprc.json
+        echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
         # Validate JSON format (fails if not valid)
         jq empty ~/.clasprc.json || { echo "Invalid JSON in credentials"; cat ~/.clasprc.json; exit 1; }
     - name: Push code to Apps Script
@@ -28,12 +28,12 @@ jobs:
     - name: Update deployment
       # If you have a specific deployment ID to update, use this format
       run: |
-        if [ -n "${{ APPS_SCRIPT_DEPLOYMENT_ID }}" ]; then
-          clasp deploy --deploymentId ${{ APPS_SCRIPT_DEPLOYMENT_ID }} --description "Auto-deployment $(date)"
+        if [ -n "${{ secrets.DEPLOYMENT_ID }}" ]; then
+          clasp deploy --deploymentId ${{ secrets.DEPLOYMENT_ID }} --description "Auto-deployment $(date)"
         else
           clasp deploy --description "Auto-deployment $(date)"
         fi
-    # Optional: Clean up the credentials file (this is good practice)
+    # Optional: Clean up the credentials file (good practice)
     - name: Clean up credentials
       if: always() # Run even if previous steps failed
       run: rm -f ~/.clasprc.json

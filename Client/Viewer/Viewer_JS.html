@@ -467,6 +467,9 @@
                      canvas.backgroundColor = '#e9e9e9'; // Default fallback
                      canvas.renderAll();
                 }
+                if (fabricCanvasEl) {
+                    fabricCanvasEl.style.opacity = '0'; // CHANGED: Make canvas fully transparent (was 0.5)
+                }
                 // Overlays will be loaded below, after the switch statement.
                 break;
 
@@ -1642,6 +1645,7 @@
         if (!canvas) return;
 
         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
+        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // ADDED: Make canvas fully opaque for questions
 
         // Background overlay for the question dialog
         const dialogWidth = canvas.width * 0.8;
@@ -1761,6 +1765,7 @@
                         }
                     });
                     if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+                    if (fabricCanvasEl) fabricCanvasEl.style.opacity = '0';
                     canvas.renderAll();
                     
                     if(ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();

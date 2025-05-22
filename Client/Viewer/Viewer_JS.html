@@ -40,6 +40,12 @@
       askedQuestionIndices: [], // Indices of questions already asked for the current slide view
     };
 
+    // Add callback for when YouTube API is ready
+    viewerApp.onYouTubeApiReady = function() {
+      isYouTubeApiReady = true;
+      console.log("YouTube API is now ready for use");
+    };
+
     // --- DOM Element References ---
     let viewerProjectListContainerEl, messageAreaElViewer, loadingSpinnerElViewer;
     let viewerListViewContainerEl, viewerProjectDisplayAreaEl, viewingProjectTitleEl;
@@ -461,7 +467,7 @@
                     canvas.renderAll();
                 }
                 if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
-                if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1';
+                if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
                 break;
 
             case 'youtube':
@@ -475,29 +481,37 @@
                         if (isYouTubeApiReady) {
                              setupYouTubePlayer(videoId);
                         } else {
-                             console.warn("YouTube API not ready yet when trying to render slide.");
-                             // Fallback if API never loads - canvas.backgroundColor handled by container or CSS
+                             console.warn("YouTube API not ready yet. Attempting to load player after delay...");
+                             // Try again after a short delay
+                             setTimeout(() => {
+                                 if (isYouTubeApiReady) {
+                                     setupYouTubePlayer(videoId);
+                                 } else {
+                                     console.error("YouTube API still not ready after delay. Video will not play.");
+                                     displayMessageViewer("YouTube player could not load. Please refresh the page.", false);
+                                 }
+                             }, 2000);
                              canvas.renderAll();
                         }
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
-                         // canvas.backgroundColor = '#555'; // Error indication - Handled by container or CSS
+                        displayMessageViewer("Invalid YouTube URL format.", false);
                          canvas.renderAll();
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
-                     // canvas.backgroundColor = '#e9e9e9'; // Default fallback - Handled by container or CSS
+                     displayMessageViewer("YouTube URL is missing for this slide.", false);
                      canvas.renderAll();
                 }
-                if (fabricCanvasEl) {
-                    fabricCanvasEl.style.opacity = '1'; // Ensure canvas is opaque for overlays
+                if (viewerFabricCanvasEl) {
+                    viewerFabricCanvasEl.style.opacity = '1'; // Ensure canvas is opaque for overlays
                 }
                 // Overlays will be loaded below, after the switch statement.
                 break;
 
             case 'audio':
                  if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
-                 if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1';
+                 if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
                  if (media.driveFileId) {
                      console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true);
@@ -533,7 +547,7 @@
 
             default: 
                  if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
-                 if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1';
+                 if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
                  // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                  canvas.renderAll();
                  break;
@@ -1418,23 +1432,28 @@
     }
 
     // --- YouTube Player API Functions ---
-    function onYouTubeIframeAPIReady() {
+    // IMPORTANT: This function MUST be global for YouTube API to call it
+    window.onYouTubeIframeAPIReady = function() {
         console.log("YouTube IFrame API Ready (called by external script).");
         isYouTubeApiReady = true;
-    }
+    };
 
     function setupYouTubePlayer(videoId) {
         if (!youtubePlayerContainerEl) {
-            console.error("YouTube player container element not found."); return;
+            console.error("YouTube player container element not found."); 
+            displayMessageViewer("YouTube player setup error: container missing.", false);
+            return;
         }
         youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>';
         youtubePlayerContainerEl.style.display = 'block';
         console.log("Setting up YouTube player for video ID:", videoId);
+        
         if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
             console.error("YT object or YT.Player is not available or API not ready.");
-            displayMessageViewer("YouTube Player API not ready. Please wait or reload.", false);
+            displayMessageViewer("YouTube Player API not available. Please check your internet connection and refresh.", false);
             return;
         }
+        
         try {
              if(ytPlayer && typeof ytPlayer.destroy === 'function') {
                  console.log("Destroying previous YT player instance.");
@@ -1457,7 +1476,7 @@
                     'onError': onPlayerError
                 }
             });
-             console.log("YT.Player instance potentially created.");
+             console.log("YT.Player instance created successfully.");
         } catch (e) {
             console.error("Error creating YouTube player instance:", e);
             displayMessageViewer(`Error initializing YouTube player: ${e.message}`, false);
@@ -1671,7 +1690,7 @@
         if (!canvas) return;
 
         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
-        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Make canvas fully opaque for questions
+        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1'; // Make canvas fully opaque for questions
 
         // Background overlay for the question dialog
         const dialogWidth = canvas.width * 0.8;
@@ -1793,9 +1812,9 @@
                     if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
                     // Adjust opacity based on mediaType after question
                     if (mediaType === 'youtube') {
-                        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Keep opaque for YouTube
+                        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1'; // Keep opaque for YouTube
                     } else {
-                        if (fabricCanvasEl) fabricCanvasEl.style.opacity = '0'; // Revert to transparent for non-YouTube if needed
+                        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0'; // Revert to transparent for non-YouTube if needed
                     }
                     canvas.renderAll();
                     

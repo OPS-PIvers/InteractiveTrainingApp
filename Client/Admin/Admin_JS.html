@@ -991,45 +991,60 @@ function onYouTubeIframeAPIReady() {
                 adminApp.state.adminYouTubePlayer = new YT.Player('adminYouTubePlayerContainer', {
                     height: '100%', // Fill the container
                     width: '100%',
-                    videoId: videoId,
+                    videoId: videoId, // The YouTube video ID extracted from the URL
                     playerVars: {
-                        'playsinline': 1,
-                        'controls': 1, // Show controls for admin
-                        'modestbranding': 1,
-                        'rel': 0
+                        'playsinline': 1,       // Plays video inline on mobile devices instead of fullscreen
+                        'controls': 1,          // Show player controls (0 to hide) - Admin gets controls
+                        'modestbranding': 1,    // Reduce YouTube logo visibility
+                        'rel': 0,               // Do not show related videos when playback ends
+                        'origin': window.location.origin // Dynamically set origin for API security & embed requirements
                     },
                     events: {
+                        // Event handler for when the player is ready
                         'onReady': (event) => {
                             console.log("Admin YouTube player ready.");
-                            updateVideoToolsVisibility(true);
-                            renderVideoQuestionsList(); // Render questions when player is ready
+                            updateVideoToolsVisibility(true); // Show timeline and question controls
+                            renderVideoQuestionsList(); // Render any existing questions for this video
                             const duration = event.target.getDuration();
                             if (videoTotalDurationDisplayEl) videoTotalDurationDisplayEl.textContent = formatTime(duration);
                             if (videoTimelineSliderEl) videoTimelineSliderEl.max = duration;
-                            event.target.playVideo();
+                            event.target.playVideo(); // Autoplay the video once ready
                         },
+                        // Event handler for when the player's state changes (playing, paused, ended, etc.)
                         'onStateChange': (event) => {
+                            // Clear any existing interval before setting a new one or if player is not playing
                             if (adminApp.state.playerUpdateInterval) {
                                 clearInterval(adminApp.state.playerUpdateInterval);
-                                adminApp.state.playerUpdateInterval = null;
+                                adminApp.state.playerUpdateInterval = null; // Clear the reference
                             }
+
+                            // If video is playing, set an interval to update the timeline slider and current time display
                             if (event.data === YT.PlayerState.PLAYING) {
                                 adminApp.state.playerUpdateInterval = setInterval(() => {
                                     const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
                                     if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
                                     if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
-                                }, 250);
+                                }, 250); // Update every 250ms
                             }
                         },
+                        // Event handler for when an error occurs in the player
                         'onError': (event) => {
-                            console.error("Admin YouTube player error", event.data);
-                            updateVideoToolsVisibility(false); // Hide timeline on error
+                            console.error("Admin YouTube player error", event.data, "for URL:", media.url);
+                            updateVideoToolsVisibility(false); // Hide timeline and question controls on error
+                            
+                            // Display a user-friendly error message
                             if (adminMediaPlaceholderEl) {
-                                adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Code: ${event.data}. URL: ${media.url}`;
-                                adminMediaPlaceholderEl.style.display = 'block';
+                                if (event.data === 150) { // Error 150: Playback restricted by video owner
+                                    adminMediaPlaceholderEl.innerHTML = `<strong>Playback Error (Code 150)</strong><br>The owner of this video has restricted playback in embedded players. Please try a different YouTube video. <br><small>URL: ${media.url}</small>`;
+                                } else { // Other errors
+                                    adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Code: ${event.data}. URL: ${media.url}`;
+                                }
+                                adminMediaPlaceholderEl.style.display = 'block'; // Show the placeholder with the error
                             }
+                            
+                            // Visual fallback for the canvas area
                             if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Restore canvas opacity
-                            canvas.backgroundColor = '#444'; // Fallback
+                            canvas.backgroundColor = '#444'; // Set a fallback background color for the canvas
                             canvas.renderAll();
                         }
                     }

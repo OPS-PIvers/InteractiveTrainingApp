@@ -81,6 +81,9 @@ function onYouTubeIframeAPIReady() {
         videoQuestionsListContainerEl, videoQuestionsListEl; // Added question list elements
     let optionInputsEl = [], correctAnswerRadiosEl = [];
 
+    // Phase 1: "Click to Begin" checkbox
+    let youtubeShowClickToBeginEl;
+
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -293,6 +296,9 @@ function onYouTubeIframeAPIReady() {
           correctAnswerRadiosEl.push(document.getElementById(`correctAnswer${i}`));
       }
 
+      // Phase 1: "Click to Begin" checkbox
+      youtubeShowClickToBeginEl = document.getElementById('youtubeShowClickToBegin');
+
 
       // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
@@ -304,6 +310,8 @@ function onYouTubeIframeAPIReady() {
       if (!shadowPopoverEl || !interactionPopoverEl || !animationPopoverEl || !fontFamilyPopoverEl) {
           console.warn("setupDOMReferences: One or more popover elements not found.");
       }
+      if (!youtubeShowClickToBeginEl) console.warn("setupDOMReferences: youtubeShowClickToBeginEl not found.");
+
 
       console.log("Admin_JS: DOM references set up.");
     };
@@ -472,6 +480,7 @@ function onYouTubeIframeAPIReady() {
             adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
             if (e.target) {
                 populateToolbar(e.target);
+                saveCanvasStateForHistory(); // Save state after modification
             }
             });
             adminApp.state.fabricCanvasInstance.on('selection:created', (e) => {
@@ -485,6 +494,11 @@ function onYouTubeIframeAPIReady() {
             adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
                populateToolbar(null);
             });
+            adminApp.state.fabricCanvasInstance.on('object:added', () => {
+                saveCanvasStateForHistory(); // Save state after adding an object
+            });
+            // Removed object:removed because handleDeleteObject calls saveCanvasStateForHistory explicitly.
+
 
             // Make toolbar visible and set initial state for no selection
             if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'block';
@@ -722,6 +736,10 @@ function onYouTubeIframeAPIReady() {
                     }
                 });
               }
+              // Ensure youtubeOptions exists for YouTube slides
+              if (slide.slideMedia && slide.slideMedia.type === 'youtube' && !slide.slideMedia.youtubeOptions) {
+                slide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default
+              }
           });
 
           adminApp.state.projectData = loadedData;
@@ -775,9 +793,15 @@ function onYouTubeIframeAPIReady() {
           currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
           currentSlide.canvasWidth = canvas.getWidth();
           currentSlide.canvasHeight = canvas.getHeight();
+          
           if (!currentSlide.slideMedia) {
                currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
           }
+          // Ensure youtubeOptions is initialized for YouTube slides if not present
+          if (currentSlide.slideMedia.type === 'youtube' && !currentSlide.slideMedia.youtubeOptions) {
+              currentSlide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default if somehow missing
+          }
+
           if(currentSlide.slideMedia.type !== 'image' && currentSlide.slideMedia.url && currentSlide.slideMedia.url.startsWith('data:image')) {
               // This case seems unlikely for non-image types but kept for safety
               currentSlide.slideMedia.url = null;
@@ -877,7 +901,11 @@ function onYouTubeIframeAPIReady() {
             canvasWidth: adminApp.state.defaultCanvasWidth,
             canvasHeight: adminApp.state.defaultCanvasHeight,
             fabricCanvasJSON: null, // Will be empty JSON for a new slide
-            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] } // Added videoQuestions
+            slideMedia: { 
+                type: null, url: null, driveFileId: null, mimeType: null, originalName: null, 
+                videoQuestions: [],
+                youtubeOptions: { showClickToBeginButton: false } // Default for new slides
+            } 
         };
         if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
@@ -906,10 +934,16 @@ function onYouTubeIframeAPIReady() {
         }
 
         if (!selectedSlideData.slideMedia) {
-            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] };
-        } else if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
-            selectedSlideData.slideMedia.videoQuestions = [];
+            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], youtubeOptions: { showClickToBeginButton: false } };
+        } else {
+            if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
+                selectedSlideData.slideMedia.videoQuestions = [];
+            }
+            if (selectedSlideData.slideMedia.type === 'youtube' && typeof selectedSlideData.slideMedia.youtubeOptions === 'undefined') {
+                selectedSlideData.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Ensure it exists
+            }
         }
+
 
         // Destroy existing YouTube player if any
         if (adminApp.state.adminYouTubePlayer) {
@@ -934,6 +968,9 @@ function onYouTubeIframeAPIReady() {
         // Reset UI elements related to slide media
         if (imageUploaderEl) imageUploaderEl.value = null;
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
+        // Phase 1: "Click to Begin" checkbox reset
+        if (youtubeShowClickToBeginEl) youtubeShowClickToBeginEl.checked = false;
+
         if (audioUploaderEl) audioUploaderEl.value = null;
         if (attachedAudioNameEl) {
             attachedAudioNameEl.textContent = '';
@@ -988,6 +1025,10 @@ function onYouTubeIframeAPIReady() {
             console.log("Attempting to load YouTube player for URL:", media.url);
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
+            // Phase 1: Populate "Click to Begin" checkbox
+            if (youtubeShowClickToBeginEl && media.youtubeOptions) {
+                youtubeShowClickToBeginEl.checked = !!media.youtubeOptions.showClickToBeginButton;
+            }
             
             const videoId = extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl && typeof YT !== 'undefined' && YT.Player) {
@@ -1028,9 +1069,14 @@ function onYouTubeIframeAPIReady() {
                             // If video is playing, set an interval to update the timeline slider and current time display
                             if (event.data === YT.PlayerState.PLAYING) {
                                 adminApp.state.playerUpdateInterval = setInterval(() => {
-                                    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
-                                    if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
-                                    if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
+                                    if (adminApp.state.adminYouTubePlayer) { // Check if player still exists
+                                        const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+                                        if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
+                                        if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
+                                    } else { // Player was destroyed, clear interval
+                                        clearInterval(adminApp.state.playerUpdateInterval);
+                                        adminApp.state.playerUpdateInterval = null;
+                                    }
                                 }, 250); // Update every 250ms
                             }
                         },
@@ -1520,15 +1566,22 @@ function onYouTubeIframeAPIReady() {
 
         const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
         if (!currentSlide.slideMedia) {
-            currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
+            currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, youtubeOptions: { showClickToBeginButton: false } };
+        } else if (typeof currentSlide.slideMedia.youtubeOptions === 'undefined') { // Ensure youtubeOptions exists
+            currentSlide.slideMedia.youtubeOptions = { showClickToBeginButton: false };
         }
         currentSlide.slideMedia.type = 'youtube';
         currentSlide.slideMedia.url = url;
         currentSlide.slideMedia.driveFileId = null; // YouTube videos are not Drive files
         currentSlide.slideMedia.mimeType = 'video/youtube';
         currentSlide.slideMedia.originalName = null;
+        // Phase 1: Save "Click to Begin" option
+        if (youtubeShowClickToBeginEl) {
+            currentSlide.slideMedia.youtubeOptions.showClickToBeginButton = youtubeShowClickToBeginEl.checked;
+        }
 
-        console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
+
+        console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}. ClickToBegin: ${currentSlide.slideMedia.youtubeOptions.showClickToBeginButton}`);
 
         if(adminApp.state.fabricCanvasInstance) {
              adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
@@ -1619,6 +1672,8 @@ function onYouTubeIframeAPIReady() {
             // Clear other media UI states and canvas background
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
             if (imageUploaderEl) imageUploaderEl.value = null;
+            if (youtubeShowClickToBeginEl) youtubeShowClickToBeginEl.checked = false; // Reset youtube specific option
+
             if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; // Default BG
@@ -1836,7 +1891,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null 
       });
     canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll();
-    saveCanvasStateForHistory(); // <-- ADD
+    saveCanvasStateForHistory(); 
     console.log("Rectangle added to canvas:", rect);
     hideActivePopover();
     }
@@ -1852,7 +1907,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null 
       });
     canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll();
-    saveCanvasStateForHistory(); // <-- ADD
+    saveCanvasStateForHistory(); 
     console.log("Circle added to canvas:", circle);
     hideActivePopover();
     }
@@ -1869,7 +1924,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null
       });
         canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll();
-        saveCanvasStateForHistory(); // <-- ADD
+        saveCanvasStateForHistory(); 
         console.log("Textbox added to canvas:", textbox);
         hideActivePopover();
         }
@@ -2359,6 +2414,7 @@ function onYouTubeIframeAPIReady() {
         if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(activeObject.customInteraction.trigger && activeObject.customInteraction.action));
         console.log("Interaction data updated for object:", activeObject.customInteraction);
         canvas.renderAll(); // Ensure change is reflected if visual properties depend on it (though unlikely here)
+        saveCanvasStateForHistory(); // Save state after interaction change
     }
 
     function updateInteractionConfigVisibility(action) {
@@ -2439,6 +2495,7 @@ function onYouTubeIframeAPIReady() {
         if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
         console.log("Animation data updated for object:", activeObject.customAnimation);
         canvas.renderAll();
+        saveCanvasStateForHistory(); // Save state after animation change
     }
 
     function updateFabricObjectFromToolbar(propertyName, value, inputType, isFloat = false) {
@@ -2529,6 +2586,10 @@ function onYouTubeIframeAPIReady() {
       canvas.renderAll();
       // Do NOT call populateToolbar here to avoid potential infinite loops.
       // The primary event handlers (e.g., button clicks) should call populateToolbar if a visual update of the toolbar itself is needed.
+      // IMPORTANT: save state after any toolbar update that modifies the object.
+      if (!propertyName.startsWith('customInteraction.') && !propertyName.startsWith('customAnimation.')) { // Custom Interactions/Animations have their own save points.
+          saveCanvasStateForHistory();
+      }
     }
 
     // --- Utilities ---

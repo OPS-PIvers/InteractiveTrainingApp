@@ -40,6 +40,7 @@
       askedQuestionIndices: [], // Indices of questions already asked for the current slide view
       currentTimestampOverlays: [], // Stores full overlay definitions for the current slide
       activeTimestampOverlayIds: new Set(), // Stores IDs of currently displayed timestamp overlays
+      currentVideoDuration: 0 // Phase 1: Store current video duration for timeline
     };
 
     // Add callback for when YouTube API is ready
@@ -57,6 +58,10 @@
     let viewerModalEl, viewerModalCloseButtonEl, viewerModalBodyEl,
         modalPrevButtonEl, modalNextButtonEl; // Modal Nav Buttons (Step 21)
     let viewerAudioPlayerEl; // Ref for the audio element
+
+    // Phase 1: Timeline Elements
+    let viewerVideoTimelineContainerEl, viewerTimelineTrackEl, viewerTimelineProgressEl,
+        viewerCurrentTimeEl, viewerTotalDurationEl;
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -97,6 +102,14 @@
 
       viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer');
 
+      // Phase 1: Timeline Elements
+      viewerVideoTimelineContainerEl = document.getElementById('viewerVideoTimelineContainer');
+      viewerTimelineTrackEl = document.getElementById('viewerTimelineTrack');
+      viewerTimelineProgressEl = document.getElementById('viewerTimelineProgress');
+      viewerCurrentTimeEl = document.getElementById('viewerCurrentTime');
+      viewerTotalDurationEl = document.getElementById('viewerTotalDuration');
+
+
       if (!viewerProjectListContainerEl) console.error("CRITICAL: viewerProjectListContainerEl not found!");
       if (!viewerModalEl) console.error("CRITICAL: viewerModalEl not found!");
       if (!viewerAudioPlayerEl) console.error("CRITICAL: viewerAudioPlayerEl not found!");
@@ -104,6 +117,8 @@
       // NEW: Get reference to the main display area for click-off listener
       viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
       if (!viewerProjectDisplayAreaEl) console.error("CRITICAL: viewerProjectDisplayAreaEl not found!"); // Add check
+      if (!viewerVideoTimelineContainerEl) console.warn("Timeline container not found (viewerVideoTimelineContainerEl)");
+
 
       console.log("Viewer_JS: DOM references set up.");
     };
@@ -134,6 +149,20 @@
                     // removeSpotlightEffect(); // SVG spotlight uses its own catcher
                 }
              }, false);
+        }
+
+        // Phase 1: Timeline track click listener for seeking
+        if (viewerTimelineTrackEl) {
+            viewerTimelineTrackEl.addEventListener('click', function(e) {
+                if (ytPlayer && typeof ytPlayer.seekTo === 'function' && viewerApp.state.currentVideoDuration > 0) {
+                    const rect = viewerTimelineTrackEl.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left; // Click position relative to the track
+                    const percentage = clickX / rect.width;
+                    const seekTime = percentage * viewerApp.state.currentVideoDuration;
+                    ytPlayer.seekTo(seekTime, true); // true allows seek ahead
+                    console.log(`Timeline clicked: Seek to ${seekTime.toFixed(2)}s`);
+                }
+            });
         }
     };
 
@@ -180,6 +209,16 @@
       }
       displayMessageViewer('Server Error: ' + errorMessage, false);
     }
+
+    // Phase 1: Helper function to format time (similar to Admin_JS)
+    // Place it for example near other helper functions or before Project List Loading
+    function formatTime(totalSeconds) {
+        totalSeconds = Math.floor(totalSeconds);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+
 
     // --- Project List Loading/Display ---
     function loadViewerProjectsList() {
@@ -300,6 +339,10 @@
                     if (slide.slideMedia && slide.slideMedia.type === 'youtube' && !Array.isArray(slide.slideMedia.videoQuestions)) {
                         slide.slideMedia.videoQuestions = [];
                     }
+                    // Phase 1: Ensure youtubeOptions exists for YouTube slides
+                    if (slide.slideMedia && slide.slideMedia.type === 'youtube' && typeof slide.slideMedia.youtubeOptions === 'undefined') {
+                        slide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default
+                    }
                  });
              } else {
                  throw new Error("Project data is missing slides array.");
@@ -378,7 +421,7 @@
             console.error("Invalid slide index:", slideIndex); return;
         }
 
-        stopAndDestroyYouTubePlayer(); // This will also clear timestamp overlay states
+        stopAndDestroyYouTubePlayer(); // This will also clear timestamp overlay states & video duration
         stopAndClearAudioPlayer();
         hideSpotlightSVG(); 
         if(viewerApp.state.isCanvasPannedOrZoomed) resetPanZoomWithAnimation(true); // Reset immediately if panned/zoomed
@@ -393,8 +436,11 @@
         const canvas = viewerApp.state.viewerFabricCanvas;
 
          if (!slideData.slideMedia) {
-            slideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
+            slideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, youtubeOptions: { showClickToBeginButton: false } };
+         } else if (slideData.slideMedia.type === 'youtube' && typeof slideData.slideMedia.youtubeOptions === 'undefined') {
+            slideData.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Ensure it exists for YouTube
          }
+
 
         const slideWidth = slideData.canvasWidth || viewerApp.state.defaultCanvasWidth;
         const slideHeight = slideData.canvasHeight || viewerApp.state.defaultCanvasHeight;
@@ -418,21 +464,25 @@
         canvas.backgroundColor = 'transparent';
 
         if (youtubePlayerContainerEl) youtubePlayerContainerEl.style.display = (mediaType === 'youtube') ? 'block' : 'none';
-        // For YouTube, canvas container should be visible to overlay.
+        if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'none'; // Hide by default
+
         if (viewerCanvasContainerEl) {
-            viewerCanvasContainerEl.style.display = 'flex'; // Always visible, overlays YT or shows image/audio bg
+            viewerCanvasContainerEl.style.display = 'flex'; 
             if (mediaType === 'youtube') {
-                viewerCanvasContainerEl.style.pointerEvents = 'none'; // Pass clicks to player by default
-                // Populate video questions for the current slide if it's a YouTube video
+                // Initial state before "Click to Begin" or overlays are evaluated
+                viewerCanvasContainerEl.style.pointerEvents = 'none'; 
+                viewerFabricCanvasEl.style.opacity = '0'; 
+
                 if (slideData.slideMedia && slideData.slideMedia.videoQuestions) {
                     viewerApp.state.currentVideoQuestions = [...slideData.slideMedia.videoQuestions].sort((a, b) => a.timestamp - b.timestamp);
                 } else {
                     viewerApp.state.currentVideoQuestions = [];
                 }
-                viewerApp.state.askedQuestionIndices = []; // Reset for new slide/video
+                viewerApp.state.askedQuestionIndices = []; 
             } else {
-                viewerCanvasContainerEl.style.pointerEvents = 'auto'; // Allow clicks on canvas for non-YT
-                viewerApp.state.currentVideoQuestions = []; // Clear questions if not a YT video
+                viewerCanvasContainerEl.style.pointerEvents = 'auto'; 
+                viewerFabricCanvasEl.style.opacity = '1'; 
+                viewerApp.state.currentVideoQuestions = []; 
                 viewerApp.state.askedQuestionIndices = [];
             }
         }
@@ -443,7 +493,6 @@
         switch(mediaType) {
             case 'image':
                 if (media.driveFileId) {
-                    // Always fetch from Drive, don't rely on stored base64
                     showLoadingViewer(true);
                     google.script.run
                         .withSuccessHandler(function(response) {
@@ -474,130 +523,86 @@
                 }
                 if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
                 if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
+                if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
                 break;
 
             case 'youtube':
                 if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = 'transparent';
-                // Canvas container is already set to display:flex above.
-                // Fabric canvas dimensions are already set by slideWidth/slideHeight.
-                // Fabric canvas background is transparent by default from initializeViewerCanvas.
-                if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                 if (media.url) {
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
                         if (isYouTubeApiReady) {
-                             setupYouTubePlayer(videoId);
-                             // --- BEGIN "Click to Begin" LOGIC ---
-                             const youtubeOptions = media.youtubeOptions || {}; // Ensure youtubeOptions exists
+                             setupYouTubePlayer(videoId); // This now calls onPlayerReady which handles timeline setup
+                             // Phase 1: "Click to Begin" logic
+                             const youtubeOptions = media.youtubeOptions || {};
                              if (youtubeOptions.showClickToBeginButton) {
                                  if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
                                  if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
 
-                                 const canvas = viewerApp.state.viewerFabricCanvas;
-                                 if (canvas) {
-                                     // Remove any existing "click to begin" button first
-                                     canvas.getObjects().forEach(obj => {
-                                         if (obj.isClickToBeginButton) {
-                                             canvas.remove(obj);
-                                         }
-                                     });
+                                 // Remove any existing "click to begin" button first
+                                 canvas.getObjects().forEach(obj => {
+                                     if (obj.customType === 'clickToBeginButton') { // Use customType
+                                         canvas.remove(obj);
+                                     }
+                                 });
 
-                                     const beginButtonText = new fabric.Textbox('Click here to begin', {
-                                         left: canvas.width / 2,
-                                         top: canvas.height / 2,
-                                         originX: 'center',
-                                         originY: 'center',
-                                         fontSize: 30,
-                                         fill: 'white',
-                                         backgroundColor: 'rgba(0,0,0,0.7)',
-                                         padding: 15,
-                                         rx: 10, // Rounded corners for background
-                                         ry: 10, // Rounded corners for background
-                                         selectable: false,
-                                         evented: true,
-                                         hoverCursor: 'pointer',
-                                         isClickToBeginButton: true // Custom property to identify this button
-                                     });
+                                 const beginButtonText = new fabric.Textbox('Click here to begin', {
+                                     left: canvas.width / 2, top: canvas.height / 2, originX: 'center', originY: 'center',
+                                     fontSize: (canvas.width > 600 ? 30 : 24), fill: 'white', backgroundColor: 'rgba(0,0,0,0.75)',
+                                     padding: 15, rx: 10, ry: 10,
+                                     selectable: false, evented: true, hoverCursor: 'pointer',
+                                     customType: 'clickToBeginButton' // Identify this button
+                                 });
 
-                                     beginButtonText.on('mousedown', function() {
-                                         if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
-                                             ytPlayer.playVideo();
-                                         }
-                                         canvas.remove(beginButtonText); // Remove the button
-                                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                                         if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                                         canvas.renderAll();
-                                     });
-                                     canvas.add(beginButtonText);
-                                     canvas.bringToFront(beginButtonText);
+                                 beginButtonText.on('mousedown', function() {
+                                     if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
+                                         ytPlayer.playVideo();
+                                     }
+                                     canvas.remove(this); 
+                                     // Transition canvas to be click-through for player if no immediate overlays
+                                     // This will be refined by updateCanvasInteractivity() later
+                                     if (viewerApp.state.activeTimestampOverlayIds.size === 0) { // Quick check
+                                        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
+                                        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+                                     }
                                      canvas.renderAll();
-                                 }
+                                 });
+                                 canvas.add(beginButtonText);
+                                 canvas.bringToFront(beginButtonText);
+                                 canvas.renderAll();
                              } else {
-                                 // If no "Click to Begin" button, ensure canvas is transparent and click-through for player
+                                 // If no "Click to Begin" and no initial overlays, canvas is transparent
                                  if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                                  if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
                              }
-                             // --- END "Click to Begin" LOGIC ---
-
-                              // Initialize timestamp overlays for the current slide
-                              viewerApp.state.currentTimestampOverlays = (slideData.timestampOverlays || []).map(o => ({...o, _fabricObject: null})); // Reset and copy, add placeholder for fabric object
-                              viewerApp.state.activeTimestampOverlayIds.clear();
-                              // Ensure canvas is initially transparent if no "Click to Begin" button was shown and no overlays are due at time 0
-                              if (!(media.youtubeOptions && media.youtubeOptions.showClickToBeginButton)) {
-                                  let isOverlayAtTimeZero = viewerApp.state.currentTimestampOverlays.some(o => o.timestampShow === 0);
-                                  if (!isOverlayAtTimeZero) {
-                                      if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                                  } else {
-                                      // If an overlay IS at time zero, canvas needs to be visible
-                                      if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
-                                      // Interactivity will be handled by checkVideoTimeForTimestampOverlays
-                                      // We should call it once here to ensure initial state is correct for t=0 overlays
-                                      // However, player might not be ready. Defer to first check in interval or on PAUSED state if autoplay is off.
-                                  }
-                              }
+                             // Timeline and question marker setup will happen in onPlayerReady
                         } else {
-                             console.warn("YouTube API not ready yet. Attempting to load player after delay...");
-                             // Try again after a short delay
-                             setTimeout(() => {
-                                 if (isYouTubeApiReady) {
-                                     setupYouTubePlayer(videoId);
-                                     // Potentially show "Click to Begin" here too if API loads late and button is configured
-                                     // For now, keeping it simple: if API wasn't ready initially, button won't show on delayed load.
-                                 } else {
-                                     console.error("YouTube API still not ready after delay. Video will not play.");
-                                     displayMessageViewer("YouTube player could not load. Please refresh the page.", false);
-                                 }
-                             }, 2000);
-                             // Ensure canvas is transparent here too if player doesn't load initially
+                             console.warn("YouTube API not ready yet. Player setup deferred.");
+                             // Set canvas to transparent as player might load later
                              if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                              if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                             canvas.renderAll();
+                             displayMessageViewer("YouTube player is loading...", true);
+                             // Fallback if API load fails is handled by the API loader itself
                         }
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
                         displayMessageViewer("Invalid YouTube URL format.", false);
-                        // Ensure canvas is transparent here too
                         if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                        canvas.renderAll(); 
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
                      displayMessageViewer("YouTube URL is missing for this slide.", false);
-                     // Ensure canvas is transparent here too
                      if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                     canvas.renderAll(); 
                 }
-                // Overlays will be loaded below, after the switch statement.
                 break;
 
             case 'audio':
                  if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
                  if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
+                 if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
                  if (media.driveFileId) {
-                     console.log("Audio media needs fetch from Drive ID:", media.driveFileId);
                      showLoadingViewer(true);
                      google.script.run
                          .withSuccessHandler(function(audioResponse) {
@@ -606,25 +611,20 @@
                              if (audioResponse && audioResponse.success && audioResponse.base64Data) {
                                  setupAudioPlayer(audioResponse.base64Data);
                                  if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block';
-                                 // canvas.backgroundColor = '#e0e0e0'; // Handled by viewerMediaContainerEl
                                  canvas.renderAll();
                              } else {
-                                 console.error("Failed to fetch audio base64 data:", audioResponse);
                                  onServerErrorViewer(audioResponse || {error: "Failed to load audio data."});
-                                 // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                                  canvas.renderAll();
                              }
                          })
                          .withFailureHandler(function(error) {
                              showLoadingViewer(false);
                              onServerErrorViewer(error);
-                             // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                              canvas.renderAll();
                          })
                          .getAudioAsBase64(media.driveFileId);
                  } else {
                      console.warn("Audio media type set but driveFileId is missing.");
-                     // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
                      canvas.renderAll();
                  }
                  break;
@@ -632,13 +632,11 @@
             default: 
                  if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
                  if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
-                 // canvas.backgroundColor = '#e9e9e9'; // Handled by viewerMediaContainerEl
+                 if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
                  canvas.renderAll();
                  break;
         }
 
-        // Load Fabric.js overlays for ALL slide types, including YouTube
-        // The canvas container visibility and pointer-events are managed above.
         if (slideData.fabricCanvasJSON) {
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) return;
@@ -649,102 +647,35 @@
                     obj.hoverCursor = 'pointer';
                     obj._clickAndHoldTimer = null;
 
-                    obj.off('mousedown');
-                    obj.off('mouseup');
-                    obj.off('mouseout');
-                    obj.off('mousemove'); 
-                    obj.off('mouseover');
+                    obj.off('mousedown'); obj.off('mouseup'); obj.off('mouseout');
+                    obj.off('mousemove'); obj.off('mouseover');
 
-                    // --- Attach Interaction & Animation Listeners ---
                     if (obj.customInteraction && obj.customInteraction.trigger) {
                         const trigger = obj.customInteraction.trigger;
                         const action = obj.customInteraction.action;
 
-                        // Special handling for "Click and Hold" + "Spotlight" (SVG Mask version)
                         if (trigger === 'clickAndHold' && action === 'spotlight') {
-                            obj.on('mousedown', function(options) {
-                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
-                                    showSpotlightSVG(this, this.customInteraction);
-                                }
-                            });
-                            obj.on('mouseup', function() {
-                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
-                                    if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
-                                        hideSpotlightSVG();
-                                    }
-                                }
-                            });
-                            obj.on('mouseout', function() { 
-                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') {
-                                    if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) {
-                                        hideSpotlightSVG();
-                                    }
-                                }
-                            });
+                            obj.on('mousedown', function(options) { if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') { showSpotlightSVG(this, this.customInteraction); }});
+                            obj.on('mouseup', function() { if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') { if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) { hideSpotlightSVG(); } }});
+                            obj.on('mouseout', function() {  if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold' && this.customInteraction.action === 'spotlight') { if (viewerApp.state.isSpotlightActive && viewerApp.state.currentSpotlightInfo && viewerApp.state.currentSpotlightInfo.targetFabricObject === this) { hideSpotlightSVG(); } }});
                         }
-                        // General click, hover, and other clickAndHold actions
                         else if (trigger === 'click') {
-                            obj.on('mousedown', function(options) {
-                                if (this.customInteraction && this.customInteraction.trigger === 'click') {
-                                    if (this._clickAndHoldTimer) { 
-                                        clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null;
-                                    }
-                                    handleOverlayInteraction(this, 'click');
-                                    // Animation on click (if also configured)
-                                    if (this.customAnimation && this.customAnimation.trigger === 'onClick' && this.customAnimation.type) {
-                                        executeAnimation(this, this.customAnimation);
-                                    }
-                                    if(options.e) options.e.stopPropagation();
-                                }
-                            });
+                            obj.on('mousedown', function(options) { if (this.customInteraction && this.customInteraction.trigger === 'click') { if (this._clickAndHoldTimer) { clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null;} handleOverlayInteraction(this, 'click'); if (this.customAnimation && this.customAnimation.trigger === 'onClick' && this.customAnimation.type) { executeAnimation(this, this.customAnimation); } if(options.e) options.e.stopPropagation();}});
                         } else if (trigger === 'hover') {
-                            obj.on('mouseover', function() {
-                                if (this.customInteraction && this.customInteraction.trigger === 'hover') {
-                                    handleOverlayInteraction(this, 'hover');
-                                }
-                                // Animation on hover (if also configured)
-                                if (this.customAnimation && this.customAnimation.trigger === 'hover' && this.customAnimation.type) {
-                                    executeAnimation(this, this.customAnimation);
-                                }
-                            });
-                            // Optionally, add mouseout to stop/reset hover animations if needed
-                            obj.on('mouseout', function() {
-                                if (this.customAnimation && this.customAnimation.trigger === 'hover' && this.customAnimation.type) {
-                                    stopAnimation(this); // Implement stopAnimation if needed
-                                }
-                            });
+                            obj.on('mouseover', function() { if (this.customInteraction && this.customInteraction.trigger === 'hover') { handleOverlayInteraction(this, 'hover'); } if (this.customAnimation && this.customAnimation.trigger === 'hover' && this.customAnimation.type) { executeAnimation(this, this.customAnimation); }});
+                            obj.on('mouseout', function() { if (this.customAnimation && this.customAnimation.trigger === 'hover' && this.customAnimation.type) { stopAnimation(this); }});
                         } else if (trigger === 'clickAndHold') { 
-                            obj.on('mousedown', function(options) {
-                                if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold') { 
-                                    if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer);
-                                    this._clickAndHoldTimer = setTimeout(() => {
-                                        handleOverlayInteraction(this, 'clickAndHold');
-                                        // Animation on clickAndHold (if also configured)
-                                        if (this.customAnimation && this.customAnimation.trigger === 'onClick' && this.customAnimation.type) { // Assuming 'onClick' trigger for animation on hold completion
-                                            executeAnimation(this, this.customAnimation);
-                                        }
-                                        this._clickAndHoldTimer = null;
-                                    }, CLICK_AND_HOLD_DURATION);
-                                }
-                            });
-                            const cancelGenericHold = function() {
-                                if (this._clickAndHoldTimer) {
-                                    clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null;
-                                }
-                            };
-                            obj.on('mouseup', cancelGenericHold);
-                            obj.on('mouseout', cancelGenericHold);
+                            obj.on('mousedown', function(options) { if (this.customInteraction && this.customInteraction.trigger === 'clickAndHold') {  if (this._clickAndHoldTimer) clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = setTimeout(() => { handleOverlayInteraction(this, 'clickAndHold'); if (this.customAnimation && this.customAnimation.trigger === 'onClick' && this.customAnimation.type) { executeAnimation(this, this.customAnimation); } this._clickAndHoldTimer = null; }, CLICK_AND_HOLD_DURATION);}});
+                            const cancelGenericHold = function() { if (this._clickAndHoldTimer) { clearTimeout(this._clickAndHoldTimer); this._clickAndHoldTimer = null; }};
+                            obj.on('mouseup', cancelGenericHold); obj.on('mouseout', cancelGenericHold);
                         }
                     }
-
-                    // Animation: On Load
                     if (obj.customAnimation && obj.customAnimation.trigger === 'onLoad' && obj.customAnimation.type) {
-                        // Delay slightly to ensure object is fully rendered
                         setTimeout(() => executeAnimation(obj, obj.customAnimation), 100);
                     }
-                }); // End of canvas.forEachObject
+                }); 
                 canvas.renderAll();
-            }); // End of canvas.loadFromJSON
+            }); 
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
              if(mediaType !== 'image' && mediaType !== 'audio') { 
                  canvas.renderAll();
@@ -768,14 +699,11 @@
             hideSpotlightSVG();
         }
          if (viewerApp.state.isCanvasPannedOrZoomed && interaction.action !== 'panZoomToTarget') {
-            // If canvas is zoomed and a new, non-panZoom interaction is triggered, reset zoom.
-            // Or, if the interaction is on the panZoomTargetObject itself, don't reset yet (allow modals from a zoomed object).
             if(fabricObject !== viewerApp.state.panZoomTargetObject){
                 console.log("Different object clicked while panned/zoomed. Resetting zoom first."); 
                 resetPanZoomWithAnimation();
             }
         }
-
 
         console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
 
@@ -841,7 +769,7 @@
                     const canvas = viewerApp.state.viewerFabricCanvas;
 
                     if (!viewerApp.state.isCanvasPannedOrZoomed) { 
-                        viewerApp.state.originalViewportTransform = canvas.viewportTransform.slice(); // Store the array
+                        viewerApp.state.originalViewportTransform = canvas.viewportTransform.slice(); 
                         console.log("Storing original viewport transform:", viewerApp.state.originalViewportTransform);
                     }
 
@@ -870,10 +798,8 @@
         if (!fabricObject || !animConfig || !animConfig.type) return;
         console.log(`Executing animation: ${animConfig.type} for object`, fabricObject);
 
-        // Stop any existing animation on this object first
         stopAnimation(fabricObject);
 
-        // Store original properties for reset
         if (!fabricObject._originalState) {
             fabricObject._originalState = {
                 angle: fabricObject.angle,
@@ -884,44 +810,31 @@
             };
         }
         
-        // Translate speed setting to duration
-        let duration = 1000; // Default: normal
+        let duration = 1000; 
         if (animConfig.speed) {
             duration = ANIMATION_SPEED_PRESETS[animConfig.speed]?.duration || 1000;
         } else if (animConfig.duration) {
-            // Backward compatibility for direct duration setting
             duration = animConfig.duration;
         }
         
-        // Default strength values by animation type
         let strength = animConfig.strength || getDefaultStrength(animConfig.type);
         
-        // Simple AbortController-like mechanism for stopping
         const controller = { aborted: false };
         viewerApp.state.activeAnimations.set(fabricObject, controller);
 
         switch (animConfig.type) {
-            case 'wiggle':
-                animateWiggle(fabricObject, duration, strength, controller, animConfig.loop);
-                break;
-            case 'float':
-                animateFloat(fabricObject, duration, strength, controller, animConfig.loop);
-                break;
-            case 'growShrink':
-                animateGrowShrink(fabricObject, duration, strength, controller, animConfig.loop);
-                break;
+            case 'wiggle': animateWiggle(fabricObject, duration, strength, controller, animConfig.loop); break;
+            case 'float': animateFloat(fabricObject, duration, strength, controller, animConfig.loop); break;
+            case 'growShrink': animateGrowShrink(fabricObject, duration, strength, controller, animConfig.loop); break;
             default:
                 console.warn("Unknown animation type:", animConfig.type);
                 viewerApp.state.activeAnimations.delete(fabricObject);
         }
     }
 
-    // Helper to get default strength values by animation type
     function getDefaultStrength(animationType) {
         switch (animationType) {
-            case 'wiggle': return 5;      // 5 degrees
-            case 'float': return 10;      // 10 pixels
-            case 'growShrink': return 1.2; // 20% scale
+            case 'wiggle': return 5; case 'float': return 10; case 'growShrink': return 1.2;
             default: return 5;
         }
     }
@@ -932,8 +845,6 @@
             controller.aborted = true;
             viewerApp.state.activeAnimations.delete(fabricObject);
             console.log("Animation stopped for object", fabricObject);
-
-            // Option: Reset to original state if defined
             if (fabricObject._originalState) {
                 fabricObject.set(fabricObject._originalState);
                 viewerApp.state.viewerFabricCanvas.renderAll();
@@ -942,75 +853,24 @@
     }
 
     function animateWiggle(fabricObject, duration, strength, controller, shouldLoop) {
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas) return;
+        const canvas = viewerApp.state.viewerFabricCanvas; if (!canvas) return;
         const originalAngle = fabricObject._originalState ? fabricObject._originalState.angle : fabricObject.angle;
-        strength = parseFloat(strength) || 5; // degrees
-        
-        // Step 1: Animate from center to left
+        strength = parseFloat(strength) || 5; 
         fabricObject.animate('angle', originalAngle - strength, {
-            duration: duration / 3,
-            onChange: canvas.renderAll.bind(canvas),
-            abort: () => controller.aborted,
+            duration: duration / 3, onChange: canvas.renderAll.bind(canvas), abort: () => controller.aborted,
             onComplete: function() {
-                if (controller.aborted) { 
-                    fabricObject.set('angle', originalAngle); 
-                    canvas.renderAll(); 
-                    viewerApp.state.activeAnimations.delete(fabricObject);
-                    return; 
-                }
-                
-                // Step 2: Animate from left to right
+                if (controller.aborted) { fabricObject.set('angle', originalAngle); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return; }
                 fabricObject.animate('angle', originalAngle + strength, {
-                    duration: duration / 3 * 2,
-                    onChange: canvas.renderAll.bind(canvas),
-                    abort: () => controller.aborted,
+                    duration: duration / 3 * 2, onChange: canvas.renderAll.bind(canvas), abort: () => controller.aborted,
                     onComplete: function() {
-                        if (controller.aborted) { 
-                            fabricObject.set('angle', originalAngle); 
-                            canvas.renderAll(); 
-                            viewerApp.state.activeAnimations.delete(fabricObject);
-                            return; 
-                        }
-                        
-                        // Step 3: Animate from right back to center
+                        if (controller.aborted) { fabricObject.set('angle', originalAngle); canvas.renderAll();  viewerApp.state.activeAnimations.delete(fabricObject); return; }
                         fabricObject.animate('angle', originalAngle, {
-                            duration: duration / 3,
-                            onChange: canvas.renderAll.bind(canvas),
-                            abort: () => controller.aborted,
+                            duration: duration / 3, onChange: canvas.renderAll.bind(canvas), abort: () => controller.aborted,
                             onComplete: function() {
-                                if (controller.aborted) { 
-                                    fabricObject.set('angle', originalAngle); 
-                                    canvas.renderAll(); 
-                                    viewerApp.state.activeAnimations.delete(fabricObject);
-                                    return; 
-                                }
-                                
-                                // One complete cycle finished
+                                if (controller.aborted) { fabricObject.set('angle', originalAngle); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return; }
                                 console.log(`Wiggle cycle complete, shouldLoop: ${shouldLoop}`);
-                                
-                                if (shouldLoop === true) {
-                                    // Start a new cycle with a small delay
-                                    setTimeout(() => {
-                                        // Check abort again during the delay
-                                        if (viewerApp.state.activeAnimations.has(fabricObject) && 
-                                            viewerApp.state.activeAnimations.get(fabricObject).aborted) {
-                                            fabricObject.set('angle', originalAngle);
-                                            canvas.renderAll();
-                                            viewerApp.state.activeAnimations.delete(fabricObject);
-                                            return;
-                                        }
-                                        
-                                        // Create new controller for the next cycle
-                                        const newLoopController = { aborted: false };
-                                        viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
-                                        animateWiggle(fabricObject, duration, strength, newLoopController, shouldLoop);
-                                    }, 50); // Small delay between cycles
-                                } else {
-                                    // Animation completed, clean up
-                                    viewerApp.state.activeAnimations.delete(fabricObject);
-                                    console.log(`Animation wiggle finished.`);
-                                }
+                                if (shouldLoop === true) { setTimeout(() => { if (viewerApp.state.activeAnimations.has(fabricObject) && viewerApp.state.activeAnimations.get(fabricObject).aborted) { fabricObject.set('angle', originalAngle); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return;} const newLoopController = { aborted: false }; viewerApp.state.activeAnimations.set(fabricObject, newLoopController); animateWiggle(fabricObject, duration, strength, newLoopController, shouldLoop); }, 50);
+                                } else { viewerApp.state.activeAnimations.delete(fabricObject); console.log(`Animation wiggle finished.`); }
                             }
                         });
                     }
@@ -1018,77 +878,25 @@
             }
         });
     }
-
     function animateFloat(fabricObject, duration, strength, controller, shouldLoop) {
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas) return;
+        const canvas = viewerApp.state.viewerFabricCanvas; if (!canvas) return;
         const originalTop = fabricObject._originalState ? fabricObject._originalState.top : fabricObject.top;
-        strength = parseFloat(strength) || 10; // pixels
-        
-        // Step 1: Animate from original position upward
+        strength = parseFloat(strength) || 10; 
         fabricObject.animate('top', originalTop - strength, {
-            duration: duration / 3,
-            onChange: canvas.renderAll.bind(canvas),
-            abort: () => controller.aborted,
+            duration: duration / 3, onChange: canvas.renderAll.bind(canvas), abort: () => controller.aborted,
             onComplete: function() {
-                if (controller.aborted) { 
-                    fabricObject.set('top', originalTop); 
-                    canvas.renderAll(); 
-                    viewerApp.state.activeAnimations.delete(fabricObject);
-                    return; 
-                }
-                
-                // Step 2: Animate from up position to down position
-                fabricObject.animate('top', originalTop + (strength/2), {
-                    duration: duration / 3 * 2,
-                    onChange: canvas.renderAll.bind(canvas),
-                    abort: () => controller.aborted,
+                if (controller.aborted) { fabricObject.set('top', originalTop); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return; }
+                fabricObject.animate('top', originalTop + (strength/2), { // Go slightly below original
+                    duration: duration / 3 * 2, onChange: canvas.renderAll.bind(canvas), abort: () => controller.aborted,
                     onComplete: function() {
-                        if (controller.aborted) { 
-                            fabricObject.set('top', originalTop); 
-                            canvas.renderAll(); 
-                            viewerApp.state.activeAnimations.delete(fabricObject);
-                            return; 
-                        }
-                        
-                        // Step 3: Animate from down position back to original
+                        if (controller.aborted) { fabricObject.set('top', originalTop); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return; }
                         fabricObject.animate('top', originalTop, {
-                            duration: duration / 3,
-                            onChange: canvas.renderAll.bind(canvas),
-                            abort: () => controller.aborted,
+                            duration: duration / 3, onChange: canvas.renderAll.bind(canvas), abort: () => controller.aborted,
                             onComplete: function() {
-                                if (controller.aborted) { 
-                                    fabricObject.set('top', originalTop); 
-                                    canvas.renderAll(); 
-                                    viewerApp.state.activeAnimations.delete(fabricObject);
-                                    return; 
-                                }
-                                
-                                // One complete cycle finished
+                                if (controller.aborted) { fabricObject.set('top', originalTop); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return; }
                                 console.log(`Float cycle complete, shouldLoop: ${shouldLoop}`);
-                                
-                                if (shouldLoop === true) {
-                                    // Start a new cycle with a small delay
-                                    setTimeout(() => {
-                                        // Check abort again during the delay
-                                        if (viewerApp.state.activeAnimations.has(fabricObject) && 
-                                            viewerApp.state.activeAnimations.get(fabricObject).aborted) {
-                                            fabricObject.set('top', originalTop);
-                                            canvas.renderAll();
-                                            viewerApp.state.activeAnimations.delete(fabricObject);
-                                            return;
-                                        }
-                                        
-                                        // Create new controller for the next cycle
-                                        const newLoopController = { aborted: false };
-                                        viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
-                                        animateFloat(fabricObject, duration, strength, newLoopController, shouldLoop);
-                                    }, 50); // Small delay between cycles
-                                } else {
-                                    // Animation completed, clean up
-                                    viewerApp.state.activeAnimations.delete(fabricObject);
-                                    console.log(`Animation float finished.`);
-                                }
+                                if (shouldLoop === true) { setTimeout(() => { if (viewerApp.state.activeAnimations.has(fabricObject) && viewerApp.state.activeAnimations.get(fabricObject).aborted) { fabricObject.set('top', originalTop); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return;} const newLoopController = { aborted: false }; viewerApp.state.activeAnimations.set(fabricObject, newLoopController); animateFloat(fabricObject, duration, strength, newLoopController, shouldLoop); }, 50);
+                                } else { viewerApp.state.activeAnimations.delete(fabricObject); console.log(`Animation float finished.`); }
                             }
                         });
                     }
@@ -1098,73 +906,33 @@
     }
 
     function animateGrowShrink(fabricObject, duration, strength, controller, shouldLoop) {
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas) return;
+        const canvas = viewerApp.state.viewerFabricCanvas; if (!canvas) return;
         const originalScaleX = fabricObject._originalState ? fabricObject._originalState.scaleX : fabricObject.scaleX;
         const originalScaleY = fabricObject._originalState ? fabricObject._originalState.scaleY : fabricObject.scaleY;
-        strength = parseFloat(strength) || 1.2; // scale factor
+        strength = parseFloat(strength) || 1.2; 
         
-        // Step 1: Animate from original size to grown size
-        animateScale(strength);
+        animateScale(strength); // Start by growing
         
-        function animateScale(targetScale) {
+        function animateScale(targetScaleFactor) { // targetScaleFactor is relative to original, e.g. 1.2 for 120%
             fabric.util.animate({
-                startValue: 1,
-                endValue: targetScale,
-                duration: duration / 2,
+                startValue: fabricObject.scaleX / originalScaleX, // Current relative scale
+                endValue: targetScaleFactor,
+                duration: duration / 2, // Half duration for grow, half for shrink
                 onChange: function(value) {
                     if (controller.aborted) return;
-                    // Apply scale relative to original scale
-                    fabricObject.set({
-                        scaleX: originalScaleX * value,
-                        scaleY: originalScaleY * value
-                    });
+                    fabricObject.set({ scaleX: originalScaleX * value, scaleY: originalScaleY * value });
                     canvas.renderAll();
                 },
                 abort: () => controller.aborted,
                 onComplete: function() {
-                    if (controller.aborted) {
-                        fabricObject.set({
-                            scaleX: originalScaleX,
-                            scaleY: originalScaleY
-                        });
-                        canvas.renderAll();
-                        viewerApp.state.activeAnimations.delete(fabricObject);
-                        return;
-                    }
+                    if (controller.aborted) { fabricObject.set({scaleX: originalScaleX, scaleY: originalScaleY}); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return; }
                     
-                    if (targetScale > 1) {
-                        // Step 2: Animate from grown size back to original
+                    if (targetScaleFactor > 1) { // If we just grew, now shrink back to original
                         animateScale(1);
-                    } else {
-                        // Complete cycle finished
+                    } else { // We just shrunk back to original, cycle complete
                         console.log(`GrowShrink cycle complete, shouldLoop: ${shouldLoop}`);
-                        
-                        if (shouldLoop === true) {
-                            // Start a new cycle with a small delay
-                            setTimeout(() => {
-                                // Check abort again during the delay
-                                if (viewerApp.state.activeAnimations.has(fabricObject) && 
-                                    viewerApp.state.activeAnimations.get(fabricObject).aborted) {
-                                    fabricObject.set({
-                                        scaleX: originalScaleX,
-                                        scaleY: originalScaleY
-                                    });
-                                    canvas.renderAll();
-                                    viewerApp.state.activeAnimations.delete(fabricObject);
-                                    return;
-                                }
-                                
-                                // Create new controller for the next cycle
-                                const newLoopController = { aborted: false };
-                                viewerApp.state.activeAnimations.set(fabricObject, newLoopController);
-                                animateGrowShrink(fabricObject, duration, strength, newLoopController, shouldLoop);
-                            }, 50); // Small delay between cycles
-                        } else {
-                            // Animation completed, clean up
-                            viewerApp.state.activeAnimations.delete(fabricObject);
-                            console.log(`Animation growShrink finished.`);
-                        }
+                        if (shouldLoop === true) { setTimeout(() => { if (viewerApp.state.activeAnimations.has(fabricObject) && viewerApp.state.activeAnimations.get(fabricObject).aborted) { fabricObject.set({scaleX: originalScaleX, scaleY: originalScaleY}); canvas.renderAll(); viewerApp.state.activeAnimations.delete(fabricObject); return; } const newLoopController = { aborted: false }; viewerApp.state.activeAnimations.set(fabricObject, newLoopController); animateGrowShrink(fabricObject, duration, strength, newLoopController, shouldLoop); }, 50);
+                        } else { viewerApp.state.activeAnimations.delete(fabricObject); console.log(`Animation growShrink finished.`); }
                     }
                 },
                 easing: fabric.util.ease.easeInOutQuad
@@ -1176,134 +944,82 @@
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas || !targetObject) return;
 
-        const animationDuration = 500; // ms
+        const animationDuration = 500; 
         const objectCenter = targetObject.getCenterPoint();
-
-        // Current viewport transform components
         const vpt = canvas.viewportTransform;
         const currentZoom = vpt[0];
         const currentPanX = vpt[4];
         const currentPanY = vpt[5];
-
-        // Calculate desired final pan to center the object AT THE TARGET ZOOM
         const finalPanX = (canvas.width / 2) - (objectCenter.x * targetZoom);
         const finalPanY = (canvas.height / 2) - (objectCenter.y * targetZoom);
 
         console.log(`Animating Pan/Zoom. From: Z=${currentZoom.toFixed(2)}, X=${currentPanX.toFixed(2)}, Y=${currentPanY.toFixed(2)}`);
         console.log(`Targeting: Z=${targetZoom.toFixed(2)}, X=${finalPanX.toFixed(2)}, Y=${finalPanY.toFixed(2)} for obj center (${objectCenter.x.toFixed(2)}, ${objectCenter.y.toFixed(2)})`);
 
-        // Animate a dummy object or just use the progress value directly
         fabric.util.animate({
-            startValue: 0, // Animation progress from 0%
-            endValue: 1,   // to 100%
-            duration: animationDuration,
+            startValue: 0, endValue: 1, duration: animationDuration,
             onChange: function(progress) {
                 const newZoom = currentZoom + (targetZoom - currentZoom) * progress;
                 const newPanX = currentPanX + (finalPanX - currentPanX) * progress;
                 const newPanY = currentPanY + (finalPanY - currentPanY) * progress;
-
                 canvas.setViewportTransform([newZoom, 0, 0, newZoom, newPanX, newPanY]);
-                // Fabric's animate utility might not automatically render canvas on each tick
-                // when not animating a Fabric object property directly.
                 canvas.requestRenderAll(); 
             },
             onComplete: function() {
                 viewerApp.state.isCanvasPannedOrZoomed = true;
-                // Ensure final state is precise
                 canvas.setViewportTransform([targetZoom, 0, 0, targetZoom, finalPanX, finalPanY]);
-                canvas.renderAll(); // Final render
+                canvas.renderAll(); 
                 console.log("Pan/Zoom animation complete.");
             },
-            easing: fabric.util.ease.easeInOutQuad // Smoother easing
+            easing: fabric.util.ease.easeInOutQuad 
         });
     }
 
     function resetPanZoomWithAnimation(immediate = false) {
         const canvas = viewerApp.state.viewerFabricCanvas;
+        console.log("[ResetPanZoom] Called. Immediate:", immediate, "isPanned:", viewerApp.state.isCanvasPannedOrZoomed, "OriginalVPT:", viewerApp.state.originalViewportTransform);
 
-        console.log("[ResetPanZoom] Called. Immediate:", immediate);
-        // ... (keep the detailed logging from the previous version here for diagnostics)
-        console.log("  - canvas valid:", !!canvas);
-        console.log("  - isCanvasPannedOrZoomed:", viewerApp.state.isCanvasPannedOrZoomed);
-        console.log("  - originalViewportTransform type:", typeof viewerApp.state.originalViewportTransform);
-        console.log("  - originalViewportTransform isArray:", Array.isArray(viewerApp.state.originalViewportTransform));
-        if(Array.isArray(viewerApp.state.originalViewportTransform)) {
-            console.log("  - originalViewportTransform value:", JSON.stringify(viewerApp.state.originalViewportTransform));
-        } else {
-            console.log("  - originalViewportTransform value: Not an array or null");
-        }
-
-        if (!canvas) {
-            console.error("[ResetPanZoom] Aborting: Canvas object is null.");
-            viewerApp.state.isCanvasPannedOrZoomed = false;
-            viewerApp.state.panZoomTargetObject = null;
-            viewerApp.state.originalViewportTransform = null;
-            return;
-        }
-        if (!viewerApp.state.isCanvasPannedOrZoomed) {
-            console.log("[ResetPanZoom] Aborting: Canvas not currently panned or zoomed (isCanvasPannedOrZoomed is false).");
-            if (Array.isArray(viewerApp.state.originalViewportTransform)) {
-                 console.warn("[ResetPanZoom] Inconsistent state: isCanvasPannedOrZoomed is false, but originalViewportTransform exists. Attempting hard reset to original.");
-                 canvas.setViewportTransform(viewerApp.state.originalViewportTransform.slice());
-                 canvas.renderAll();
+        if (!canvas || !viewerApp.state.isCanvasPannedOrZoomed || !Array.isArray(viewerApp.state.originalViewportTransform) || viewerApp.state.originalViewportTransform.length !== 6) {
+            console.warn("[ResetPanZoom] Aborting: Conditions not met or invalid original transform.");
+            if(canvas && Array.isArray(viewerApp.state.originalViewportTransform) && viewerApp.state.originalViewportTransform.length === 6 && !viewerApp.state.isCanvasPannedOrZoomed){
+                 // If somehow isCanvasPannedOrZoomed is false but we have a transform, try to reset.
+                 console.log("[ResetPanZoom] Attempting reset despite isCanvasPannedOrZoomed being false, as original transform exists.");
+            } else if (!canvas) {
+                viewerApp.state.isCanvasPannedOrZoomed = false; viewerApp.state.panZoomTargetObject = null; viewerApp.state.originalViewportTransform = null; return;
+            } else { // Not panned or invalid original transform
+                viewerApp.state.isCanvasPannedOrZoomed = false; viewerApp.state.panZoomTargetObject = null; viewerApp.state.originalViewportTransform = null; return;
             }
-            viewerApp.state.isCanvasPannedOrZoomed = false;
-            viewerApp.state.panZoomTargetObject = null;
-            viewerApp.state.originalViewportTransform = null;
-            return;
-        }
-        if (!Array.isArray(viewerApp.state.originalViewportTransform) || viewerApp.state.originalViewportTransform.length !== 6) {
-            console.error("[ResetPanZoom] Aborting: originalViewportTransform is not a valid 6-element array. Cannot reset. Value:", viewerApp.state.originalViewportTransform);
-            viewerApp.state.isCanvasPannedOrZoomed = false;
-            viewerApp.state.panZoomTargetObject = null;
-            if (!Array.isArray(viewerApp.state.originalViewportTransform)) {
-                 viewerApp.state.originalViewportTransform = null;
-            }
-            return;
         }
         
         console.log("[ResetPanZoom] Conditions met, proceeding with reset.");
-
         const animationDuration = immediate ? 0 : 500;
         const vpt = canvas.viewportTransform;
-        const currentZoom = vpt[0];
-        const currentPanX = vpt[4];
-        const currentPanY = vpt[5];
-
-        const finalOriginalVPT = viewerApp.state.originalViewportTransform.slice(); // Secure a copy
-        const finalZoom = finalOriginalVPT[0];
-        const finalPanX = finalOriginalVPT[4];
-        const finalPanY = finalOriginalVPT[5];
+        const currentZoom = vpt[0]; const currentPanX = vpt[4]; const currentPanY = vpt[5];
+        const finalOriginalVPT = viewerApp.state.originalViewportTransform.slice();
+        const finalZoom = finalOriginalVPT[0]; const finalPanX = finalOriginalVPT[4]; const finalPanY = finalOriginalVPT[5];
         
         viewerApp.state.panZoomTargetObject = null; 
 
         if (immediate) {
             canvas.setViewportTransform(finalOriginalVPT);
-            viewerApp.state.isCanvasPannedOrZoomed = false;
-            viewerApp.state.originalViewportTransform = null; 
-            canvas.renderAll();
-            console.log("Pan/Zoom reset immediately.");
+            viewerApp.state.isCanvasPannedOrZoomed = false; viewerApp.state.originalViewportTransform = null; 
+            canvas.renderAll(); console.log("Pan/Zoom reset immediately.");
             return;
         }
 
         fabric.util.animate({
-            startValue: 0, // Animation progress 0%
-            endValue: 1,   // to 100%
-            duration: animationDuration,
+            startValue: 0, endValue: 1, duration: animationDuration,
             onChange: function(progress) {
                 const newZoom = currentZoom + (finalZoom - currentZoom) * progress;
                 const newPanX = currentPanX + (finalPanX - currentPanX) * progress;
                 const newPanY = currentPanY + (finalPanY - currentPanY) * progress;
-                
                 canvas.setViewportTransform([newZoom, 0, 0, newZoom, newPanX, newPanY]);
                 canvas.requestRenderAll();
             },
             onComplete: function() {
-                canvas.setViewportTransform(finalOriginalVPT); // Ensure final state
-                viewerApp.state.isCanvasPannedOrZoomed = false;
-                viewerApp.state.originalViewportTransform = null; 
-                canvas.renderAll(); // Final render
-                console.log("Pan/Zoom reset animation complete.");
+                canvas.setViewportTransform(finalOriginalVPT); 
+                viewerApp.state.isCanvasPannedOrZoomed = false; viewerApp.state.originalViewportTransform = null; 
+                canvas.renderAll(); console.log("Pan/Zoom reset animation complete.");
             },
             easing: fabric.util.ease.easeInOutQuad
         });
@@ -1329,165 +1045,80 @@
          const sequence = viewerApp.state.modalSequence;
          const currentIndex = viewerApp.state.currentModalSequenceIndex;
          if (sequence.length <= 1) {
-             modalPrevButtonEl.style.display = 'none';
-             modalNextButtonEl.style.display = 'none';
-             return;
+             modalPrevButtonEl.style.display = 'none'; modalNextButtonEl.style.display = 'none'; return;
          }
-         if (currentIndex > 0) {
-             modalPrevButtonEl.disabled = false;
-             modalPrevButtonEl.style.display = 'inline-block';
-         } else {
-             modalPrevButtonEl.disabled = true;
-              modalPrevButtonEl.style.display = 'inline-block';
-         }
-         if (currentIndex < sequence.length - 1) {
-             modalNextButtonEl.disabled = false;
-             modalNextButtonEl.style.display = 'inline-block';
-         } else {
-             modalNextButtonEl.disabled = true;
-             modalNextButtonEl.style.display = 'inline-block';
-         }
+         modalPrevButtonEl.disabled = !(currentIndex > 0); modalPrevButtonEl.style.display = 'inline-block';
+         modalNextButtonEl.disabled = !(currentIndex < sequence.length - 1); modalNextButtonEl.style.display = 'inline-block';
      }
 
      function navigateModalPrevious() {
-          const sequence = viewerApp.state.modalSequence;
-          let currentIndex = viewerApp.state.currentModalSequenceIndex;
-          if (currentIndex > 0) {
-              currentIndex--;
-              const prevOverlay = sequence[currentIndex];
+          const sequence = viewerApp.state.modalSequence; let currentIndex = viewerApp.state.currentModalSequenceIndex;
+          if (currentIndex > 0) { currentIndex--; const prevOverlay = sequence[currentIndex];
               if (prevOverlay && prevOverlay.customInteraction && prevOverlay.customInteraction.modalContent) {
-                  viewerApp.state.currentModalSequenceIndex = currentIndex;
-                  viewerApp.state.currentModalOverlay = prevOverlay;
+                  viewerApp.state.currentModalSequenceIndex = currentIndex; viewerApp.state.currentModalOverlay = prevOverlay;
                   if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = prevOverlay.customInteraction.modalContent;
-                  updateModalNavigationButtons();
-                  console.log("Navigated to previous modal, index:", currentIndex);
-              } else {
-                   console.error("Previous overlay or its content is invalid.");
-              }
+                  updateModalNavigationButtons(); console.log("Navigated to previous modal, index:", currentIndex);
+              } else { console.error("Previous overlay or its content is invalid."); }
           }
      }
-
      function navigateModalNext() {
-          const sequence = viewerApp.state.modalSequence;
-          let currentIndex = viewerApp.state.currentModalSequenceIndex;
-          if (currentIndex < sequence.length - 1) {
-              currentIndex++;
-              const nextOverlay = sequence[currentIndex];
+          const sequence = viewerApp.state.modalSequence; let currentIndex = viewerApp.state.currentModalSequenceIndex;
+          if (currentIndex < sequence.length - 1) { currentIndex++; const nextOverlay = sequence[currentIndex];
                if (nextOverlay && nextOverlay.customInteraction && nextOverlay.customInteraction.modalContent) {
-                   viewerApp.state.currentModalSequenceIndex = currentIndex;
-                   viewerApp.state.currentModalOverlay = nextOverlay;
+                   viewerApp.state.currentModalSequenceIndex = currentIndex; viewerApp.state.currentModalOverlay = nextOverlay;
                    if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = nextOverlay.customInteraction.modalContent;
-                   updateModalNavigationButtons();
-                    console.log("Navigated to next modal, index:", currentIndex);
-               } else {
-                    console.error("Next overlay or its content is invalid.");
-               }
+                   updateModalNavigationButtons(); console.log("Navigated to next modal, index:", currentIndex);
+               } else { console.error("Next overlay or its content is invalid."); }
           }
      }
 
-     // --- Spotlight SVG Functions ---
     function showSpotlightSVG(targetFabricObject, interactionData) {
         hideSpotlightSVG(); 
-
         const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas || !targetFabricObject) {
-            console.error("Cannot show spotlight: canvas or targetFabricObject missing.");
-            return;
-        }
-
+        if (!canvas || !targetFabricObject) { console.error("Cannot show spotlight: canvas or targetFabricObject missing."); return; }
         console.log(`[WebApp] Spotlight SVG requested for Fabric object:`, targetFabricObject);
         const targetRect = targetFabricObject.getBoundingRect(true); 
         const canvasRect = viewerFabricCanvasEl.getBoundingClientRect(); 
-
-        const viewportLeft = canvasRect.left + targetRect.left;
-        const viewportTop = canvasRect.top + targetRect.top;
-        const viewportWidth = targetRect.width;
-        const viewportHeight = targetRect.height;
-
-        const svgNS = "http://www.w3.org/2000/svg";
-        const svg = document.createElementNS(svgNS, "svg");
+        const viewportLeft = canvasRect.left + window.scrollX + targetRect.left; // Account for canvas position and scroll
+        const viewportTop = canvasRect.top + window.scrollY + targetRect.top;   // Account for canvas position and scroll
+        const viewportWidth = targetRect.width; const viewportHeight = targetRect.height;
+        const svgNS = "http://www.w3.org/2000/svg"; const svg = document.createElementNS(svgNS, "svg");
         svg.setAttribute("id", "spotlightSVG");
-        svg.style.position = "fixed";
-        svg.style.top = "0";
-        svg.style.left = "0";
-        svg.style.width = "100vw"; 
-        svg.style.height = "100vh";
-        svg.style.zIndex = "9990"; 
-        svg.style.pointerEvents = "none"; 
-
-        const mask = document.createElementNS(svgNS, "mask");
-        mask.setAttribute("id", "spotlightMask");
-
+        svg.style.position = "fixed"; svg.style.top = "0"; svg.style.left = "0";
+        svg.style.width = "100vw";  svg.style.height = "100vh";
+        svg.style.zIndex = "9990";  svg.style.pointerEvents = "none"; 
+        const mask = document.createElementNS(svgNS, "mask"); mask.setAttribute("id", "spotlightMask");
         const bgRect = document.createElementNS(svgNS, "rect");
-        bgRect.setAttribute("x", "0");
-        bgRect.setAttribute("y", "0");
-        bgRect.setAttribute("width", "100%");
-        bgRect.setAttribute("height", "100%");
-        bgRect.setAttribute("fill", "white");
+        bgRect.setAttribute("x", "0"); bgRect.setAttribute("y", "0"); bgRect.setAttribute("width", "100%"); bgRect.setAttribute("height", "100%"); bgRect.setAttribute("fill", "white");
         mask.appendChild(bgRect);
-
         const cutoutRect = document.createElementNS(svgNS, "rect");
-        cutoutRect.setAttribute("x", viewportLeft);
-        cutoutRect.setAttribute("y", viewportTop);
-        cutoutRect.setAttribute("width", viewportWidth);
-        cutoutRect.setAttribute("height", viewportHeight);
+        cutoutRect.setAttribute("x", viewportLeft); cutoutRect.setAttribute("y", viewportTop);
+        cutoutRect.setAttribute("width", viewportWidth); cutoutRect.setAttribute("height", viewportHeight);
         cutoutRect.setAttribute("fill", "black"); 
-        mask.appendChild(cutoutRect);
-        svg.appendChild(mask);
-
+        mask.appendChild(cutoutRect); svg.appendChild(mask);
         const dimRect = document.createElementNS(svgNS, "rect");
-        dimRect.setAttribute("x", "0");
-        dimRect.setAttribute("y", "0");
-        dimRect.setAttribute("width", "100%");
-        dimRect.setAttribute("height", "100%");
-        dimRect.setAttribute("fill", "rgba(0, 0, 0, 0.75)");
-        dimRect.setAttribute("mask", "url(#spotlightMask)");
-        svg.appendChild(dimRect);
-
-        document.body.appendChild(svg);
-
-        const clickCatcher = document.createElement('div');
-        clickCatcher.id = 'spotlightClickCatcher';
-        clickCatcher.style.position = 'fixed';
-        clickCatcher.style.top = '0';
-        clickCatcher.style.left = '0';
-        clickCatcher.style.width = '100vw';
-        clickCatcher.style.height = '100vh';
-        clickCatcher.style.zIndex = '9989'; 
-        clickCatcher.style.cursor = 'pointer'; 
-        clickCatcher.addEventListener('click', function(event) {
-            console.log("Spotlight click catcher clicked.");
-            hideSpotlightSVG();
-            event.stopPropagation(); 
-        });
+        dimRect.setAttribute("x", "0"); dimRect.setAttribute("y", "0"); dimRect.setAttribute("width", "100%"); dimRect.setAttribute("height", "100%");
+        dimRect.setAttribute("fill", "rgba(0, 0, 0, 0.75)"); dimRect.setAttribute("mask", "url(#spotlightMask)");
+        svg.appendChild(dimRect); document.body.appendChild(svg);
+        const clickCatcher = document.createElement('div'); clickCatcher.id = 'spotlightClickCatcher';
+        clickCatcher.style.position = 'fixed'; clickCatcher.style.top = '0'; clickCatcher.style.left = '0';
+        clickCatcher.style.width = '100vw'; clickCatcher.style.height = '100vh';
+        clickCatcher.style.zIndex = '9989';  clickCatcher.style.cursor = 'pointer'; 
+        clickCatcher.addEventListener('click', function(event) { console.log("Spotlight click catcher clicked."); hideSpotlightSVG(); event.stopPropagation(); });
         document.body.appendChild(clickCatcher);
-
         viewerApp.state.isSpotlightActive = true;
-        viewerApp.state.currentSpotlightInfo = {
-            svg: svg,
-            clickCatcher: clickCatcher,
-            targetFabricObject: targetFabricObject,
-        };
+        viewerApp.state.currentSpotlightInfo = { svg: svg, clickCatcher: clickCatcher, targetFabricObject: targetFabricObject,};
         displayMessageViewer("Spotlight active. Click anywhere to dismiss.", true);
         console.log("[WebApp] SVG Spotlight activated for Fabric object:", targetFabricObject);
     }
-
     function hideSpotlightSVG() {
-        if (!viewerApp.state.isSpotlightActive || !viewerApp.state.currentSpotlightInfo) {
-            return;
-        }
+        if (!viewerApp.state.isSpotlightActive || !viewerApp.state.currentSpotlightInfo) return;
         console.log('[WebApp] Hiding SVG Spotlight');
-
-        if (viewerApp.state.currentSpotlightInfo.svg) {
-            document.body.removeChild(viewerApp.state.currentSpotlightInfo.svg);
-        }
-        if (viewerApp.state.currentSpotlightInfo.clickCatcher) {
-            document.body.removeChild(viewerApp.state.currentSpotlightInfo.clickCatcher);
-        }
-        viewerApp.state.isSpotlightActive = false;
-        viewerApp.state.currentSpotlightInfo = null;
+        if (viewerApp.state.currentSpotlightInfo.svg) document.body.removeChild(viewerApp.state.currentSpotlightInfo.svg);
+        if (viewerApp.state.currentSpotlightInfo.clickCatcher) document.body.removeChild(viewerApp.state.currentSpotlightInfo.clickCatcher);
+        viewerApp.state.isSpotlightActive = false; viewerApp.state.currentSpotlightInfo = null;
     }
-    // --- Slide Navigation ---
+
     function updateSlideNavigationUI() {
         console.log("updateSlideNavigationUI called. Current Index:", viewerApp.state.currentSlideIndex, "Project Data:", viewerApp.state.currentProjectData);
         if (!viewerApp.state.currentProjectData || !Array.isArray(viewerApp.state.currentProjectData.slides)) {
@@ -1503,62 +1134,28 @@
         if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = (currentIndex <= 0);
         if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.disabled = (currentIndex >= numSlides - 1);
     }
+    function navigateToPrevSlide() { if (viewerApp.state.currentSlideIndex > 0) renderSlideForViewing(viewerApp.state.currentSlideIndex - 1); }
+    function navigateToNextSlide() { if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) renderSlideForViewing(viewerApp.state.currentSlideIndex + 1); }
 
-    function navigateToPrevSlide() {
-         if (viewerApp.state.currentSlideIndex > 0) {
-            renderSlideForViewing(viewerApp.state.currentSlideIndex - 1);
-        }
-    }
-    function navigateToNextSlide() {
-         if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) {
-            renderSlideForViewing(viewerApp.state.currentSlideIndex + 1);
-        }
-    }
-
-    // --- YouTube Player API Functions ---
-    // IMPORTANT: This function MUST be global for YouTube API to call it
-    window.onYouTubeIframeAPIReady = function() {
-        console.log("YouTube IFrame API Ready (called by external script).");
-        isYouTubeApiReady = true;
-    };
+    window.onYouTubeIframeAPIReady = function() { console.log("YouTube IFrame API Ready (called by external script)."); isYouTubeApiReady = true;};
 
     function setupYouTubePlayer(videoId) {
-        if (!youtubePlayerContainerEl) {
-            console.error("YouTube player container element not found."); 
-            displayMessageViewer("YouTube player setup error: container missing.", false);
-            return;
-        }
+        if (!youtubePlayerContainerEl) { console.error("YouTube player container element not found."); displayMessageViewer("YouTube player setup error: container missing.", false); return; }
         youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>';
         youtubePlayerContainerEl.style.display = 'block';
         console.log("Setting up YouTube player for video ID:", videoId);
         
         if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
             console.error("YT object or YT.Player is not available or API not ready.");
-            displayMessageViewer("YouTube Player API not available. Please check your internet connection and refresh.", false);
-            return;
+            displayMessageViewer("YouTube Player API not available. Please check your internet connection and refresh.", false); return;
         }
-        
         try {
-             if(ytPlayer && typeof ytPlayer.destroy === 'function') {
-                 console.log("Destroying previous YT player instance.");
-                 ytPlayer.destroy();
-                 ytPlayer = null;
-             }
+             if(ytPlayer && typeof ytPlayer.destroy === 'function') { console.log("Destroying previous YT player instance."); ytPlayer.destroy(); ytPlayer = null; }
              console.log("Creating new YT.Player instance.");
              ytPlayer = new YT.Player('youtube-player-div', {
-                height: '100%',
-                width: '100%',
-                videoId: videoId,
-                playerVars: {
-                    'autoplay': 0, 'controls': 0, 'rel': 0, 'showinfo': 0,
-                    'modestbranding': 1, 'iv_load_policy': 3, 'fs': 0,
-                    'disablekb': 1, 'playsinline': 1
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange,
-                    'onError': onPlayerError
-                }
+                height: '100%', width: '100%', videoId: videoId,
+                playerVars: { 'autoplay': 0, 'controls': 0, 'rel': 0, 'showinfo': 0, 'modestbranding': 1, 'iv_load_policy': 3, 'fs': 0, 'disablekb': 1, 'playsinline': 1 },
+                events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange, 'onError': onPlayerError }
             });
              console.log("YT.Player instance created successfully.");
         } catch (e) {
@@ -1570,58 +1167,82 @@
 
     function onPlayerReady(event) {
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
+        const videoDuration = event.target.getDuration();
+        viewerApp.state.currentVideoDuration = videoDuration; // Store duration
+        if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(videoDuration);
+        if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0); // Reset current time display
+        if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%'; // Reset progress bar
+        if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'block'; // Show timeline
+
+        renderQuestionMarkers(); // Call this after duration is known
+
          if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
              console.log("Adding click-to-play listener to YT player container.");
              youtubePlayerContainerEl.addEventListener('click', function() {
                  console.log("Player container clicked.");
                  if (ytPlayer && typeof ytPlayer.playVideo === 'function' && typeof ytPlayer.pauseVideo === 'function' && typeof ytPlayer.getPlayerState === 'function') {
                      const state = ytPlayer.getPlayerState();
-                     if (state !== YT.PlayerState.PLAYING) {
-                         console.log("Calling playVideo().");
-                         ytPlayer.playVideo();
-                     } else {
-                         console.log("Calling pauseVideo().");
-                         ytPlayer.pauseVideo();
-                     }
-                 } else {
-                     console.warn("Cannot play/pause: Player or methods not available.");
-                 }
+                     if (state !== YT.PlayerState.PLAYING) { console.log("Calling playVideo()."); ytPlayer.playVideo(); } 
+                     else { console.log("Calling pauseVideo()."); ytPlayer.pauseVideo(); }
+                 } else { console.warn("Cannot play/pause: Player or methods not available."); }
              });
              youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
          }
     }
 
+    // New function for Phase 1 to render question markers on the timeline
+    function renderQuestionMarkers() {
+        if (!viewerTimelineTrackEl || viewerApp.state.currentVideoDuration <= 0) return;
+        
+        // Clear existing markers
+        const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.question-marker');
+        existingMarkers.forEach(marker => marker.remove());
+
+        if (viewerApp.state.currentVideoQuestions && viewerApp.state.currentVideoQuestions.length > 0) {
+            viewerApp.state.currentVideoQuestions.forEach(question => {
+                const marker = document.createElement('div');
+                marker.className = 'question-marker';
+                marker.style.position = 'absolute';
+                marker.style.width = '3px'; // Thinner line
+                marker.style.height = '100%'; // Full height of track
+                marker.style.backgroundColor = 'orange'; // Bright color for visibility
+                marker.style.left = (question.timestamp / viewerApp.state.currentVideoDuration) * 100 + '%';
+                marker.style.top = '0px';
+                marker.title = `Question at ${formatTime(question.timestamp)}: ${question.questionText.substring(0, 50)}...`;
+                marker.style.zIndex = '2'; // Above progress bar
+                viewerTimelineTrackEl.appendChild(marker);
+            });
+        }
+    }
+
+
     function onPlayerStateChange(event) {
         console.log("YouTube Player State Change:", event.data);
+        if (viewerApp.state.playerQuestionCheckInterval) { // Always clear previous interval
+            clearInterval(viewerApp.state.playerQuestionCheckInterval);
+            viewerApp.state.playerQuestionCheckInterval = null;
+        }
+
         if (event.data === YT.PlayerState.PLAYING) {
-            if (viewerApp.state.playerQuestionCheckInterval) {
-                clearInterval(viewerApp.state.playerQuestionCheckInterval);
-            }
-            // Combine checks in one interval
             viewerApp.state.playerQuestionCheckInterval = setInterval(function() {
-                checkVideoTimeForQuestions();
-                checkVideoTimeForTimestampOverlays(); // Call the new function
+                if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') { // Ensure player exists
+                    const currentTime = ytPlayer.getCurrentTime();
+                    if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(currentTime);
+                    if (viewerTimelineProgressEl && viewerApp.state.currentVideoDuration > 0) {
+                        viewerTimelineProgressEl.style.width = (currentTime / viewerApp.state.currentVideoDuration) * 100 + '%';
+                    }
+                    checkVideoTimeForQuestions();
+                    // Phase 2: checkVideoTimeForTimestampOverlays(); 
+                } else { // Player was destroyed or became unavailable
+                    if (viewerApp.state.playerQuestionCheckInterval) {
+                        clearInterval(viewerApp.state.playerQuestionCheckInterval);
+                        viewerApp.state.playerQuestionCheckInterval = null;
+                    }
+                }
             }, 250);
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
-            if (viewerApp.state.playerQuestionCheckInterval) {
-                // Check if pause was due to a question or an interactive overlay
-                const canvas = viewerApp.state.viewerFabricCanvas;
-                const isQuestionShowing = canvas && canvas.getObjects().some(obj => obj.customType === 'videoQuestionOverlay');
-                let isInteractiveOverlayShowing = false;
-                viewerApp.state.currentTimestampOverlays.forEach(overlay => {
-                    if (viewerApp.state.activeTimestampOverlayIds.has(overlay.overlayId) && overlay.isInteractive) {
-                        isInteractiveOverlayShowing = true;
-                    }
-                });
-
-                if (!isQuestionShowing && !isInteractiveOverlayShowing) {
-                    clearInterval(viewerApp.state.playerQuestionCheckInterval);
-                    viewerApp.state.playerQuestionCheckInterval = null;
-                }
-            }
-            // Call once on pause/end to update overlay states if needed (e.g. hide overlays)
-            // Also ensures overlays at t=0 are shown if video starts paused.
-            checkVideoTimeForTimestampOverlays(); 
+            // Interval is cleared above, so no need to clear again here.
+            // Phase 2: checkVideoTimeForTimestampOverlays(); // Call once on pause/end for overlays
         }
     }
 
@@ -1629,10 +1250,8 @@
         console.error("YouTube Player Error Code:", event.data);
         let errorMsg = `YouTube Player Error: Code ${event.data}. `;
         switch (event.data) {
-            case 2: errorMsg += "Invalid video ID."; break;
-            case 5: errorMsg += "HTML5 player error."; break;
-            case 100: errorMsg += "Video not found or private."; break;
-            case 101: case 150: errorMsg += "Playback forbidden by owner."; break;
+            case 2: errorMsg += "Invalid video ID."; break; case 5: errorMsg += "HTML5 player error."; break;
+            case 100: errorMsg += "Video not found or private."; break; case 101: case 150: errorMsg += "Playback forbidden by owner."; break;
             default: errorMsg += "Unknown error."; break;
         }
         displayMessageViewer(errorMsg, false);
@@ -1647,364 +1266,223 @@
         finally {
              if (youtubePlayerContainerEl) {
                  youtubePlayerContainerEl.removeAttribute('click-listener-added');
-                 youtubePlayerContainerEl.innerHTML = '';
-                 youtubePlayerContainerEl.style.display = 'none';
+                 youtubePlayerContainerEl.innerHTML = ''; youtubePlayerContainerEl.style.display = 'none';
              }
-             // Cleanup for question checking
-            if (viewerApp.state.playerQuestionCheckInterval) {
-                clearInterval(viewerApp.state.playerQuestionCheckInterval);
-                viewerApp.state.playerQuestionCheckInterval = null;
+            if (viewerApp.state.playerQuestionCheckInterval) { clearInterval(viewerApp.state.playerQuestionCheckInterval); viewerApp.state.playerQuestionCheckInterval = null;}
+            viewerApp.state.currentVideoQuestions = []; viewerApp.state.askedQuestionIndices = [];
+            viewerApp.state.currentTimestampOverlays = []; viewerApp.state.activeTimestampOverlayIds.clear();
+            
+            // Phase 1: Timeline cleanup
+            viewerApp.state.currentVideoDuration = 0;
+            if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'none';
+            if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%';
+            if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0);
+            if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(0);
+            if (viewerTimelineTrackEl) { // Clear markers
+                const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.question-marker');
+                existingMarkers.forEach(marker => marker.remove());
             }
-            viewerApp.state.currentVideoQuestions = [];
-            viewerApp.state.askedQuestionIndices = [];
-            viewerApp.state.currentTimestampOverlays = [];
-            viewerApp.state.activeTimestampOverlayIds.clear();
-            if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0'; // Ensure canvas is clear
+
+            if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0'; 
             if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
         }
     }
 
     function extractYouTubeVideoId(url) {
-        if (!url) return null;
-        let videoId = null;
-        try {
-            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-            const match = url.match(regExp);
-            videoId = (match && match[2].length === 11) ? match[2] : null;
-        } catch (e) { console.error("Error extracting YouTube Video ID:", e); videoId = null; }
-        console.log(`Extracted Video ID: ${videoId} from URL: ${url}`);
-        return videoId;
+        if (!url) return null; let videoId = null;
+        try { const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/; const match = url.match(regExp); videoId = (match && match[2].length === 11) ? match[2] : null;} 
+        catch (e) { console.error("Error extracting YouTube Video ID:", e); videoId = null; }
+        console.log(`Extracted Video ID: ${videoId} from URL: ${url}`); return videoId;
     }
 
     function setupAudioPlayer(audioDataURI) {
         if (!viewerAudioPlayerEl) { console.error("Audio player element not found."); return;}
         console.log("Setting up audio player.");
         try {
-             viewerAudioPlayerEl.src = audioDataURI;
-             viewerAudioPlayerEl.load();
+             viewerAudioPlayerEl.src = audioDataURI; viewerAudioPlayerEl.load();
              const playPromise = viewerAudioPlayerEl.play();
-             if (playPromise !== undefined) {
-                 playPromise.then(() => console.log("Audio playback started."))
-                          .catch(error => console.error("Audio playback failed:", error));
-             }
-             viewerAudioPlayerEl.style.display = 'block';
-             viewerApp.state.currentAudioElement = viewerAudioPlayerEl;
-        } catch (e) {
-             console.error("Error setting up audio player:", e);
-             displayMessageViewer("Error loading audio.", false);
-        }
+             if (playPromise !== undefined) { playPromise.then(() => console.log("Audio playback started.")).catch(error => console.error("Audio playback failed:", error));}
+             viewerAudioPlayerEl.style.display = 'block'; viewerApp.state.currentAudioElement = viewerAudioPlayerEl;
+        } catch (e) { console.error("Error setting up audio player:", e); displayMessageViewer("Error loading audio.", false); }
     }
-
     function stopAndClearAudioPlayer() {
         const audioPlayer = viewerApp.state.currentAudioElement || viewerAudioPlayerEl;
-        if (audioPlayer) {
-             try {
-                 if (!audioPlayer.paused) audioPlayer.pause();
-                 audioPlayer.removeAttribute('src');
-                 audioPlayer.load();
-                 audioPlayer.style.display = 'none';
-                 console.log("Audio Player Stopped and Cleared.");
-             } catch (e) { console.error("Error stopping/clearing audio player:", e); }
-        }
+        if (audioPlayer) { try { if (!audioPlayer.paused) audioPlayer.pause(); audioPlayer.removeAttribute('src'); audioPlayer.load(); audioPlayer.style.display = 'none'; console.log("Audio Player Stopped and Cleared."); } catch (e) { console.error("Error stopping/clearing audio player:", e); }}
          viewerApp.state.currentAudioElement = null;
     }
-
-    // --- UPDATED Spotlight Functions (Step 23 - Cutout Overlay) ---
-    function applySpotlightEffect(targetObject) { // This is the older version, SVG one is preferred -- probably remove
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas) {
-            console.log("Spotlight not applied: Canvas not available.");
-            return;
-        }
-        if (viewerApp.state.spotlightOverlayObject) {
-            console.log("Spotlight already active, removing previous one first.");
-            removeSpotlightEffect();
-        }
-
-        console.log("Applying spotlight (cutout) effect to:", targetObject);
-        viewerApp.state.spotlightOverlayObject = {}; 
-        viewerApp.state.spotlightOverlayObject.target = targetObject; 
-
-        const overlayRect = new fabric.Rect({
-            left: 0,
-            top: 0,
-            originX: 'left',
-            originY: 'top',
-            width: canvas.width,
-            height: canvas.height,
-            fill: 'rgba(0, 0, 0, 0.75)', 
-            selectable: false,
-            evented: true, 
-            hoverCursor: 'default',
-            customInteraction: { isSpotlightDimOverlay: true }
-        });
-        overlayRect.on('mousedown', function(options) {
-             console.log("Spotlight dim overlay clicked, removing spotlight.");
-             if (options.e) options.e.stopPropagation(); 
-             removeSpotlightEffect();
-        });
-
-        canvas.add(overlayRect);
-        canvas.bringToFront(targetObject); 
-        viewerApp.state.spotlightOverlayObject.rect = overlayRect;
-        canvas.renderAll();
-        displayMessageViewer("Spotlight active. Click outside the object (on the dim area) to remove.", true);
-    }
-
-    function removeSpotlightEffect() { // Older version
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        const overlayRect = viewerApp.state.spotlightOverlayObject ? viewerApp.state.spotlightOverlayObject.rect : null;
-
-        if (!canvas || !overlayRect) {
-            return; 
-        }
-        console.log("Removing spotlight (cutout) effect.");
-        canvas.remove(overlayRect); 
-        viewerApp.state.spotlightOverlayObject = null; 
-        canvas.renderAll();
-    }
-    // --- End UPDATED Spotlight Functions ---
+    function applySpotlightEffect(targetObject) { /* SVG version preferred, this might be removed */ }
+    function removeSpotlightEffect() { /* SVG version preferred, this might be removed */ }
 
     function checkVideoTimeForQuestions() {
-        if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.currentVideoQuestions) {
-            return;
-        }
+        if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.currentVideoQuestions) return;
         const currentTime = ytPlayer.getCurrentTime();
-        
         for (let i = 0; i < viewerApp.state.currentVideoQuestions.length; i++) {
             const question = viewerApp.state.currentVideoQuestions[i];
             if (currentTime >= question.timestamp && !viewerApp.state.askedQuestionIndices.includes(i)) {
                 if(ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
-                
                 viewerApp.state.askedQuestionIndices.push(i);
-                
-                if (viewerApp.state.playerQuestionCheckInterval) {
-                    clearInterval(viewerApp.state.playerQuestionCheckInterval);
-                    viewerApp.state.playerQuestionCheckInterval = null; 
-                }
-                displayQuestion(question, viewerApp.state.currentMediaType); // Pass currentMediaType
+                // Interval is cleared in onPlayerStateChange when paused/ended. No need to clear here
+                // if the pause for the question itself triggers the state change that clears it.
+                displayQuestion(question, viewerApp.state.currentMediaType); 
                 break; 
             }
         }
     }
 
-    function displayQuestion(question, mediaType) { // Added mediaType parameter
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas) return;
+    function displayQuestion(question, mediaType) { 
+        const canvas = viewerApp.state.viewerFabricCanvas; if (!canvas) return;
 
+        // Ensure canvas is interactive for the question
         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
-        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1'; // Make canvas fully opaque for questions
+        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
 
-        // Background overlay for the question dialog
-        const dialogWidth = canvas.width * 0.8;
-        const dialogHeight = canvas.height * 0.7; // Adjust as needed, can be dynamic later
+        const dialogWidth = Math.min(canvas.width * 0.9, 600); // Max width for dialog
+        const dialogHeightRatio = canvas.height > 500 ? 0.75 : 0.85; // Adjust height ratio for smaller canvases
+        let dialogHeight = canvas.height * dialogHeightRatio; 
+
         const dialogBackground = new fabric.Rect({
-            left: canvas.width / 2,
-            top: canvas.height / 2,
-            originX: 'center', originY: 'center',
-            width: dialogWidth,
-            height: dialogHeight,
-            fill: 'rgba(0, 0, 0, 0.8)', // Darker fill
-            rx: 10, ry: 10, // Rounded corners
-            selectable: false, evented: false,
-            customType: 'videoQuestionOverlay'
+            left: canvas.width / 2, top: canvas.height / 2, originX: 'center', originY: 'center',
+            width: dialogWidth, height: dialogHeight, fill: 'rgba(20, 20, 20, 0.92)', 
+            rx: 15, ry: 15, stroke: 'rgba(200, 200, 200, 0.5)', strokeWidth: 1,
+            shadow: 'rgba(0,0,0,0.6) 8px 8px 20px',
+            selectable: false, evented: false, customType: 'videoQuestionOverlay'
         });
-        canvas.add(dialogBackground);
 
-        // Question text styling
+        const questionFontSize = Math.max(16, Math.min(28, dialogWidth / 25)); // Responsive font size
         const questionText = new fabric.Textbox(question.questionText, {
-            left: dialogBackground.left, // Relative to dialogBackground center
-            top: dialogBackground.top - dialogBackground.height / 2 + 40, // Position near top of dialog
-            originX: 'center', originY: 'top',
-            width: dialogWidth * 0.9, // Wrap text within 90% of dialog width
-            fontSize: 24, // Suitable font size
-            fill: '#FFFFFF', // White text
-            textAlign: 'center',
-            selectable: false, evented: false,
-            customType: 'videoQuestionOverlay'
+            left: dialogBackground.left, top: dialogBackground.top - dialogBackground.height / 2 + (questionFontSize * 1.5), 
+            originX: 'center', originY: 'top', width: dialogWidth * 0.85, 
+            fontSize: questionFontSize, fill: '#EFEFEF', textAlign: 'center', padding: 10,
+            selectable: false, evented: false, customType: 'videoQuestionOverlay'
         });
-        canvas.add(questionText);
-
-        // Answer option styling and positioning
-        const optionHeight = 40;
-        const optionMargin = 15; // Increased margin for better spacing
+        
+        const optionFontSize = Math.max(14, Math.min(22, dialogWidth / 30));
+        const optionHeight = optionFontSize * 2.2; // Proportional height
+        const optionMargin = optionFontSize * 0.8;
         const optionsContainerWidth = dialogWidth * 0.8;
-        
-        // Calculate starting Y position for options to be centered vertically below question text
         const totalOptionsContentHeight = question.options.length * (optionHeight + optionMargin) - optionMargin;
-        let startY = questionText.top + questionText.height + 30; // Initial Y below question
         
-        // Adjust startY if options would overflow dialogHeight (simple centering for now)
-        const remainingDialogHeight = dialogBackground.height - (questionText.top - (dialogBackground.top - dialogBackground.height/2)) - questionText.height - 20; // 20 for bottom padding
-        if (totalOptionsContentHeight < remainingDialogHeight) {
-            startY = questionText.top + questionText.height + (remainingDialogHeight - totalOptionsContentHeight) / 2;
+        // Recalculate dialogHeight if content (question + options) is too large
+        const minContentHeight = questionText.height + totalOptionsContentHeight + (questionFontSize * 2) + (optionMargin * 2); // Approx.
+        if (minContentHeight > dialogHeight) {
+            dialogHeight = minContentHeight + 40; // Add some padding
+            dialogBackground.set('height', dialogHeight);
         }
+        // Re-adjust questionText top if dialogHeight changed
+        questionText.set('top', dialogBackground.top - dialogBackground.height / 2 + (questionFontSize * 1.5));
 
+
+        let startY = questionText.top + questionText.height + optionMargin * 1.5; 
+        const remainingDialogHeightForOptions = dialogBackground.height - (questionText.top - (dialogBackground.top - dialogBackground.height/2)) - questionText.height - (optionMargin * 1.5);
+        if (totalOptionsContentHeight < remainingDialogHeightForOptions) { // Center options in remaining space
+            startY = questionText.top + questionText.height + (remainingDialogHeightForOptions - totalOptionsContentHeight) / 2;
+        }
+        
+        canvas.add(dialogBackground); // Add background first
+        canvas.add(questionText);   // Then question text
 
         question.options.forEach((optionStr, index) => {
             const optionGroupY = startY + index * (optionHeight + optionMargin);
-            
             const optionRect = new fabric.Rect({
-                width: optionsContainerWidth,
-                height: optionHeight,
-                fill: 'rgba(50, 50, 50, 0.9)', // Darker individual option background
-                stroke: '#CCCCCC',
-                strokeWidth: 1,
-                rx: 5, ry: 5, // Rounded corners for options
-                originX: 'center', originY: 'top'
+                width: optionsContainerWidth, height: optionHeight, fill: 'rgba(60, 60, 60, 0.95)', 
+                stroke: '#888', strokeWidth: 1, rx: 8, ry: 8, originX: 'center', originY: 'top'
             });
-
-            const optionText = new fabric.Textbox(optionStr, {
-                fontSize: 18,
-                fill: '#FFFFFF',
-                width: optionRect.width - 20, // Padding within the rect
-                textAlign: 'center',
-                originX: 'center', originY: 'center',
-                top: optionRect.height / 2 // Center text vertically in rect
+            const optionTextContent = new fabric.Textbox(optionStr, {
+                fontSize: optionFontSize, fill: '#DADADA', width: optionRect.width - 20, 
+                textAlign: 'center', originX: 'center', originY: 'center', top: optionRect.height / 2 
             });
-            
-            const optionGroup = new fabric.Group([optionRect, optionText], {
-                left: dialogBackground.left, // Center with dialogBackground
-                top: optionGroupY,
-                originX: 'center', originY: 'top', // Group origin for easier positioning
-                selectable: false,
-                evented: true,
-                customType: 'videoQuestionOverlay',
-                customAnswerIndex: index,
-                hoverCursor: 'pointer'
+            const optionGroup = new fabric.Group([optionRect, optionTextContent], {
+                left: dialogBackground.left, top: optionGroupY, originX: 'center', originY: 'top', 
+                selectable: false, evented: true, customType: 'videoQuestionOverlay', 
+                customAnswerIndex: index, hoverCursor: 'pointer'
             });
             canvas.add(optionGroup);
 
             optionGroup.on('mousedown', function() {
                 const isCorrect = (this.customAnswerIndex === question.correctOptionIndex);
-                // Update optionRect fill directly (it's the first object in the group)
-                this.item(0).set('fill', isCorrect ? 'rgba(0, 150, 0, 0.9)' : 'rgba(150, 0, 0, 0.9)');
+                this.item(0).set('fill', isCorrect ? 'rgba(40, 180, 99, 0.95)' : 'rgba(231, 76, 60, 0.95)');
                 
-                // Add checkmark or cross
-                const feedbackSymbol = new fabric.Text(isCorrect ? '✓' : '✗', {
-                    fontSize: 20,
-                    fill: isCorrect ? 'lightgreen' : 'pink',
-                    left: this.item(0).width / 2 - 25, // Position to the right of text
-                    top: this.item(0).height / 2,    // Center vertically with text
-                    originX: 'right', 
-                    originY: 'center',
-                    selectable: false,
-                    evented: false
+                const feedbackSymbolText = isCorrect ? '✓' : '✗';
+                const feedbackSymbolColor = isCorrect ? '#D5F5E3' : '#FADBD8';
+                const existingSymbol = this.getObjects().find(obj => obj.isFeedbackSymbol);
+                if (existingSymbol) this.remove(existingSymbol); // Remove if one exists
+
+                const feedbackSymbol = new fabric.Text(feedbackSymbolText, {
+                    fontSize: optionFontSize * 1.2, fill: feedbackSymbolColor,
+                    left: this.item(0).width / 2 - (optionFontSize * 0.5), // Position to the right
+                    top: this.item(0).height / 2, originX: 'right', originY: 'center',
+                    selectable: false, evented: false, isFeedbackSymbol: true
                 });
-                // Add symbol to the group so it's positioned relative to the option
                 this.addWithUpdate(feedbackSymbol);
-                // Ensure the symbol is visible if text is long
-                this.item(1).set('width', optionRect.width - 50); // Make space for symbol
+                this.item(1).set('width', optionRect.width - (optionFontSize * 2)); // Adjust text width for symbol
 
                 canvas.renderAll();
-
-                // Disable further clicks on options
-                canvas.getObjects('group').forEach(obj => {
-                    if (obj.customType === 'videoQuestionOverlay' && obj.customAnswerIndex !== undefined) {
-                        obj.evented = false;
-                    }
-                });
+                canvas.getObjects('group').forEach(obj => { if (obj.customType === 'videoQuestionOverlay' && obj.customAnswerIndex !== undefined) obj.evented = false;});
 
                 setTimeout(() => {
-                    // Remove all question elements
-                    canvas.getObjects().forEach(obj => {
-                        if (obj.customType === 'videoQuestionOverlay') {
-                            canvas.remove(obj);
-                        }
-                    });
-                    // Call checkVideoTimeForTimestampOverlays to re-evaluate the correct state.
-                    // This will handle opacity and pointerEvents based on any active timestamp overlays or if video is playing.
-                    checkVideoTimeForTimestampOverlays(); 
-                    canvas.renderAll();
+                    canvas.getObjects().forEach(obj => { if (obj.customType === 'videoQuestionOverlay') canvas.remove(obj);});
                     
+                    // Determine canvas state after question
+                    if (viewerApp.state.activeTimestampOverlayIds.size > 0) {
+                         if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
+                         // Pointer events depend on whether active overlays are interactive (handled by checkVideoTimeForTimestampOverlays or a new updateCanvasInteractivity)
+                         // For now, assume if overlays are present, canvas might need interaction.
+                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto'; 
+                    } else {
+                         if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
+                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+                    }
+                    canvas.renderAll();
                     if(ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
-                    // Interval will be restarted by onPlayerStateChange if video plays
-                }, 1500); // Show feedback for 1.5 seconds
+                }, 1500); 
             });
         });
         canvas.renderAll();
     }
 
     function checkVideoTimeForTimestampOverlays() {
-        if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.viewerFabricCanvas) {
-            return;
-        }
-        const currentTime = ytPlayer.getCurrentTime();
+        // To be implemented in Phase 2
+        // This will also call updateCanvasInteractivity()
+    }
+
+    // New function to centralize canvas opacity/pointer events (will be used more in Phase 2)
+    // For Phase 1, it's mainly called after questions or "Click to Begin" changes state.
+    function updateCanvasInteractivity() {
         const canvas = viewerApp.state.viewerFabricCanvas;
-        // const media = viewerApp.state.currentProjectData.slides[viewerApp.state.currentSlideIndex].slideMedia; // Not strictly needed for current logic here but good for context
+        if (!canvas || !viewerCanvasContainerEl || !viewerFabricCanvasEl) return;
 
-        let isAnyTimestampOverlayActiveAndInteractive = false;
-        let isAnyTimestampOverlayVisible = false;
-
-        viewerApp.state.currentTimestampOverlays.forEach(overlay => {
-            const shouldBeVisible = (currentTime >= overlay.timestampShow && currentTime < overlay.timestampHide);
-            const isCurrentlyVisible = viewerApp.state.activeTimestampOverlayIds.has(overlay.overlayId);
-
-            if (shouldBeVisible && !isCurrentlyVisible) {
-                // Show overlay
-                if (overlay.fabricObjectJSON) {
-                    fabric.util.enlivenObjects([overlay.fabricObjectJSON], function(enlivenedObjects) {
-                        if (enlivenedObjects.length > 0) {
-                            overlay._fabricObject = enlivenedObjects[0];
-                            overlay._fabricObject.selectable = false;
-                            overlay._fabricObject.evented = !!overlay.isInteractive; // Set based on isInteractive
-                            overlay._fabricObject.hoverCursor = overlay.isInteractive ? 'pointer' : 'default';
-
-                            // Attach generic click handler for interactions if defined on the object itself
-                            // This is a simplified interaction handling for timestamp overlays.
-                            // More complex interactions might need the full setup from renderSlideForViewing.
-                            if (overlay.isInteractive && overlay._fabricObject.customInteraction) {
-                                overlay._fabricObject.on('mousedown', function() {
-                                    // Pass the fabric object itself and a generic 'click' type
-                                    handleOverlayInteraction(this, 'click'); 
-                                });
-                            }
-                            
-                            canvas.add(overlay._fabricObject);
-                            viewerApp.state.activeTimestampOverlayIds.add(overlay.overlayId);
-                            canvas.requestRenderAll();
-                        }
-                    }, ''); // Pass empty namespace
-                }
-            } else if (!shouldBeVisible && isCurrentlyVisible) {
-                // Hide overlay
-                if (overlay._fabricObject) {
-                    canvas.remove(overlay._fabricObject);
-                    overlay._fabricObject = null; 
-                    viewerApp.state.activeTimestampOverlayIds.delete(overlay.overlayId);
-                    canvas.requestRenderAll();
-                }
-            }
-
-            if (viewerApp.state.activeTimestampOverlayIds.has(overlay.overlayId)) {
-                isAnyTimestampOverlayVisible = true;
-                if (overlay.isInteractive) { 
-                    isAnyTimestampOverlayActiveAndInteractive = true;
-                }
-            }
-        });
-
-        // Manage overall canvas opacity and interactivity based on overlays and questions
         const isQuestionActive = canvas.getObjects().some(obj => obj.customType === 'videoQuestionOverlay');
-        const isClickToBeginShowing = canvas.getObjects().some(obj => obj.isClickToBeginButton === true); // Check the custom property
+        const isClickToBeginActive = canvas.getObjects().some(obj => obj.customType === 'clickToBeginButton');
+        
+        // Placeholder for Phase 2: Check for interactive timestamp overlays
+        let isInteractiveTimestampOverlayActive = false; 
+        // viewerApp.state.currentTimestampOverlays.forEach(overlay => {
+        //     if (viewerApp.state.activeTimestampOverlayIds.has(overlay.overlayId) && overlay.isInteractive) {
+        //         isInteractiveTimestampOverlayActive = true;
+        //     }
+        // });
 
-        // Determine overall canvas visibility
-        if (isAnyTimestampOverlayVisible || isQuestionActive || isClickToBeginShowing) {
-            if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
+        if (isQuestionActive || isClickToBeginActive || isInteractiveTimestampOverlayActive) {
+            viewerCanvasContainerEl.style.pointerEvents = 'auto';
+            viewerFabricCanvasEl.style.opacity = '1';
         } else {
-            // Only make transparent if not in a state where an overlay *might* immediately appear (e.g. video not yet playing with click-to-begin)
-            // This function primarily handles state *during* playback or when paused.
-            if (ytPlayer && (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING || ytPlayer.getPlayerState() === YT.PlayerState.PAUSED)) {
-                 if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-            }
-        }
+            // If only non-interactive timestamp overlays are visible (Phase 2 logic)
+            // let isNonInteractiveOverlayVisible = false; 
+            // viewerApp.state.currentTimestampOverlays.forEach(overlay => {
+            //     if (viewerApp.state.activeTimestampOverlayIds.has(overlay.overlayId) && !overlay.isInteractive) {
+            //         isNonInteractiveOverlayVisible = true;
+            //     }
+            // });
 
-        // Determine overall canvas interactivity
-        if (isAnyTimestampOverlayActiveAndInteractive || isQuestionActive || isClickToBeginShowing) {
-            if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
-        } else {
-            if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+            // if (isNonInteractiveOverlayVisible) {
+            //    viewerCanvasContainerEl.style.pointerEvents = 'none';
+            //    viewerFabricCanvasEl.style.opacity = '1';
+            //} else { // No overlays, or player should be primary interaction
+                viewerCanvasContainerEl.style.pointerEvents = 'none';
+                viewerFabricCanvasEl.style.opacity = '0';
+            //}
         }
+        canvas.requestRenderAll();
     }
 
   </script>

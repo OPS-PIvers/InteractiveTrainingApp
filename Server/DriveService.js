@@ -7,15 +7,15 @@
  * @return {string} The ID of the newly created folder.
  */
 function createDriveFolder(folderName, parentFolderId) {
-    try {
-      const parentFolder = DriveApp.getFolderById(parentFolderId);
-      const newFolder = parentFolder.createFolder(folderName);
-      Logger.log(`Folder "${folderName}" created with ID: ${newFolder.getId()} inside parent ID: ${parentFolderId}`);
-      return newFolder.getId();
-    } catch (e) {
-      Logger.log(`Error in createDriveFolder: ${e.toString()} - FolderName: ${folderName}, ParentID: ${parentFolderId}`);
-      throw new Error(`Failed to create folder: ${e.message}`);
-    }
+  try {
+    const parentFolder = DriveApp.getFolderById(parentFolderId);
+    const newFolder = parentFolder.createFolder(folderName);
+    Logger.log(`Folder "${folderName}" created with ID: ${newFolder.getId()} inside parent ID: ${parentFolderId}`);
+    return newFolder.getId();
+  } catch (e) {
+    Logger.log(`Error in createDriveFolder: ${e.toString()} - FolderName: ${folderName}, ParentID: ${parentFolderId}`);
+    throw new Error(`Failed to create folder: ${e.message}`);
+  }
 }
   
 /**

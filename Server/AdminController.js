@@ -392,7 +392,6 @@ function updateProjectStatus(projectId, newStatus) {
 
     const nowISO = new Date().toISOString();
 
-    const nowISO = new Date().toISOString();
     const projectFolderId = rowData[COL_PROJECT_FOLDER_ID - 1];
     const projectDataFileId = rowData[COL_PROJECT_DATA_FILE_ID - 1];
 

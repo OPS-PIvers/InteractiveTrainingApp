@@ -583,3 +583,26 @@ function getAudioAsBase64(driveFileId) {
       return { success: false, error: `Failed to retrieve audio as base64: ${e.message}` };
   }
 }
+
+/**
+ * Diagnostic function that can be called from the client to test folder access
+ * @return {object} Diagnostic results
+ */
+function diagnoseFolderAccess() {
+  try {
+    Logger.log(`diagnoseFolderAccess: Starting diagnostic for ROOT_PROJECT_FOLDER_ID: ${ROOT_PROJECT_FOLDER_ID}`);
+    
+    const result = testFolderAccess(ROOT_PROJECT_FOLDER_ID);
+    
+    Logger.log(`diagnoseFolderAccess: Test result: ${JSON.stringify(result)}`);
+    return result;
+    
+  } catch (e) {
+    Logger.log(`Error in diagnoseFolderAccess: ${e.toString()}`);
+    return {
+      success: false,
+      error: `Diagnostic function failed: ${e.message}`,
+      step: 'diagnostic wrapper'
+    };
+  }
+}

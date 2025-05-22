@@ -50,15 +50,14 @@ function getActiveProjectsList() {
  * Retrieves the project's data JSON string from its file in Google Drive for viewer.
  * Ensures the project is "Active".
  * @param {string} projectId The ID of the project.
- * @return {string} The JSON string content of the project data file if active.
- *                  Throws an error if not found, not active, or other error.
+ * @return {object} An object like { success: true, data: jsonString } or { success: false, error: string }
  */
 function getProjectViewData(projectId) {
   try {
     Logger.log(`getProjectViewData: Attempting to load data for projectId: ${projectId}`);
     if (!projectId) {
       Logger.log("getProjectViewData: ProjectID is missing.");
-      throw new Error("Project ID is required.");
+      return { success: false, error: "Project ID is required." };
     }
 
     const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
@@ -69,31 +68,40 @@ function getProjectViewData(projectId) {
 
     if (!projectEntry) {
       Logger.log(`getProjectViewData: Project with ID "${projectId}" not found in ProjectIndex.`);
-      throw new Error("Project not found.");
+      return { success: false, error: "Project not found." };
     }
 
     // Direct property access for status and file ID
     const status = projectEntry['Status'];
     if (status !== "Active") {
       Logger.log(`getProjectViewData: Project with ID "${projectId}" is not active (Status: ${status}).`);
-      throw new Error("Project is not currently active.");
+      return { success: false, error: "Project is not currently active." };
     }
 
     const projectDataFileId = projectEntry['ProjectDataFileID'];
     if (!projectDataFileId) {
       Logger.log(`getProjectViewData: ProjectDataFileID is missing for active project "${projectId}".`);
-      throw new Error("Project data file reference is missing.");
+      return { success: false, error: "Project data file reference is missing." };
     }
     Logger.log(`getProjectViewData: Found ProjectDataFileID: ${projectDataFileId} for active project ${projectId}.`);
 
     const jsonContent = readDriveFileContent(projectDataFileId); // This can throw
 
     Logger.log(`getProjectViewData: Successfully read content for file ID ${projectDataFileId}.`);
-    return jsonContent; // Return the JSON string directly on success
+    
+    // Return properly formatted success response
+    return { 
+      success: true, 
+      data: jsonContent 
+    };
 
   } catch (e) {
     Logger.log(`Error in getProjectViewData for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-    // Re-throw the error so it's caught by .withFailureHandler on the client side
-    throw new Error(`Server error fetching project data for viewing: ${e.message}`);
+    
+    // Return error response instead of throwing
+    return { 
+      success: false, 
+      error: `Server error fetching project data for viewing: ${e.message}` 
+    };
   }
 }

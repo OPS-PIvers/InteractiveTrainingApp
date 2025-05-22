@@ -887,17 +887,23 @@ function onYouTubeIframeAPIReady() {
     }
 
     function selectSlide(slideIndex) {
-        if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("selectSlide: Invalid index or slides array missing.", slideIndex); return; }
+        if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { 
+            console.error("selectSlide: Invalid index or slides array missing.", slideIndex); 
+            return; 
+        }
         console.log(`Selecting slide ${slideIndex + 1}`);
 
         if (adminApp.state.currentSlideIndex !== -1 && adminApp.state.currentSlideIndex < adminApp.state.projectData.slides.length) {
-             saveCurrentSlideState();
+            saveCurrentSlideState();
         }
 
         adminApp.state.currentSlideIndex = slideIndex;
         const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
         const canvas = adminApp.state.fabricCanvasInstance;
-        if (!canvas) { console.error("selectSlide: Canvas not ready!"); return; }
+        if (!canvas) { 
+            console.error("selectSlide: Canvas not ready!"); 
+            return; 
+        }
 
         if (!selectedSlideData.slideMedia) {
             selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] };
@@ -918,7 +924,6 @@ function onYouTubeIframeAPIReady() {
             fabricCanvasEl.style.opacity = '1';
         }
 
-
         canvas.clear(); // Clears objects
         canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); // Clears background image
         canvas.backgroundColor = '#e9e9e9'; // Reset background color
@@ -931,52 +936,54 @@ function onYouTubeIframeAPIReady() {
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
         if (audioUploaderEl) audioUploaderEl.value = null;
         if (attachedAudioNameEl) {
-             attachedAudioNameEl.textContent = '';
-             const audioControls = document.getElementById('audioControls');
-             if(audioControls) audioControls.style.display = 'none';
+            attachedAudioNameEl.textContent = '';
+            const audioControls = document.getElementById('audioControls');
+            if(audioControls) audioControls.style.display = 'none';
         }
         if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
         if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
-
 
         const media = selectedSlideData.slideMedia;
         // Update video tools visibility - hide by default
         updateVideoToolsVisibility(false);
 
-        if (media && media.type === 'image' && (media.url || media.driveFileId)) {
+        // UPDATED IMAGE HANDLING - Always fetch from Drive, never use cached base64
+        if (media && media.type === 'image' && media.driveFileId) {
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
-            if (media.url && media.url.startsWith('data:image')) {
-                console.log("Loading background from base64 data URI.");
-                fabric.Image.fromURL(media.url, function(img) {
-                    if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return; // Check if slide changed
-                    adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
-                    console.log("Background loaded for slide", slideIndex);
-                }, { crossOrigin: 'anonymous' });
-            } else if (media.driveFileId) {
-                 console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
-                 showLoading(true); displayMessage("Loading slide background...", true);
-                 google.script.run.withSuccessHandler(function(response) {
-                     showLoading(false);
-                     if (adminApp.state.currentSlideIndex !== slideIndex) { console.log("Slide changed before background could be fetched for index", slideIndex); return; }
-                     if (response && response.success && response.base64Data) {
-                          media.url = response.base64Data; // Cache it
-                         fabric.Image.fromURL(response.base64Data, function(img) {
-                             if (!adminApp.state.fabricCanvasInstance) return;
-                             adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: canvas.width / img.width, scaleY: canvas.height / img.height });
-                             console.log("Background fetched and loaded for slide", slideIndex);
-                         }, { crossOrigin: 'anonymous' });
-                     } else { 
-                        console.error("Failed to re-fetch background", response); 
-                        displayMessage("Error loading slide background image.", false); 
-                        canvas.backgroundColor = '#e9e9e9'; // Fallback color
-                        canvas.renderAll(); 
-                    }
-                 }).withFailureHandler(onServerError).getImageAsBase64(media.driveFileId);
-             } else { 
-                console.warn("Slide media URL/ID not suitable for loading:", media); 
-                canvas.backgroundColor = '#e9e9e9';
-                canvas.renderAll(); 
-            }
+            console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
+            showLoading(true); 
+            displayMessage("Loading slide background...", true);
+            
+            google.script.run.withSuccessHandler(function(response) {
+                showLoading(false);
+                if (adminApp.state.currentSlideIndex !== slideIndex) { 
+                    console.log("Slide changed before background could be fetched for index", slideIndex); 
+                    return; 
+                }
+                if (response && response.success && response.base64Data) {
+                    // DON'T cache the base64Data in media.url - just use it directly
+                    fabric.Image.fromURL(response.base64Data, function(img) {
+                        if (!adminApp.state.fabricCanvasInstance) return;
+                        adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { 
+                            scaleX: canvas.width / img.width, 
+                            scaleY: canvas.height / img.height 
+                        });
+                        console.log("Background fetched and loaded for slide", slideIndex);
+                    }, { crossOrigin: 'anonymous' });
+                } else { 
+                    console.error("Failed to fetch background", response); 
+                    displayMessage("Error loading slide background image.", false); 
+                    canvas.backgroundColor = '#e9e9e9'; // Fallback color
+                    canvas.renderAll(); 
+                }
+            }).withFailureHandler(onServerError).getImageAsBase64(media.driveFileId);
+            
+        } else if (media && media.type === 'image' && !media.driveFileId) {
+            // Handle case where image type is set but no Drive file ID (shouldn't happen in normal flow)
+            console.warn("Image media type set but no driveFileId:", media); 
+            canvas.backgroundColor = '#e9e9e9';
+            canvas.renderAll(); 
+            
         } else if (media && media.type === 'youtube' && media.url) {
             console.log("Attempting to load YouTube player for URL:", media.url);
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
@@ -1059,51 +1066,53 @@ function onYouTubeIframeAPIReady() {
                 canvas.backgroundColor = '#444'; // Fallback
             }
             canvas.renderAll();
+            
         } else if (media && media.type === 'audio' && (media.driveFileId)) {
-             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'block'; // Keep placeholder for audio
-             console.log("Indicating attached audio:", media.originalName || media.driveFileId);
-             if (attachedAudioNameEl) {
+            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'block'; // Keep placeholder for audio
+            console.log("Indicating attached audio:", media.originalName || media.driveFileId);
+            if (attachedAudioNameEl) {
                 attachedAudioNameEl.textContent = `Attached: ${media.originalName || 'Audio File'}`;
                 const audioControls = document.getElementById('audioControls');
                 if(audioControls) audioControls.style.display = 'block';
-             }
-             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
-             
-             if (adminMediaPlaceholderEl) {
-                 adminMediaPlaceholderEl.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
-                 adminMediaPlaceholderEl.style.display = 'block';
-             }
-             canvas.backgroundColor = '#e9e9e9'; // Default bg color
-             canvas.renderAll();
+            }
+            if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
+            
+            if (adminMediaPlaceholderEl) {
+                adminMediaPlaceholderEl.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
+                adminMediaPlaceholderEl.style.display = 'block';
+            }
+            canvas.backgroundColor = '#e9e9e9'; // Default bg color
+            canvas.renderAll();
+            
         } else {
             console.log("No background media found or configured for slide", slideIndex);
-             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
-             canvas.backgroundColor = '#e9e9e9'; // Default bg color
-             canvas.renderAll();
+            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+            canvas.backgroundColor = '#e9e9e9'; // Default bg color
+            canvas.renderAll();
         }
 
         if (selectedSlideData.fabricCanvasJSON) {
-          console.log("Loading fabricCanvasJSON for slide", slideIndex);
-          // Ensure customInteraction and customAnimation properties are revived if necessary
-          canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
-              if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return;
-              
-              // Post-load processing to ensure custom properties are on objects
-              adminApp.state.fabricCanvasInstance.getObjects().forEach(obj => {
-                  // The `fabricCanvasJSON` should already have these if saved correctly.
-                  // This is more of a safeguard or for older data.
-                  if (!obj.customInteraction) {
-                      obj.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
-                  }
-                  if (!obj.customAnimation) {
-                      obj.customAnimation = { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
-                  }
-              });
+        console.log("Loading fabricCanvasJSON for slide", slideIndex);
+        // Ensure customInteraction and customAnimation properties are revived if necessary
+        canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
+            if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return;
+            
+            // Post-load processing to ensure custom properties are on objects
+            adminApp.state.fabricCanvasInstance.getObjects().forEach(obj => {
+                // The `fabricCanvasJSON` should already have these if saved correctly.
+                // This is more of a safeguard or for older data.
+                if (!obj.customInteraction) {
+                    obj.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
+                }
+                if (!obj.customAnimation) {
+                    obj.customAnimation = { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
+                }
+            });
 
-              adminApp.state.fabricCanvasInstance.renderAll();
-              console.log("Finished loading canvas JSON for slide", slideIndex);
-              const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
-              populateToolbar(activeObj); // Update new toolbar
+            adminApp.state.fabricCanvasInstance.renderAll();
+            console.log("Finished loading canvas JSON for slide", slideIndex);
+            const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
+            populateToolbar(activeObj); // Update new toolbar
             }, function(o, object) { 
                 /* Revival function if needed for complex object types, not typically for custom props */ 
                 // console.log("Reviving object:", o, object);
@@ -1433,16 +1442,22 @@ function onYouTubeIframeAPIReady() {
     function onBase64ImageReceived(response) {
         showLoading(false);
         if (response && response.success && response.base64Data) {
-            if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { displayMessage("Error: Canvas/Slide not ready.", false); return; }
+            if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { 
+                displayMessage("Error: Canvas/Slide not ready.", false); 
+                return; 
+            }
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
-            if (!currentSlide) { displayMessage("Error: Slide data missing.", false); return; }
+            if (!currentSlide) { 
+                displayMessage("Error: Slide data missing.", false); 
+                return; 
+            }
 
             fabric.Image.fromURL(response.base64Data, function(img) {
-                if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) return; // Check slide again
+                if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) return;
                 const canvas = adminApp.state.fabricCanvasInstance;
-                const imgWidth = img.width; const imgHeight = img.height;
-                // Determine canvas size based on image, but cap at maxWidth
-                const maxWidth = 960; // Max width for the canvas
+                const imgWidth = img.width; 
+                const imgHeight = img.height;
+                const maxWidth = 960;
                 let cvWidth = imgWidth; 
                 let cvHeight = imgHeight; 
                 const ratio = imgWidth / imgHeight;
@@ -1451,36 +1466,33 @@ function onYouTubeIframeAPIReady() {
                     cvWidth = maxWidth; 
                     cvHeight = Math.round(cvWidth / ratio); 
                 }
-                // Optionally, you might also want a maxHeight constraint
 
-                canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
-                if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
-                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { scaleX: cvWidth / imgWidth, scaleY: cvHeight / imgHeight });
-                // No need to call canvas.renderAll() here, setBackgroundImage does it.
+                canvas.setWidth(cvWidth); 
+                canvas.setHeight(cvHeight);
+                if (fabricCanvasEl) { 
+                    fabricCanvasEl.width = cvWidth; 
+                    fabricCanvasEl.height = cvHeight; 
+                }
+                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { 
+                    scaleX: cvWidth / imgWidth, 
+                    scaleY: cvHeight / imgHeight 
+                });
                 displayMessage("Background image set.", true);
 
                 if (!currentSlide.slideMedia) currentSlide.slideMedia = {};
                 currentSlide.slideMedia.type = 'image';
-                currentSlide.slideMedia.url = response.base64Data; // Store base64 for immediate use
+                // DON'T store base64 data in JSON - only store the Drive file ID
+                currentSlide.slideMedia.url = null; // Clear any existing base64 data
                 currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null;
-                currentSlide.slideMedia.mimeType = adminApp.state.lastUploadedMimeType || response.mimeType; // mimeType from uploadFileToDrive is better
+                currentSlide.slideMedia.mimeType = adminApp.state.lastUploadedMimeType || response.mimeType;
                 currentSlide.slideMedia.originalName = adminApp.state.lastUploadedFileName || null;
-                currentSlide.canvasWidth = cvWidth; // Update slide dimensions
+                currentSlide.canvasWidth = cvWidth;
                 currentSlide.canvasHeight = cvHeight;
 
                 console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated for image.`);
-                updateSlideThumbnailsUI(); // Reflect potential dimension changes in any thumbnail logic
+                updateSlideThumbnailsUI();
 
-                // Clear other media UI states
-                if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
-                if (attachedAudioNameEl) {
-                    attachedAudioNameEl.textContent = '';
-                    const audioControls = document.getElementById('audioControls');
-                    if(audioControls) audioControls.style.display = 'none';
-                }
-                if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
-                if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
-
+                // Clear temporary state
                 delete adminApp.state.lastUploadedDriveId;
                 delete adminApp.state.lastUploadedMimeType;
                 delete adminApp.state.lastUploadedFileName;
@@ -1488,9 +1500,6 @@ function onYouTubeIframeAPIReady() {
             }, { crossOrigin: 'anonymous' });
         } else {
             onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." });
-            delete adminApp.state.lastUploadedDriveId;
-            delete adminApp.state.lastUploadedMimeType;
-            delete adminApp.state.lastUploadedFileName;
         }
     }
 

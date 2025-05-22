@@ -81,9 +81,6 @@ function onYouTubeIframeAPIReady() {
         videoQuestionsListContainerEl, videoQuestionsListEl; // Added question list elements
     let optionInputsEl = [], correctAnswerRadiosEl = [];
 
-    // Phase 1: "Click to Begin" checkbox
-    let youtubeShowClickToBeginEl;
-
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -296,9 +293,6 @@ function onYouTubeIframeAPIReady() {
           correctAnswerRadiosEl.push(document.getElementById(`correctAnswer${i}`));
       }
 
-      // Phase 1: "Click to Begin" checkbox
-      youtubeShowClickToBeginEl = document.getElementById('youtubeShowClickToBegin');
-
 
       // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
@@ -310,8 +304,6 @@ function onYouTubeIframeAPIReady() {
       if (!shadowPopoverEl || !interactionPopoverEl || !animationPopoverEl || !fontFamilyPopoverEl) {
           console.warn("setupDOMReferences: One or more popover elements not found.");
       }
-      if (!youtubeShowClickToBeginEl) console.warn("setupDOMReferences: youtubeShowClickToBeginEl not found.");
-
 
       console.log("Admin_JS: DOM references set up.");
     };
@@ -480,7 +472,6 @@ function onYouTubeIframeAPIReady() {
             adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
             if (e.target) {
                 populateToolbar(e.target);
-                saveCanvasStateForHistory(); // Save state after modification
             }
             });
             adminApp.state.fabricCanvasInstance.on('selection:created', (e) => {
@@ -494,11 +485,6 @@ function onYouTubeIframeAPIReady() {
             adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
                populateToolbar(null);
             });
-            adminApp.state.fabricCanvasInstance.on('object:added', () => {
-                saveCanvasStateForHistory(); // Save state after adding an object
-            });
-            // Removed object:removed because handleDeleteObject calls saveCanvasStateForHistory explicitly.
-
 
             // Make toolbar visible and set initial state for no selection
             if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'block';
@@ -736,10 +722,6 @@ function onYouTubeIframeAPIReady() {
                     }
                 });
               }
-              // Ensure youtubeOptions exists for YouTube slides
-              if (slide.slideMedia && slide.slideMedia.type === 'youtube' && !slide.slideMedia.youtubeOptions) {
-                slide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default
-              }
           });
 
           adminApp.state.projectData = loadedData;
@@ -793,15 +775,9 @@ function onYouTubeIframeAPIReady() {
           currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
           currentSlide.canvasWidth = canvas.getWidth();
           currentSlide.canvasHeight = canvas.getHeight();
-          
           if (!currentSlide.slideMedia) {
                currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
           }
-          // Ensure youtubeOptions is initialized for YouTube slides if not present
-          if (currentSlide.slideMedia.type === 'youtube' && !currentSlide.slideMedia.youtubeOptions) {
-              currentSlide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default if somehow missing
-          }
-
           if(currentSlide.slideMedia.type !== 'image' && currentSlide.slideMedia.url && currentSlide.slideMedia.url.startsWith('data:image')) {
               // This case seems unlikely for non-image types but kept for safety
               currentSlide.slideMedia.url = null;
@@ -901,11 +877,7 @@ function onYouTubeIframeAPIReady() {
             canvasWidth: adminApp.state.defaultCanvasWidth,
             canvasHeight: adminApp.state.defaultCanvasHeight,
             fabricCanvasJSON: null, // Will be empty JSON for a new slide
-            slideMedia: { 
-                type: null, url: null, driveFileId: null, mimeType: null, originalName: null, 
-                videoQuestions: [],
-                youtubeOptions: { showClickToBeginButton: false } // Default for new slides
-            } 
+            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] } // Added videoQuestions
         };
         if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
@@ -934,16 +906,10 @@ function onYouTubeIframeAPIReady() {
         }
 
         if (!selectedSlideData.slideMedia) {
-            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], youtubeOptions: { showClickToBeginButton: false } };
-        } else {
-            if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
-                selectedSlideData.slideMedia.videoQuestions = [];
-            }
-            if (selectedSlideData.slideMedia.type === 'youtube' && typeof selectedSlideData.slideMedia.youtubeOptions === 'undefined') {
-                selectedSlideData.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Ensure it exists
-            }
+            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] };
+        } else if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
+            selectedSlideData.slideMedia.videoQuestions = [];
         }
-
 
         // Destroy existing YouTube player if any
         if (adminApp.state.adminYouTubePlayer) {
@@ -968,9 +934,6 @@ function onYouTubeIframeAPIReady() {
         // Reset UI elements related to slide media
         if (imageUploaderEl) imageUploaderEl.value = null;
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
-        // Phase 1: "Click to Begin" checkbox reset
-        if (youtubeShowClickToBeginEl) youtubeShowClickToBeginEl.checked = false;
-
         if (audioUploaderEl) audioUploaderEl.value = null;
         if (attachedAudioNameEl) {
             attachedAudioNameEl.textContent = '';
@@ -1025,10 +988,6 @@ function onYouTubeIframeAPIReady() {
             console.log("Attempting to load YouTube player for URL:", media.url);
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
-            // Phase 1: Populate "Click to Begin" checkbox
-            if (youtubeShowClickToBeginEl && media.youtubeOptions) {
-                youtubeShowClickToBeginEl.checked = !!media.youtubeOptions.showClickToBeginButton;
-            }
             
             const videoId = extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl && typeof YT !== 'undefined' && YT.Player) {
@@ -1069,14 +1028,9 @@ function onYouTubeIframeAPIReady() {
                             // If video is playing, set an interval to update the timeline slider and current time display
                             if (event.data === YT.PlayerState.PLAYING) {
                                 adminApp.state.playerUpdateInterval = setInterval(() => {
-                                    if (adminApp.state.adminYouTubePlayer) { // Check if player still exists
-                                        const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
-                                        if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
-                                        if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
-                                    } else { // Player was destroyed, clear interval
-                                        clearInterval(adminApp.state.playerUpdateInterval);
-                                        adminApp.state.playerUpdateInterval = null;
-                                    }
+                                    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+                                    if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
+                                    if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
                                 }, 250); // Update every 250ms
                             }
                         },
@@ -1566,22 +1520,15 @@ function onYouTubeIframeAPIReady() {
 
         const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
         if (!currentSlide.slideMedia) {
-            currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, youtubeOptions: { showClickToBeginButton: false } };
-        } else if (typeof currentSlide.slideMedia.youtubeOptions === 'undefined') { // Ensure youtubeOptions exists
-            currentSlide.slideMedia.youtubeOptions = { showClickToBeginButton: false };
+            currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
         }
         currentSlide.slideMedia.type = 'youtube';
         currentSlide.slideMedia.url = url;
         currentSlide.slideMedia.driveFileId = null; // YouTube videos are not Drive files
         currentSlide.slideMedia.mimeType = 'video/youtube';
         currentSlide.slideMedia.originalName = null;
-        // Phase 1: Save "Click to Begin" option
-        if (youtubeShowClickToBeginEl) {
-            currentSlide.slideMedia.youtubeOptions.showClickToBeginButton = youtubeShowClickToBeginEl.checked;
-        }
 
-
-        console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}. ClickToBegin: ${currentSlide.slideMedia.youtubeOptions.showClickToBeginButton}`);
+        console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
 
         if(adminApp.state.fabricCanvasInstance) {
              adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
@@ -1672,8 +1619,6 @@ function onYouTubeIframeAPIReady() {
             // Clear other media UI states and canvas background
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
             if (imageUploaderEl) imageUploaderEl.value = null;
-            if (youtubeShowClickToBeginEl) youtubeShowClickToBeginEl.checked = false; // Reset youtube specific option
-
             if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; // Default BG
@@ -1891,7 +1836,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null 
       });
     canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll();
-    saveCanvasStateForHistory(); 
+    saveCanvasStateForHistory(); // <-- ADD
     console.log("Rectangle added to canvas:", rect);
     hideActivePopover();
     }
@@ -1907,7 +1852,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null 
       });
     canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll();
-    saveCanvasStateForHistory(); 
+    saveCanvasStateForHistory(); // <-- ADD
     console.log("Circle added to canvas:", circle);
     hideActivePopover();
     }
@@ -1924,7 +1869,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null
       });
         canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll();
-        saveCanvasStateForHistory(); 
+        saveCanvasStateForHistory(); // <-- ADD
         console.log("Textbox added to canvas:", textbox);
         hideActivePopover();
         }
@@ -2414,7 +2359,6 @@ function onYouTubeIframeAPIReady() {
         if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(activeObject.customInteraction.trigger && activeObject.customInteraction.action));
         console.log("Interaction data updated for object:", activeObject.customInteraction);
         canvas.renderAll(); // Ensure change is reflected if visual properties depend on it (though unlikely here)
-        saveCanvasStateForHistory(); // Save state after interaction change
     }
 
     function updateInteractionConfigVisibility(action) {
@@ -2495,7 +2439,6 @@ function onYouTubeIframeAPIReady() {
         if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
         console.log("Animation data updated for object:", activeObject.customAnimation);
         canvas.renderAll();
-        saveCanvasStateForHistory(); // Save state after animation change
     }
 
     function updateFabricObjectFromToolbar(propertyName, value, inputType, isFloat = false) {
@@ -2586,10 +2529,6 @@ function onYouTubeIframeAPIReady() {
       canvas.renderAll();
       // Do NOT call populateToolbar here to avoid potential infinite loops.
       // The primary event handlers (e.g., button clicks) should call populateToolbar if a visual update of the toolbar itself is needed.
-      // IMPORTANT: save state after any toolbar update that modifies the object.
-      if (!propertyName.startsWith('customInteraction.') && !propertyName.startsWith('customAnimation.')) { // Custom Interactions/Animations have their own save points.
-          saveCanvasStateForHistory();
-      }
     }
 
     // --- Utilities ---
@@ -2852,5 +2791,187 @@ function onYouTubeIframeAPIReady() {
         const minutes = Math.floor(totalSeconds / 60);
         const seconds = totalSeconds % 60;
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+        /**
+     * Handles adding a new timestamp overlay based on the currently selected
+     * Fabric object and the current YouTube video time.
+     */
+    function handleAddTimestampOverlay() {
+        const currentSlide = getCurrentSlide();
+        if (!currentSlide || !adminApp.state.fabricCanvasInstance ) {
+            displayMessage("Cannot add timestamp overlay: No slide or canvas active.", false);
+            return;
+        }
+        if (currentSlide.slideMedia.type !== 'youtube' || !adminApp.state.adminYouTubePlayer) {
+            displayMessage("Timestamp overlays can only be added to YouTube video slides with an active player.", false);
+            return;
+        }
+        
+        const selectedObject = adminApp.state.fabricCanvasInstance.getActiveObject();
+        if (!selectedObject) {
+            displayMessage("Please select an object on the canvas to use as an overlay.", false);
+            return;
+        }
+
+        const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+        const isInteractive = makeOverlayInteractiveCheckboxEl ? makeOverlayInteractiveCheckboxEl.checked : false;
+        // Default hide time can be set, e.g., current time + 5 seconds, or let user edit. For now, null.
+        const defaultHideTimeOffset = 5; // Show for 5 seconds by default, can be null
+        const timestampHide = (currentOverlayTimestampInputEl && currentOverlayTimestampInputEl.value !== '') 
+                              ? parseFloat(currentOverlayTimestampInputEl.value) // Placeholder for a dedicated hide time input
+                              : currentTime + defaultHideTimeOffset;
+
+
+        const overlayId = 'ts_overlay_' + Utilities.getUuid();
+        // Define a comprehensive list of properties to include in the JSON.
+        // This ensures that all necessary visual and behavioral aspects of the object are saved.
+        const propsToInclude = [
+            'type', 'originX', 'originY', 'left', 'top', 'width', 'height', 'scaleX', 'scaleY', 'flipX', 'flipY', 
+            'opacity', 'angle', 'fill', 'stroke', 'strokeWidth', 'strokeDashArray', 'strokeLineCap', 'strokeLineJoin', 
+            'strokeMiterLimit', 'shadow', 'visible', 'backgroundColor', 'clipPath', 'skewX', 'skewY',
+            // Text-specific properties
+            'text', 'fontSize', 'fontWeight', 'fontFamily', 'fontStyle', 'lineHeight', 'underline', 'overline', 
+            'linethrough', 'textAlign', 'textBackgroundColor', 'charSpacing', 'path', 'direction',
+            // Custom properties that might have been added via the toolbar
+            'customInteraction', 'customAnimation', 'sequenceOrder', 'slideId' // slideId might be useful for context, though not strictly for rendering the object itself
+        ];
+        
+        const fabricObjectJSON = selectedObject.toJSON(propsToInclude);
+
+        const newTimestampOverlay = {
+            overlayId: overlayId,
+            timestampShow: currentTime,
+            timestampHide: timestampHide, // Using calculated or default hide time
+            fabricObjectJSON: fabricObjectJSON,
+            isInteractive: isInteractive 
+        };
+
+        if (!Array.isArray(currentSlide.timestampOverlays)) {
+            currentSlide.timestampOverlays = [];
+        }
+        currentSlide.timestampOverlays.push(newTimestampOverlay);
+        currentSlide.timestampOverlays.sort((a, b) => a.timestampShow - b.timestampShow); 
+
+        displayMessage(`Overlay added from ${formatTime(currentTime)} to ${formatTime(timestampHide)}. Save project to persist.`, true);
+        populateTimestampOverlayList(); 
+        // Optionally, reset the "Make Interactive" checkbox after adding
+        if (makeOverlayInteractiveCheckboxEl) makeOverlayInteractiveCheckboxEl.checked = false;
+    }
+
+    /**
+     * Populates the list of timestamp overlays in the admin management modal.
+     */
+    function populateTimestampOverlayList() {
+        if (!timestampOverlayListEl) {
+            console.warn("populateTimestampOverlayList: timestampOverlayListEl not found.");
+            return;
+        }
+        timestampOverlayListEl.innerHTML = ''; 
+
+        const currentSlide = getCurrentSlide();
+        if (!currentSlide || !currentSlide.timestampOverlays || currentSlide.timestampOverlays.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = "No timestamp overlays defined for this slide.";
+            li.style.fontStyle = "italic";
+            timestampOverlayListEl.appendChild(li);
+            return;
+        }
+
+        currentSlide.timestampOverlays.forEach((overlay, index) => {
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.justifyContent = 'space-between';
+            li.style.alignItems = 'center';
+            li.style.padding = '5px 0';
+            li.style.borderBottom = '1px solid #eee';
+
+
+            const infoSpan = document.createElement('span');
+            const overlayType = overlay.fabricObjectJSON.type || 'Object';
+            const shortText = overlay.fabricObjectJSON.text ? `"${overlay.fabricObjectJSON.text.substring(0,15)}..."` : '';
+            const hideTimeText = (overlay.timestampHide !== null && overlay.timestampHide !== undefined) ? ` to ${formatTime(overlay.timestampHide)}` : ' (persists)';
+            
+            infoSpan.textContent = `[${formatTime(overlay.timestampShow)}${hideTimeText}] ${overlayType} ${shortText} (Interactive: ${overlay.isInteractive})`;
+            li.appendChild(infoSpan);
+            
+            const controlsDiv = document.createElement('div');
+
+            // Basic Edit Button (placeholder for more complex functionality)
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit Time'; // Simple edit for now
+            editBtn.className = 'edit-button'; // Re-use existing styles
+            editBtn.style.marginLeft = '10px';
+            editBtn.style.padding = '2px 5px';
+            editBtn.style.fontSize = '0.8em';
+            editBtn.onclick = function() {
+                editTimestampOverlayTimes(index); // New function for simple time editing
+            };
+            controlsDiv.appendChild(editBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'danger-button';
+            deleteBtn.style.marginLeft = '5px';
+            deleteBtn.style.padding = '2px 5px';
+            deleteBtn.style.fontSize = '0.8em';
+            deleteBtn.onclick = function() {
+                if (confirm('Are you sure you want to delete this timestamp overlay?')) {
+                    currentSlide.timestampOverlays.splice(index, 1);
+                    populateTimestampOverlayList(); 
+                    displayMessage("Timestamp overlay removed. Save project to persist change.", true);
+                }
+            };
+            controlsDiv.appendChild(deleteBtn);
+            li.appendChild(controlsDiv);
+            timestampOverlayListEl.appendChild(li);
+        });
+    }
+
+    /**
+     * Simple edit for show/hide times of an existing timestamp overlay.
+     * @param {number} index The index of the overlay in currentSlide.timestampOverlays array.
+     */
+    function editTimestampOverlayTimes(index) {
+        const currentSlide = getCurrentSlide();
+        if (!currentSlide || !currentSlide.timestampOverlays || !currentSlide.timestampOverlays[index]) {
+            displayMessage("Overlay not found for editing.", false);
+            return;
+        }
+        const overlay = currentSlide.timestampOverlays[index];
+
+        const newShowTimeStr = prompt(`Edit Show Time for overlay (currently ${formatTime(overlay.timestampShow)}):`, overlay.timestampShow.toFixed(1));
+        if (newShowTimeStr === null) return; // User cancelled
+
+        const newShowTime = parseFloat(newShowTimeStr);
+        if (isNaN(newShowTime) || newShowTime < 0) {
+            displayMessage("Invalid show time entered.", false);
+            return;
+        }
+
+        const newHideTimeStr = prompt(`Edit Hide Time for overlay (currently ${overlay.timestampHide !== null ? formatTime(overlay.timestampHide) : 'Persists'}). Enter new time or leave blank to persist:`, overlay.timestampHide !== null ? overlay.timestampHide.toFixed(1) : "");
+        if (newHideTimeStr === null) return; // User cancelled
+
+        let newHideTime = null;
+        if (newHideTimeStr.trim() !== "") {
+            newHideTime = parseFloat(newHideTimeStr);
+            if (isNaN(newHideTime) || newHideTime < newShowTime) {
+                displayMessage("Invalid hide time entered. Must be after show time.", false);
+                return;
+            }
+        }
+
+        overlay.timestampShow = newShowTime;
+        overlay.timestampHide = newHideTime;
+
+        currentSlide.timestampOverlays.sort((a, b) => a.timestampShow - b.timestampShow); // Re-sort
+        populateTimestampOverlayList(); // Refresh list
+        displayMessage("Overlay times updated. Save project to persist changes.", true);
+    }
+
+
+    // Placeholder for more comprehensive editing (e.g., changing the Fabric object itself)
+    function editTimestampOverlay(index) {
+        console.log("Comprehensive edit functionality for timestamp overlay at index", index, "is a TODO.");
+        displayMessage("Advanced editing for overlay content is not yet implemented. Use Delete and Add New.", "info");
     }
 </script>

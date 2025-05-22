@@ -1,3 +1,5 @@
+--- START OF FILE AdminView.html ---
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -361,8 +363,7 @@
       .toolbar-popover input[type="text"],
       .toolbar-popover select,
       .toolbar-popover textarea { 
-        /* Default widths for popover inputs, can be overridden by specific IDs or classes if needed */
-        width: 150px; /* A reasonable default width for popover inputs */
+        width: 150px; 
       }
       .toolbar-popover input[type="checkbox"] {
             margin-right: 5px; 
@@ -585,6 +586,54 @@
         font-size: 18px;
         color: var(--theme-icon-color);
       }
+
+      /* Styles for Timestamp Overlay Modal */
+      #timestampOverlayModal {
+        display: none; /* Hidden by default */
+        position: fixed; 
+        z-index: 1002; /* Above question modal but below loading spinner */
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 500px;
+        max-height: 80vh;
+        background-color: var(--theme-background-card);
+        border: 1px solid var(--theme-border-color);
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        padding: 20px;
+        overflow-y: auto;
+      }
+      #timestampOverlayModal h3 {
+        margin-top: 0;
+        border-bottom: 1px solid var(--theme-border-color);
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+      }
+      #timestampOverlayList {
+        list-style: none;
+        padding: 0;
+        margin-bottom: 15px;
+        max-height: 300px; /* Limit height and allow scroll */
+        overflow-y: auto;
+        border: 1px solid var(--theme-border-color);
+        padding: 10px;
+        border-radius: 4px;
+      }
+      #timestampOverlayList li {
+        padding: 8px 5px;
+        border-bottom: 1px dashed var(--theme-border-color);
+      }
+      #timestampOverlayList li:last-child {
+        border-bottom: none;
+      }
+      #timestampOverlayModal .checkbox-label { /* Re-use existing checkbox-label style */
+        font-weight: normal;
+      }
+      #timestampOverlayModal button {
+        margin-right: 10px;
+      }
+
     </style>
   </head>
   <body>
@@ -612,12 +661,8 @@
         <button id="backToProjectsListButton">Back to Projects List</button>
         <h2 id="editingProjectTitle">Editing Project: </h2>
         
-        <!-- Notification Container -->
         <div id="notificationContainer"></div>
           
-        <!-- OLD TABBED UI (effects-tab, actions-tab) REMOVED as their controls are now in popovers -->
-        
-        <!-- Media Tools Popover (triggered by mediaToolsButton in toolbar) -->
         <div id="mediaToolsPopover" class="toolbar-popover">
             <h4>Media Settings</h4>
             <div class="media-tabs">
@@ -626,7 +671,6 @@
                 <button class="media-tab-btn" data-tab="youtube-tab">YouTube</button>
             </div>
             <div class="media-tab-content">
-                <!-- Image Tab -->
                 <div id="image-tab" class="media-tab-pane active">
                     <p>Paste an image, drag a file, or click to upload.</p>
                     <div class="media-upload-zone" id="imageDropZone">
@@ -637,7 +681,6 @@
                         </div>
                     </div>
                 </div>
-                <!-- Audio Tab -->
                 <div id="audio-tab" class="media-tab-pane">
                     <p>Drag an audio file or click to upload.</p>
                     <div class="media-upload-zone" id="audioDropZone">
@@ -647,19 +690,17 @@
                             <p>Drop audio or click</p>
                         </div>
                     </div>
-                    <div id="audioControls" style="display: none; margin-top: 15px; padding-top: 10px;"> {/* Added padding-top recommendation */}
+                    <div id="audioControls" style="display: none; margin-top: 15px; padding-top: 10px;">
                         <span id="attachedAudioName" style="margin-right: 10px; font-style: italic;"></span>
                         <button id="removeAudioButton" class="danger-button" style="padding: 5px 8px; font-size: 0.8em;">Remove Audio</button>
                     </div>
                 </div>
-                <!-- YouTube Tab -->
                 <div id="youtube-tab" class="media-tab-pane">
                     <p>Paste a YouTube video link below.</p>
                     <div class="youtube-input-group">
                         <input type="text" id="youtubeUrlInput" placeholder="Paste YouTube URL here">
                         <button id="setYoutubeBackgroundButton">Set BG</button>
                     </div>
-                    <!-- ADDED "Click to Begin" Checkbox -->
                     <label style="display: block; margin-top: 10px; font-weight: normal;">
                         <input type="checkbox" id="youtubeShowClickToBegin"> Show "Click to Begin" Button on video start
                     </label>
@@ -667,10 +708,9 @@
             </div>
         </div>
 
-        <!-- Shapes Popover (triggered by addShapeButton in toolbar) -->
         <div id="shapesPopover" class="toolbar-popover">
             <h4>Add Shape</h4>
-            <div class="shapes-buttons"> <!-- This class styles the container for shape-button items -->
+            <div class="shapes-buttons"> 
                 <button id="addRectangleButton" class="shape-button">
                     <span class="material-symbols-outlined">rectangle</span>
                     <span>Rectangle</span>
@@ -686,56 +726,32 @@
             </div>
         </div>
 
-        <!-- Position Controls Popover (triggered by positionToolsButton in toolbar) -->
         <div id="positionToolsPopover" class="toolbar-popover">
             <h4>Position & Size</h4>
             <div class="position-controls">
-                <div class="position-control-row">
-                    <label for="objX">X:</label>
-                    <input type="number" id="objX" class="toolbar-input-compact">
-                </div>
-                <div class="position-control-row">
-                    <label for="objY">Y:</label>
-                    <input type="number" id="objY" class="toolbar-input-compact">
-                </div>
-                <div class="position-control-row">
-                    <label for="objWidth">Width:</label>
-                    <input type="number" id="objWidth" class="toolbar-input-compact" min="0">
-                </div>
-                <div class="position-control-row">
-                    <label for="objHeight">Height:</label>
-                    <input type="number" id="objHeight" class="toolbar-input-compact" min="0">
-                </div>
-                <div class="position-control-row">
-                    <label for="objAngle">Angle:</label>
-                    <input type="number" id="objAngle" class="toolbar-input-compact">
-                </div>
+                <div class="position-control-row"> <label for="objX">X:</label> <input type="number" id="objX" class="toolbar-input-compact"> </div>
+                <div class="position-control-row"> <label for="objY">Y:</label> <input type="number" id="objY" class="toolbar-input-compact"> </div>
+                <div class="position-control-row"> <label for="objWidth">Width:</label> <input type="number" id="objWidth" class="toolbar-input-compact" min="0"> </div>
+                <div class="position-control-row"> <label for="objHeight">Height:</label> <input type="number" id="objHeight" class="toolbar-input-compact" min="0"> </div>
+                <div class="position-control-row"> <label for="objAngle">Angle:</label> <input type="number" id="objAngle" class="toolbar-input-compact"> </div>
             </div>
         </div>
 
-        <!-- MAIN OVERLAY PROPERTIES TOOLBAR -->
         <div id="overlayPropertiesToolbar" style="display:none;">
-            <!-- Main Toolbar Row - Includes media, shapes, position, and common style tools -->
             <div class="fabric-toolbar-row">
-                <div class="toolbar-group"> <!-- Group 1: Add Media, Shapes, Position -->
-                    <button class="toolbar-button" id="mediaToolsButton" title="Media Tools">
-                        <span class="material-symbols-outlined">perm_media</span>
-                    </button>
-                    <button class="toolbar-button" id="addShapeButton" title="Add Shapes"> <!-- singular ID -->
-                        <span class="material-symbols-outlined">shapes</span>
-                    </button>
-                    <button class="toolbar-button" id="positionToolsButton" title="Position & Size Tools">
-                        <span class="material-symbols-outlined">straighten</span>
-                    </button>
+                <div class="toolbar-group"> 
+                    <button class="toolbar-button" id="mediaToolsButton" title="Media Tools"> <span class="material-symbols-outlined">perm_media</span> </button>
+                    <button class="toolbar-button" id="addShapeButton" title="Add Shapes"> <span class="material-symbols-outlined">shapes</span> </button>
+                    <button class="toolbar-button" id="positionToolsButton" title="Position & Size Tools"> <span class="material-symbols-outlined">straighten</span> </button>
                 </div>
-                <div class="toolbar-group"> <!-- Group 2: Fill, Stroke -->
+                <div class="toolbar-group"> 
                     <button class="toolbar-button" id="fillColorButton" title="Fill Color"><span class="material-symbols-outlined">format_paint</span></button>
                     <button class="toolbar-button" id="strokeColorButton" title="Stroke Color"><span class="material-symbols-outlined">border_color</span></button>
                 </div>
-                <div class="toolbar-group"> <!-- Group 3: Opacity -->
+                <div class="toolbar-group"> 
                     <button class="toolbar-button" id="opacityButton" title="Opacity"><span class="material-symbols-outlined">opacity</span></button>
                 </div>
-                 <div class="toolbar-group"> <!-- Group 4: Effects & Actions -->
+                 <div class="toolbar-group"> 
                     <button class="toolbar-button" id="shadowSettingsButton" title="Shadow Settings"><span class="material-symbols-outlined">blur_on</span></button>
                     <button class="toolbar-button" id="interactionSettingsButton" title="Interaction Settings"><span class="material-symbols-outlined">touch_app</span></button>
                     <button class="toolbar-button" id="animationSettingsButton" title="Animation Settings"><span class="material-symbols-outlined">animation</span></button>
@@ -747,27 +763,26 @@
                 </div>
             </div>
 
-            <!-- Text Specific Toolbar Row (conditionally shown by JS) -->
             <div class="fabric-toolbar-row" id="textSpecificControls" style="display:none;">
-                 <div class="toolbar-group"> <!-- Text Group 1: Font Family, Size -->
+                 <div class="toolbar-group"> 
                     <button class="toolbar-button" id="fontFamilyButton" title="Font Family"><span class="material-symbols-outlined">font_download</span></button>
                     <label for="objFontSize" class="sr-only">Font Size</label><input type="number" id="objFontSize" min="1" class="toolbar-input-compact" title="Font Size" value="24">
                 </div>
-                <div class="toolbar-group"> <!-- Text Group 2: Styles -->
+                <div class="toolbar-group"> 
                     <button class="toolbar-button" id="fontWeightButton" title="Bold"><span class="material-symbols-outlined">format_bold</span></button>
                     <button class="toolbar-button" id="fontStyleButton" title="Italic"><span class="material-symbols-outlined">format_italic</span></button>
                 </div>
-                <div class="toolbar-group" id="textAlignGroup"> <!-- Text Group 3: Alignment -->
+                <div class="toolbar-group" id="textAlignGroup"> 
                     <button class="toolbar-button" data-align="left" title="Align Left"><span class="material-symbols-outlined">format_align_left</span></button>
                     <button class="toolbar-button" data-align="center" title="Align Center"><span class="material-symbols-outlined">format_align_center</span></button>
                     <button class="toolbar-button" data-align="right" title="Align Right"><span class="material-symbols-outlined">format_align_right</span></button>
                     <button class="toolbar-button" data-align="justify" title="Align Justify"><span class="material-symbols-outlined">format_align_justify</span></button>
                 </div>
-                 <div class="toolbar-group"> <!-- Text Group 4: Spacing -->
+                 <div class="toolbar-group"> 
                     <label for="objLineHeight" class="sr-only">Line Height</label><input type="number" id="objLineHeight" step="0.1" min="0" class="toolbar-input-compact" title="Line Height" value="1.16">
                     <label for="objCharSpacing" class="sr-only">Character Spacing</label><input type="number" id="objCharSpacing" class="toolbar-input-compact" title="Character Spacing" value="0">
                 </div>
-                <div class="toolbar-group"> <!-- Text Group 5: Content -->
+                <div class="toolbar-group"> 
                      <label for="objTextContent" class="sr-only">Text Content</label>
                      <textarea id="objTextContent" rows="1" title="Text Content" style="width: 200px; vertical-align:middle;"></textarea>
                 </div>
@@ -810,19 +825,18 @@
                
                <div id="animationParamsConfig" class="config-section" style="display:none;">
                    <label for="objAnimationSpeed">Speed:</label>
-                   <select id="objAnimationSpeed"> <!-- Removed .sidebar-input class -->
+                   <select id="objAnimationSpeed"> 
                        <option value="slow">Slow</option>
                        <option value="normal" selected>Normal</option>
                        <option value="fast">Fast</option>
                    </select><br>
                    <label for="objAnimationStrength">Strength:</label> <input type="number" id="objAnimationStrength" step="0.1" value="5"> <span id="objAnimationStrengthUnit" style="font-size:0.8em; margin-left:5px;">(pixels/degrees/scale)</span><br>
                    <label for="objAnimationLoop">Loop:</label>
-                   <select id="objAnimationLoop"> <!-- Removed .sidebar-input class -->
+                   <select id="objAnimationLoop"> 
                        <option value="false">No</option>
                        <option value="true">Yes</option>
                    </select><br>
-                   <!-- Hidden legacy controls, kept for JS variable existence but not displayed -->
-                   <div id="animationLoopCountConfig" style="display:none;"> <!-- This ID is referenced by Admin_JS.html -->
+                   <div id="animationLoopCountConfig" style="display:none;"> 
                        <label for="objAnimationLoopCount">Loop Count:</label><input type="number" id="objAnimationLoopCount" min="1" value="3">
                    </div>
                    <div style="display:none;"><label for="objAnimationLoopDelay">Loop Delay (ms):</label><input type="number" id="objAnimationLoopDelay" min="0" value="500"></div>
@@ -832,20 +846,17 @@
             <div id="fontFamilyPopover" class="toolbar-popover">
                 <h4>Font Family</h4>
                 <select id="objFontFamily" class="toolbar-select-compact" style="width: 100%; margin-bottom:10px;"></select>
-                <!-- Hidden selects controlled by toolbar buttons B/I and Align -->
                 <select id="objFontWeight" style="display:none;"><option value="normal">Normal</option><option value="bold">Bold</option></select>
                 <select id="objFontStyle" style="display:none;"><option value="normal">Normal</option><option value="italic">Italic</option></select>
                 <select id="objTextAlign" style="display:none;"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option><option value="justify">Justify</option></select>
             </div>
 
-            <!-- Popover for Fill Color -->
             <div id="fillColorPopover" class="toolbar-popover" style="min-width: 180px;">
                 <h4>Fill Color</h4>
                 <label for="objFill" class="sr-only">Fill Color:</label>
                 <input type="color" id="objFill" class="toolbar-color-input" value="#ff0000" style="width: calc(100% - 20px); margin: 0 auto; display: block;">
             </div>
 
-            <!-- Popover for Stroke Properties -->
             <div id="strokeColorPopover" class="toolbar-popover" style="min-width: 220px;">
                 <h4>Stroke</h4>
                 <label for="objStrokeColor" style="display: block; margin-bottom: 5px; width: 50px;">Color:</label>
@@ -855,15 +866,13 @@
                 <input type="number" id="objStrokeWidth" min="0" class="toolbar-input-compact" title="Stroke Width" value="1" style="width: 60px; vertical-align: middle;">
             </div>
 
-            <!-- Popover for Opacity -->
             <div id="opacityPopover" class="toolbar-popover" style="min-width: 200px;">
                 <h4>Opacity</h4>
                 <label for="objOpacity" class="sr-only">Opacity:</label>
                 <input type="range" id="objOpacity" min="0" max="1" step="0.01" value="1.0" title="Opacity" style="width: calc(100% - 50px); margin: 5px 0; vertical-align: middle;">
                 <span id="objOpacityValueDisplay" style="font-size:0.9em; width: 35px; text-align: right; display: inline-block; vertical-align: middle;">100%</span>
             </div>
-
-        </div> <!-- End of #overlayPropertiesToolbar -->
+        </div> 
 
 
         <div id="fabricCanvasContainer" style="position: relative;">
@@ -880,12 +889,35 @@
                 <span style="float: right;">Total Duration: <span id="videoTotalDurationDisplay">0:00</span></span>
             </div>
             <button id="addQuestionBtn" style="margin-top: 10px;">Add Question at Timestamp</button>
+            <button id="manageTimestampOverlaysButton" style="margin-top: 10px; display: none; background-color: var(--theme-primary-color);">Manage Timestamp Overlays</button>
         </div>
 
         <div id="videoQuestionsListContainer" style="display:none; margin-top: 10px; padding: 10px; border: 1px solid var(--theme-border-color); border-radius: 5px; background-color: var(--theme-background-card);">
             <h4>Added Questions:</h4>
             <ul id="videoQuestionsList" style="list-style: none; padding: 0;"></ul>
         </div>
+        
+        <div id="timestampOverlayModal" class="toolbar-popover">
+            <h3>Manage Timestamp Overlays</h3>
+            <p style="font-size:0.9em; color: var(--theme-text-color-secondary); margin-bottom:10px;">Select an object on the main canvas, then click "Add Overlay" to use it at the current video time.</p>
+            <div>
+                <label for="makeOverlayInteractiveCheckbox" class="checkbox-label" style="font-weight:normal;">
+                    <input type="checkbox" id="makeOverlayInteractiveCheckbox"> Make this overlay interactive?
+                </label>
+            </div>
+            <!-- Input for Hide Time - For future more detailed editing, for now JS uses a default or prompt -->
+            <!-- <label for="currentOverlayTimestampInput" style="display:block; margin-top:5px;">Hide At (secs, optional):</label>
+            <input type="number" id="currentOverlayTimestampInput" class="toolbar-input-compact" style="width:70px;" step="0.1" min="0"> -->
+
+            <button id="addTimestampOverlayButton" style="margin-top: 10px; margin-bottom:15px;">Add Overlay from Selected Object</button>
+            
+            <h4>Existing Overlays for this Slide:</h4>
+            <ul id="timestampOverlayList">
+                <!-- Dynamically populated by JS: e.g., <li>[0:15 to 0:20] Text: "Hello" (Interactive) <button>Edit</button> <button>Delete</button></li> -->
+            </ul>
+            <button id="closeTimestampOverlayModalBtn" class="danger-button" style="margin-top:15px; float:right;" onclick="document.getElementById('timestampOverlayModal').style.display='none';">Close</button>
+        </div>
+
 
         <div id="slideManagementPanel">
             <h3>Slides</h3>
@@ -903,7 +935,6 @@
     <?!= include('Client/Admin/Admin_JS'); ?>
     </div> <!-- End of main-content-wrapper -->
 
-    <!-- Question Modal (initially hidden) -->
     <div id="questionModal" class="toolbar-popover" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; z-index: 1001;">
         <h3>Add/Edit Video Question</h3>
         <p>Question at: <span id="questionTimestampDisplay">0:00</span></p>

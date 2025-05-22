@@ -35,22 +35,25 @@ function createDriveFolder(folderName, parentFolderId) {
           file = DriveApp.getFileById(fileIdToOverwrite);
           // Optional: Check if file is in the correct folderId. For simplicity, assume fileIdToOverwrite is correct.
           file.setContent(jsonContent);
-          Logger.log(`JSON content overwritten in file ID: ${file.getId()} (${fileName}) in folder ID: ${folderId}`);
+          Logger.log(`JSON content overwritten in file ID: ${file.getId()} (${fileName}) in folder ID: ${folderId}. Function: saveJsonToDriveFile.`);
         } catch (e) {
-          // If fileIdToOverwrite is invalid or not found, proceed to create a new file.
-          Logger.log(`File ID to overwrite "${fileIdToOverwrite}" not found or invalid. Creating new file. Error: ${e.toString()}`);
-          const folder = DriveApp.getFolderById(folderId);
-          file = folder.createFile(fileName, jsonContent, MimeType.PLAIN_TEXT); // Or MimeType.JSON
-          Logger.log(`New JSON file created: ${file.getId()} (${fileName}) in folder ID: ${folderId}`);
+          // If fileIdToOverwrite is invalid or not found, throw an error.
+          Logger.log(`Error in saveJsonToDriveFile: Failed to access file for overwrite. File ID: ${fileIdToOverwrite}. Error: ${e.message}. FileName: ${fileName}, FolderID: ${folderId}`);
+          throw new Error(`Failed to access file for overwrite. File ID: ${fileIdToOverwrite}. Error: ${e.message}`);
         }
       } else {
         const folder = DriveApp.getFolderById(folderId);
         file = folder.createFile(fileName, jsonContent, MimeType.PLAIN_TEXT); // Or MimeType.JSON
-        Logger.log(`New JSON file created: ${file.getId()} (${fileName}) in folder ID: ${folderId}`);
+        Logger.log(`New JSON file created: ${file.getId()} (${fileName}) in folder ID: ${folderId}. Function: saveJsonToDriveFile.`);
       }
       return file.getId();
     } catch (e) {
+      // Catch any other error, including potential error from DriveApp.getFolderById() or file.createFile()
       Logger.log(`Error in saveJsonToDriveFile: ${e.toString()} - FileName: ${fileName}, FolderID: ${folderId}, FileToOverwrite: ${fileIdToOverwrite}`);
+      // Re-throw the original error if it's one of our specific new errors, otherwise wrap it.
+      if (e.message.startsWith("Failed to access file for overwrite")) {
+        throw e;
+      }
       throw new Error(`Failed to save JSON file: ${e.message}`);
     }
   }

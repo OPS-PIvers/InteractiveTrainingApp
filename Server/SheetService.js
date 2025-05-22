@@ -136,31 +136,33 @@ function appendRowToSheet(sheetId, sheetName, rowData) {
       const values = range.getValues();
   
       if (values.length === 0) {
-        Logger.log(`Sheet ${sheetName} is empty.`);
+        Logger.log(`getAllSheetData: Sheet ${sheetName} is empty. Returning [].`);
+        return [];
+      }
+      
+      if (values.length === 1) {
+        Logger.log(`getAllSheetData: Sheet ${sheetName} has only one row (assumed to be headers). Returning [] as there is no data.`);
         return [];
       }
   
-      // Check if the first row looks like headers (heuristic: all non-empty strings)
+      // Always treat the first row as headers
       const headers = values[0];
-      const looksLikeHeaders = headers.every(header => typeof header === 'string' && header.trim() !== '');
-  
-      if (looksLikeHeaders && values.length > 1) {
-        const dataObjects = [];
-        for (let i = 1; i < values.length; i++) {
-          const obj = {};
-          for (let j = 0; j < headers.length; j++) {
-            obj[headers[j]] = values[i][j];
-          }
-          dataObjects.push(obj);
+      const dataObjects = [];
+      
+      for (let i = 1; i < values.length; i++) {
+        const obj = {};
+        for (let j = 0; j < headers.length; j++) {
+          // Ensure header is a string and not empty to be a valid key
+          const headerKey = (typeof headers[j] === 'string' && headers[j].trim() !== '') ? headers[j].trim() : `_col${j+1}`;
+          obj[headerKey] = values[i][j];
         }
-        Logger.log(`Retrieved ${dataObjects.length} data objects from ${sheetName}.`);
-        return dataObjects;
-      } else {
-        Logger.log(`Retrieved data as 2D array from ${sheetName} (no headers or data beyond headers).`);
-        return values; // Return raw 2D array if no headers or only header row
+        dataObjects.push(obj);
       }
+      Logger.log(`getAllSheetData: Retrieved ${dataObjects.length} data objects from ${sheetName} using first row as headers.`);
+      return dataObjects;
+      
     } catch (e) {
-      Logger.log(`Error in getAllSheetData: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}`);
+      Logger.log(`Error in getAllSheetData: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}. Stack: ${e.stack ? e.stack : 'No stack'}`);
       throw new Error(`Failed to get all data: ${e.message}`);
     }
   }

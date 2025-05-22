@@ -18,20 +18,24 @@ function getActiveProjectsList() {
     }
 
     const activeProjects = [];
+    // getAllSheetData now consistently returns an array of objects.
     allProjectsData.forEach(project => {
-      const status = project['Status'] || (project[COL_STATUS - 1] ? project[COL_STATUS - 1] : null);
-      const projectId = project['ProjectID'] || (project[COL_PROJECT_ID - 1] ? project[COL_PROJECT_ID - 1] : null);
-      const projectTitle = project['ProjectTitle'] || (project[COL_PROJECT_TITLE - 1] ? project[COL_PROJECT_TITLE - 1] : null);
+      const status = project['Status']; // Directly access by header name
+      const projectId = project['ProjectID']; // Directly access by header name
+      const projectTitle = project['ProjectTitle']; // Directly access by header name
 
       if (status === "Active" && projectId && projectTitle) {
         activeProjects.push({
           projectId: projectId,
           projectTitle: projectTitle
         });
+      } else if (status === "Active" && (!projectId || !projectTitle)) {
+        // Log if an "Active" project is missing essential details
+        Logger.log(`getActiveProjectsList: Found an 'Active' project with missing ProjectID or ProjectTitle. Data: ${JSON.stringify(project)}`);
       }
     });
 
-    Logger.log(`getActiveProjectsList: Found ${activeProjects.length} active projects.`);
+    Logger.log(`getActiveProjectsList: Found ${activeProjects.length} active projects from ${allProjectsData.length} total projects processed.`);
     return activeProjects;
 
   } catch (e) {
@@ -58,26 +62,26 @@ function getProjectViewData(projectId) {
     }
 
     const allProjects = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
-    let projectEntry = null;
-    if (allProjects && Array.isArray(allProjects)) {
-      projectEntry = allProjects.find(p => (p['ProjectID'] || p[COL_PROJECT_ID - 1]) === projectId);
-    }
+    
+    // getAllSheetData now consistently returns an array of objects.
+    // Find the project entry using direct property access.
+    const projectEntry = allProjects.find(p => p && p['ProjectID'] === projectId);
 
     if (!projectEntry) {
       Logger.log(`getProjectViewData: Project with ID "${projectId}" not found in ProjectIndex.`);
       throw new Error("Project not found.");
     }
 
-    const status = projectEntry['Status'] || projectEntry[COL_STATUS - 1];
+    // Direct property access for status and file ID
+    const status = projectEntry['Status'];
     if (status !== "Active") {
       Logger.log(`getProjectViewData: Project with ID "${projectId}" is not active (Status: ${status}).`);
       throw new Error("Project is not currently active.");
     }
 
-    const projectDataFileId = projectEntry['ProjectDataFileID'] || projectEntry[COL_PROJECT_DATA_FILE_ID - 1];
-
+    const projectDataFileId = projectEntry['ProjectDataFileID'];
     if (!projectDataFileId) {
-      Logger.log(`getProjectViewData: ProjectDataFileID is missing for project "${projectId}".`);
+      Logger.log(`getProjectViewData: ProjectDataFileID is missing for active project "${projectId}".`);
       throw new Error("Project data file reference is missing.");
     }
     Logger.log(`getProjectViewData: Found ProjectDataFileID: ${projectDataFileId} for active project ${projectId}.`);

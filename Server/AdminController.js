@@ -3,7 +3,7 @@
 /**
  * Creates a new project:
  * - Generates a unique ProjectID.
- * - Creates a new folder in Google Drive for the project.
+ * - Creates a new folder in Google Drive for the new project.
  * - Creates an initial project_data.json file in the new folder.
  * - Adds a new row to the "ProjectIndex" sheet.
  * @param {string} projectTitle The title of the project.

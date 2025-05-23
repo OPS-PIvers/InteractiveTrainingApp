@@ -81,13 +81,18 @@ function onYouTubeIframeAPIReady() {
         videoQuestionsListContainerEl, videoQuestionsListEl; // Added question list elements
     let optionInputsEl = [], correctAnswerRadiosEl = [];
 
+    // Timestamp Overlay Elements (from AdminView.html)
+    let manageTimestampOverlaysButtonEl, timestampOverlayModalEl, makeOverlayInteractiveCheckboxEl,
+        addTimestampOverlayButtonEl, timestampOverlayListEl, closeTimestampOverlayModalBtnEl,
+        currentOverlayTimestampInputEl; // Added currentOverlayTimestampInputEl just in case, though it's commented out in HTML
+
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
       console.log("Admin_JS: DOMContentLoaded event fired!");
       adminApp.setupDOMReferences();
       adminApp.attachEventListeners();
-      adminApp.attachVideoQuestionEventListeners(); // New function call
+      adminApp.attachVideoQuestionEventListeners(); // This now also includes overlay management button listeners
       switchToListView();
       loadAdminProjectsList();
       console.log("Admin_JS: Initialization complete.");
@@ -110,7 +115,6 @@ function onYouTubeIframeAPIReady() {
         const containerWidth = fabricCanvasContainer.clientWidth;
         const containerHeight = fabricCanvasContainer.clientHeight;
 
-        // If container has no size yet, defer (e.g. it's hidden)
         if (containerWidth === 0 || containerHeight === 0) {
             console.log("resizeCanvasToFit: Container has no dimensions, skipping resize.");
             return;
@@ -130,7 +134,6 @@ function onYouTubeIframeAPIReady() {
         
         const zoomX = containerWidth / contentWidth;
         const zoomY = containerHeight / contentHeight;
-        // Ensure zoom is not zero or negative if content dimensions are larger than container
         const finalZoom = Math.max(0.01, Math.min(zoomX, zoomY)); 
 
 
@@ -159,32 +162,28 @@ function onYouTubeIframeAPIReady() {
       addCircleButtonEl = document.getElementById('addCircleButton');
       addTextboxButtonEl = document.getElementById('addTextboxButton');
 
-      // Main Toolbar container
       overlayPropertiesToolbarEl  = document.getElementById('overlayPropertiesToolbar');
 
-      // Direct input elements (some might be hidden or styled differently)
       objXEl = document.getElementById('objX');
       objYEl = document.getElementById('objY');
       objWidthEl = document.getElementById('objWidth');
       objHeightEl = document.getElementById('objHeight');
       objAngleEl = document.getElementById('objAngle');
-      objFillEl = document.getElementById('objFill'); // The color input itself
-      objStrokeColorEl = document.getElementById('objStrokeColor'); // The color input itself
+      objFillEl = document.getElementById('objFill'); 
+      objStrokeColorEl = document.getElementById('objStrokeColor'); 
       objStrokeWidthEl = document.getElementById('objStrokeWidth');
-      objOpacityEl = document.getElementById('objOpacity'); // The range input itself
+      objOpacityEl = document.getElementById('objOpacity'); 
 
-      // Text specific controls row and core inputs
       textSpecificControlsEl = document.getElementById('textSpecificControls');
       objTextContentEl = document.getElementById('objTextContent');
-      objFontFamilyEl = document.getElementById('objFontFamily'); // The <select> for fonts (likely in a popover)
+      objFontFamilyEl = document.getElementById('objFontFamily'); 
       objFontSizeEl = document.getElementById('objFontSize');
-      objFontWeightEl = document.getElementById('objFontWeight'); // Hidden <select>
-      objFontStyleEl = document.getElementById('objFontStyle');   // Hidden <select>
-      objTextAlignEl = document.getElementById('objTextAlign');   // Hidden <select>
+      objFontWeightEl = document.getElementById('objFontWeight'); 
+      objFontStyleEl = document.getElementById('objFontStyle');   
+      objTextAlignEl = document.getElementById('objTextAlign');   
       objLineHeightEl = document.getElementById('objLineHeight');
       objCharSpacingEl = document.getElementById('objCharSpacing');
 
-      // Shadow inputs (will be in shadowPopoverEl)
       objShadowColorEl = document.getElementById('objShadowColor');
       objShadowBlurEl = document.getElementById('objShadowBlur');
       objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
@@ -192,7 +191,6 @@ function onYouTubeIframeAPIReady() {
       objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
       objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
 
-      // Interaction inputs (will be in interactionPopoverEl)
       objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
       objInteractionActionEl = document.getElementById('objInteractionAction');
       modalContentConfigEl = document.getElementById('modalContentConfig');
@@ -202,20 +200,17 @@ function onYouTubeIframeAPIReady() {
       panZoomConfigEl = document.getElementById('panZoomConfigEl'); 
       objPanZoomLevelEl = document.getElementById('objPanZoomLevel');
 
-      // Animation inputs (will be in animationPopoverEl)
       objAnimationTriggerEl = document.getElementById('objAnimationTrigger');
       objAnimationTypeEl = document.getElementById('objAnimationType');
       animationParamsConfigEl = document.getElementById('animationParamsConfig');
-      objAnimationSpeedEl = document.getElementById('objAnimationSpeed'); // New speed dropdown
+      objAnimationSpeedEl = document.getElementById('objAnimationSpeed'); 
       objAnimationStrengthEl = document.getElementById('objAnimationStrength');
       objAnimationStrengthUnitEl = document.getElementById('objAnimationStrengthUnit');
       objAnimationLoopEl = document.getElementById('objAnimationLoop');
-      // Keep references for backward compatibility
-      animationLoopCountConfigEl = document.getElementById('animationLoopCountConfig'); // Will be hidden
-      objAnimationLoopCountEl = document.getElementById('objAnimationLoopCount'); // Will be hidden
-      objAnimationLoopDelayEl = document.getElementById('objAnimationLoopDelay'); // Will be hidden
+      animationLoopCountConfigEl = document.getElementById('animationLoopCountConfig'); 
+      objAnimationLoopCountEl = document.getElementById('objAnimationLoopCount'); 
+      objAnimationLoopDelayEl = document.getElementById('objAnimationLoopDelay'); 
 
-      // New Popover Trigger Buttons
       fillColorButtonEl = document.getElementById('fillColorButton');
       strokeColorButtonEl = document.getElementById('strokeColorButton');
       opacityButtonEl = document.getElementById('opacityButton');
@@ -224,57 +219,46 @@ function onYouTubeIframeAPIReady() {
       animationSettingsButtonEl = document.getElementById('animationSettingsButton');
       fontFamilyButtonEl = document.getElementById('fontFamilyButton');
 
-      // New Popover Container Elements
       shadowPopoverEl = document.getElementById('shadowPopover');
       interactionPopoverEl = document.getElementById('interactionPopover');
       animationPopoverEl = document.getElementById('animationPopover');
       fontFamilyPopoverEl = document.getElementById('fontFamilyPopover');
       
-      // New Popovers for Fill, Stroke, Opacity
       fillColorPopoverEl = document.getElementById('fillColorPopover');
       strokeColorPopoverEl = document.getElementById('strokeColorPopover');
       opacityPopoverEl = document.getElementById('opacityPopover');
       objOpacityValueDisplayEl = document.getElementById('objOpacityValueDisplay');
 
-
-      // New Text Style Toggle Buttons
-      fontWeightButtonEl = document.getElementById('fontWeightButton'); // Bold
-      fontStyleButtonEl = document.getElementById('fontStyleButton');   // Italic
-      textAlignGroupEl = document.getElementById('textAlignGroup');     // Container for align buttons
+      fontWeightButtonEl = document.getElementById('fontWeightButton'); 
+      fontStyleButtonEl = document.getElementById('fontStyleButton');   
+      textAlignGroupEl = document.getElementById('textAlignGroup');     
 
       undoButtonEl = document.getElementById('undoButton');
       redoButtonEl = document.getElementById('redoButton');
       deleteObjectButtonEl = document.getElementById('deleteObjectButton');
 
-
-      // Step 20 Elements
       youtubeUrlInputEl = document.getElementById('youtubeUrlInput');
       setYoutubeBackgroundButtonEl = document.getElementById('setYoutubeBackgroundButton');
       audioUploaderEl = document.getElementById('audioUploader');
       attachedAudioNameEl = document.getElementById('attachedAudioName');
       removeAudioButtonEl = document.getElementById('removeAudioButton');
       adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
-      adminYouTubePlayerContainerEl = document.getElementById('adminYouTubePlayerContainer'); // Added adminYouTubePlayerContainerEl
+      adminYouTubePlayerContainerEl = document.getElementById('adminYouTubePlayerContainer'); 
 
-      // New toolbar buttons
       mediaToolsButtonEl = document.getElementById('mediaToolsButton');
-      addShapeButtonEl = document.getElementById('addShapeButton'); // Singular, for new toolbar
+      addShapeButtonEl = document.getElementById('addShapeButton'); 
       positionToolsButtonEl = document.getElementById('positionToolsButton');
 
-      // New popovers
       mediaToolsPopoverEl = document.getElementById('mediaToolsPopover');
       shapesPopoverEl = document.getElementById('shapesPopover');
       positionToolsPopoverEl = document.getElementById('positionToolsPopover');
 
-      // Media tab elements
       mediaTabButtonsEl = document.querySelectorAll('.media-tab-btn');
       mediaTabPanesEl = document.querySelectorAll('.media-tab-pane');
 
-      // Drag and drop zones
       imageDropZoneEl = document.getElementById('imageDropZone');
       audioDropZoneEl = document.getElementById('audioDropZone');
 
-      // Video Question/Timeline elements
       videoTimelineControlsEl = document.getElementById('videoTimelineControls');
       videoTimelineSliderEl = document.getElementById('videoTimelineSlider');
       videoCurrentTimeDisplayEl = document.getElementById('videoCurrentTimeDisplay');
@@ -286,15 +270,22 @@ function onYouTubeIframeAPIReady() {
       saveQuestionBtnEl = document.getElementById('saveQuestionBtn');
       cancelQuestionBtnEl = document.getElementById('cancelQuestionBtn');
       editingQuestionIndexEl = document.getElementById('editingQuestionIndex');
-      videoQuestionsListContainerEl = document.getElementById('videoQuestionsListContainer'); // Added
-      videoQuestionsListEl = document.getElementById('videoQuestionsList'); // Added
+      videoQuestionsListContainerEl = document.getElementById('videoQuestionsListContainer'); 
+      videoQuestionsListEl = document.getElementById('videoQuestionsList'); 
       for (let i = 0; i < 4; i++) {
           optionInputsEl.push(document.getElementById(`option${i+1}`));
           correctAnswerRadiosEl.push(document.getElementById(`correctAnswer${i}`));
       }
 
+      // Timestamp Overlay Elements
+      manageTimestampOverlaysButtonEl = document.getElementById('manageTimestampOverlaysButton');
+      timestampOverlayModalEl = document.getElementById('timestampOverlayModal');
+      makeOverlayInteractiveCheckboxEl = document.getElementById('makeOverlayInteractiveCheckbox');
+      addTimestampOverlayButtonEl = document.getElementById('addTimestampOverlayButton');
+      timestampOverlayListEl = document.getElementById('timestampOverlayList');
+      closeTimestampOverlayModalBtnEl = document.getElementById('closeTimestampOverlayModalBtn'); // Though it has inline JS
+      // currentOverlayTimestampInputEl = document.getElementById('currentOverlayTimestampInput'); // This is commented out in HTML
 
-      // Check for essential elements - only warn if globally expected elements are missing
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
       if (!loadingSpinnerEl) console.warn("setupDOMReferences: loadingSpinnerEl not found.");
       if (!listViewContainerEl) console.warn("setupDOMReferences: listViewContainerEl not found.");
@@ -304,6 +295,9 @@ function onYouTubeIframeAPIReady() {
       if (!shadowPopoverEl || !interactionPopoverEl || !animationPopoverEl || !fontFamilyPopoverEl) {
           console.warn("setupDOMReferences: One or more popover elements not found.");
       }
+      if (!manageTimestampOverlaysButtonEl) console.warn("setupDOMReferences: manageTimestampOverlaysButtonEl not found.");
+      if (!timestampOverlayModalEl) console.warn("setupDOMReferences: timestampOverlayModalEl not found.");
+
 
       console.log("Admin_JS: DOM references set up.");
     };
@@ -318,28 +312,23 @@ function onYouTubeIframeAPIReady() {
       };
       safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
       
-      // Window resize listener
       window.addEventListener('resize', debounce(handleWindowResize, 250));
 
       console.log("Admin_JS: Initial event listeners attached.");
-      // Edit view listeners attached in switchToEditView
 
-      // Global listener for closing popovers when clicking outside
       document.addEventListener('click', function(event) {
         if (adminApp.state.activePopoverId && adminApp.state.currentView === 'edit') {
             const popover = document.getElementById(adminApp.state.activePopoverId);
-            // Construct potential trigger button IDs (e.g., shadowPopover -> shadowSettingsButton or shadowButton)
             let triggerButton = null;
-            const baseId = adminApp.state.activePopoverId.replace('Popover', ''); // e.g., "shadow"
+            const baseId = adminApp.state.activePopoverId.replace('Popover', ''); 
             const possibleTriggerIds = [
-                baseId + 'SettingsButton', // shadowSettingsButton
-                baseId + 'Button',         // fontFamilyButton
-                baseId + 'ToolsButton'     // mediaToolsButton, positionToolsButton
+                baseId + 'SettingsButton', 
+                baseId + 'Button',         
+                baseId + 'ToolsButton'     
             ];
 
             for (const id of possibleTriggerIds) {
                 const btn = document.getElementById(id);
-                // A special check for addShapeButton which triggers shapesPopover
                 if (id === 'addShapeButton' && adminApp.state.activePopoverId === 'shapesPopover') {
                     triggerButton = document.getElementById('addShapeButton');
                     if (triggerButton) break;
@@ -350,12 +339,15 @@ function onYouTubeIframeAPIReady() {
                 }
             }
 
-
             if (popover && !popover.contains(event.target) && (!triggerButton || !triggerButton.contains(event.target))) {
+                // Check if the click is inside the timestampOverlayModal, if it's the active "popover" (though it's a modal)
+                if (adminApp.state.activePopoverId === 'timestampOverlayModal' && timestampOverlayModalEl && timestampOverlayModalEl.contains(event.target)) {
+                    return; // Don't close timestamp overlay modal if click is inside it
+                }
                 hideActivePopover();
             }
         }
-      }, true); // Use capture phase to catch clicks early
+      }, true); 
     };
 
     // --- UI View Management ---
@@ -365,7 +357,7 @@ function onYouTubeIframeAPIReady() {
       adminApp.state.currentProjectId = null;
       adminApp.state.projectData = null;
       adminApp.state.currentSlideIndex = -1;
-      hideActivePopover(); // Ensure popovers are closed
+      hideActivePopover(); 
 
       if (adminApp.state.fabricCanvasInstance) {
           adminApp.state.fabricCanvasInstance.dispose();
@@ -376,47 +368,41 @@ function onYouTubeIframeAPIReady() {
       if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
       
-      // No need to hide old .edit-controls-group as they should be removed from HTML
-
-      // Remove paste listener if it was active
       if (adminApp.state.isPasteListenerActive) {
           document.removeEventListener('paste', handlePasteImage);
           adminApp.state.isPasteListenerActive = false;
           console.log("Admin_JS: Paste event listener for images removed from document.");
       }
-      loadAdminProjectsList(); // Reload list in case status changed etc.
+      loadAdminProjectsList(); 
     }
 
     function switchToEditView(projectIdToEdit) {
         console.log("Switching to Edit View for project ID:", projectIdToEdit);
         adminApp.state.currentView = 'edit';
         adminApp.state.currentProjectId = projectIdToEdit;
-        adminApp.state.projectData = null; // Clear previous project data
-        adminApp.state.currentSlideIndex = -1; // Reset slide index
-        hideActivePopover(); // Ensure popovers are closed
+        adminApp.state.projectData = null; 
+        adminApp.state.currentSlideIndex = -1; 
+        hideActivePopover(); 
 
         if(listViewContainerEl) listViewContainerEl.style.display = 'none';
         if(editViewContainerEl) editViewContainerEl.style.display = 'block';
 
-        if(editingProjectTitleEl) { // Set temporary title
+        if(editingProjectTitleEl) { 
             editingProjectTitleEl.textContent = `Loading Project (ID: ${projectIdToEdit})...`;
         }
 
-        // Clear previous canvas instance if exists
         if (adminApp.state.fabricCanvasInstance) {
             adminApp.state.fabricCanvasInstance.dispose();
             adminApp.state.fabricCanvasInstance = null;
         }
         if (messageAreaEl) messageAreaEl.innerHTML = '';
-        // No need to hide old .edit-controls-group as they should be removed from HTML
-        if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; // Clear old thumbnails
+        if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; 
 
-        // Helper to ensure elements are found and listeners attached ONLY ONCE for edit view
         const ensureEditViewListener = (elementVarName, id, eventType, handler, critical = false) => {
-            let element = window[elementVarName]; // Use the global variable like objXEl
+            let element = window[elementVarName]; 
             if (!element) {
                 element = document.getElementById(id);
-                window[elementVarName] = element; // Assign if freshly found
+                window[elementVarName] = element; 
             }
 
             const listenerAttribute = `listener-${eventType}-attached`;
@@ -429,21 +415,16 @@ function onYouTubeIframeAPIReady() {
             }
         };
 
-        // Ensure references are fresh (needed after potential view switches)
         fabricCanvasEl = document.getElementById('fabricCanvasElement');
         slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
         adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
-        overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar'); // Ensure this is fresh
+        overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar'); 
 
-        // Attach listeners for edit view buttons and controls
         ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView, true);
         ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload, true);
         ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide, true);
         ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject, true);
         
-        // These listeners are for buttons inside the 'shapesPopoverEl', which is handled by initToolbar -> togglePopover
-        // and their click handlers are attached directly in 'initToolbar' or their respective popover setup.
-        // However, the function calls themselves still need to be callable.
         ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle, true);
         ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle, true);
         ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox, true);
@@ -452,26 +433,24 @@ function onYouTubeIframeAPIReady() {
         ensureEditViewListener('audioUploaderEl', 'audioUploader', 'change', handleAudioUpload, true);
         ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio, true);
 
-        // Initialize Fabric Canvas with defaults
         if (typeof fabric !== 'undefined' && fabricCanvasEl) {
             adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
                 width: adminApp.state.defaultCanvasWidth,
                 height: adminApp.state.defaultCanvasHeight,
-                backgroundColor: '#e9e9e9' // Default background
+                backgroundColor: '#e9e9e9' 
             });
-            // Set initial size of the HTML canvas element itself
             fabricCanvasEl.width = adminApp.state.defaultCanvasWidth;
             fabricCanvasEl.height = adminApp.state.defaultCanvasHeight;
             console.log("Admin_JS: Fabric.js canvas initialized with default dimensions.");
 
-            initToolbar(); // Initialize toolbar structure, popovers, and their listeners
-            adminApp.resizeCanvasToFit(null); // Initial resize before loading project
+            initToolbar(); 
+            adminApp.resizeCanvasToFit(null); 
             
-            // Attach Fabric canvas event listeners
-            adminApp.state.fabricCanvasInstance.off(); // Remove previous listeners first
+            adminApp.state.fabricCanvasInstance.off(); 
             adminApp.state.fabricCanvasInstance.on('object:modified', (e) => {
             if (e.target) {
                 populateToolbar(e.target);
+                saveCanvasStateForHistory(); // Save state on modification
             }
             });
             adminApp.state.fabricCanvasInstance.on('selection:created', (e) => {
@@ -485,89 +464,82 @@ function onYouTubeIframeAPIReady() {
             adminApp.state.fabricCanvasInstance.on('selection:cleared', () => {
                populateToolbar(null);
             });
+             adminApp.state.fabricCanvasInstance.on('object:added', () => saveCanvasStateForHistory()); // Save on add
+             adminApp.state.fabricCanvasInstance.on('object:removed', () => saveCanvasStateForHistory()); // Save on remove
 
-            // Make toolbar visible and set initial state for no selection
+
             if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'block';
-            populateToolbar(null); // Set initial state for an empty canvas
-            hideActivePopover(); // Make sure all popovers are hidden initially
+            populateToolbar(null); 
+            hideActivePopover(); 
 
-            // Attach paste listener for images
             if (!adminApp.state.isPasteListenerActive) {
                 document.addEventListener('paste', handlePasteImage);
                 adminApp.state.isPasteListenerActive = true;
                 console.log("Admin_JS: Paste event listener for images attached to document.");
             }
 
-            loadProjectForEditing(projectIdToEdit); // Load the actual project data
+            loadProjectForEditing(projectIdToEdit); 
 
         } else {
             console.error("Fabric.js library or canvas element #fabricCanvasElement not found in switchToEditView.");
             displayMessage("Critical error: Editor canvas could not be initialized.", false);
-            showLoading(false); // Ensure spinner hidden
+            showLoading(false); 
         }
     }
 
     // --- Popover Management ---
     function togglePopover(popoverId, triggerButtonEl) {
-        if (adminApp.state.activePopoverId === popoverId) {
+        const isTimestampModal = popoverId === 'timestampOverlayModal';
+
+        if (adminApp.state.activePopoverId === popoverId && !isTimestampModal) { // Don't auto-close timestamp modal this way
             hideActivePopover();
         } else {
-            hideActivePopover(); // Hide any currently open popover
+            if (!isTimestampModal) hideActivePopover(); 
+            
             const popover = document.getElementById(popoverId);
             if (popover && triggerButtonEl) {
-                // First, reset any positioning to get natural size
-                popover.style.display = 'block';
-                popover.style.position = 'absolute';
-                popover.style.top = 'auto';
-                popover.style.left = 'auto';
-                
-                // Get positions after element is visible
-                const btnRect = triggerButtonEl.getBoundingClientRect();
-                const popoverRect = popover.getBoundingClientRect();
-                
-                // Get viewport dimensions
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-                
-                // Calculate initial position (below button)
-                let posTop = btnRect.bottom + 5;
-                let posLeft = btnRect.left;
-                
-                // Adjust if popover would go off-screen horizontally
-                if (posLeft + popoverRect.width > viewportWidth) {
-                    posLeft = Math.max(5, viewportWidth - popoverRect.width - 5); // Ensure it doesn't go off left either
-                }
-                 if (posLeft < 0) posLeft = 5; // Prevent going off left screen edge
+                popover.style.display = 'block'; // Keep this for all popovers/modals
+                adminApp.state.activePopoverId = popoverId; // Set active for all
 
-                // If popover would go below viewport, position it above the button instead
-                if (posTop + popoverRect.height > viewportHeight && btnRect.top - popoverRect.height - 5 > 0) { // also check if there is space above
-                    posTop = btnRect.top - popoverRect.height - 5;
-                } else if (posTop + popoverRect.height > viewportHeight) { // if no space above either, stick to bottom of button and allow scroll
-                     posTop = Math.max(5, viewportHeight - popoverRect.height - 5);
+                if (!isTimestampModal) { // Positioning logic only for non-timestamp modals
+                    popover.style.position = 'absolute';
+                    popover.style.top = 'auto';
+                    popover.style.left = 'auto';
+                    
+                    const btnRect = triggerButtonEl.getBoundingClientRect();
+                    const popoverRect = popover.getBoundingClientRect();
+                    const viewportWidth = window.innerWidth;
+                    const viewportHeight = window.innerHeight;
+                    
+                    let posTop = btnRect.bottom + 5;
+                    let posLeft = btnRect.left;
+                    
+                    if (posLeft + popoverRect.width > viewportWidth) {
+                        posLeft = Math.max(5, viewportWidth - popoverRect.width - 5); 
+                    }
+                    if (posLeft < 0) posLeft = 5; 
+
+                    if (posTop + popoverRect.height > viewportHeight && btnRect.top - popoverRect.height - 5 > 0) { 
+                        posTop = btnRect.top - popoverRect.height - 5;
+                    } else if (posTop + popoverRect.height > viewportHeight) { 
+                         posTop = Math.max(5, viewportHeight - popoverRect.height - 5);
+                    }
+                    if (posTop < 0) posTop = 5; 
+                    
+                    popover.style.top = posTop + 'px';
+                    popover.style.left = posLeft + 'px';
                 }
-                if (posTop < 0) posTop = 5; // Prevent going off top screen edge
                 
-                // Apply final position
-                popover.style.top = posTop + 'px';
-                popover.style.left = posLeft + 'px';
-                
-                // Set active states
-                adminApp.state.activePopoverId = popoverId;
-                
-                // Add active class to button
                 document.querySelectorAll('.toolbar-button').forEach(btn => {
                     btn.classList.remove('popover-active');
                 });
                 triggerButtonEl.classList.add('popover-active');
 
-                // Special handling for media popover: initialize tab state
                 if (popoverId === 'mediaToolsPopover') {
-                   // Check if a tab is already active, if not, make the first one active
                    const activeTab = popover.querySelector('.media-tab-btn.active');
                    if (!activeTab) {
-                       switchMediaTab('image-tab'); // Default to image tab
+                       switchMediaTab('image-tab'); 
                    }
-                   // Populate audio info if audio tab is active
                    if (popover.querySelector('.media-tab-btn[data-tab="audio-tab"].active')) {
                        const currentSlide = getCurrentSlide();
                        const hasAudio = currentSlide && currentSlide.slideMedia && 
@@ -581,6 +553,9 @@ function onYouTubeIframeAPIReady() {
                            }
                        }
                    }
+                } else if (isTimestampModal) {
+                    // If it's the timestamp modal, ensure the list is populated
+                    populateTimestampOverlayList();
                 }
 
             } else {
@@ -591,44 +566,46 @@ function onYouTubeIframeAPIReady() {
 
     function hideActivePopover() {
         if (adminApp.state.activePopoverId) {
-            const popover = document.getElementById(adminApp.state.activePopoverId);
-            if (popover) popover.style.display = 'none';
+            // Do not hide the timestampOverlayModal using this generic function
+            // It has its own close button.
+            if (adminApp.state.activePopoverId === 'timestampOverlayModal') {
+                 // If you want to allow generic hide for it too, remove this check.
+                 // For now, let's assume its close button is the primary way to hide it.
+            } else {
+                const popover = document.getElementById(adminApp.state.activePopoverId);
+                if (popover) popover.style.display = 'none';
+            }
             
-            // Remove active class from all toolbar buttons that might have triggered a popover
             document.querySelectorAll('.toolbar-button.popover-active').forEach(btn => {
                 btn.classList.remove('popover-active');
             });
-            adminApp.state.activePopoverId = null;
+            // Only nullify if it wasn't the timestamp modal, or if we decide to let it be hidden this way.
+            if (adminApp.state.activePopoverId !== 'timestampOverlayModal') {
+                 adminApp.state.activePopoverId = null;
+            }
         }
     }
 
+
     function switchMediaTab(tabId) {
-        // Hide all tab panes
         document.querySelectorAll('.media-tab-pane').forEach(pane => {
             pane.classList.remove('active');
         });
-        
-        // Remove active class from all tab buttons
         document.querySelectorAll('.media-tab-btn').forEach(tab => {
             tab.classList.remove('active');
         });
-        
-        // Show the selected tab pane
         const tabPane = document.getElementById(tabId);
         if (tabPane) tabPane.classList.add('active');
-        
-        // Add active class to the clicked tab button
         const activeTabBtn = document.querySelector(`.media-tab-btn[data-tab="${tabId}"]`);
         if (activeTabBtn) activeTabBtn.classList.add('active');
         
-        // Display audio controls if we're on the audio tab and there's an attached audio
         if (tabId === 'audio-tab') {
             const currentSlide = getCurrentSlide();
             const hasAudio = currentSlide && currentSlide.slideMedia && 
                             currentSlide.slideMedia.type === 'audio' && 
                             currentSlide.slideMedia.driveFileId;
             const audioControlsEl = document.getElementById('audioControls');
-            if (audioControlsEl) { // Ensure element exists
+            if (audioControlsEl) { 
                 audioControlsEl.style.display = hasAudio ? 'block' : 'none';
                 if (hasAudio && attachedAudioNameEl) {
                      attachedAudioNameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`;
@@ -637,7 +614,6 @@ function onYouTubeIframeAPIReady() {
         }
     }
 
-    // Helper function to get current slide
     function getCurrentSlide() {
         if (adminApp.state.currentSlideIndex === -1 || !adminApp.state.projectData || 
             !adminApp.state.projectData.slides || 
@@ -662,7 +638,6 @@ function onYouTubeIframeAPIReady() {
     function onProjectDataLoaded(jsonString) {
       console.log("onProjectDataLoaded: Received data:", jsonString);
 
-      // Check for error object first
       if (jsonString && typeof jsonString === 'object' && jsonString.error) {
           showLoading(false);
           console.error(`onProjectDataLoaded: Received error object from server: ${jsonString.error}`);
@@ -674,8 +649,6 @@ function onYouTubeIframeAPIReady() {
           return;
       }
 
-      // Existing check for null or undefined, though the object check above should catch most errors.
-      // This handles cases where the server might return `null` for reasons other than a structured error.
       if (jsonString === null || jsonString === undefined) {
           showLoading(false);
           console.error("onProjectDataLoaded: Received null or undefined data from server (Project or data file likely not found).");
@@ -687,11 +660,8 @@ function onYouTubeIframeAPIReady() {
           return;
       }
       
-      // Proceed to parse if it's a string (expected good path)
       try {
           if (typeof jsonString !== 'string') {
-            // This case should ideally be caught by the object check above if it's an error object.
-            // If it's some other non-string, non-error-object, it's unexpected.
             throw new Error("Received data is not a JSON string or a recognized error object.");
           }
           const loadedData = JSON.parse(jsonString);
@@ -709,9 +679,11 @@ function onYouTubeIframeAPIReady() {
               if (!slide.slideMedia) {
                   slide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
               }
-              // Ensure customInteraction and customAnimation objects exist with defaults if missing
+              // Ensure timestampOverlays array exists
+              if (!Array.isArray(slide.timestampOverlays)) {
+                  slide.timestampOverlays = [];
+              }
               if (!slide.fabricCanvasJSON || !slide.fabricCanvasJSON.objects) {
-                // If no fabric JSON or objects, nothing to iterate
               } else {
                 slide.fabricCanvasJSON.objects.forEach(obj => {
                     if (!obj.customInteraction) {
@@ -733,13 +705,13 @@ function onYouTubeIframeAPIReady() {
           updateSlideThumbnailsUI();
 
           if (adminApp.state.projectData.slides.length > 0) {
-              selectSlide(0); // Select and load the first slide
+              selectSlide(0); 
               displayMessage("Project loaded successfully.", true);
           } else {
               displayMessage("Project loaded, but it has no slides. Adding one.", true);
-              handleAddSlide(); // Add an initial slide if the loaded project was empty
+              handleAddSlide(); 
           }
-          showLoading(false); // Success path loading finished
+          showLoading(false); 
 
       } catch (e) {
           showLoading(false);
@@ -749,7 +721,7 @@ function onYouTubeIframeAPIReady() {
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
           adminApp.state.currentSlideIndex = -1;
           if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`;
-          updateSlideThumbnailsUI(); // Clear thumbnails
+          updateSlideThumbnailsUI(); 
       }
     }
 
@@ -761,7 +733,6 @@ function onYouTubeIframeAPIReady() {
         try {
           const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
           const canvas = adminApp.state.fabricCanvasInstance;
-          // Ensure custom properties are on the objects before serializing
           canvas.getObjects().forEach(obj => {
               if (!obj.customInteraction) {
                   obj.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
@@ -779,11 +750,15 @@ function onYouTubeIframeAPIReady() {
                currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
           }
           if(currentSlide.slideMedia.type !== 'image' && currentSlide.slideMedia.url && currentSlide.slideMedia.url.startsWith('data:image')) {
-              // This case seems unlikely for non-image types but kept for safety
               currentSlide.slideMedia.url = null;
           }
+          // Ensure timestampOverlays array exists on the slide object
+          if (!Array.isArray(currentSlide.timestampOverlays)) {
+              currentSlide.timestampOverlays = [];
+          }
 
-          console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Media:`, JSON.stringify(currentSlide.slideMedia));
+
+          console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Media:`, JSON.stringify(currentSlide.slideMedia), "Overlays:", currentSlide.timestampOverlays.length);
         } catch(e) {
             console.error(`Error saving slide state for index ${adminApp.state.currentSlideIndex}:`, e);
             displayMessage(`Error saving current slide state: ${e.message}`, false);
@@ -794,18 +769,20 @@ function onYouTubeIframeAPIReady() {
         if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
         if (adminApp.state.isLoading) { console.log("handleSaveProject: Already saving."); return; }
 
-        saveCurrentSlideState(); // Ensure latest slide state is captured before saving entire project
+        saveCurrentSlideState(); 
 
         showLoading(true); displayMessage("Saving project...", true);
         try {
             const projectDataToSave = JSON.parse(JSON.stringify(adminApp.state.projectData));
 
              projectDataToSave.slides.forEach(slide => {
-                 // Clean up slideMedia.url if it's a base64 data URI for non-image types
-                 // (though this state should ideally not occur if logic elsewhere is correct)
                  if (slide.slideMedia && slide.slideMedia.type !== 'image' && 
                      slide.slideMedia.url && slide.slideMedia.url.startsWith('data:image')) {
                      slide.slideMedia.url = null; 
+                 }
+                 // Ensure timestampOverlays is an array
+                 if (!Array.isArray(slide.timestampOverlays)) {
+                     slide.timestampOverlays = [];
                  }
              });
 
@@ -828,13 +805,10 @@ function onYouTubeIframeAPIReady() {
             return;
         }
         const canvas = adminApp.state.fabricCanvasInstance;
-        // Only save state if it has changed since the last save or if explicitly needed
-        // For simplicity now, we save on object modification and additions/deletions.
 
-        const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; // Match saveCurrentSlideState
+        const propsToInclude = ['slideId', 'canvasWidth', 'canvasHeight', 'customInteraction', 'customAnimation', 'sequenceOrder']; 
         const currentState = canvas.toJSON(propsToInclude);
 
-        // If we are at an older history point and make a new change, clear the "redo" future.
         if (adminApp.state.historyIndex < adminApp.state.history.length - 1) {
             adminApp.state.history = adminApp.state.history.slice(0, adminApp.state.historyIndex + 1);
         }
@@ -842,10 +816,9 @@ function onYouTubeIframeAPIReady() {
         adminApp.state.history.push(currentState);
         adminApp.state.historyIndex = adminApp.state.history.length - 1;
 
-        // Limit history size (optional)
         const maxHistorySize = 20;
         if (adminApp.state.history.length > maxHistorySize) {
-            adminApp.state.history.shift(); // Remove the oldest state
+            adminApp.state.history.shift(); 
             adminApp.state.historyIndex--;
         }
         console.log("Canvas state saved to history. Index:", adminApp.state.historyIndex, "Total states:", adminApp.state.history.length);
@@ -870,19 +843,20 @@ function onYouTubeIframeAPIReady() {
     function handleAddSlide() {
         console.log("handleAddSlide called");
         if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
-        saveCurrentSlideState(); // Save previous slide first
+        saveCurrentSlideState(); 
         const newSlideId = 'slide_' + Utilities.getUuid();
         const newSlide = {
             slideId: newSlideId,
             canvasWidth: adminApp.state.defaultCanvasWidth,
             canvasHeight: adminApp.state.defaultCanvasHeight,
-            fabricCanvasJSON: null, // Will be empty JSON for a new slide
-            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] } // Added videoQuestions
+            fabricCanvasJSON: null, 
+            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] },
+            timestampOverlays: [] // Initialize with empty array
         };
         if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
         const newSlideIndex = adminApp.state.projectData.slides.length - 1;
-        selectSlide(newSlideIndex); // Select the new slide
+        selectSlide(newSlideIndex); 
         console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
     }
 
@@ -910,28 +884,30 @@ function onYouTubeIframeAPIReady() {
         } else if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
             selectedSlideData.slideMedia.videoQuestions = [];
         }
+        // Ensure timestampOverlays array exists on the slide
+        if (!Array.isArray(selectedSlideData.timestampOverlays)) {
+            selectedSlideData.timestampOverlays = [];
+        }
 
-        // Destroy existing YouTube player if any
+
         if (adminApp.state.adminYouTubePlayer) {
             adminApp.state.adminYouTubePlayer.destroy();
             adminApp.state.adminYouTubePlayer = null;
         }
         if (adminYouTubePlayerContainerEl) {
             adminYouTubePlayerContainerEl.style.display = 'none';
-            adminYouTubePlayerContainerEl.innerHTML = ''; // Clear any previous player
+            adminYouTubePlayerContainerEl.innerHTML = ''; 
         }
-        if(fabricCanvasEl) { // Ensure canvas is visible by default
-            fabricCanvasEl.style.opacity = '1';
+        if(fabricCanvasEl) { 
+            fabricCanvasEl.style.opacity = '1'; // Default to visible canvas in editor
         }
 
-        canvas.clear(); // Clears objects
-        canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); // Clears background image
-        canvas.backgroundColor = '#e9e9e9'; // Reset background color
+        canvas.clear(); 
+        canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
+        canvas.backgroundColor = '#e9e9e9'; 
 
-        // Resize and zoom canvas to fit the container
         adminApp.resizeCanvasToFit(selectedSlideData);
 
-        // Reset UI elements related to slide media
         if (imageUploaderEl) imageUploaderEl.value = null;
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
         if (audioUploaderEl) audioUploaderEl.value = null;
@@ -944,10 +920,9 @@ function onYouTubeIframeAPIReady() {
         if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
 
         const media = selectedSlideData.slideMedia;
-        // Update video tools visibility - hide by default
         updateVideoToolsVisibility(false);
+        if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none'; // Hide by default
 
-        // UPDATED IMAGE HANDLING - Always fetch from Drive, never use cached base64
         if (media && media.type === 'image' && media.driveFileId) {
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
@@ -961,7 +936,6 @@ function onYouTubeIframeAPIReady() {
                     return; 
                 }
                 if (response && response.success && response.base64Data) {
-                    // DON'T cache the base64Data in media.url - just use it directly
                     fabric.Image.fromURL(response.base64Data, function(img) {
                         if (!adminApp.state.fabricCanvasInstance) return;
                         adminApp.state.fabricCanvasInstance.setBackgroundImage(img, canvas.renderAll.bind(canvas), { 
@@ -973,13 +947,12 @@ function onYouTubeIframeAPIReady() {
                 } else { 
                     console.error("Failed to fetch background", response); 
                     displayMessage("Error loading slide background image.", false); 
-                    canvas.backgroundColor = '#e9e9e9'; // Fallback color
+                    canvas.backgroundColor = '#e9e9e9'; 
                     canvas.renderAll(); 
                 }
             }).withFailureHandler(onServerError).getImageAsBase64(media.driveFileId);
             
         } else if (media && media.type === 'image' && !media.driveFileId) {
-            // Handle case where image type is set but no Drive file ID (shouldn't happen in normal flow)
             console.warn("Image media type set but no driveFileId:", media); 
             canvas.backgroundColor = '#e9e9e9';
             canvas.renderAll(); 
@@ -992,83 +965,78 @@ function onYouTubeIframeAPIReady() {
             const videoId = extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl && typeof YT !== 'undefined' && YT.Player) {
                 adminYouTubePlayerContainerEl.style.display = 'block';
-                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Make canvas semi-transparent
-                canvas.backgroundColor = 'rgba(0,0,0,0)'; // Make canvas background transparent
+                // For admin editor, keep canvas fully visible or semi-transparent, not opacity 0
+                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // MODIFIED for editor visibility
+                canvas.backgroundColor = 'rgba(0,0,0,0)'; 
 
                 adminApp.state.adminYouTubePlayer = new YT.Player('adminYouTubePlayerContainer', {
-                    height: '100%', // Fill the container
+                    height: '100%', 
                     width: '100%',
-                    videoId: videoId, // The YouTube video ID extracted from the URL
+                    videoId: videoId, 
                     playerVars: {
-                        'playsinline': 1,       // Plays video inline on mobile devices instead of fullscreen
-                        'controls': 1,          // Show player controls (0 to hide) - Admin gets controls
-                        'modestbranding': 1,    // Reduce YouTube logo visibility
-                        'rel': 0,               // Do not show related videos when playback ends
-                        'origin': window.location.origin // Dynamically set origin for API security & embed requirements
+                        'playsinline': 1,       
+                        'controls': 1,          
+                        'modestbranding': 1,    
+                        'rel': 0,               
+                        'origin': window.location.origin 
                     },
                     events: {
-                        // Event handler for when the player is ready
                         'onReady': (event) => {
                             console.log("Admin YouTube player ready.");
-                            updateVideoToolsVisibility(true); // Show timeline and question controls
-                            renderVideoQuestionsList(); // Render any existing questions for this video
+                            updateVideoToolsVisibility(true); 
+                            if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'inline-block'; // Show button
+                            renderVideoQuestionsList(); 
                             const duration = event.target.getDuration();
                             if (videoTotalDurationDisplayEl) videoTotalDurationDisplayEl.textContent = formatTime(duration);
                             if (videoTimelineSliderEl) videoTimelineSliderEl.max = duration;
-                            event.target.playVideo(); // Autoplay the video once ready
+                            // event.target.playVideo(); // Autoplay for admin can be distracting, commented out
                         },
-                        // Event handler for when the player's state changes (playing, paused, ended, etc.)
                         'onStateChange': (event) => {
-                            // Clear any existing interval before setting a new one or if player is not playing
                             if (adminApp.state.playerUpdateInterval) {
                                 clearInterval(adminApp.state.playerUpdateInterval);
-                                adminApp.state.playerUpdateInterval = null; // Clear the reference
+                                adminApp.state.playerUpdateInterval = null; 
                             }
-
-                            // If video is playing, set an interval to update the timeline slider and current time display
                             if (event.data === YT.PlayerState.PLAYING) {
                                 adminApp.state.playerUpdateInterval = setInterval(() => {
                                     const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
                                     if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
                                     if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
-                                }, 250); // Update every 250ms
+                                }, 250); 
                             }
                         },
-                        // Event handler for when an error occurs in the player
                         'onError': (event) => {
                             console.error("Admin YouTube player error", event.data, "for URL:", media.url);
-                            updateVideoToolsVisibility(false); // Hide timeline and question controls on error
+                            updateVideoToolsVisibility(false); 
+                            if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none';
                             
-                            // Display a user-friendly error message
                             if (adminMediaPlaceholderEl) {
-                                if (event.data === 150) { // Error 150: Playback restricted by video owner
+                                if (event.data === 150) { 
                                     adminMediaPlaceholderEl.innerHTML = `<strong>Playback Error (Code 150)</strong><br>The owner of this video has restricted playback in embedded players. Please try a different YouTube video. <br><small>URL: ${media.url}</small>`;
-                                } else { // Other errors
+                                } else { 
                                     adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Code: ${event.data}. URL: ${media.url}`;
                                 }
-                                adminMediaPlaceholderEl.style.display = 'block'; // Show the placeholder with the error
+                                adminMediaPlaceholderEl.style.display = 'block'; 
                             }
-                            
-                            // Visual fallback for the canvas area
-                            if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Restore canvas opacity
-                            canvas.backgroundColor = '#444'; // Set a fallback background color for the canvas
+                            if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; 
+                            canvas.backgroundColor = '#444'; 
                             canvas.renderAll();
                         }
                     }
                 });
             } else {
                 console.error("YouTube Player API not ready or videoId invalid or container missing.");
-                updateVideoToolsVisibility(false); // Hide timeline if player fails to load
+                updateVideoToolsVisibility(false); 
+                if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none';
                 if (adminMediaPlaceholderEl) {
                     adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Check URL or API. URL: ${media.url}`;
                     adminMediaPlaceholderEl.style.display = 'block';
                 }
-                canvas.backgroundColor = '#444'; // Fallback
+                canvas.backgroundColor = '#444'; 
             }
             canvas.renderAll();
             
         } else if (media && media.type === 'audio' && (media.driveFileId)) {
-            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'block'; // Keep placeholder for audio
+            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'block'; 
             console.log("Indicating attached audio:", media.originalName || media.driveFileId);
             if (attachedAudioNameEl) {
                 attachedAudioNameEl.textContent = `Attached: ${media.originalName || 'Audio File'}`;
@@ -1081,26 +1049,22 @@ function onYouTubeIframeAPIReady() {
                 adminMediaPlaceholderEl.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
                 adminMediaPlaceholderEl.style.display = 'block';
             }
-            canvas.backgroundColor = '#e9e9e9'; // Default bg color
+            canvas.backgroundColor = '#e9e9e9'; 
             canvas.renderAll();
             
         } else {
             console.log("No background media found or configured for slide", slideIndex);
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
-            canvas.backgroundColor = '#e9e9e9'; // Default bg color
+            canvas.backgroundColor = '#e9e9e9'; 
             canvas.renderAll();
         }
 
         if (selectedSlideData.fabricCanvasJSON) {
         console.log("Loading fabricCanvasJSON for slide", slideIndex);
-        // Ensure customInteraction and customAnimation properties are revived if necessary
         canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, function() {
             if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex !== slideIndex) return;
             
-            // Post-load processing to ensure custom properties are on objects
             adminApp.state.fabricCanvasInstance.getObjects().forEach(obj => {
-                // The `fabricCanvasJSON` should already have these if saved correctly.
-                // This is more of a safeguard or for older data.
                 if (!obj.customInteraction) {
                     obj.customInteraction = { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
                 }
@@ -1112,25 +1076,21 @@ function onYouTubeIframeAPIReady() {
             adminApp.state.fabricCanvasInstance.renderAll();
             console.log("Finished loading canvas JSON for slide", slideIndex);
             const activeObj = adminApp.state.fabricCanvasInstance.getActiveObject();
-            populateToolbar(activeObj); // Update new toolbar
+            populateToolbar(activeObj); 
             }, function(o, object) { 
-                /* Revival function if needed for complex object types, not typically for custom props */ 
-                // console.log("Reviving object:", o, object);
             });
         } else {
             console.log("No fabricCanvasJSON to load for slide", slideIndex);
-            canvas.renderAll(); // Render the empty canvas (with background if any)
-            populateToolbar(null); // Clear new toolbar as no objects are selected
+            canvas.renderAll(); 
+            populateToolbar(null); 
         }
         updateSlideThumbnailsUI();
-        // Initialize/Reset history for the current slide
         adminApp.state.history = [];
         adminApp.state.historyIndex = -1;
-        // A short timeout to ensure canvas is fully rendered before saving initial state
         setTimeout(() => {
             saveCanvasStateForHistory();
             updateUndoRedoButtonStates();
-        }, 100); // Adjust timeout if needed
+        }, 100); 
     }
 
     function updateSlideThumbnailsUI() {
@@ -1158,22 +1118,20 @@ function onYouTubeIframeAPIReady() {
         console.log("Deleted slide at index:", slideIndex);
 
         if (wasCurrentSlide) {
-            adminApp.state.currentSlideIndex = -1; // Force re-selection
+            adminApp.state.currentSlideIndex = -1; 
             const newIndexToSelect = Math.max(0, Math.min(slideIndex, adminApp.state.projectData.slides.length - 1));
              if (adminApp.state.projectData.slides.length > 0) {
                 selectSlide(newIndexToSelect);
             } else {
-                // This case should not be reached due to "Cannot delete the last slide" check
-                // but as a fallback, clear canvas and UI.
                 if(adminApp.state.fabricCanvasInstance) adminApp.state.fabricCanvasInstance.clear();
                 updateSlideThumbnailsUI();
                 populateToolbar(null);
             }
         } else if (adminApp.state.currentSlideIndex > slideIndex) {
-            adminApp.state.currentSlideIndex--; // Adjust current index if a preceding slide was deleted
-            updateSlideThumbnailsUI(); // Update UI to reflect new active slide
+            adminApp.state.currentSlideIndex--; 
+            updateSlideThumbnailsUI(); 
         } else {
-             updateSlideThumbnailsUI(); // Just update thumbnails if a non-active, non-preceding slide was deleted
+             updateSlideThumbnailsUI(); 
         }
     }
 
@@ -1255,9 +1213,7 @@ function onYouTubeIframeAPIReady() {
         else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
     }
 
-    // Improved notification system
     function showNotification(message, type = 'info', duration = 5000) {
-        // Create notification container if it doesn't exist
         let container = document.getElementById('notificationContainer');
         if (!container) {
             container = document.createElement('div');
@@ -1271,21 +1227,17 @@ function onYouTubeIframeAPIReady() {
         
         container.appendChild(notification);
         
-        // Animate in
         setTimeout(() => notification.classList.add('visible'), 10);
         
-        // Remove after duration
         setTimeout(() => {
             notification.classList.remove('visible');
-            setTimeout(() => notification.remove(), 300); // After fade out transition
+            setTimeout(() => notification.remove(), 300); 
         }, duration);
     }
 
     function displayMessage(message, isSuccess) {
-        // Show in the new notification system
         showNotification(message, isSuccess ? 'success' : 'error');
         
-        // Also update the original message area for backward compatibility
         if (messageAreaEl) { 
             messageAreaEl.innerHTML = ''; 
             const p = document.createElement('p'); 
@@ -1408,7 +1360,7 @@ function onYouTubeIframeAPIReady() {
         const file = event.target.files[0];
         if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
 
-        saveCurrentSlideState(); // Save current slide state before modifying its media
+        saveCurrentSlideState(); 
 
         showLoading(true); displayMessage("Uploading image...", true);
         const reader = new FileReader();
@@ -1481,8 +1433,7 @@ function onYouTubeIframeAPIReady() {
 
                 if (!currentSlide.slideMedia) currentSlide.slideMedia = {};
                 currentSlide.slideMedia.type = 'image';
-                // DON'T store base64 data in JSON - only store the Drive file ID
-                currentSlide.slideMedia.url = null; // Clear any existing base64 data
+                currentSlide.slideMedia.url = null; 
                 currentSlide.slideMedia.driveFileId = adminApp.state.lastUploadedDriveId || null;
                 currentSlide.slideMedia.mimeType = adminApp.state.lastUploadedMimeType || response.mimeType;
                 currentSlide.slideMedia.originalName = adminApp.state.lastUploadedFileName || null;
@@ -1492,7 +1443,6 @@ function onYouTubeIframeAPIReady() {
                 console.log(`Slide ${adminApp.state.currentSlideIndex + 1} media/dims updated for image.`);
                 updateSlideThumbnailsUI();
 
-                // Clear temporary state
                 delete adminApp.state.lastUploadedDriveId;
                 delete adminApp.state.lastUploadedMimeType;
                 delete adminApp.state.lastUploadedFileName;
@@ -1511,12 +1461,12 @@ function onYouTubeIframeAPIReady() {
             displayMessage("Please enter a YouTube URL.", false); return;
         }
         const url = youtubeUrlInputEl.value.trim();
-        if (!url.includes("youtube.com/") && !url.includes("youtu.be/")) {
+        if (!url.includes("youtube.com/") && !url.includes("youtu.be/")) { // Simplified check
             displayMessage("Please enter a valid YouTube URL.", false);
             return;
         }
 
-        saveCurrentSlideState(); // Save current slide state before modifying its media
+        saveCurrentSlideState(); 
 
         const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
         if (!currentSlide.slideMedia) {
@@ -1524,32 +1474,16 @@ function onYouTubeIframeAPIReady() {
         }
         currentSlide.slideMedia.type = 'youtube';
         currentSlide.slideMedia.url = url;
-        currentSlide.slideMedia.driveFileId = null; // YouTube videos are not Drive files
+        currentSlide.slideMedia.driveFileId = null; 
         currentSlide.slideMedia.mimeType = 'video/youtube';
         currentSlide.slideMedia.originalName = null;
+        currentSlide.slideMedia.videoQuestions = currentSlide.slideMedia.videoQuestions || []; // Ensure array exists
+        currentSlide.timestampOverlays = currentSlide.timestampOverlays || []; // Ensure array exists
+
 
         console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
-
-        if(adminApp.state.fabricCanvasInstance) {
-             adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
-             adminApp.state.fabricCanvasInstance.backgroundColor = '#444'; // Darker bg for YouTube
-             adminApp.state.fabricCanvasInstance.renderAll();
-        }
-       if (adminMediaPlaceholderEl) {
-           adminMediaPlaceholderEl.textContent = `YouTube BG: ${url}`;
-           adminMediaPlaceholderEl.style.display = 'block';
-       }
-       // Clear other media UI states
-       if (imageUploaderEl) imageUploaderEl.value = null;
-       if (audioUploaderEl) audioUploaderEl.value = null;
-       if (attachedAudioNameEl) {
-            attachedAudioNameEl.textContent = '';
-            const audioControls = document.getElementById('audioControls');
-            if(audioControls) audioControls.style.display = 'none';
-        }
-       if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
-
-       displayMessage("YouTube background set for this slide.", true);
+        selectSlide(adminApp.state.currentSlideIndex); // Reload slide to show YouTube player
+        displayMessage("YouTube background set for this slide.", true);
     }
 
     function handleAudioUpload(event) {
@@ -1565,7 +1499,7 @@ function onYouTubeIframeAPIReady() {
              return;
         }
 
-        saveCurrentSlideState(); // Save current slide state before modifying its media
+        saveCurrentSlideState(); 
 
         showLoading(true); displayMessage("Uploading audio...", true);
         const reader = new FileReader();
@@ -1601,14 +1535,13 @@ function onYouTubeIframeAPIReady() {
                 currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
              }
             currentSlide.slideMedia.type = 'audio';
-            currentSlide.slideMedia.url = null; // Audio is not displayed visually from URL on canvas bg
+            currentSlide.slideMedia.url = null; 
             currentSlide.slideMedia.driveFileId = response.driveFileId;
             currentSlide.slideMedia.mimeType = response.mimeType;
             currentSlide.slideMedia.originalName = response.fileName;
 
             console.log(`Audio attached for slide ${adminApp.state.currentSlideIndex + 1}:`, currentSlide.slideMedia);
             
-            // Update UI
             if (attachedAudioNameEl) {
                 attachedAudioNameEl.textContent = `Attached: ${response.fileName}`;
                 const audioControls = document.getElementById('audioControls');
@@ -1616,12 +1549,11 @@ function onYouTubeIframeAPIReady() {
             }
             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
 
-            // Clear other media UI states and canvas background
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
             if (imageUploaderEl) imageUploaderEl.value = null;
             if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.setBackgroundImage(null, adminApp.state.fabricCanvasInstance.renderAll.bind(adminApp.state.fabricCanvasInstance));
-                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; // Default BG
+                adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; 
                 adminApp.state.fabricCanvasInstance.renderAll();
             }
             if (adminMediaPlaceholderEl) {
@@ -1641,24 +1573,21 @@ function onYouTubeIframeAPIReady() {
         if (currentSlide.slideMedia && currentSlide.slideMedia.type === 'audio') {
             console.log(`Removing audio from slide ${adminApp.state.currentSlideIndex + 1}`);
 
-            // Clear audio properties from slideMedia
             currentSlide.slideMedia.type = null;
             currentSlide.slideMedia.url = null;
             currentSlide.slideMedia.driveFileId = null;
             currentSlide.slideMedia.mimeType = null;
             currentSlide.slideMedia.originalName = null;
 
-            // Update UI
             if (attachedAudioNameEl) {
                 attachedAudioNameEl.textContent = '';
                 const audioControls = document.getElementById('audioControls');
                 if(audioControls) audioControls.style.display = 'none';
             }
             if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
-            if (audioUploaderEl) audioUploaderEl.value = null; // Clear file input
+            if (audioUploaderEl) audioUploaderEl.value = null; 
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             
-            // Reset canvas background color if it was changed for audio indication
             if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9';
                 adminApp.state.fabricCanvasInstance.renderAll();
@@ -1680,13 +1609,13 @@ function onYouTubeIframeAPIReady() {
                 if (!blob) continue;
                 event.preventDefault();
                 console.log("Image pasted from clipboard:", blob.name || 'pasted_image', blob.type);
-                saveCurrentSlideState(); // Save current slide state before potentially changing its background
+                saveCurrentSlideState(); 
                 showLoading(true);
                 displayMessage("Processing pasted image...", true);
                 const reader = new FileReader();
                 reader.onload = function(e_reader) {
                     const fileData = {
-                        fileName: blob.name || `pasted_image_${Date.now()}.${blob.type.split('/')[1] || 'png'}`, // Generate a name if needed
+                        fileName: blob.name || `pasted_image_${Date.now()}.${blob.type.split('/')[1] || 'png'}`, 
                         mimeType: blob.type,
                         data: e_reader.target.result.split(',')[1]
                     };
@@ -1696,7 +1625,7 @@ function onYouTubeIframeAPIReady() {
                         return;
                     }
                     google.script.run
-                        .withSuccessHandler(onImageUploaded) // Reuses the existing image upload flow
+                        .withSuccessHandler(onImageUploaded) 
                         .withFailureHandler(onServerError)
                         .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
                 };
@@ -1706,7 +1635,7 @@ function onYouTubeIframeAPIReady() {
                     console.error("FileReader error:", error);
                 };
                 reader.readAsDataURL(blob);
-                break; // Process first image found
+                break; 
             }
         }
         if (imageFound) {
@@ -1716,7 +1645,6 @@ function onYouTubeIframeAPIReady() {
         }
     }
 
-    // Unified media handling for toolbar buttons (if added later, not currently used by this plan)
     function handleMediaSelection(mediaType) {
         if (adminApp.state.currentView !== 'edit' || !adminApp.state.currentProjectId || adminApp.state.isLoading) {
             showNotification("Cannot add media now. Please wait...", "error");
@@ -1754,9 +1682,8 @@ function onYouTubeIframeAPIReady() {
         }
     }
 
-    // Place these with other toolbar action functions
     function handleUndo() {
-        if (adminApp.state.historyIndex <= 0) return; // Cannot undo further than the initial state
+        if (adminApp.state.historyIndex <= 0) return; 
 
         adminApp.state.isApplyingHistory = true;
         adminApp.state.historyIndex--;
@@ -1765,15 +1692,14 @@ function onYouTubeIframeAPIReady() {
 
         canvas.loadFromJSON(stateToLoad, () => {
             canvas.renderAll();
-            // Ensure custom properties are revived correctly after load (if necessary)
             canvas.getObjects().forEach(obj => {
-                const originalObjState = stateToLoad.objects.find(sObj => sObj.slideId === obj.slideId /* or another unique id if you have one */);
-                if (originalObjState) { // This matching needs to be robust
+                const originalObjState = stateToLoad.objects.find(sObj => sObj.slideId === obj.slideId );
+                if (originalObjState) { 
                     obj.customInteraction = originalObjState.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
                     obj.customAnimation = originalObjState.customAnimation || { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
                 }
             });
-            populateToolbar(canvas.getActiveObject()); // Update toolbar based on current selection
+            populateToolbar(canvas.getActiveObject()); 
             adminApp.state.isApplyingHistory = false;
             updateUndoRedoButtonStates();
             console.log("Undo applied. History index:", adminApp.state.historyIndex);
@@ -1790,7 +1716,6 @@ function onYouTubeIframeAPIReady() {
 
         canvas.loadFromJSON(stateToLoad, () => {
             canvas.renderAll();
-            // Ensure custom properties are revived
             canvas.getObjects().forEach(obj => {
                 const originalObjState = stateToLoad.objects.find(sObj => sObj.slideId === obj.slideId);
                 if (originalObjState) {
@@ -1811,14 +1736,13 @@ function onYouTubeIframeAPIReady() {
         const activeObject = canvas.getActiveObject();
         if (activeObject) {
             canvas.remove(activeObject);
-            // If it was a group, also remove individual items if needed, or handle groups directly
-            if (activeObject.type === 'activeSelection') { // Fabric's term for a multi-selection group
+            if (activeObject.type === 'activeSelection') { 
                 activeObject.forEachObject(obj => canvas.remove(obj));
-                canvas.discardActiveObject(); // Clear the activeSelection object
+                canvas.discardActiveObject(); 
             }
             canvas.renderAll();
-            saveCanvasStateForHistory(); // Save state after deletion
-            populateToolbar(null); // Update toolbar since object is gone
+            saveCanvasStateForHistory(); 
+            populateToolbar(null); 
             showNotification("Object deleted", "info");
         } else {
             showNotification("No object selected to delete.", "info");
@@ -1836,7 +1760,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null 
       });
     canvas.add(rect); canvas.setActiveObject(rect); canvas.renderAll();
-    saveCanvasStateForHistory(); // <-- ADD
+    saveCanvasStateForHistory(); 
     console.log("Rectangle added to canvas:", rect);
     hideActivePopover();
     }
@@ -1852,7 +1776,7 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null 
       });
     canvas.add(circle); canvas.setActiveObject(circle); canvas.renderAll();
-    saveCanvasStateForHistory(); // <-- ADD
+    saveCanvasStateForHistory(); 
     console.log("Circle added to canvas:", circle);
     hideActivePopover();
     }
@@ -1869,59 +1793,50 @@ function onYouTubeIframeAPIReady() {
           sequenceOrder: null
       });
         canvas.add(textbox); canvas.setActiveObject(textbox); canvas.renderAll();
-        saveCanvasStateForHistory(); // <-- ADD
+        saveCanvasStateForHistory(); 
         console.log("Textbox added to canvas:", textbox);
         hideActivePopover();
         }
 
     // --- Toolbar Logic (Significantly Reworked) ---
     function toHexColor(fabricColor) {
-      if (!fabricColor) return '#000000'; // Default for undefined or null
+      if (!fabricColor) return '#000000'; 
       try {
-        // If it's already a hex string (potentially with alpha), fabric.Color can handle it.
-        // If it's an object (like a gradient), toHex() might not be what we want for a simple color picker.
-        // For simplicity, we assume solid colors for these pickers.
         if (typeof fabricColor === 'string') {
             const colorInstance = new fabric.Color(fabricColor);
-            const hex = colorInstance.toHex(); // Gets 6-digit hex
+            const hex = colorInstance.toHex(); 
             return '#' + hex;
         }
-        return '#000000'; // Fallback for unexpected types
+        return '#000000'; 
       } catch (e) {
         console.warn("Could not convert color to HEX:", fabricColor, e);
-        return '#000000'; // Fallback on error
+        return '#000000'; 
       }
     }
 
     function initToolbar() {
         console.log("initToolbar: Attaching listeners to NEW toolbar inputs and popovers.");
-        hideActivePopover(); // Ensure all popovers start hidden
+        hideActivePopover(); 
 
-        // Populate Font Family Select (inside its popover)
         if(objFontFamilyEl) {
-            objFontFamilyEl.innerHTML = ''; // Clear existing options
+            objFontFamilyEl.innerHTML = ''; 
             FONT_FAMILIES.forEach(font => {
                 const option = document.createElement('option'); option.value = font; option.textContent = font; objFontFamilyEl.appendChild(option);
             });
-             // Listener for the font family select itself
             if (!objFontFamilyEl.hasAttribute('listener-attached')) {
                 objFontFamilyEl.addEventListener('change', (e) => updateFabricObjectFromToolbar('fontFamily', e.target.value));
                 objFontFamilyEl.setAttribute('listener-attached', 'true');
             }
         } else { console.warn("initToolbar: objFontFamilyEl not found for populating fonts."); }
 
-
-        // --- Event Listeners for Popover Trigger Buttons ---
         const popoverTriggers = [
             { buttonEl: shadowSettingsButtonEl, popoverId: 'shadowPopover' },
             { buttonEl: interactionSettingsButtonEl, popoverId: 'interactionPopover' },
             { buttonEl: animationSettingsButtonEl, popoverId: 'animationPopover' },
             { buttonEl: fontFamilyButtonEl, popoverId: 'fontFamilyPopover' },
-            // New toolbar buttons integrated here
             { buttonEl: mediaToolsButtonEl, popoverId: 'mediaToolsPopover' },
-            { buttonEl: addShapeButtonEl, popoverId: 'shapesPopover' }, // Singular 'addShapeButtonEl'
+            { buttonEl: addShapeButtonEl, popoverId: 'shapesPopover' }, 
             { buttonEl: positionToolsButtonEl, popoverId: 'positionToolsPopover' },
-            // Popovers for Fill, Stroke, Opacity
             { buttonEl: fillColorButtonEl, popoverId: 'fillColorPopover' },
             { buttonEl: strokeColorButtonEl, popoverId: 'strokeColorPopover' },
             { buttonEl: opacityButtonEl, popoverId: 'opacityPopover' }
@@ -1930,7 +1845,7 @@ function onYouTubeIframeAPIReady() {
         popoverTriggers.forEach(item => {
             if (item.buttonEl && !item.buttonEl.hasAttribute('listener-attached')) {
                 item.buttonEl.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Prevent this click from immediately closing popover via document listener
+                    e.stopPropagation(); 
                     togglePopover(item.popoverId, item.buttonEl);
                 });
                 item.buttonEl.setAttribute('listener-attached', 'true');
@@ -1939,7 +1854,6 @@ function onYouTubeIframeAPIReady() {
             }
         });
 
-        // Media tab buttons event listeners (inside mediaToolsPopover)
         if (mediaTabButtonsEl && mediaTabButtonsEl.length > 0) {
             mediaTabButtonsEl.forEach(tab => {
                 if (!tab.hasAttribute('listener-attached')) {
@@ -1952,7 +1866,6 @@ function onYouTubeIframeAPIReady() {
             });
         }
 
-        // Drag and drop zone event listeners (inside mediaToolsPopover)
         const setupDropZone = (dropZoneEl, uploaderEl, fileTypePrefix, uploadHandler) => {
             if (dropZoneEl && !dropZoneEl.hasAttribute('listener-attached')) {
                 dropZoneEl.addEventListener('click', () => {
@@ -1978,14 +1891,9 @@ function onYouTubeIframeAPIReady() {
         setupDropZone(imageDropZoneEl, imageUploaderEl, 'image/', handleImageUpload);
         setupDropZone(audioDropZoneEl, audioUploaderEl, 'audio/', handleAudioUpload);
 
-
-        // --- Event Listeners for Direct Toolbar Inputs (X, Y, Width, Height, Angle, StrokeWidth, Opacity, FontSize, LineHeight, CharSpacing, TextContent) ---
-        // Note: objFill, objStrokeColor, objStrokeWidth, objOpacity are now in popovers.
-        // Their listeners are attached here but they operate on elements within those popovers.
         const directInputs = [
-            // Position inputs are inside positionToolsPopover, handled there.
-            {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'}, // In strokeColorPopover
-            {el: objOpacityEl, prop: 'opacity', type: 'range'}, // In opacityPopover
+            {el: objStrokeWidthEl, prop: 'strokeWidth', type: 'number'}, 
+            {el: objOpacityEl, prop: 'opacity', type: 'range'}, 
             {el: objFontSizeEl, prop: 'fontSize', type: 'number'},
             {el: objLineHeightEl, prop: 'lineHeight', type: 'number', isFloat: true},
             {el: objCharSpacingEl, prop: 'charSpacing', type: 'number'},
@@ -2003,7 +1911,6 @@ function onYouTubeIframeAPIReady() {
             }
         });
 
-        // Listener for Opacity display update (objOpacityEl is in opacityPopover)
         if (objOpacityEl && objOpacityValueDisplayEl && !objOpacityEl.hasAttribute('listener-opacity-display')) {
             objOpacityEl.addEventListener('input', function(e) {
                 objOpacityValueDisplayEl.textContent = Math.round(parseFloat(e.target.value) * 100) + '%';
@@ -2011,16 +1918,15 @@ function onYouTubeIframeAPIReady() {
             objOpacityEl.setAttribute('listener-opacity-display', 'true');
         }
         
-        // Listeners for inputs within positionToolsPopover
         const positionInputs = [
             {el: objXEl, prop: 'left', type: 'number'}, {el: objYEl, prop: 'top', type: 'number'},
-            {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, // Special handling for width/height
+            {el: objWidthEl, prop: 'width', type: 'number', targetProp: 'scaleX'}, 
             {el: objHeightEl, prop: 'height', type: 'number', targetProp: 'scaleY'},
             {el: objAngleEl, prop: 'angle', type: 'number'}
         ];
         positionInputs.forEach(inputConfig => {
             if (inputConfig.el && !inputConfig.el.hasAttribute('listener-attached')) {
-                 inputConfig.el.addEventListener('change', (e) => { // Use 'change' for number inputs to avoid excessive updates while typing
+                 inputConfig.el.addEventListener('change', (e) => { 
                     updateFabricObjectFromToolbar(inputConfig.prop, e.target.value, inputConfig.type);
                 });
                 inputConfig.el.setAttribute('listener-attached', 'true');
@@ -2029,8 +1935,6 @@ function onYouTubeIframeAPIReady() {
             }
         });
 
-
-        // --- Event Listeners for Color Inputs (Fill, Stroke) ---
         const colorInputs = [
             {el: objFillEl, prop: 'fill'},
             {el: objStrokeColorEl, prop: 'stroke'}
@@ -2044,15 +1948,13 @@ function onYouTubeIframeAPIReady() {
             }
         });
 
-
-        // --- Event Listeners for Text Style Toggle Buttons (Bold, Italic, Align) ---
         if (fontWeightButtonEl && !fontWeightButtonEl.hasAttribute('listener-attached')) {
             fontWeightButtonEl.addEventListener('click', () => {
                 const activeObject = adminApp.state.fabricCanvasInstance.getActiveObject();
                 if (!activeObject || !(activeObject.type === 'textbox' || activeObject.type === 'i-text')) return;
                 const newValue = activeObject.fontWeight === 'bold' ? 'normal' : 'bold';
                 updateFabricObjectFromToolbar('fontWeight', newValue);
-                populateToolbar(activeObject); // Repopulate to update button state
+                populateToolbar(activeObject); 
             });
             fontWeightButtonEl.setAttribute('listener-attached', 'true');
         } else if(!fontWeightButtonEl) { console.warn("initToolbar: fontWeightButtonEl not found."); }
@@ -2063,7 +1965,7 @@ function onYouTubeIframeAPIReady() {
                 if (!activeObject || !(activeObject.type === 'textbox' || activeObject.type === 'i-text')) return;
                 const newValue = activeObject.fontStyle === 'italic' ? 'normal' : 'italic';
                 updateFabricObjectFromToolbar('fontStyle', newValue);
-                populateToolbar(activeObject); // Repopulate to update button state
+                populateToolbar(activeObject); 
             });
             fontStyleButtonEl.setAttribute('listener-attached', 'true');
         } else if(!fontStyleButtonEl) { console.warn("initToolbar: fontStyleButtonEl not found."); }
@@ -2076,15 +1978,13 @@ function onYouTubeIframeAPIReady() {
                     if (!activeObject || !(activeObject.type === 'textbox' || activeObject.type === 'i-text')) return;
                     const alignValue = button.dataset.align;
                     updateFabricObjectFromToolbar('textAlign', alignValue);
-                    populateToolbar(activeObject); // Repopulate to update button states
+                    populateToolbar(activeObject); 
                 });
             });
             textAlignGroupEl.setAttribute('listener-attached', 'true');
         } else if(!textAlignGroupEl) { console.warn("initToolbar: textAlignGroupEl not found."); }
 
-
-        // --- Event Listeners for Inputs INSIDE Popovers (Shadow, Interaction, Animation) ---
-        const shadowInputs = [ // These are inside shadowPopover
+        const shadowInputs = [ 
             {el: objShadowColorEl, prop: 'shadow.color', type: 'color'},
             {el: objShadowBlurEl, prop: 'shadow.blur', type: 'range'},
             {el: objShadowOffsetXEl, prop: 'shadow.offsetX', type: 'number'},
@@ -2117,34 +2017,31 @@ function onYouTubeIframeAPIReady() {
                 console.warn(`initToolbar: Critical edit action button element not found (e.g., delete).`);
             }
         });
-        updateUndoRedoButtonStates(); // Set initial state of undo/redo buttons
+        updateUndoRedoButtonStates(); 
 
-        // Interaction inputs (inside interactionPopover)
         if (objInteractionTriggerEl && !objInteractionTriggerEl.hasAttribute('listener-attached')) {
             objInteractionTriggerEl.addEventListener('change', handleInteractionChange); objInteractionTriggerEl.setAttribute('listener-attached', 'true');
         } else if(!objInteractionTriggerEl) { console.warn("initToolbar: objInteractionTriggerEl not found.");}
         if (objInteractionActionEl && !objInteractionActionEl.hasAttribute('listener-attached')) {
             objInteractionActionEl.addEventListener('change', handleInteractionChange); objInteractionActionEl.setAttribute('listener-attached', 'true');
         } else if(!objInteractionActionEl) { console.warn("initToolbar: objInteractionActionEl not found.");}
-        if (objModalContentEl && !objModalContentEl.hasAttribute('listener-attached')) { // This is textarea inside popover
+        if (objModalContentEl && !objModalContentEl.hasAttribute('listener-attached')) { 
             objModalContentEl.addEventListener('input', handleInteractionChange); objModalContentEl.setAttribute('listener-attached', 'true');
         } else if(!objModalContentEl) { console.warn("initToolbar: objModalContentEl (popover) not found.");}
-        if (objNavigateToEl && !objNavigateToEl.hasAttribute('listener-attached')) { // This is input inside popover
+        if (objNavigateToEl && !objNavigateToEl.hasAttribute('listener-attached')) { 
             objNavigateToEl.addEventListener('input', handleInteractionChange); objNavigateToEl.setAttribute('listener-attached', 'true');
         } else if(!objNavigateToEl) { console.warn("initToolbar: objNavigateToEl (popover) not found.");}
-         if (objPanZoomLevelEl && !objPanZoomLevelEl.hasAttribute('listener-attached')) { // This is input inside popover
+         if (objPanZoomLevelEl && !objPanZoomLevelEl.hasAttribute('listener-attached')) { 
              objPanZoomLevelEl.addEventListener('input', handleInteractionChange); objPanZoomLevelEl.setAttribute('listener-attached', 'true');
         } else if(!objPanZoomLevelEl) { console.warn("initToolbar: objPanZoomLevelEl (popover) not found.");}
 
-
-        // Animation inputs (inside animationPopover)
         if (objAnimationTriggerEl && !objAnimationTriggerEl.hasAttribute('listener-attached')) {
             objAnimationTriggerEl.addEventListener('change', handleAnimationChange); objAnimationTriggerEl.setAttribute('listener-attached', 'true');
         } else if(!objAnimationTriggerEl) { console.warn("initToolbar: objAnimationTriggerEl not found.");}
         if (objAnimationTypeEl && !objAnimationTypeEl.hasAttribute('listener-attached')) {
             objAnimationTypeEl.addEventListener('change', handleAnimationChange); objAnimationTypeEl.setAttribute('listener-attached', 'true');
         } else if(!objAnimationTypeEl) { console.warn("initToolbar: objAnimationTypeEl not found.");}
-        if (objAnimationSpeedEl && !objAnimationSpeedEl.hasAttribute('listener-attached')) { // Note: this is objAnimationSpeedEl from setupDOMReferences
+        if (objAnimationSpeedEl && !objAnimationSpeedEl.hasAttribute('listener-attached')) { 
             objAnimationSpeedEl.addEventListener('change', handleAnimationChange); objAnimationSpeedEl.setAttribute('listener-attached', 'true');
         } else if(!objAnimationSpeedEl) { console.warn("initToolbar: objAnimationSpeedEl not found.");}
         if (objAnimationStrengthEl && !objAnimationStrengthEl.hasAttribute('listener-attached')) {
@@ -2155,8 +2052,6 @@ function onYouTubeIframeAPIReady() {
             objAnimationLoopEl.setAttribute('listener-attached', 'true');
         } else if(!objAnimationLoopEl) { console.warn("initToolbar: objAnimationLoopEl not found.");}
         
-        // Hidden animation elements - listeners kept for potential backward compatibility if data has them.
-        // Their config sections are hidden.
         if (objAnimationLoopCountEl && !objAnimationLoopCountEl.hasAttribute('listener-attached')) {
             objAnimationLoopCountEl.addEventListener('input', handleAnimationChange);
             objAnimationLoopCountEl.setAttribute('listener-attached', 'true');
@@ -2169,106 +2064,83 @@ function onYouTubeIframeAPIReady() {
     
     function populateToolbar(activeObject) {
         if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
-        overlayPropertiesToolbarEl.style.display = 'block'; // Toolbar container always visible
+        overlayPropertiesToolbarEl.style.display = 'block'; 
 
         const isObjectSelected = !!activeObject;
         const isTextObject = isObjectSelected && (activeObject.type === 'textbox' || activeObject.type === 'i-text');
 
         if (deleteObjectButtonEl) deleteObjectButtonEl.disabled = !isObjectSelected;
 
-        // --- Manage Enabled/Disabled States ---
-
-        // Buttons for adding elements or slide-level changes - always enabled in edit view
         if (mediaToolsButtonEl) mediaToolsButtonEl.disabled = false;
         if (addShapeButtonEl) addShapeButtonEl.disabled = false;
 
-        // Text-specific controls row visibility
         if (textSpecificControlsEl) {
             textSpecificControlsEl.style.display = isTextObject ? 'flex' : 'none';
         }
 
-        // General object property controls (inputs and popover triggers)
         const generalObjectControlsAndTriggers = [
-            objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl, // Direct inputs
-            positionToolsButtonEl, shadowSettingsButtonEl, interactionSettingsButtonEl, animationSettingsButtonEl // Popover triggers
+            objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl, 
+            positionToolsButtonEl, shadowSettingsButtonEl, interactionSettingsButtonEl, animationSettingsButtonEl 
         ];
         generalObjectControlsAndTriggers.forEach(control => {
             if (control) control.disabled = !isObjectSelected;
         });
 
-        // Text-specific property controls (font family popover trigger and inputs/buttons within textSpecificControls row)
         const textPropertyControlsAndTriggers = [
-            fontFamilyButtonEl, // Popover trigger
-            objFontSizeEl, objLineHeightEl, objCharSpacingEl, objTextContentEl, // Inputs in text row
-            fontWeightButtonEl, fontStyleButtonEl // Buttons in text row
+            fontFamilyButtonEl, 
+            objFontSizeEl, objLineHeightEl, objCharSpacingEl, objTextContentEl, 
+            fontWeightButtonEl, fontStyleButtonEl 
         ];
-        if (textAlignGroupEl) { // Buttons in text row
+        if (textAlignGroupEl) { 
             textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(btn => textPropertyControlsAndTriggers.push(btn));
         }
         textPropertyControlsAndTriggers.forEach(control => {
             if (control) control.disabled = !isTextObject;
         });
 
-
-        // --- If NO object is selected, clean up and return ---
         if (!isObjectSelected) {
-            hideActivePopover(); // Close any object-property popovers
+            hideActivePopover(); 
 
-            // Visually deactivate popover trigger buttons
             const popoverTriggerButtons = [positionToolsButtonEl, shadowSettingsButtonEl, interactionSettingsButtonEl, animationSettingsButtonEl, fontFamilyButtonEl];
             popoverTriggerButtons.forEach(btn => {
                 if (btn) btn.classList.remove('active', 'popover-active');
             });
 
-            // Visually deactivate text style buttons
             if (fontWeightButtonEl) fontWeightButtonEl.classList.remove('active');
             if (fontStyleButtonEl) fontStyleButtonEl.classList.remove('active');
             if (textAlignGroupEl) {
                 textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(btn => btn.classList.remove('active'));
             }
             
-            // Optionally, reset some input values to defaults or placeholders if they are not disabled styling enough
-            // For example:
-            // if (objFillEl) objFillEl.value = '#dddddd'; 
-            if (objOpacityEl) objOpacityEl.value = 1; // Reset opacity slider
+            if (objOpacityEl) objOpacityEl.value = 1; 
             if (objOpacityValueDisplayEl) objOpacityValueDisplayEl.textContent = '100%';
 
-            // Remove 'active' class from Fill, Stroke, Opacity buttons
             if (fillColorButtonEl) fillColorButtonEl.classList.remove('active');
             if (strokeColorButtonEl) strokeColorButtonEl.classList.remove('active');
             if (opacityButtonEl) opacityButtonEl.classList.remove('active');
 
-
-            return; // Stop further population
+            return; 
         }
-
-        // --- If an object IS selected, proceed to populate its properties into the (now enabled) controls ---
         
-        // Populate Position Popover Inputs (objX, objY, etc.) - these are enabled if isObjectSelected
         if (objXEl) objXEl.value = activeObject.left !== undefined ? activeObject.left.toFixed(0) : 0;
         if (objYEl) objYEl.value = activeObject.top !== undefined ? activeObject.top.toFixed(0) : 0;
         if (objWidthEl) objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || 0);
         if (objHeightEl) objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || 0);
         if (objAngleEl) objAngleEl.value = activeObject.angle !== undefined ? activeObject.angle.toFixed(0) : 0;
         
-        // Populate Main Toolbar Direct Inputs - these are enabled if isObjectSelected
-        // objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl are now in popovers,
-        // but their values are still populated here.
         if (objFillEl) objFillEl.value = toHexColor(activeObject.fill);
         if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
         if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
-        if (objOpacityEl) { // In opacityPopover
+        if (objOpacityEl) { 
             objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
-            if (objOpacityValueDisplayEl) { // Update the percentage display
+            if (objOpacityValueDisplayEl) { 
                 objOpacityValueDisplayEl.textContent = Math.round(parseFloat(objOpacityEl.value) * 100) + '%';
             }
         }
 
-
-        // Populate Text Specific Controls (if applicable and visible)
-        if (isTextObject) { // These controls are already enabled if isTextObject is true
+        if (isTextObject) { 
             if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
-            if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial'; // Inside fontFamilyPopover
+            if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial'; 
             if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
             if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight === undefined ? 1.16 : activeObject.lineHeight;
             if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing === undefined ? 0 : activeObject.charSpacing;
@@ -2280,13 +2152,11 @@ function onYouTubeIframeAPIReady() {
                     btn.classList.toggle('active', btn.dataset.align === activeObject.textAlign);
                 });
             }
-            // Sync hidden selects (inside fontFamilyPopover)
             if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
             if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
             if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
         }
 
-        // Populate Shadow Popover Inputs - shadowSettingsButtonEl is enabled if isObjectSelected
         const shadow = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow : null;
         if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000';
         if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
@@ -2296,27 +2166,22 @@ function onYouTubeIframeAPIReady() {
         if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
         if (shadowSettingsButtonEl) shadowSettingsButtonEl.classList.toggle('active', !!shadow);
 
-        // Fill button active state
         if (fillColorButtonEl) {
             const hasFill = activeObject.fill && activeObject.fill !== 'transparent' && 
                             (typeof activeObject.fill !== 'object' || activeObject.fill.type !== 'gradient' || activeObject.fill.colorStops.length > 0);
             fillColorButtonEl.classList.toggle('active', !!hasFill);
         }
 
-        // Stroke button active state
         if (strokeColorButtonEl) {
             const hasStroke = activeObject.stroke && activeObject.strokeWidth > 0;
             strokeColorButtonEl.classList.toggle('active', hasStroke);
         }
 
-        // Opacity button active state
         if (opacityButtonEl) {
             const isTranslucent = activeObject.opacity !== undefined && activeObject.opacity < 1;
             opacityButtonEl.classList.toggle('active', isTranslucent);
         }
 
-
-        // Populate Interaction Popover Inputs - interactionSettingsButtonEl is enabled if isObjectSelected
         const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
         if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
         if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
@@ -2326,7 +2191,6 @@ function onYouTubeIframeAPIReady() {
         updateInteractionConfigVisibility(interaction.action);
         if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(interaction.trigger && interaction.action));
 
-        // Populate Animation Popover Inputs - animationSettingsButtonEl is enabled if isObjectSelected
         const animation = activeObject.customAnimation || { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
         if (objAnimationTriggerEl) objAnimationTriggerEl.value = animation.trigger || "";
         if (objAnimationTypeEl) objAnimationTypeEl.value = animation.type || "";
@@ -2358,11 +2222,11 @@ function onYouTubeIframeAPIReady() {
         updateInteractionConfigVisibility(activeObject.customInteraction.action);
         if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(activeObject.customInteraction.trigger && activeObject.customInteraction.action));
         console.log("Interaction data updated for object:", activeObject.customInteraction);
-        canvas.renderAll(); // Ensure change is reflected if visual properties depend on it (though unlikely here)
+        canvas.renderAll(); 
+        saveCanvasStateForHistory();
     }
 
     function updateInteractionConfigVisibility(action) {
-        // These elements are INSIDE the interactionPopover
         const modalConfig = interactionPopoverEl ? interactionPopoverEl.querySelector('#modalContentConfig') : null;
         const navigateConfig = interactionPopoverEl ? interactionPopoverEl.querySelector('#navigateToConfig') : null;
         const panZoomConfig = interactionPopoverEl ? interactionPopoverEl.querySelector('#panZoomConfigEl') : null;
@@ -2377,11 +2241,10 @@ function onYouTubeIframeAPIReady() {
     }
 
     function updateAnimationStrengthUnit(animationType) {
-        // This element is INSIDE the animationPopover
         const strengthUnitEl = animationPopoverEl ? animationPopoverEl.querySelector('#objAnimationStrengthUnit') : null;
         if (!strengthUnitEl) return;
 
-        let unitText = "(pixels/degrees/scale)"; // Default/generic
+        let unitText = "(pixels/degrees/scale)"; 
         switch(animationType) {
             case 'wiggle': unitText = "(degrees)"; break;
             case 'float': unitText = "(pixels)"; break;
@@ -2404,28 +2267,25 @@ function onYouTubeIframeAPIReady() {
         if (objAnimationTypeEl) activeObject.customAnimation.type = objAnimationTypeEl.value;
         
         const showAnimParams = !!(activeObject.customAnimation.trigger && activeObject.customAnimation.type);
-        // This config element is INSIDE the animationPopover
         const animParamsConfig = animationPopoverEl ? animationPopoverEl.querySelector('#animationParamsConfig') : null;
         if (animParamsConfig) animParamsConfig.style.display = showAnimParams ? 'block' : 'none';
 
         if (showAnimParams) {
             if (objAnimationSpeedEl) activeObject.customAnimation.speed = objAnimationSpeedEl.value;
-            // Map speed to duration for data model (client might use speed directly)
             switch(activeObject.customAnimation.speed) {
                 case 'slow': activeObject.customAnimation.duration = 1500; break;
                 case 'fast': activeObject.customAnimation.duration = 500; break;
-                default: activeObject.customAnimation.duration = 1000; // Normal
+                default: activeObject.customAnimation.duration = 1000; 
             }
             
             if (objAnimationStrengthEl) activeObject.customAnimation.strength = parseFloat(objAnimationStrengthEl.value) || 5;
             updateAnimationStrengthUnit(activeObject.customAnimation.type);
             if (objAnimationLoopEl) activeObject.customAnimation.loop = objAnimationLoopEl.value === "true";
             
-            // Remove legacy properties from the object model for cleanliness
             delete activeObject.customAnimation.loopCount;
-            delete activeObject.customAnimation.loopDelay; // Or set to a default if used by client animation logic
+            delete activeObject.customAnimation.loopDelay; 
 
-        } else { // If no trigger or type, reset customAnimation properties
+        } else { 
             activeObject.customAnimation.trigger = "";
             activeObject.customAnimation.type = "";
             activeObject.customAnimation.speed = "normal";
@@ -2439,6 +2299,7 @@ function onYouTubeIframeAPIReady() {
         if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
         console.log("Animation data updated for object:", activeObject.customAnimation);
         canvas.renderAll();
+        saveCanvasStateForHistory();
     }
 
     function updateFabricObjectFromToolbar(propertyName, value, inputType, isFloat = false) {
@@ -2451,18 +2312,16 @@ function onYouTubeIframeAPIReady() {
       if (inputType === 'number') {
           parsedValue = isFloat ? parseFloat(value) : parseInt(value, 10);
           if (isNaN(parsedValue)) {
-              // Allow empty strokeWidth or charSpacing to be 0.
               if ((propertyName === 'strokeWidth' || propertyName === 'charSpacing') && value === '') parsedValue = 0;
-              else if (value === '') return; // For other number fields, if empty, do nothing.
-              else return; // If truly NaN and not an allowed empty case, do nothing.
+              else if (value === '') return; 
+              else return; 
           }
-      } else if (inputType === 'range') { // Opacity, shadow.blur
+      } else if (inputType === 'range') { 
           parsedValue = parseFloat(value);
           if (isNaN(parsedValue)) return;
-      } else if (inputType === 'checkbox') { // For shadow.affectStroke, shadow.nonScaling
-          parsedValue = !!value; // This is usually already a boolean from e.target.checked
+      } else if (inputType === 'checkbox') { 
+          parsedValue = !!value; 
       }
-      // For string properties (fill, stroke, text, fontFamily, fontWeight, fontStyle, textAlign), parsedValue is already correct.
 
       if (propertyName === 'width') { 
           const newWidth = parseFloat(value);
@@ -2475,15 +2334,12 @@ function onYouTubeIframeAPIReady() {
             activeObject.scaleY = newHeight > 0 ? (newHeight / activeObject.height) : (activeObject.height > 0 ? 0.0001 / activeObject.height : 0.0001);
            }
       } else if (propertyName.startsWith('shadow.')) {
-        const shadowPropKey = propertyName.split('.')[1]; // color, blur, offsetX, etc.
+        const shadowPropKey = propertyName.split('.')[1]; 
         let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
         
-        // Update the specific property that triggered this call
         shadowOptions[shadowPropKey] = parsedValue;
 
-        // Always re-read all shadow properties from the popover inputs to ensure consistency
-        // This is important because one change might affect how another is interpreted (e.g. blur needs a color)
-        if (shadowPopoverEl) { // Ensure popover exists (it should if this is called)
+        if (shadowPopoverEl) { 
             const popoverShadowColorEl = shadowPopoverEl.querySelector('#objShadowColor');
             const popoverShadowBlurEl = shadowPopoverEl.querySelector('#objShadowBlur');
             const popoverShadowOffsetXEl = shadowPopoverEl.querySelector('#objShadowOffsetX');
@@ -2499,36 +2355,35 @@ function onYouTubeIframeAPIReady() {
             if (popoverShadowNonScalingEl) shadowOptions.nonScaling = popoverShadowNonScalingEl.checked;
         }
         
-        // Only set shadow if it has meaningful values (blur > 0 or an offset, or a non-default color)
-        // A black shadow with 0 blur and 0 offset is effectively no shadow.
         if (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0 || 
             (shadowOptions.color && shadowOptions.color !== '#000000' && shadowOptions.color.toLowerCase() !== 'rgb(0,0,0)' && shadowOptions.color.toLowerCase() !== 'rgba(0,0,0,0)')) {
             activeObject.set('shadow', new fabric.Shadow(shadowOptions));
         } else {
-            activeObject.set('shadow', null); // Remove shadow if all parameters are default/zero
+            activeObject.set('shadow', null); 
         }
         if (shadowSettingsButtonEl) shadowSettingsButtonEl.classList.toggle('active', !!activeObject.shadow);
 
       } else {
-        // Exclude customInteraction and customAnimation as they are handled by their specific functions
         if (!propertyName.startsWith('customInteraction.') && !propertyName.startsWith('customAnimation.')) {
              activeObject.set(propertyName, parsedValue);
-             // Sync hidden selects for text properties (these are in fontFamilyPopover)
              if (propertyName === 'fontWeight' && objFontWeightEl) objFontWeightEl.value = parsedValue;
              if (propertyName === 'fontStyle' && objFontStyleEl) objFontStyleEl.value = parsedValue;
              if (propertyName === 'textAlign' && objTextAlignEl) objTextAlignEl.value = parsedValue;
         }
       }
 
-      // For text objects, certain property changes require re-calculating dimensions.
       if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') &&
           ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'textAlign'].includes(propertyName)) {
-          activeObject.initDimensions(); // Re-calculate bounding box
+          activeObject.initDimensions(); 
       }
-      activeObject.setCoords(); // Update object's coordinates
+      activeObject.setCoords(); 
       canvas.renderAll();
-      // Do NOT call populateToolbar here to avoid potential infinite loops.
-      // The primary event handlers (e.g., button clicks) should call populateToolbar if a visual update of the toolbar itself is needed.
+      // Do NOT call populateToolbar here.
+      // Call saveCanvasStateForHistory only if it's not a shadow property being actively dragged (range/color)
+      // to avoid too many history states. For discrete changes (like number input 'change'), it's fine.
+      if (inputType !== 'range' && inputType !== 'color' && !propertyName.startsWith('shadow.')) {
+        saveCanvasStateForHistory();
+      }
     }
 
     // --- Utilities ---
@@ -2538,19 +2393,20 @@ function onYouTubeIframeAPIReady() {
         if (!url) return null;
         let videoId = null;
         try {
-            const urlObj = new URL(url);
-            if (urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') {
+            const urlObj = new URL(url); // Try direct URL parsing first
+            if ((urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') && urlObj.searchParams.has('v')) {
                 videoId = urlObj.searchParams.get('v');
             } else if (urlObj.hostname === 'youtu.be') {
                 videoId = urlObj.pathname.substring(1);
             }
         } catch (e) {
-            console.error("Error parsing YouTube URL:", e);
-            // Fallback for simpler regex if URL parsing fails (e.g. invalid URL)
-            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            // Fallback for simpler regex if URL parsing fails (e.g. not a full URL)
+            // This regex is more robust for various YouTube URL formats.
+            const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
             const match = url.match(regex);
             if (match) videoId = match[1];
         }
+        if (!videoId) console.warn("Could not extract YouTube Video ID from URL:", url);
         return videoId;
     }
 
@@ -2590,11 +2446,9 @@ function onYouTubeIframeAPIReady() {
                 const currentTime = adminApp.state.adminYouTubePlayer ? adminApp.state.adminYouTubePlayer.getCurrentTime() : 0;
                 if (questionTimestampDisplayEl) {
                     questionTimestampDisplayEl.textContent = formatTime(currentTime);
-                    // Store raw timestamp for saving, e.g., on a data attribute of the modal or a global variable
                     if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
                 }
 
-                // Clear form fields
                 if(questionTextEl) questionTextEl.value = '';
                 optionInputsEl.forEach(input => { if(input) input.value = ''; });
                 correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
@@ -2619,7 +2473,7 @@ function onYouTubeIframeAPIReady() {
                 }
 
                 const options = optionInputsEl.map(input => input ? input.value.trim() : '').filter(opt => opt !== '');
-                if (options.length < 2) { // Require at least 2 options
+                if (options.length < 2) { 
                     displayMessage("Please provide at least two options.", false);
                     return;
                 }
@@ -2631,7 +2485,7 @@ function onYouTubeIframeAPIReady() {
                         break;
                     }
                 }
-                if (correctOptionIndex === -1 || correctOptionIndex >= options.length) { // Ensure correct option is selected and within bounds of provided options
+                if (correctOptionIndex === -1 || correctOptionIndex >= options.length) { 
                     displayMessage("Please select a correct answer from the provided options.", false);
                     return;
                 }
@@ -2651,20 +2505,19 @@ function onYouTubeIframeAPIReady() {
                     currentSlide.slideMedia.videoQuestions = [];
                 }
 
-                if (editIndex === -1) { // New question
+                if (editIndex === -1) { 
                     currentSlide.slideMedia.videoQuestions.push(questionData);
-                } else { // Editing existing question
+                } else { 
                     currentSlide.slideMedia.videoQuestions[editIndex] = questionData;
                 }
                 
-                // Sort questions by timestamp
                 currentSlide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp);
 
-                console.log("videoQuestions array after save:", currentSlide.slideMedia.videoQuestions); // Added console.log
+                console.log("videoQuestions array after save:", currentSlide.slideMedia.videoQuestions); 
 
                 displayMessage("Question saved!", true);
                 if (questionModalEl) questionModalEl.style.display = 'none';
-                renderVideoQuestionsList(); // Re-render the list after saving
+                renderVideoQuestionsList(); 
             });
         }
 
@@ -2673,6 +2526,45 @@ function onYouTubeIframeAPIReady() {
                 if (questionModalEl) questionModalEl.style.display = 'none';
             });
         }
+
+        // --- Timestamp Overlay Modal Button Listeners ---
+        if (manageTimestampOverlaysButtonEl) { // manageTimestampOverlaysButtonEl from setupDOMReferences
+            if (!manageTimestampOverlaysButtonEl.hasAttribute('listener-attached')) {
+                manageTimestampOverlaysButtonEl.addEventListener('click', () => {
+                    // Use togglePopover to handle the timestampOverlayModal display
+                    // This ensures it's treated like other popovers for hiding logic if needed,
+                    // though its primary close is its own button.
+                    togglePopover('timestampOverlayModal', manageTimestampOverlaysButtonEl);
+                });
+                manageTimestampOverlaysButtonEl.setAttribute('listener-attached', 'true');
+                console.log("Listener attached for manageTimestampOverlaysButtonEl.");
+            }
+        } else {
+            console.warn("manageTimestampOverlaysButtonEl not found for attaching listener.");
+        }
+
+        if (addTimestampOverlayButtonEl) { // addTimestampOverlayButtonEl from setupDOMReferences
+             if (!addTimestampOverlayButtonEl.hasAttribute('listener-attached')) { 
+                addTimestampOverlayButtonEl.addEventListener('click', handleAddTimestampOverlay);
+                addTimestampOverlayButtonEl.setAttribute('listener-attached', 'true');
+                console.log("Listener attached for addTimestampOverlayButtonEl.");
+            }
+        } else {
+            console.warn("addTimestampOverlayButtonEl not found for attaching listener.");
+        }
+        
+        // The close button for timestampOverlayModal already has an inline onclick in AdminView.html
+        // If you prefer to manage it here:
+        // if (closeTimestampOverlayModalBtnEl && !closeTimestampOverlayModalBtnEl.hasAttribute('listener-attached')) {
+        //    closeTimestampOverlayModalBtnEl.onclick = null; // Remove inline listener if any
+        //    closeTimestampOverlayModalBtnEl.addEventListener('click', () => {
+        //        if (timestampOverlayModalEl) timestampOverlayModalEl.style.display = 'none';
+        //        if (adminApp.state.activePopoverId === 'timestampOverlayModal') {
+        //            adminApp.state.activePopoverId = null; // Clear active state
+        //        }
+        //    });
+        //    closeTimestampOverlayModalBtnEl.setAttribute('listener-attached', 'true');
+        // }
     };
 
     function updateVideoToolsVisibility(show) {
@@ -2681,17 +2573,15 @@ function onYouTubeIframeAPIReady() {
         } else {
             console.warn("updateVideoToolsVisibility: videoTimelineControlsEl not found.");
         }
-        if (videoQuestionsListContainerEl) { // Also control the questions list visibility
+        if (videoQuestionsListContainerEl) { 
             videoQuestionsListContainerEl.style.display = show ? 'block' : 'none';
         } else {
             console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
         }
-        if (videoQuestionsListContainerEl) { // Also control the questions list visibility
-            videoQuestionsListContainerEl.style.display = show ? 'block' : 'none';
-        } else {
-            console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
+         // Show/hide the "Manage Timestamp Overlays" button along with other video tools
+        if (manageTimestampOverlaysButtonEl) {
+            manageTimestampOverlaysButtonEl.style.display = show ? 'inline-block' : 'none';
         }
-        // The addQuestionBtnEl is inside videoTimelineControlsEl, so it's shown/hidden with its parent.
     }
 
     function renderVideoQuestionsList() {
@@ -2699,7 +2589,7 @@ function onYouTubeIframeAPIReady() {
             console.warn("renderVideoQuestionsList: videoQuestionsListEl not found.");
             return;
         }
-        videoQuestionsListEl.innerHTML = ''; // Clear existing items
+        videoQuestionsListEl.innerHTML = ''; 
 
         const currentSlide = getCurrentSlide();
         if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube' || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
@@ -2712,24 +2602,24 @@ function onYouTubeIframeAPIReady() {
 
         const questions = currentSlide.slideMedia.videoQuestions;
 
-        console.log("Rendering questions list:", questions); // Added console.log
+        console.log("Rendering questions list:", questions); 
 
         questions.forEach((question, index) => {
             const li = document.createElement('li');
             li.style.marginBottom = "8px";
             li.style.padding = "5px";
-            li.style.border = "1px solid #eee"; // Light border for each item
+            li.style.border = "1px solid #eee"; 
             li.style.borderRadius = "3px";
-            li.style.display = "flex"; // Use flexbox for alignment
-            li.style.justifyContent = "space-between"; // Space out text and buttons
-            li.style.alignItems = "center"; // Align items vertically
+            li.style.display = "flex"; 
+            li.style.justifyContent = "space-between"; 
+            li.style.alignItems = "center"; 
 
             const questionTextSpan = document.createElement('span'); 
             questionTextSpan.textContent = `[${formatTime(question.timestamp)}] ${question.questionText.substring(0, 40)}${question.questionText.length > 40 ? '...' : ''}`;
-            questionTextSpan.style.flexGrow = "1"; // Allow text to take available space
+            questionTextSpan.style.flexGrow = "1"; 
             
             const actionsDiv = document.createElement('div');
-            actionsDiv.style.whiteSpace = "nowrap"; // Prevent buttons from wrapping
+            actionsDiv.style.whiteSpace = "nowrap"; 
 
             const editBtn = document.createElement('button');
             editBtn.textContent = 'Edit';
@@ -2738,7 +2628,7 @@ function onYouTubeIframeAPIReady() {
             editBtn.style.fontSize = '0.8em';
             editBtn.className = 'edit-button'; 
             editBtn.onclick = function() {
-                console.log("Editing question index:", index, questions[index]); // Added console.log
+                console.log("Editing question index:", index, questions[index]); 
 
                 if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
                     adminApp.state.adminYouTubePlayer.pauseVideo();
@@ -2751,7 +2641,6 @@ function onYouTubeIframeAPIReady() {
                 optionInputsEl.forEach((input, i) => {
                     if(input) input.value = question.options[i] || '';
                 });
-                // Ensure correct number of radio buttons are checked based on available options for the question
                 correctAnswerRadiosEl.forEach((radio, i) => {
                     if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length);
                 });
@@ -2768,7 +2657,7 @@ function onYouTubeIframeAPIReady() {
             deleteBtn.style.fontSize = '0.8em';
             deleteBtn.onclick = function() {
                 if (confirm(`Are you sure you want to delete the question: "${question.questionText.substring(0,30)}..."?`)) {
-                    console.log("Deleting question index:", index); // Added console.log
+                    console.log("Deleting question index:", index); 
 
                     currentSlide.slideMedia.videoQuestions.splice(index, 1);
                     renderVideoQuestionsList(); 
@@ -2792,10 +2681,7 @@ function onYouTubeIframeAPIReady() {
         const seconds = totalSeconds % 60;
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
-        /**
-     * Handles adding a new timestamp overlay based on the currently selected
-     * Fabric object and the current YouTube video time.
-     */
+       
     function handleAddTimestampOverlay() {
         const currentSlide = getCurrentSlide();
         if (!currentSlide || !adminApp.state.fabricCanvasInstance ) {
@@ -2815,25 +2701,24 @@ function onYouTubeIframeAPIReady() {
 
         const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
         const isInteractive = makeOverlayInteractiveCheckboxEl ? makeOverlayInteractiveCheckboxEl.checked : false;
-        // Default hide time can be set, e.g., current time + 5 seconds, or let user edit. For now, null.
-        const defaultHideTimeOffset = 5; // Show for 5 seconds by default, can be null
-        const timestampHide = (currentOverlayTimestampInputEl && currentOverlayTimestampInputEl.value !== '') 
-                              ? parseFloat(currentOverlayTimestampInputEl.value) // Placeholder for a dedicated hide time input
+        const defaultHideTimeOffset = 5; 
+        
+        // Use currentOverlayTimestampInputEl.value if you implement an input field for hide time
+        // For now, it uses the default offset.
+        const hideTimeInputVal = currentOverlayTimestampInputEl ? currentOverlayTimestampInputEl.value : '';
+        const timestampHide = (hideTimeInputVal !== '' && !isNaN(parseFloat(hideTimeInputVal)))
+                              ? parseFloat(hideTimeInputVal)
                               : currentTime + defaultHideTimeOffset;
 
 
         const overlayId = 'ts_overlay_' + Utilities.getUuid();
-        // Define a comprehensive list of properties to include in the JSON.
-        // This ensures that all necessary visual and behavioral aspects of the object are saved.
         const propsToInclude = [
             'type', 'originX', 'originY', 'left', 'top', 'width', 'height', 'scaleX', 'scaleY', 'flipX', 'flipY', 
             'opacity', 'angle', 'fill', 'stroke', 'strokeWidth', 'strokeDashArray', 'strokeLineCap', 'strokeLineJoin', 
             'strokeMiterLimit', 'shadow', 'visible', 'backgroundColor', 'clipPath', 'skewX', 'skewY',
-            // Text-specific properties
             'text', 'fontSize', 'fontWeight', 'fontFamily', 'fontStyle', 'lineHeight', 'underline', 'overline', 
             'linethrough', 'textAlign', 'textBackgroundColor', 'charSpacing', 'path', 'direction',
-            // Custom properties that might have been added via the toolbar
-            'customInteraction', 'customAnimation', 'sequenceOrder', 'slideId' // slideId might be useful for context, though not strictly for rendering the object itself
+            'customInteraction', 'customAnimation', 'sequenceOrder', 'slideId' 
         ];
         
         const fabricObjectJSON = selectedObject.toJSON(propsToInclude);
@@ -2841,7 +2726,7 @@ function onYouTubeIframeAPIReady() {
         const newTimestampOverlay = {
             overlayId: overlayId,
             timestampShow: currentTime,
-            timestampHide: timestampHide, // Using calculated or default hide time
+            timestampHide: timestampHide, 
             fabricObjectJSON: fabricObjectJSON,
             isInteractive: isInteractive 
         };
@@ -2854,13 +2739,10 @@ function onYouTubeIframeAPIReady() {
 
         displayMessage(`Overlay added from ${formatTime(currentTime)} to ${formatTime(timestampHide)}. Save project to persist.`, true);
         populateTimestampOverlayList(); 
-        // Optionally, reset the "Make Interactive" checkbox after adding
         if (makeOverlayInteractiveCheckboxEl) makeOverlayInteractiveCheckboxEl.checked = false;
+        if (currentOverlayTimestampInputEl) currentOverlayTimestampInputEl.value = ''; // Reset if used
     }
 
-    /**
-     * Populates the list of timestamp overlays in the admin management modal.
-     */
     function populateTimestampOverlayList() {
         if (!timestampOverlayListEl) {
             console.warn("populateTimestampOverlayList: timestampOverlayListEl not found.");
@@ -2885,7 +2767,6 @@ function onYouTubeIframeAPIReady() {
             li.style.padding = '5px 0';
             li.style.borderBottom = '1px solid #eee';
 
-
             const infoSpan = document.createElement('span');
             const overlayType = overlay.fabricObjectJSON.type || 'Object';
             const shortText = overlay.fabricObjectJSON.text ? `"${overlay.fabricObjectJSON.text.substring(0,15)}..."` : '';
@@ -2896,15 +2777,14 @@ function onYouTubeIframeAPIReady() {
             
             const controlsDiv = document.createElement('div');
 
-            // Basic Edit Button (placeholder for more complex functionality)
             const editBtn = document.createElement('button');
-            editBtn.textContent = 'Edit Time'; // Simple edit for now
-            editBtn.className = 'edit-button'; // Re-use existing styles
+            editBtn.textContent = 'Edit Time'; 
+            editBtn.className = 'edit-button'; 
             editBtn.style.marginLeft = '10px';
             editBtn.style.padding = '2px 5px';
             editBtn.style.fontSize = '0.8em';
             editBtn.onclick = function() {
-                editTimestampOverlayTimes(index); // New function for simple time editing
+                editTimestampOverlayTimes(index); 
             };
             controlsDiv.appendChild(editBtn);
 
@@ -2927,10 +2807,6 @@ function onYouTubeIframeAPIReady() {
         });
     }
 
-    /**
-     * Simple edit for show/hide times of an existing timestamp overlay.
-     * @param {number} index The index of the overlay in currentSlide.timestampOverlays array.
-     */
     function editTimestampOverlayTimes(index) {
         const currentSlide = getCurrentSlide();
         if (!currentSlide || !currentSlide.timestampOverlays || !currentSlide.timestampOverlays[index]) {
@@ -2940,7 +2816,7 @@ function onYouTubeIframeAPIReady() {
         const overlay = currentSlide.timestampOverlays[index];
 
         const newShowTimeStr = prompt(`Edit Show Time for overlay (currently ${formatTime(overlay.timestampShow)}):`, overlay.timestampShow.toFixed(1));
-        if (newShowTimeStr === null) return; // User cancelled
+        if (newShowTimeStr === null) return; 
 
         const newShowTime = parseFloat(newShowTimeStr);
         if (isNaN(newShowTime) || newShowTime < 0) {
@@ -2949,7 +2825,7 @@ function onYouTubeIframeAPIReady() {
         }
 
         const newHideTimeStr = prompt(`Edit Hide Time for overlay (currently ${overlay.timestampHide !== null ? formatTime(overlay.timestampHide) : 'Persists'}). Enter new time or leave blank to persist:`, overlay.timestampHide !== null ? overlay.timestampHide.toFixed(1) : "");
-        if (newHideTimeStr === null) return; // User cancelled
+        if (newHideTimeStr === null) return; 
 
         let newHideTime = null;
         if (newHideTimeStr.trim() !== "") {
@@ -2963,14 +2839,12 @@ function onYouTubeIframeAPIReady() {
         overlay.timestampShow = newShowTime;
         overlay.timestampHide = newHideTime;
 
-        currentSlide.timestampOverlays.sort((a, b) => a.timestampShow - b.timestampShow); // Re-sort
-        populateTimestampOverlayList(); // Refresh list
+        currentSlide.timestampOverlays.sort((a, b) => a.timestampShow - b.timestampShow); 
+        populateTimestampOverlayList(); 
         displayMessage("Overlay times updated. Save project to persist changes.", true);
     }
 
-
-    // Placeholder for more comprehensive editing (e.g., changing the Fabric object itself)
-    function editTimestampOverlay(index) {
+    function editTimestampOverlay(index) { // Placeholder for more advanced editing
         console.log("Comprehensive edit functionality for timestamp overlay at index", index, "is a TODO.");
         displayMessage("Advanced editing for overlay content is not yet implemented. Use Delete and Add New.", "info");
     }

@@ -3,7 +3,7 @@
     window.viewerApp = {};
 
     // --- Global Variables ---
-    let ytPlayer; // Global variable to hold the YouTube player instance
+    // let ytPlayer; // Global variable to hold the YouTube player instance - MOVED to viewerApp.state.ytPlayer
     let isYouTubeApiReady = false; // Flag to track API readiness
     const CLICK_AND_HOLD_DURATION = 750; // Milliseconds for click and hold
     // Animation speed presets - duration for a complete animation cycle
@@ -40,13 +40,20 @@
       askedQuestionIndices: [], // Indices of questions already asked for the current slide view
       currentTimestampOverlays: [], // Stores full overlay definitions for the current slide
       activeTimestampOverlayIds: new Set(), // Stores IDs of currently displayed timestamp overlays
-      currentVideoDuration: 0 // Phase 1: Store current video duration for timeline
+      currentVideoDuration: 0, // Phase 1: Store current video duration for timeline
+      ytPlayer: null, // Holds the YouTube player instance
+      deferredYouTubeVideoId: null // Stores videoId if player setup is deferred
     };
 
     // Add callback for when YouTube API is ready
     viewerApp.onYouTubeApiReady = function() {
       isYouTubeApiReady = true;
       console.log("YouTube API is now ready for use");
+      if (viewerApp.state.deferredYouTubeVideoId) {
+          console.log("Deferred YouTube video found, setting up player for:", viewerApp.state.deferredYouTubeVideoId);
+          setupYouTubePlayer(viewerApp.state.deferredYouTubeVideoId);
+          viewerApp.state.deferredYouTubeVideoId = null; // Clear after setup
+      }
     };
 
     // --- DOM Element References ---
@@ -154,12 +161,12 @@
         // Phase 1: Timeline track click listener for seeking
         if (viewerTimelineTrackEl) {
             viewerTimelineTrackEl.addEventListener('click', function(e) {
-                if (ytPlayer && typeof ytPlayer.seekTo === 'function' && viewerApp.state.currentVideoDuration > 0) {
+                if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.seekTo === 'function' && viewerApp.state.currentVideoDuration > 0) {
                     const rect = viewerTimelineTrackEl.getBoundingClientRect();
                     const clickX = e.clientX - rect.left; // Click position relative to the track
                     const percentage = clickX / rect.width;
                     const seekTime = percentage * viewerApp.state.currentVideoDuration;
-                    ytPlayer.seekTo(seekTime, true); // true allows seek ahead
+                    viewerApp.state.ytPlayer.seekTo(seekTime, true); // true allows seek ahead
                     console.log(`Timeline clicked: Seek to ${seekTime.toFixed(2)}s`);
                 }
             });
@@ -426,14 +433,23 @@
         hideSpotlightSVG(); 
         if(viewerApp.state.isCanvasPannedOrZoomed) resetPanZoomWithAnimation(true); // Reset immediately if panned/zoomed
 
+        const slideData = slides[slideIndex]; // Moved up to access slideData earlier
 
         viewerApp.state.currentSlideIndex = slideIndex; 
         
         // Initialize timestamp overlay states for the new slide
+        // Clear any existing timestamp overlays from canvas (part of stopAndDestroyYouTubePlayer now, but good to be sure)
+        if (viewerApp.state.viewerFabricCanvas) {
+            viewerApp.state.viewerFabricCanvas.getObjects().forEach(obj => {
+                if (obj.isTimestampOverlay) { // Assuming we add this flag when creating them
+                    viewerApp.state.viewerFabricCanvas.remove(obj);
+                }
+            });
+        }
         viewerApp.state.currentTimestampOverlays = (slideData && slideData.timestampOverlays && Array.isArray(slideData.timestampOverlays)) ? [...slideData.timestampOverlays] : [];
         viewerApp.state.activeTimestampOverlayIds = new Set(); // Initialize as a new Set
 
-        const slideData = slides[slideIndex];
+        // const slideData = slides[slideIndex]; // Original position
         const canvas = viewerApp.state.viewerFabricCanvas;
 
          if (!slideData.slideMedia) {
@@ -565,10 +581,10 @@
                                  });
 
                                  beginButtonText.on('mousedown', function() {
-                                     if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
-                                         ytPlayer.playVideo();
+                                     if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.playVideo === 'function') {
+                                         viewerApp.state.ytPlayer.playVideo();
                                      } else {
-                                         console.warn("ClickToBegin: ytPlayer not ready or playVideo not available.");
+                                         console.warn("ClickToBegin: viewerApp.state.ytPlayer not ready or playVideo not available.");
                                      }
                                      canvas.remove(this); 
                                      updateViewerCanvasInteractivity(); 
@@ -584,7 +600,8 @@
                              }
                              // Timeline and question marker setup will happen in onPlayerReady
                         } else {
-                             console.warn("YouTube API not ready yet. Player setup deferred.");
+                             console.warn("YouTube API not ready yet. Player setup deferred for videoId:", videoId);
+                             viewerApp.state.deferredYouTubeVideoId = videoId; // Store video ID for deferred setup
                              if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                              if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
                              displayMessageViewer("YouTube player is loading...", true);
@@ -1156,12 +1173,31 @@
             displayMessageViewer("YouTube Player API not available. Please check your internet connection and refresh.", false); return;
         }
         try {
-             if(ytPlayer && typeof ytPlayer.destroy === 'function') { console.log("Destroying previous YT player instance."); ytPlayer.destroy(); ytPlayer = null; }
+             if(viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.destroy === 'function') {
+                 console.log("Destroying previous YT player instance.");
+                 viewerApp.state.ytPlayer.destroy();
+                 viewerApp.state.ytPlayer = null;
+             }
              console.log("Creating new YT.Player instance.");
-             ytPlayer = new YT.Player('youtube-player-div', {
+             viewerApp.state.ytPlayer = new YT.Player('youtube-player-div', {
                 height: '100%', width: '100%', videoId: videoId,
-                playerVars: { 'autoplay': 0, 'controls': 0, 'rel': 0, 'showinfo': 0, 'modestbranding': 1, 'iv_load_policy': 3, 'fs': 0, 'disablekb': 1, 'playsinline': 1 },
-                events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange, 'onError': onPlayerError }
+                // Ensure all required playerVars are present, especially disablekb: 1
+                playerVars: {
+                    'autoplay': 0,
+                    'controls': 0,
+                    'rel': 0,
+                    'showinfo': 0,
+                    'modestbranding': 1,
+                    'iv_load_policy': 3,
+                    'fs': 0,
+                    'disablekb': 1, // Ensures keyboard controls are disabled
+                    'playsinline': 1
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
             });
              console.log("YT.Player instance created successfully.");
         } catch (e) {
@@ -1180,43 +1216,80 @@
         if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%'; // Reset progress bar
         if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'block'; // Show timeline
 
-        renderQuestionMarkers(); // Call this after duration is known
+        // renderQuestionMarkers(); // Call this after duration is known - REPLACED by renderTimelineMarkers
+        renderTimelineMarkers(); // New function to render all timeline markers
 
          if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
              console.log("Adding click-to-play listener to YT player container.");
              youtubePlayerContainerEl.addEventListener('click', function() {
                  console.log("Player container clicked.");
-                 if (ytPlayer && typeof ytPlayer.playVideo === 'function' && typeof ytPlayer.pauseVideo === 'function' && typeof ytPlayer.getPlayerState === 'function') {
-                     const state = ytPlayer.getPlayerState();
-                     if (state !== YT.PlayerState.PLAYING) { console.log("Calling playVideo()."); ytPlayer.playVideo(); } 
-                     else { console.log("Calling pauseVideo()."); ytPlayer.pauseVideo(); }
+                 if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.playVideo === 'function' && typeof viewerApp.state.ytPlayer.pauseVideo === 'function' && typeof viewerApp.state.ytPlayer.getPlayerState === 'function') {
+                     const state = viewerApp.state.ytPlayer.getPlayerState();
+                     if (state !== YT.PlayerState.PLAYING) { console.log("Calling playVideo()."); viewerApp.state.ytPlayer.playVideo(); } 
+                     else { console.log("Calling pauseVideo()."); viewerApp.state.ytPlayer.pauseVideo(); }
                  } else { console.warn("Cannot play/pause: Player or methods not available."); }
              });
              youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
          }
     }
 
-    // New function for Phase 1 to render question markers on the timeline
-    function renderQuestionMarkers() {
-        if (!viewerTimelineTrackEl || viewerApp.state.currentVideoDuration <= 0) return;
-        
-        // Clear existing markers
-        const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.question-marker');
+    // New function for Phase 1 to render question markers on the timeline - REPLACED by renderTimelineMarkers
+    // function renderQuestionMarkers() { ... } // Removed
+
+    function renderTimelineMarkers() {
+        if (!viewerTimelineTrackEl || !viewerApp.state.currentVideoDuration || viewerApp.state.currentVideoDuration <= 0) {
+            console.warn("renderTimelineMarkers: Timeline track or video duration not available.");
+            return;
+        }
+
+        // Clear any existing markers
+        const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.timeline-marker');
         existingMarkers.forEach(marker => marker.remove());
 
+        // Render Question Markers
         if (viewerApp.state.currentVideoQuestions && viewerApp.state.currentVideoQuestions.length > 0) {
             viewerApp.state.currentVideoQuestions.forEach(question => {
                 const marker = document.createElement('div');
-                marker.className = 'question-marker';
+                marker.className = 'timeline-marker question-marker'; // Generic and specific class
                 marker.style.position = 'absolute';
-                marker.style.width = '3px'; // Thinner line
-                marker.style.height = '100%'; // Full height of track
-                marker.style.backgroundColor = 'orange'; // Bright color for visibility
-                marker.style.left = (question.timestamp / viewerApp.state.currentVideoDuration) * 100 + '%';
+                marker.style.width = '3px';
+                marker.style.height = '100%';
+                marker.style.backgroundColor = 'orange'; // Question color
                 marker.style.top = '0px';
-                marker.title = `Question at ${formatTime(question.timestamp)}: ${question.questionText.substring(0, 50)}...`;
-                marker.style.zIndex = '2'; // Above progress bar
+                marker.style.zIndex = '2'; // Ensure visible above progress bar
+
+                const percentagePosition = (question.timestamp / viewerApp.state.currentVideoDuration) * 100;
+                marker.style.left = percentagePosition + '%';
+                marker.title = `Question at ${formatTime(question.timestamp)}: ${question.questionText.substring(0, 30)}...`;
                 viewerTimelineTrackEl.appendChild(marker);
+            });
+        }
+
+        // Render Timestamp Overlay Markers
+        if (viewerApp.state.currentTimestampOverlays && viewerApp.state.currentTimestampOverlays.length > 0) {
+            viewerApp.state.currentTimestampOverlays.forEach(overlayDef => {
+                if (overlayDef && typeof overlayDef.timestampShow !== 'undefined' && overlayDef.fabricObjectJSON) {
+                    const marker = document.createElement('div');
+                    marker.className = 'timeline-marker overlay-marker'; // Generic and specific class
+                    marker.style.position = 'absolute';
+                    marker.style.width = '3px'; 
+                    marker.style.height = '100%';
+                    marker.style.backgroundColor = '#4CAF50'; // Green for overlays
+                    marker.style.top = '0px';
+                    marker.style.zIndex = '2';
+
+                    const percentagePosition = (overlayDef.timestampShow / viewerApp.state.currentVideoDuration) * 100;
+                    marker.style.left = percentagePosition + '%';
+                    // Attempt to get a meaningful name for the overlay from its JSON
+                    let overlayName = 'Overlay';
+                    if (overlayDef.fabricObjectJSON.type) {
+                        overlayName = overlayDef.fabricObjectJSON.type.charAt(0).toUpperCase() + overlayDef.fabricObjectJSON.type.slice(1);
+                    } else if (overlayDef.fabricObjectJSON.text) {
+                         overlayName = `Text: "${overlayDef.fabricObjectJSON.text.substring(0,15)}..."`;
+                    }
+                    marker.title = `${overlayName} at ${formatTime(overlayDef.timestampShow)}`;
+                    viewerTimelineTrackEl.appendChild(marker);
+                }
             });
         }
     }
@@ -1231,14 +1304,14 @@
 
         if (event.data === YT.PlayerState.PLAYING) {
             viewerApp.state.playerQuestionCheckInterval = setInterval(function() {
-                if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') { // Ensure player exists
-                    const currentTime = ytPlayer.getCurrentTime();
+                if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getCurrentTime === 'function') { // Ensure player exists
+                    const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
                     if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(currentTime);
                     if (viewerTimelineProgressEl && viewerApp.state.currentVideoDuration > 0) {
                         viewerTimelineProgressEl.style.width = (currentTime / viewerApp.state.currentVideoDuration) * 100 + '%';
                     }
                     checkVideoTimeForQuestions();
-                    // Phase 2: checkVideoTimeForTimestampOverlays(); 
+                    checkVideoTimeForTimestampOverlays(); 
                 } else { // Player was destroyed or became unavailable
                     if (viewerApp.state.playerQuestionCheckInterval) {
                         clearInterval(viewerApp.state.playerQuestionCheckInterval);
@@ -1260,41 +1333,46 @@
             }, 250);
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
             // Interval is cleared above, so no need to clear again here.
-            // Phase 2: checkVideoTimeForTimestampOverlays(); // Call once on pause/end for overlays
+            checkVideoTimeForTimestampOverlays(); // Call once on pause/end for overlays
         }
     }
 
     // Ensure updateViewerCanvasInteractivity is a global helper function
     function updateViewerCanvasInteractivity() {
-        console.log("Placeholder: updateViewerCanvasInteractivity() called.");
         const canvas = viewerApp.state.viewerFabricCanvas;
-        // Basic check: if no interactive elements (like questions, or an active clickToBegin button itself if it were evented differently)
-        // are present, assume canvas should be non-interactive.
-        // This will be expanded for timestamp overlays.
-        let hasInteractiveElements = false;
-        if (canvas) {
-            hasInteractiveElements = canvas.getObjects().some(obj => 
-                obj.evented && 
-                (obj.customType === 'videoQuestionOverlay' || obj.customType === 'clickToBeginButton') // Add other customTypes if they are interactive
-            );
-        }
+        if (!canvas || !viewerCanvasContainerEl || !viewerFabricCanvasEl) return;
 
-        if (hasInteractiveElements) {
-            if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
-            if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
-        } else {
-            // Default for YouTube: if no specific interactive elements, make canvas click-through for the player
-            if (viewerApp.state.currentMediaType === 'youtube') {
-                if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-            } else {
-                // For other media types like images/audio, canvas might be intrinsically interactive
-                // This part might need refinement based on overall interaction model for non-video slides
-                if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1'; // Default to visible if not YouTube and no specific rules
-                if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
+        const isQuestionActive = canvas.getObjects().some(obj => obj.customType === 'videoQuestionOverlay');
+        const isClickToBeginActive = canvas.getObjects().some(obj => obj.customType === 'clickToBeginButton');
+
+        let isInteractiveTSOverlayVisible = false;
+        let isAnyTSOverlayVisible = viewerApp.state.activeTimestampOverlayIds.size > 0;
+
+        if (isAnyTSOverlayVisible) {
+            for (const overlayDef of viewerApp.state.currentTimestampOverlays) {
+                if (viewerApp.state.activeTimestampOverlayIds.has(overlayDef.overlayId) && overlayDef.isInteractive) {
+                    isInteractiveTSOverlayVisible = true;
+                    break;
+                }
             }
         }
-        if(canvas) canvas.requestRenderAll(); // Render if changes might have occurred
+
+        if (isQuestionActive || isClickToBeginActive || isInteractiveTSOverlayVisible) {
+            viewerCanvasContainerEl.style.pointerEvents = 'auto';
+            viewerFabricCanvasEl.style.opacity = '1';
+        } else if (isAnyTSOverlayVisible) { // Non-interactive overlay(s) are visible
+            viewerCanvasContainerEl.style.pointerEvents = 'none'; // Pass clicks to player
+            viewerFabricCanvasEl.style.opacity = '1'; // But canvas is visible
+        } else { // No questions, no click-to-begin, no timestamp overlays active
+            if (viewerApp.state.currentMediaType === 'youtube') {
+                viewerCanvasContainerEl.style.pointerEvents = 'none';
+                viewerFabricCanvasEl.style.opacity = '0';
+            } else { // For non-YouTube media, default to interactive canvas
+                viewerCanvasContainerEl.style.pointerEvents = 'auto';
+                viewerFabricCanvasEl.style.opacity = '1';
+            }
+        }
+        // canvas.requestRenderAll(); // Not strictly needed here as callers should render
     }
 
     function onPlayerError(event) {
@@ -1310,20 +1388,43 @@
 
     function stopAndDestroyYouTubePlayer() {
         try {
-            if (ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
-            if (ytPlayer && typeof ytPlayer.destroy === 'function') ytPlayer.destroy();
-            ytPlayer = null;
-        } catch (e) { console.error("Error stopping/destroying YouTube player:", e); }
-        finally {
-             if (youtubePlayerContainerEl) {
+            if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.stopVideo === 'function') {
+                viewerApp.state.ytPlayer.stopVideo();
+            }
+            if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.destroy === 'function') {
+                viewerApp.state.ytPlayer.destroy();
+            }
+        } catch (e) {
+            console.error("Error stopping/destroying YouTube player:", e);
+        } finally {
+            viewerApp.state.ytPlayer = null; // Ensure it's nulled out
+            if (youtubePlayerContainerEl) {
                  youtubePlayerContainerEl.removeAttribute('click-listener-added');
                  youtubePlayerContainerEl.innerHTML = ''; youtubePlayerContainerEl.style.display = 'none';
              }
             if (viewerApp.state.playerQuestionCheckInterval) { clearInterval(viewerApp.state.playerQuestionCheckInterval); viewerApp.state.playerQuestionCheckInterval = null;}
             viewerApp.state.currentVideoQuestions = []; viewerApp.state.askedQuestionIndices = [];
             
-            // Ensure timestamp overlays are cleared
-            viewerApp.state.currentTimestampOverlays = []; 
+            // Cleanup Fabric objects: Timestamp overlays and ClickToBeginButton
+            if (viewerApp.state.viewerFabricCanvas) {
+                const canvas = viewerApp.state.viewerFabricCanvas;
+                const objectsToRemove = [];
+                canvas.getObjects().forEach(obj => {
+                    // Check for timestamp overlays by overlayId
+                    if (obj.overlayId && viewerApp.state.activeTimestampOverlayIds.has(obj.overlayId)) {
+                        objectsToRemove.push(obj);
+                    }
+                    // Check for ClickToBeginButton by customType
+                    if (obj.customType === 'clickToBeginButton') {
+                        objectsToRemove.push(obj);
+                    }
+                });
+                objectsToRemove.forEach(obj => canvas.remove(obj));
+                if (objectsToRemove.length > 0) {
+                    canvas.requestRenderAll(); // Render after removing objects
+                }
+            }
+            viewerApp.state.currentTimestampOverlays = []; // Clear state for timestamp overlays
             viewerApp.state.activeTimestampOverlayIds.clear();
             
             // Phase 1: Timeline cleanup
@@ -1332,8 +1433,8 @@
             if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%';
             if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0);
             if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(0);
-            if (viewerTimelineTrackEl) { // Clear markers
-                const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.question-marker');
+            if (viewerTimelineTrackEl) { // Clear all timeline markers
+                const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.timeline-marker');
                 existingMarkers.forEach(marker => marker.remove());
             }
 
@@ -1368,12 +1469,12 @@
     function removeSpotlightEffect() { /* SVG version preferred, this might be removed */ }
 
     function checkVideoTimeForQuestions() {
-        if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.currentVideoQuestions) return;
-        const currentTime = ytPlayer.getCurrentTime();
+        if (!viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.currentVideoQuestions) return;
+        const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
         for (let i = 0; i < viewerApp.state.currentVideoQuestions.length; i++) {
             const question = viewerApp.state.currentVideoQuestions[i];
             if (currentTime >= question.timestamp && !viewerApp.state.askedQuestionIndices.includes(i)) {
-                if(ytPlayer && typeof ytPlayer.pauseVideo === 'function') ytPlayer.pauseVideo();
+                if(viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.pauseVideo === 'function') viewerApp.state.ytPlayer.pauseVideo();
                 viewerApp.state.askedQuestionIndices.push(i);
                 // Interval is cleared in onPlayerStateChange when paused/ended. No need to clear here
                 // if the pause for the question itself triggers the state change that clears it.
@@ -1487,7 +1588,7 @@
                          if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
                     }
                     canvas.renderAll();
-                    if(ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
+                    if(viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.playVideo === 'function') viewerApp.state.ytPlayer.playVideo();
                 }, 1500); 
             });
         });
@@ -1495,48 +1596,102 @@
     }
 
     function checkVideoTimeForTimestampOverlays() {
-        // To be implemented in Phase 2
-        // This will also call updateCanvasInteractivity()
-    }
-
-    // New function to centralize canvas opacity/pointer events (will be used more in Phase 2)
-    // For Phase 1, it's mainly called after questions or "Click to Begin" changes state.
-    function updateCanvasInteractivity() {
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas || !viewerCanvasContainerEl || !viewerFabricCanvasEl) return;
-
-        const isQuestionActive = canvas.getObjects().some(obj => obj.customType === 'videoQuestionOverlay');
-        const isClickToBeginActive = canvas.getObjects().some(obj => obj.customType === 'clickToBeginButton');
-        
-        // Placeholder for Phase 2: Check for interactive timestamp overlays
-        let isInteractiveTimestampOverlayActive = false; 
-        // viewerApp.state.currentTimestampOverlays.forEach(overlay => {
-        //     if (viewerApp.state.activeTimestampOverlayIds.has(overlay.overlayId) && overlay.isInteractive) {
-        //         isInteractiveTimestampOverlayActive = true;
-        //     }
-        // });
-
-        if (isQuestionActive || isClickToBeginActive || isInteractiveTimestampOverlayActive) {
-            viewerCanvasContainerEl.style.pointerEvents = 'auto';
-            viewerFabricCanvasEl.style.opacity = '1';
-        } else {
-            // If only non-interactive timestamp overlays are visible (Phase 2 logic)
-            // let isNonInteractiveOverlayVisible = false; 
-            // viewerApp.state.currentTimestampOverlays.forEach(overlay => {
-            //     if (viewerApp.state.activeTimestampOverlayIds.has(overlay.overlayId) && !overlay.isInteractive) {
-            //         isNonInteractiveOverlayVisible = true;
-            //     }
-            // });
-
-            // if (isNonInteractiveOverlayVisible) {
-            //    viewerCanvasContainerEl.style.pointerEvents = 'none';
-            //    viewerFabricCanvasEl.style.opacity = '1';
-            //} else { // No overlays, or player should be primary interaction
-                viewerCanvasContainerEl.style.pointerEvents = 'none';
-                viewerFabricCanvasEl.style.opacity = '0';
-            //}
+        if (!viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || 
+            !viewerApp.state.viewerFabricCanvas || !viewerApp.state.currentTimestampOverlays) {
+            return;
         }
-        canvas.requestRenderAll();
+
+        const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
+        const canvas = viewerApp.state.viewerFabricCanvas;
+
+        viewerApp.state.currentTimestampOverlays.forEach(overlayDef => {
+            if (!overlayDef || typeof overlayDef.timestampShow === 'undefined' || !overlayDef.overlayId || !overlayDef.fabricObjectJSON) {
+                // console.warn("Skipping invalid overlay definition:", overlayDef);
+                return; 
+            }
+
+            const shouldBeVisible = (currentTime >= overlayDef.timestampShow) && 
+                                  (overlayDef.timestampHide === null || currentTime < overlayDef.timestampHide);
+            const isActive = viewerApp.state.activeTimestampOverlayIds.has(overlayDef.overlayId);
+
+            if (shouldBeVisible && !isActive) {
+                fabric.util.enlivenObjects([overlayDef.fabricObjectJSON], function(enlivenedObjects) {
+                    if (enlivenedObjects && enlivenedObjects.length > 0) {
+                        const fabricObject = enlivenedObjects[0];
+                        fabricObject.set({
+                            selectable: false,
+                            evented: false, // Default to non-evented
+                            overlayId: overlayDef.overlayId, // Store overlayId for later reference
+                            isTimestampOverlay: true // Mark it as a timestamp overlay for easier cleanup
+                        });
+
+                        // Apply custom properties that might have been stripped during JSON serialization/deserialization
+                        // For example, if customInteraction was stored in fabricObjectJSON.customInteraction
+                        if (overlayDef.fabricObjectJSON.customInteraction) {
+                            fabricObject.customInteraction = {...overlayDef.fabricObjectJSON.customInteraction};
+                        }
+                        if (overlayDef.fabricObjectJSON.customAnimation) {
+                            fabricObject.customAnimation = {...overlayDef.fabricObjectJSON.customAnimation};
+                        }
+
+
+                        if (overlayDef.isInteractive) {
+                            fabricObject.set({
+                                evented: true,
+                                hoverCursor: 'pointer'
+                            });
+                            // Assuming 'click' is the primary trigger for interactive timestamp overlays.
+                            // This might need to be more generic if overlays can have different triggers (e.g., hover)
+                            // and if those triggers are defined within overlayDef.fabricObjectJSON.customInteraction.trigger
+                            fabricObject.off('mousedown'); // Clear previous if any (e.g., from default fabric behavior)
+                            fabricObject.on('mousedown', function() {
+                                // If the overlay has its own customInteraction, use that.
+                                if (this.customInteraction && this.customInteraction.trigger && this.customInteraction.action) {
+                                    handleOverlayInteraction(this, this.customInteraction.trigger);
+                                } else {
+                                    // Fallback or default interaction if not specified in the object itself
+                                    console.warn("Interactive timestamp overlay clicked, but no specific customInteraction defined on object. OverlayDef:", overlayDef);
+                                }
+                            });
+                        }
+                        
+                        // Check if object with this ID already exists (e.g. due to rapid state changes)
+                        let alreadyExists = false;
+                        canvas.getObjects().forEach(obj => {
+                            if (obj.overlayId === overlayDef.overlayId) {
+                                alreadyExists = true;
+                            }
+                        });
+                        if(!alreadyExists) {
+                            canvas.add(fabricObject);
+                            viewerApp.state.activeTimestampOverlayIds.add(overlayDef.overlayId);
+                            // console.log("Added timestamp overlay:", overlayDef.overlayId, "at", currentTime);
+                            canvas.requestRenderAll();
+                            updateViewerCanvasInteractivity();
+                        }
+                    }
+                }, ''); // Pass empty namespace, not strictly necessary for simple objects
+
+            } else if (!shouldBeVisible && isActive) {
+                let foundObject = null;
+                canvas.getObjects().forEach(obj => {
+                    if (obj.overlayId === overlayDef.overlayId) {
+                        foundObject = obj;
+                    }
+                });
+
+                if (foundObject) {
+                    canvas.remove(foundObject);
+                    viewerApp.state.activeTimestampOverlayIds.delete(overlayDef.overlayId);
+                    // console.log("Removed timestamp overlay:", overlayDef.overlayId, "at", currentTime);
+                    canvas.requestRenderAll();
+                    updateViewerCanvasInteractivity();
+                }
+            }
+        });
     }
+
+    // updateCanvasInteractivity was renamed to updateViewerCanvasInteractivity, the placeholder below can be removed.
+    // function updateCanvasInteractivity() { ... } // This is now updateViewerCanvasInteractivity
 
   </script>

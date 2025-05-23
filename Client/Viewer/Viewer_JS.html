@@ -428,9 +428,10 @@
 
 
         viewerApp.state.currentSlideIndex = slideIndex; 
-        // Reset timestamp overlay states for any new slide
-        viewerApp.state.currentTimestampOverlays = [];
-        viewerApp.state.activeTimestampOverlayIds.clear();
+        
+        // Initialize timestamp overlay states for the new slide
+        viewerApp.state.currentTimestampOverlays = (slideData && slideData.timestampOverlays && Array.isArray(slideData.timestampOverlays)) ? [...slideData.timestampOverlays] : [];
+        viewerApp.state.activeTimestampOverlayIds = new Set(); // Initialize as a new Set
 
         const slideData = slides[slideIndex];
         const canvas = viewerApp.state.viewerFabricCanvas;
@@ -532,53 +533,58 @@
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
                         if (isYouTubeApiReady) {
-                             setupYouTubePlayer(videoId); // This now calls onPlayerReady which handles timeline setup
-                             // Phase 1: "Click to Begin" logic
-                             const youtubeOptions = media.youtubeOptions || {};
+                             setupYouTubePlayer(videoId); 
+                             
+                             const youtubeOptions = media.youtubeOptions || { showClickToBeginButton: false };
+
+                             // Clear existing "click to begin" buttons before adding a new one or setting defaults
+                             canvas.getObjects().forEach(obj => {
+                                 if (obj.customType === 'clickToBeginButton') {
+                                     canvas.remove(obj);
+                                 }
+                             });
+
                              if (youtubeOptions.showClickToBeginButton) {
                                  if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
                                  if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
 
-                                 // Remove any existing "click to begin" button first
-                                 canvas.getObjects().forEach(obj => {
-                                     if (obj.customType === 'clickToBeginButton') { // Use customType
-                                         canvas.remove(obj);
-                                     }
-                                 });
-
                                  const beginButtonText = new fabric.Textbox('Click here to begin', {
-                                     left: canvas.width / 2, top: canvas.height / 2, originX: 'center', originY: 'center',
-                                     fontSize: (canvas.width > 600 ? 30 : 24), fill: 'white', backgroundColor: 'rgba(0,0,0,0.75)',
-                                     padding: 15, rx: 10, ry: 10,
-                                     selectable: false, evented: true, hoverCursor: 'pointer',
-                                     customType: 'clickToBeginButton' // Identify this button
+                                     left: canvas.width / 2, 
+                                     top: canvas.height / 2, 
+                                     originX: 'center', 
+                                     originY: 'center',
+                                     fontSize: (canvas.width > 600 ? 30 : 24), 
+                                     fill: 'white', 
+                                     backgroundColor: 'rgba(0,0,0,0.8)',
+                                     padding: 20, 
+                                     rx: 10, ry: 10,
+                                     selectable: false, 
+                                     evented: true, 
+                                     hoverCursor: 'pointer',
+                                     customType: 'clickToBeginButton' 
                                  });
 
                                  beginButtonText.on('mousedown', function() {
                                      if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
                                          ytPlayer.playVideo();
+                                     } else {
+                                         console.warn("ClickToBegin: ytPlayer not ready or playVideo not available.");
                                      }
                                      canvas.remove(this); 
-                                     // Transition canvas to be click-through for player if no immediate overlays
-                                     // This will be refined by updateCanvasInteractivity() later
-                                     if (viewerApp.state.activeTimestampOverlayIds.size === 0) { // Quick check
-                                        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                                        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                                     }
-                                     canvas.renderAll();
+                                     updateViewerCanvasInteractivity(); 
+                                     // renderAll will be called by updateViewerCanvasInteractivity
                                  });
                                  canvas.add(beginButtonText);
                                  canvas.bringToFront(beginButtonText);
-                                 canvas.renderAll();
+                                 canvas.renderAll(); // Render after adding button. updateViewerCanvasInteractivity will also render.
                              } else {
-                                 // If no "Click to Begin" and no initial overlays, canvas is transparent
-                                 if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                                 if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+                                 // If button not shown, call updateViewerCanvasInteractivity to set defaults
+                                 // (which for YT without other interactive elements is opacity 0, pointerEvents none)
+                                 updateViewerCanvasInteractivity(); // This will also call renderAll
                              }
                              // Timeline and question marker setup will happen in onPlayerReady
                         } else {
                              console.warn("YouTube API not ready yet. Player setup deferred.");
-                             // Set canvas to transparent as player might load later
                              if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                              if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
                              displayMessageViewer("YouTube player is loading...", true);
@@ -1239,11 +1245,56 @@
                         viewerApp.state.playerQuestionCheckInterval = null;
                     }
                 }
+
+    function updateViewerCanvasInteractivity() {
+        console.log("Placeholder: updateViewerCanvasInteractivity() called.");
+        // Full logic will be added in a later step.
+        // For now, ensure canvas is non-interactive if no other elements demand attention.
+        // This is a simplified placeholder.
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (canvas && !canvas.getObjects().some(obj => obj.evented && obj.customType !== 'clickToBeginButton')) { // Basic check
+             if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
+             if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+        }
+    }
             }, 250);
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
             // Interval is cleared above, so no need to clear again here.
             // Phase 2: checkVideoTimeForTimestampOverlays(); // Call once on pause/end for overlays
         }
+    }
+
+    // Ensure updateViewerCanvasInteractivity is a global helper function
+    function updateViewerCanvasInteractivity() {
+        console.log("Placeholder: updateViewerCanvasInteractivity() called.");
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        // Basic check: if no interactive elements (like questions, or an active clickToBegin button itself if it were evented differently)
+        // are present, assume canvas should be non-interactive.
+        // This will be expanded for timestamp overlays.
+        let hasInteractiveElements = false;
+        if (canvas) {
+            hasInteractiveElements = canvas.getObjects().some(obj => 
+                obj.evented && 
+                (obj.customType === 'videoQuestionOverlay' || obj.customType === 'clickToBeginButton') // Add other customTypes if they are interactive
+            );
+        }
+
+        if (hasInteractiveElements) {
+            if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
+            if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
+        } else {
+            // Default for YouTube: if no specific interactive elements, make canvas click-through for the player
+            if (viewerApp.state.currentMediaType === 'youtube') {
+                if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
+                if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+            } else {
+                // For other media types like images/audio, canvas might be intrinsically interactive
+                // This part might need refinement based on overall interaction model for non-video slides
+                if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1'; // Default to visible if not YouTube and no specific rules
+                if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
+            }
+        }
+        if(canvas) canvas.requestRenderAll(); // Render if changes might have occurred
     }
 
     function onPlayerError(event) {
@@ -1270,7 +1321,10 @@
              }
             if (viewerApp.state.playerQuestionCheckInterval) { clearInterval(viewerApp.state.playerQuestionCheckInterval); viewerApp.state.playerQuestionCheckInterval = null;}
             viewerApp.state.currentVideoQuestions = []; viewerApp.state.askedQuestionIndices = [];
-            viewerApp.state.currentTimestampOverlays = []; viewerApp.state.activeTimestampOverlayIds.clear();
+            
+            // Ensure timestamp overlays are cleared
+            viewerApp.state.currentTimestampOverlays = []; 
+            viewerApp.state.activeTimestampOverlayIds.clear();
             
             // Phase 1: Timeline cleanup
             viewerApp.state.currentVideoDuration = 0;

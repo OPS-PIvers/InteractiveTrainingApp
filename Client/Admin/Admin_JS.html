@@ -992,7 +992,7 @@ function onYouTubeIframeAPIReady() {
             const videoId = extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl && typeof YT !== 'undefined' && YT.Player) {
                 adminYouTubePlayerContainerEl.style.display = 'block';
-                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '0'; // Make canvas semi-transparent
+                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // Make canvas semi-transparent
                 canvas.backgroundColor = 'rgba(0,0,0,0)'; // Make canvas background transparent
 
                 adminApp.state.adminYouTubePlayer = new YT.Player('adminYouTubePlayerContainer', {

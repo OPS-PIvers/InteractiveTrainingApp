@@ -25,70 +25,139 @@
       })();
     </script>
     <title>Interactive Training Modules</title>
+    <!-- Add Google Fonts (Roboto) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <?!= include('Client/Shared/Modal_CSS'); ?>
     <style>
-      body { font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; color: #333; }
-      .container { background-color: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-      h1 { color: #333; text-align: center; margin-bottom: 30px;}
+      :root { /* Theme variables (consistent with AdminView) */
+            --theme-primary-color: #1a73e8; 
+            --theme-primary-hover: #1765cc; 
+            --theme-text-color-primary: #202124;
+            --theme-text-color-secondary: #5f6368;
+            --theme-background-main: #f8f9fa;
+            --theme-background-card: #ffffff;
+            --theme-border-color: #dadce0;
+            --theme-input-border-color: #80868b; 
+            --theme-danger-color: #d93025;
+            --theme-danger-hover: #c5221f;
+            --theme-success-color: #1e8e3e;
+            --theme-success-hover: #187332;
+            --theme-font-family: 'Roboto', Arial, sans-serif;
+        }
+
+      body { 
+        font-family: var(--theme-font-family); 
+        margin: 0; 
+        background-color: var(--theme-background-main); 
+        color: var(--theme-text-color-primary); 
+        padding: 20px; /* Add some padding to the body */
+      }
+      .container { 
+        background-color: var(--theme-background-card); 
+        padding: 20px; 
+        margin-bottom: 20px; 
+        border-radius: 8px; 
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+        border: 1px solid var(--theme-border-color);
+      }
+      h1 { 
+        color: var(--theme-text-color-primary); 
+        text-align: center; 
+        margin-bottom: 24px; /* Consistent margin */
+        font-size: 1.8rem;
+        font-weight: 400;
+      }
+      h2 { /* For #viewingProjectTitle */
+        color: var(--theme-text-color-primary);
+        font-size: 1.4rem;
+        font-weight: 400;
+        margin-bottom: 1rem;
+      }
       
       .project-list-viewer {
         list-style-type: none;
         padding: 0;
       }
       .project-card-viewer {
-        background-color: #eef;
-        border: 1px solid #ccd;
-        padding: 15px 20px;
-        margin-bottom: 15px;
-        border-radius: 6px;
+        background-color: var(--theme-background-card);
+        border: 1px solid var(--theme-border-color);
+        padding: 16px 20px; /* Adjusted padding */
+        margin-bottom: 12px; /* Consistent spacing */
+        border-radius: 8px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.08), 0 1px 3px 1px rgba(60,64,67,0.05);
+        transition: box-shadow 0.2s ease-in-out;
+      }
+      .project-card-viewer:hover {
+        box-shadow: 0 1px 3px 0 rgba(60,64,67,0.12), 0 2px 5px 2px rgba(60,64,67,0.08);
       }
       .project-card-viewer h3 {
         margin: 0;
         font-size: 1.2em;
-        color: #2c3e50;
+        color: var(--theme-text-color-primary);
+        font-weight: 500; /* Medium weight for card titles */
       }
       .view-project-button {
-        padding: 8px 12px;
-        cursor: pointer;
-        background-color: #3498db;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        font-size: 0.9em;
+        padding: 8px 16px; 
+        cursor: pointer; 
+        background-color: var(--theme-primary-color); 
+        color: white; 
+        border: none; 
+        border-radius: 4px; 
+        font-size: 0.875rem;
+        font-weight: 500; 
+        text-transform: uppercase; 
+        letter-spacing: 0.089em;
+        transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
       }
       .view-project-button:hover {
-        background-color: #2980b9;
+        background-color: var(--theme-primary-hover);
+        box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 2px 5px 2px rgba(60,64,67,0.15);
       }
+       .view-project-button:focus {
+        outline: 2px solid var(--theme-primary-hover);
+        outline-offset: 2px;
+      }
+
       .fabric-spotlight-target-highlight {
         /* Example: adds a subtle glow */
         box-shadow: 0 0 15px 5px rgba(255, 255, 150, 0.9);
         /* Fabric objects don't directly use box-shadow. You'd modify stroke instead. */
       }
 
-      #messageAreaViewer { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
-      .success { border-color: green; background-color: #d4edda; color: #155724; } 
-      .error { border-color: red; background-color: #f8d7da; color: #721c24; } 
+      #messageAreaViewer { 
+        margin-top: 15px; padding: 10px; border: 1px solid transparent; 
+        border-radius: 4px; min-height: 1.5em; font-size: 0.9rem;
+      }
+      .success { 
+        border-color: var(--theme-success-color); 
+        background-color: #e6f4ea; 
+        color: var(--theme-success-hover); 
+      } 
+      .error { 
+        border-color: var(--theme-danger-color); 
+        background-color: #fce8e6; 
+        color: var(--theme-danger-hover); 
+      } 
 
-      #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
-      .loader { border: 8px solid #f3f3f3; border-top: 8px solid #3498db; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      /* Spinner CSS is now in Client/Shared/LoadingSpinner.html */
 
       /* Styles for Project View Mode */
       #viewerProjectDisplayArea { display: none; /* Hidden initially */ }
 
-      /* New wrapper for canvas and potential YT player */
       #viewerMediaContainer {
-        position: relative; /* Important for layering */
-        width: 100%; /* Take available width */
-        /* The height will be determined by the canvas/video aspect ratio, set by JS */
-        /* max-width: 960px; /* Optional max width */
-        margin: 15px auto; /* Center container */
-        /* min-height: 300px; /* Removed, let content define height */
-        background-color: #333; /* Default dark BG for player area */
-        overflow: hidden; /* Ensure nothing spills out */
+        position: relative; 
+        width: 100%; 
+        margin: 20px auto; /* Consistent margin */
+        background-color: #000000; /* Black background for media usually looks good */
+        overflow: hidden; 
+        border-radius: 8px; /* Rounded corners for the media area */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); /* Subtle shadow */
       }
 
       #viewerCanvasContainer {
@@ -129,40 +198,251 @@
            border: none; /* Remove iframe border */
        }
 
+      button, .button-viewer { /* General button styling for viewer */
+        padding: 8px 16px; 
+        cursor: pointer; 
+        background-color: var(--theme-primary-color); 
+        color: white; 
+        border: none; 
+        border-radius: 4px; 
+        font-size: 0.875rem;
+        font-weight: 500; 
+        text-transform: uppercase; 
+        letter-spacing: 0.089em;
+        transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.2), 0 1px 3px 1px rgba(60,64,67,0.1);
+      }
+      button:hover, .button-viewer:hover {
+        background-color: var(--theme-primary-hover);
+        box-shadow: 0 1px 3px 0 rgba(60,64,67,0.25), 0 2px 5px 2px rgba(60,64,67,0.15);
+      }
+      button:focus, .button-viewer:focus {
+        outline: 2px solid var(--theme-primary-hover);
+        outline-offset: 2px;
+      }
+      button:disabled, .button-viewer:disabled {
+        background-color: #ccc;
+        color: #666;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
 
-      #viewerSlideNavigation { margin-top: 15px; text-align: center; }
-      #viewerSlideNavigation button { margin: 0 10px; }
-      #backToViewerListButton { margin-bottom: 15px; }
+      #backToViewerListButton { /* Style as a secondary button */
+        background-color: var(--theme-background-card);
+        color: var(--theme-primary-color);
+        border: 1px solid var(--theme-input-border-color);
+        box-shadow: none;
+        margin-bottom: 20px; /* More spacing */
+        text-transform: none; /* Less emphasis */
+        letter-spacing: normal;
+      }
+      #backToViewerListButton:hover {
+        background-color: rgba(0,0,0,0.03);
+        border-color: var(--theme-primary-hover);
+      }
+
+      #viewerSlideNavigation { 
+        margin-top: 20px; /* More spacing */
+        text-align: center; 
+        display: flex; /* Use flex for better alignment */
+        justify-content: center;
+        align-items: center;
+        gap: 12px; /* Space between buttons and indicator */
+      }
+      #viewerSlideNavigation button { /* Already styled by general button rule */
+         /* margin: 0 10px; Removed, using gap now */
+         text-transform: none; /* Less emphasis */
+         letter-spacing: normal;
+      }
+      #viewerSlideIndicator {
+        font-size: 1rem;
+        color: var(--theme-text-color-secondary);
+        font-weight: 500;
+      }
+
 
       /* Basic styles for Audio Player */
        #viewerAudioPlayer {
-           width: 90%; /* Make controls slightly smaller than container */
-           margin: 15px auto 0; /* Center and add top margin */
-           display: none; /* Hidden by default */
+           width: 100%; /* Full width within its container */
+           max-width: 600px; /* Max width for very large screens */
+           margin: 20px auto 0; 
+           display: none; 
        }
 
-       /* Modal Navigation Buttons (from Step 21) */
+       /* Modal Navigation Buttons (from Step 21) - these will be styled in Modal_CSS.html */
         .modal-navigation {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
+            /* Styles will be in Modal_CSS.html */
         }
          .modal-navigation button {
-             padding: 8px 15px;
-             cursor: pointer;
-             border-radius: 4px;
-             border: 1px solid #ccc;
-             font-size: 0.9em;
+            /* Styles will be in Modal_CSS.html */
          }
           .modal-navigation button:disabled {
-              cursor: not-allowed;
-              opacity: 0.5;
+            /* Styles will be in Modal_CSS.html */
           }
-         #modalPrevButton { background-color: #f0f0f0; }
-         #modalNextButton { background-color: #007bff; color: white; border-color: #007bff;}
+         #modalPrevButton { /* Specific IDs if needed, but prefer class-based for general modal buttons */ }
+         #modalNextButton { /* Specific IDs if needed */ }
 
+
+        /* Video Timeline Refinements */
+        #viewerVideoTimelineContainer { 
+            margin: 20px auto; 
+            max-width: 960px; 
+            padding: 12px; 
+            background-color: var(--theme-background-card); 
+            border-radius: 8px;
+            border: 1px solid var(--theme-border-color);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        #viewerTimelineTrack { 
+            position: relative; 
+            height: 12px; /* Slightly thicker track */
+            background-color: #e0e0e0; /* Lighter grey for track */
+            border-radius: 6px; 
+            cursor: pointer;
+        }
+        #viewerTimelineProgress { 
+            position: absolute; 
+            height: 100%; 
+            background-color: var(--theme-primary-color); 
+            border-radius: 6px; 
+            width: 0%;
+            transition: width 0.1s linear; /* Smooth progress update */
+        }
+        #viewerTimelineTimeDisplay { 
+            text-align: right; 
+            font-size: 0.875rem; 
+            margin-top: 8px; 
+            color: var(--theme-text-color-secondary);
+        }
+        /* Timeline markers (assuming they will be added with this class by JS) */
+        .timeline-marker {
+            position: absolute;
+            width: 4px; /* Thicker marker for visibility */
+            height: 100%;
+            top: 0px;
+            z-index: 2;
+            border-radius: 2px; /* Rounded marker */
+            transform: translateX(-50%); /* Center the marker */
+        }
+        .timeline-marker.question-marker {
+            background-color: var(--theme-danger-color); /* Use a distinct color for questions */
+        }
+        .timeline-marker.overlay-marker {
+            background-color: var(--theme-success-color); /* Use a distinct color for overlays */
+        }
+
+
+      /* --- Responsive Design --- */
+
+      /* Medium screens (tablets, smaller desktops) */
+      @media (max-width: 768px) {
+        body {
+          margin: 10px; /* Reduce body margin */
+        }
+        .container {
+          padding: 15px; /* Reduce container padding */
+        }
+        h1 {
+          font-size: 1.5em; /* Adjust heading size */
+          margin-bottom: 20px;
+        }
+        h2 {
+          font-size: 1.3em;
+        }
+
+        .project-card-viewer {
+          flex-direction: column; /* Stack title and button */
+          align-items: flex-start; /* Align items to the start */
+          gap: 10px; /* Add gap between title and button */
+        }
+        .project-card-viewer h3 {
+          font-size: 1.1em;
+        }
+        .view-project-button {
+          width: 100%; /* Make button full width */
+          text-align: center;
+          padding: 10px 12px; /* Slightly larger padding for easier tap */
+        }
+
+        #viewerMediaContainer {
+          margin: 10px auto; /* Reduce margin */
+        }
+
+        #viewerSlideNavigation button {
+          margin: 0 5px; /* Reduce margin for nav buttons */
+          padding: 8px 10px; /* Adjust padding */
+        }
+        #viewerSlideIndicator {
+          font-size: 0.9em;
+        }
+        
+        /* Modal adjustments - assuming styles are from Shared/Modal_CSS.html */
+        /* If modal styles are in this file, adjust them directly. */
+        /* For shared modal: these might need to be in Shared/Modal_CSS or override here if specific */
+        .modal-content { /* From Shared/Modal_CSS.html */
+            width: 90%; 
+            max-width: 500px; /* Adjust max-width if needed for tablets */
+        }
+      }
+
+      /* Small screens (mobile phones) */
+      @media (max-width: 480px) {
+        body {
+          margin: 5px;
+        }
+        .container {
+          padding: 10px;
+        }
+        h1 {
+          font-size: 1.3em;
+          margin-bottom: 15px;
+        }
+         h2 {
+          font-size: 1.1em;
+        }
+
+        #backToViewerListButton {
+          width: 100%; /* Make back button full width */
+          margin-bottom: 10px;
+          padding: 10px;
+        }
+        
+        #viewerMediaContainer {
+          min-height: 200px; /* Ensure a minimum height for very small media */
+        }
+        
+        #viewerVideoTimelineContainer {
+            padding: 8px; /* Reduce padding for timeline */
+        }
+        #viewerTimelineTimeDisplay {
+            font-size: 0.8em; /* Smaller time display */
+        }
+
+        #viewerSlideNavigation {
+          display: flex;
+          flex-direction: column; /* Stack navigation controls */
+          gap: 8px;
+        }
+        #viewerSlideNavigation button {
+          width: 100%; /* Make nav buttons full width */
+          margin: 0;
+        }
+        
+        /* Modal adjustments for very small screens */
+        .modal-content { /* From Shared/Modal_CSS.html */
+            width: 95%;
+            padding: 15px; /* Adjust padding for smaller modals */
+        }
+        .modal-navigation button {
+            padding: 8px 10px; /* Adjust modal nav button padding */
+            font-size: 0.85em;
+        }
+        #viewerModalCloseButton { /* Ensure close button is easily tappable */
+            right: 10px;
+            top: 5px; 
+            font-size: 24px;
+        }
+      }
     </style>
   </head>
   <body>

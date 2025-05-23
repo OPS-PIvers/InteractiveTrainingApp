@@ -1,84 +1,145 @@
 <!-- Client/Shared/Modal_CSS.html -->
 <style>
+  /* Re-define theme variables here if they are not globally available from Viewer/Admin files */
+  /* For consistency, these should ideally match the ones in AdminView.html and ViewerView.html */
+  :root {
+    --theme-primary-color: #1a73e8; 
+    --theme-primary-hover: #1765cc; 
+    --theme-text-color-primary: #202124;
+    --theme-text-color-secondary: #5f6368;
+    --theme-icon-color: #5f6368;
+    --theme-background-main: #f8f9fa;
+    --theme-background-card: #ffffff;
+    --theme-border-color: #dadce0;
+    --theme-input-border-color: #80868b;
+    --theme-danger-color: #d93025;
+    --theme-font-family: 'Roboto', Arial, sans-serif; /* Ensure Roboto is loaded in host HTML */
+  }
+
   .modal-overlay {
     display: none; /* Hidden by default */
     position: fixed; /* Stay in place */
-    z-index: 10001; /* Sit on top - higher than loading spinner if needed */
+    z-index: 10001; /* Sit on top */
     left: 0;
     top: 0;
     width: 100%; 
     height: 100%;
     overflow: auto; /* Enable scroll if needed */
-    background-color: rgba(0,0,0,0.6); /* Black w/ opacity */
-    justify-content: center; /* Center content horizontally */
-    align-items: center; /* Center content vertically */
+    background-color: rgba(32,33,36,0.6); /* Darker overlay, consistent with Google's scrim */
+    justify-content: center; 
+    align-items: center; 
     /* Use flex display via JS when showing */
   }
   
   .modal-content {
-    background-color: #fefefe;
-    margin: auto; /* Responsive centering */
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%; /* Could be more specific */
-    max-width: 600px; /* Max width */
-    border-radius: 8px;
-    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2),0 6px 20px 0 rgba(0,0,0,0.19);
-    position: relative; /* For close button positioning */
+    background-color: var(--theme-background-card);
+    color: var(--theme-text-color-primary);
+    margin: auto; 
+    padding: 24px; /* Increased padding */
+    border: 1px solid var(--theme-border-color);
+    width: 90%; /* Responsive width */
+    max-width: 520px; /* Adjusted max-width */
+    border-radius: 8px; /* Consistent with containers */
+    box-shadow: 0 4px 8px 0 rgba(60,64,67,0.3), 0 6px 20px 0 rgba(60,64,67,0.19); /* Google-style shadow */
+    position: relative; 
     animation-name: animatetop;
-    animation-duration: 0.4s
+    animation-duration: 0.3s; /* Slightly faster animation */
+    font-family: var(--theme-font-family);
   }
   
   /* Add Animation */
   @keyframes animatetop {
-    from {top: -300px; opacity: 0}
-    to {top: 0; opacity: 1}
+    from {transform: translateY(-50px); opacity: 0} /* Slide down effect */
+    to {transform: translateY(0); opacity: 1}
   }
   
   .modal-close-button {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
+    color: var(--theme-icon-color);
+    background: none; /* Remove default button appearance */
+    border: none;
+    font-size: 24px; /* Material icon size */
+    font-weight: normal; /* Not bold */
     position: absolute;
-    top: 10px;
-    right: 20px;
+    top: 12px; /* Adjust position for better alignment with padding */
+    right: 12px;
+    padding: 4px; /* Make it easier to click */
+    line-height: 1;
+    border-radius: 50%; /* Circular hover effect */
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
   }
   
   .modal-close-button:hover,
   .modal-close-button:focus {
-    color: black;
+    color: var(--theme-danger-color);
+    background-color: rgba(0,0,0,0.05); /* Subtle background on hover */
     text-decoration: none;
     cursor: pointer;
+    outline: none; /* Remove default focus outline if custom is applied or not needed */
   }
   
-  #viewerModalBody {
+  #viewerModalBody { /* Assuming this ID is specific to the viewer's modal body */
     padding-top: 10px;
     line-height: 1.6;
-    max-height: 70vh; /* Prevent modal body from being too tall */
-    overflow-y: auto; /* Allow scrolling for long content */
+    color: var(--theme-text-color-primary);
+    font-size: 0.95rem; /* Slightly larger for readability */
+    max-height: 65vh; /* Adjusted max height */
+    overflow-y: auto; 
   }
   
-  /* Styles for Modal Navigation Buttons (Step 21) */
+  /* Styles for Modal Navigation Buttons */
   .modal-navigation {
-      margin-top: 20px;
-      padding-top: 15px;
-      border-top: 1px solid #eee;
+      margin-top: 24px; /* Increased spacing */
+      padding-top: 16px;
+      border-top: 1px solid var(--theme-border-color);
       display: flex;
-      justify-content: space-between;
+      justify-content: space-between; /* Default, can be overridden if only one button */
+      gap: 12px; /* Space between buttons */
   }
+
+   /* General styling for buttons within modal-navigation */
    .modal-navigation button {
-       padding: 8px 15px;
+       padding: 8px 16px;
        cursor: pointer;
        border-radius: 4px;
-       border: 1px solid #ccc;
-       font-size: 0.9em;
+       font-size: 0.875rem;
+       font-weight: 500;
+       text-transform: uppercase;
+       letter-spacing: 0.089em;
+       transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+       border: 1px solid transparent; /* Base border */
    }
     .modal-navigation button:disabled {
+        background-color: rgba(0,0,0,0.12); /* Material disabled background */
+        color: rgba(0,0,0,0.38); /* Material disabled text */
+        border-color: transparent;
+        box-shadow: none;
         cursor: not-allowed;
-        opacity: 0.5;
+        opacity: 1; /* Override default opacity if any */
     }
-   #modalPrevButton { background-color: #f0f0f0; }
-   #modalNextButton { background-color: #007bff; color: white; border-color: #007bff;}
+
+   /* Previous button - Secondary button style */
+   #modalPrevButton, .modal-button-secondary { 
+       background-color: var(--theme-background-card);
+       color: var(--theme-primary-color);
+       border-color: var(--theme-input-border-color);
+       box-shadow: none;
+   }
+   #modalPrevButton:hover:not(:disabled), .modal-button-secondary:hover:not(:disabled) {
+       background-color: rgba(26,115,232,0.05); /* Very light primary on hover */
+       border-color: var(--theme-primary-hover);
+   }
+
+   /* Next button - Primary button style */
+   #modalNextButton, .modal-button-primary { 
+       background-color: var(--theme-primary-color); 
+       color: white; 
+       border-color: var(--theme-primary-color);
+       box-shadow: 0 1px 2px 0 rgba(60,64,67,0.2), 0 1px 3px 1px rgba(60,64,67,0.1);
+   }
+   #modalNextButton:hover:not(:disabled), .modal-button-primary:hover:not(:disabled) { 
+       background-color: var(--theme-primary-hover); 
+       border-color: var(--theme-primary-hover);
+       box-shadow: 0 1px 3px 0 rgba(60,64,67,0.25), 0 2px 5px 2px rgba(60,64,67,0.15);
+   }
   
   </style>

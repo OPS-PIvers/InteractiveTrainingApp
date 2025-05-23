@@ -269,20 +269,6 @@
            display: none; 
        }
 
-       /* Modal Navigation Buttons (from Step 21) - these will be styled in Modal_CSS.html */
-        .modal-navigation {
-            /* Styles will be in Modal_CSS.html */
-        }
-         .modal-navigation button {
-            /* Styles will be in Modal_CSS.html */
-         }
-          .modal-navigation button:disabled {
-            /* Styles will be in Modal_CSS.html */
-          }
-         #modalPrevButton { /* Specific IDs if needed, but prefer class-based for general modal buttons */ }
-         #modalNextButton { /* Specific IDs if needed */ }
-
-
         /* Video Timeline Refinements */
         #viewerVideoTimelineContainer { 
             margin: 20px auto; 
@@ -506,6 +492,6 @@
     </div>
 
     <?!= include('Client/Shared/LoadingSpinner'); ?>
-    <?!= include('Client/Viewer/Viewer_JS'); ?> 
+    <?!= include('Client/Viewer/Viewer_Overlay_Logic'); ?> 
   </body>
 </html>

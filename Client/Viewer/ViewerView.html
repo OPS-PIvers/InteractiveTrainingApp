@@ -163,6 +163,22 @@
          #modalPrevButton { background-color: #f0f0f0; }
          #modalNextButton { background-color: #007bff; color: white; border-color: #007bff;}
 
+      /* CSS for YouTube Question Timeline Markers */
+      .timeline-marker {
+          position: absolute;
+          width: 4px; /* Small width for a vertical line marker */
+          height: 100%; /* Full height of the timeline bar */
+          background-color: #007bff; /* Blue color, can be changed */
+          top: 0;
+          /* left will be set by JS */
+          transform: translateX(-50%); /* Center the marker on its left position */
+      }
+      
+      .timeline-marker:hover { /* Optional: hover effect */
+          background-color: #0056b3;
+          cursor: default; /* Indicate it's not clickable, unless functionality is added later */
+      }
+
     </style>
   </head>
   <body>
@@ -186,6 +202,10 @@
             <div id="viewerCanvasContainer">
                 <canvas id="viewerFabricCanvas"></canvas>
             </div>
+        </div>
+        <!-- YouTube Question Timeline -->
+        <div id="youtubeQuestionTimeline" style="display: none; width: 100%; height: 20px; background-color: #ccc; margin-top: 5px; position: relative;">
+            <!-- Question markers will be added here by JavaScript -->
         </div>
 
         <!-- Audio Player (can be hidden visually if desired) -->

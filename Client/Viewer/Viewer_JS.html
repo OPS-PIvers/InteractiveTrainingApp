@@ -57,6 +57,7 @@
     let viewerModalEl, viewerModalCloseButtonEl, viewerModalBodyEl,
         modalPrevButtonEl, modalNextButtonEl; // Modal Nav Buttons (Step 21)
     let viewerAudioPlayerEl; // Ref for the audio element
+    let youtubeQuestionTimelineEl; // For YouTube question timeline display
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -104,6 +105,10 @@
       // NEW: Get reference to the main display area for click-off listener
       viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
       if (!viewerProjectDisplayAreaEl) console.error("CRITICAL: viewerProjectDisplayAreaEl not found!"); // Add check
+      
+      youtubeQuestionTimelineEl = document.getElementById('youtubeQuestionTimeline');
+      if (!youtubeQuestionTimelineEl) console.warn("youtubeQuestionTimelineEl not found, timeline feature may not work.");
+
 
       console.log("Viewer_JS: DOM references set up.");
     };
@@ -482,6 +487,13 @@
                 // Fabric canvas dimensions are already set by slideWidth/slideHeight.
                 // Fabric canvas background is transparent by default from initializeViewerCanvas.
                 if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
+
+                // Initialize/hide question timeline for YouTube videos
+                if (youtubeQuestionTimelineEl) {
+                    youtubeQuestionTimelineEl.innerHTML = ''; // Clear it
+                    youtubeQuestionTimelineEl.style.display = 'none'; // Hide it initially
+                }
+
                 if (media.url) {
                     const videoId = extractYouTubeVideoId(media.url);
                     if (videoId) {
@@ -495,12 +507,27 @@
 
                                  const canvas = viewerApp.state.viewerFabricCanvas;
                                  if (canvas) {
-                                     // Remove any existing "click to begin" button first
+                                     // Remove any existing "click to begin" elements first
                                      canvas.getObjects().forEach(obj => {
-                                         if (obj.isClickToBeginButton) {
+                                         if (obj.isClickToBeginButton || obj.isDimOverlay) {
                                              canvas.remove(obj);
                                          }
                                      });
+
+                                     // Create the dimming rectangle
+                                     const dimmingRect = new fabric.Rect({
+                                         left: 0,
+                                         top: 0,
+                                         originX: 'left',
+                                         originY: 'top',
+                                         width: canvas.width,
+                                         height: canvas.height,
+                                         fill: 'rgba(0,0,0,0.5)',
+                                         selectable: false,
+                                         evented: false,
+                                         isDimOverlay: true // Custom property
+                                     });
+                                     canvas.add(dimmingRect);
 
                                      const beginButtonText = new fabric.Textbox('Click here to begin', {
                                          left: canvas.width / 2,
@@ -523,38 +550,43 @@
                                          if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
                                              ytPlayer.playVideo();
                                          }
-                                         canvas.remove(beginButtonText); // Remove the button
+                                         // Remove both the button and the dimming overlay
+                                         canvas.remove(beginButtonText);
+                                         canvas.getObjects().forEach(obj => {
+                                             if (obj.isDimOverlay) {
+                                                 canvas.remove(obj);
+                                             }
+                                         });
+                                         
                                          if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
                                          if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                                          canvas.renderAll();
                                      });
                                      canvas.add(beginButtonText);
-                                     canvas.bringToFront(beginButtonText);
+                                     canvas.bringToFront(beginButtonText); // Ensure button is on top of the dimmer
                                      canvas.renderAll();
                                  }
                              } else {
                                  // If no "Click to Begin" button, ensure canvas is transparent and click-through for player
+                                 // (This state is also handled by checkVideoTimeForTimestampOverlays initially if no overlays at t=0)
                                  if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                                  if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
                              }
                              // --- END "Click to Begin" LOGIC ---
+
+                             // Call checkVideoTimeForTimestampOverlays to correctly set initial canvas opacity/pointerEvents
+                             // if there's no "Click to Begin" button but there might be overlays at t=0.
+                             // This also ensures the canvas is correctly configured if the "Click to Begin" logic was skipped.
+                             checkVideoTimeForTimestampOverlays();
 
                               // Initialize timestamp overlays for the current slide
                               viewerApp.state.currentTimestampOverlays = (slideData.timestampOverlays || []).map(o => ({...o, _fabricObject: null})); // Reset and copy, add placeholder for fabric object
                               viewerApp.state.activeTimestampOverlayIds.clear();
                               // Ensure canvas is initially transparent if no "Click to Begin" button was shown and no overlays are due at time 0
                               if (!(media.youtubeOptions && media.youtubeOptions.showClickToBeginButton)) {
-                                  let isOverlayAtTimeZero = viewerApp.state.currentTimestampOverlays.some(o => o.timestampShow === 0);
-                                  if (!isOverlayAtTimeZero) {
-                                      if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                                      if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                                  } else {
-                                      // If an overlay IS at time zero, canvas needs to be visible
-                                      if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
-                                      // Interactivity will be handled by checkVideoTimeForTimestampOverlays
-                                      // We should call it once here to ensure initial state is correct for t=0 overlays
-                                      // However, player might not be ready. Defer to first check in interval or on PAUSED state if autoplay is off.
-                                  }
+                                     // This logic is now primarily handled by checkVideoTimeForTimestampOverlays,
+                                     // which is called after "Click to Begin" logic or if it's skipped.
+                                     // No specific opacity/pointerEvents changes needed here anymore for the non-button case.
                               }
                         } else {
                              console.warn("YouTube API not ready yet. Attempting to load player after delay...");
@@ -562,35 +594,48 @@
                              setTimeout(() => {
                                  if (isYouTubeApiReady) {
                                      setupYouTubePlayer(videoId);
-                                     // Potentially show "Click to Begin" here too if API loads late and button is configured
-                                     // For now, keeping it simple: if API wasn't ready initially, button won't show on delayed load.
+                                     // Potentially show "Click to Begin" here too if API loads late and button is configured.
+                                     // This would involve re-running the logic for the button. For simplicity, this edge case
+                                     // (API ready late + button configured) might not show the button.
+                                     // However, checkVideoTimeForTimestampOverlays will still be called.
+                                     if (media.youtubeOptions && media.youtubeOptions.showClickToBeginButton) {
+                                         // Re-evaluate click to begin if API becomes ready later
+                                         // This is a simplified re-evaluation.
+                                         // Note: This part of the logic might need more robust handling if late API readiness
+                                         // for "Click to Begin" is a critical feature.
+                                         console.log("YouTube API became ready late, re-evaluating 'Click to Begin' for videoId:", videoId);
+                                         // The original 'Click to Begin' logic is above, within the `if (youtubeOptions.showClickToBeginButton)` block.
+                                         // To avoid duplicating that large block, we'll rely on the fact that if the player setup was delayed,
+                                         // the initial renderSlideForViewing call might not have shown the button.
+                                         // A full re-render or more targeted function might be needed for perfect handling.
+                                         // For now, ensure checkVideoTimeForTimestampOverlays is called to set correct canvas state.
+                                         checkVideoTimeForTimestampOverlays();
+                                     }
                                  } else {
                                      console.error("YouTube API still not ready after delay. Video will not play.");
                                      displayMessageViewer("YouTube player could not load. Please refresh the page.", false);
                                  }
                              }, 2000);
-                             // Ensure canvas is transparent here too if player doesn't load initially
-                             if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                             if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                             canvas.renderAll();
+                             // Ensure canvas is transparent here too if player doesn't load initially,
+                             // unless overlays at t=0 need it (handled by checkVideoTimeForTimestampOverlays).
+                             checkVideoTimeForTimestampOverlays(); // Call to set initial state
+                             // canvas.renderAll(); // checkVideoTimeForTimestampOverlays will render if needed
                         }
                     } else {
                         console.error("Could not extract YouTube Video ID from URL:", media.url);
                         displayMessageViewer("Invalid YouTube URL format.", false);
-                        // Ensure canvas is transparent here too
-                        if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                        if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                        canvas.renderAll(); 
+                        checkVideoTimeForTimestampOverlays(); // Ensure canvas state is appropriate
+                        // canvas.renderAll();
                     }
                 } else {
                      console.warn("YouTube media type set but URL is missing.");
                      displayMessageViewer("YouTube URL is missing for this slide.", false);
-                     // Ensure canvas is transparent here too
-                     if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-                     if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-                     canvas.renderAll(); 
+                     checkVideoTimeForTimestampOverlays(); // Ensure canvas state is appropriate
+                     // canvas.renderAll();
                 }
                 // Overlays will be loaded below, after the switch statement.
+                // checkVideoTimeForTimestampOverlays() is also called after player state changes
+                // and after questions, so initial state for overlays at t=0 should be handled.
                 break;
 
             case 'audio':
@@ -1570,25 +1615,15 @@
 
     function onPlayerReady(event) {
         console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
-         if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
-             console.log("Adding click-to-play listener to YT player container.");
-             youtubePlayerContainerEl.addEventListener('click', function() {
-                 console.log("Player container clicked.");
-                 if (ytPlayer && typeof ytPlayer.playVideo === 'function' && typeof ytPlayer.pauseVideo === 'function' && typeof ytPlayer.getPlayerState === 'function') {
-                     const state = ytPlayer.getPlayerState();
-                     if (state !== YT.PlayerState.PLAYING) {
-                         console.log("Calling playVideo().");
-                         ytPlayer.playVideo();
-                     } else {
-                         console.log("Calling pauseVideo().");
-                         ytPlayer.pauseVideo();
-                     }
-                 } else {
-                     console.warn("Cannot play/pause: Player or methods not available.");
-                 }
-             });
-             youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
+         // The click listener on youtubePlayerContainerEl has been removed as per requirements.
+         // Video control should now primarily be through defined interactive elements on the Fabric canvas
+         // (e.g., "Click to Begin" button, questions, interactive timestamp overlays).
+         // If youtubePlayerContainerEl had a 'click-listener-added' attribute, ensure it's removed
+         // if any related cleanup logic relied on it (though it's not strictly necessary now).
+         if (youtubePlayerContainerEl) {
+            youtubePlayerContainerEl.removeAttribute('click-listener-added');
          }
+         renderQuestionTimeline(); // Call to render the timeline
     }
 
     function onPlayerStateChange(event) {
@@ -1661,8 +1696,58 @@
             viewerApp.state.activeTimestampOverlayIds.clear();
             if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0'; // Ensure canvas is clear
             if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
+
+            // Hide and clear the question timeline
+            if (youtubeQuestionTimelineEl) {
+                youtubeQuestionTimelineEl.innerHTML = '';
+                youtubeQuestionTimelineEl.style.display = 'none';
+            }
         }
     }
+
+    function renderQuestionTimeline() {
+        if (!ytPlayer || typeof ytPlayer.getDuration !== 'function' || !youtubeQuestionTimelineEl || !viewerApp.state.currentVideoQuestions) {
+            if (youtubeQuestionTimelineEl) youtubeQuestionTimelineEl.style.display = 'none';
+            return;
+        }
+        const duration = ytPlayer.getDuration();
+        if (duration <= 0) {
+            if (youtubeQuestionTimelineEl) youtubeQuestionTimelineEl.style.display = 'none';
+            return;
+        }
+
+        youtubeQuestionTimelineEl.innerHTML = ''; // Clear existing markers
+        
+        // Adjust timeline width to match media container if it's not already 100% via CSS, or if parent has padding
+        // This ensures markers align correctly with the video player area.
+        if (viewerMediaContainerEl) {
+            // Set the timeline's width to be the same as the media container's current width.
+            // This is important if the media container's width is dynamic or not simply 100% of its parent.
+            youtubeQuestionTimelineEl.style.width = viewerMediaContainerEl.offsetWidth + 'px';
+        } else {
+            // Fallback or default if viewerMediaContainerEl is not found, though it should be.
+            // The CSS already sets width: 100%, so this might only be needed if offsetWidth is more accurate.
+        }
+        youtubeQuestionTimelineEl.style.display = 'block'; // Make timeline visible only if there are questions and duration > 0
+
+        if (viewerApp.state.currentVideoQuestions.length === 0) {
+             youtubeQuestionTimelineEl.style.display = 'none'; // No questions, no need for timeline
+             return;
+        }
+
+
+        viewerApp.state.currentVideoQuestions.forEach(question => {
+            if (typeof question.timestamp === 'number' && question.timestamp >= 0 && question.timestamp <= duration) {
+                const marker = document.createElement('div');
+                marker.className = 'timeline-marker';
+                const percentPosition = (question.timestamp / duration) * 100;
+                marker.style.left = percentPosition + '%';
+                marker.title = `Question at ${Math.floor(question.timestamp / 60)}m ${Math.floor(question.timestamp % 60)}s`; // Tooltip
+                youtubeQuestionTimelineEl.appendChild(marker);
+            }
+        });
+    }
+
 
     function extractYouTubeVideoId(url) {
         if (!url) return null;

@@ -55,9 +55,15 @@
         h1 { font-size: 1.8rem; margin-bottom: 1rem;} /* Adjust sizes as needed */
         h2 { font-size: 1.4rem; margin-bottom: 0.75rem;}
         h3 { font-size: 1.1rem; color: var(--theme-text-color-primary); font-weight: 500; margin-bottom: 0.5rem;} /* For "Slides" in slide panel */
-      label { display: inline-block; margin-bottom: 5px; font-weight: bold;} /* Will be reviewed later */
+      label { 
+        display: inline-block; 
+        margin-bottom: 6px; /* Slightly more breathing room */
+        font-weight: 500; /* Material Medium */
+        font-size: 0.875rem; /* 14px */
+        color: var(--theme-text-color-secondary); 
+      }
       
-      button { 
+      button, .button { /* Added .button class for elements that should look like buttons */
             padding: 8px 16px; 
             cursor: pointer; 
             background-color: var(--theme-primary-color); 
@@ -70,15 +76,30 @@
             letter-spacing: 0.089em; /* Material spec */
             transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
             box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); /* Subtle shadow for buttons */
+            display: inline-flex; /* For aligning icons if any */
+            align-items: center;
+            justify-content: center;
+            text-decoration: none; /* For .button used on <a> tags */
         }
-        button:hover { 
+        button:hover, .button:hover { 
             background-color: var(--theme-primary-hover); 
             box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 2px 5px 2px rgba(60,64,67,0.15); /* Slightly elevated shadow on hover */
         }
-      button.edit-button { background-color: var(--theme-success-color); }
-      button.edit-button:hover { background-color: var(--theme-success-hover); }
-      button.danger-button { background-color: var(--theme-danger-color); }
-      button.danger-button:hover { background-color: var(--theme-danger-hover); }
+      button.edit-button, .button.edit-button { background-color: var(--theme-success-color); }
+      button.edit-button:hover, .button.edit-button:hover { background-color: var(--theme-success-hover); }
+      button.danger-button, .button.danger-button { background-color: var(--theme-danger-color); }
+      button.danger-button:hover, .button.danger-button:hover { background-color: var(--theme-danger-hover); }
+      button.secondary-button, .button.secondary-button { /* For less prominent actions */
+        background-color: var(--theme-background-card);
+        color: var(--theme-primary-color);
+        border: 1px solid var(--theme-input-border-color);
+        box-shadow: none;
+      }
+      button.secondary-button:hover, .button.secondary-button:hover {
+        background-color: rgba(0,0,0,0.03);
+        border-color: var(--theme-primary-hover);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      }
       
       /* General input styling - some of these will be overridden by more specific toolbar/popover rules */
       input[type="text"], 
@@ -97,6 +118,11 @@
         color: var(--theme-text-color-primary);
         background-color: var(--theme-background-card);
       }
+      input[type="text"]::placeholder,
+      textarea::placeholder {
+        color: var(--theme-text-color-secondary);
+        opacity: 0.7;
+      }
       input[type="text"]:focus, 
       input[type="file"]:focus, 
       input[type="number"]:focus, 
@@ -111,20 +137,42 @@
         accent-color: var(--theme-primary-color);
       }
 
-      #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; }
+      #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; font-size: 0.9rem;}
       .success { border-color: var(--theme-success-color); background-color: #e6f4ea; color: var(--theme-success-hover); } /* Light green bg */
       .error { border-color: var(--theme-danger-color); background-color: #fce8e6; color: var(--theme-danger-hover); } /* Light red bg */
 
       #adminProjectListContainer { margin-top: 15px; }
-      .project-item { background-color: #e9ecef; padding: 10px 15px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;}
+      .project-item { 
+        background-color: var(--theme-background-card); /* Consistent with .container */
+        padding: 15px; /* Consistent padding */
+        margin-bottom: 12px; /* Slightly more spacing */
+        border-radius: 8px; /* Consistent with .container */
+        border: 1px solid var(--theme-border-color); /* Consistent border */
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        flex-wrap: wrap; 
+        gap: 10px;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.08), 0 1px 3px 1px rgba(60,64,67,0.05); /* Softer shadow */
+      }
+      .project-item:hover {
+        box-shadow: 0 1px 3px 0 rgba(60,64,67,0.12), 0 2px 5px 2px rgba(60,64,67,0.08); /* Subtle hover shadow */
+      }
       .project-item > div:first-child { flex-basis: 60%; min-width: 200px;}
-      .project-item > div:last-child { flex-basis: 35%; min-width: 200px; display: flex; justify-content: flex-end; align-items: center;}
-      .project-item span { font-size: 1.1em; display: block; }
-      .project-item .status-text { font-style: italic; color: #555; font-size: 0.9em;}
+      .project-item > div:last-child { 
+        flex-basis: 35%; 
+        min-width: 200px; 
+        display: flex; 
+        justify-content: flex-end; 
+        align-items: center;
+        gap: 8px; /* Add gap between buttons in project item */
+      }
+      .project-item span { font-size: 1.1em; display: block; color: var(--theme-text-color-primary); font-weight: 500;}
+      .project-item .status-text { font-style: italic; color: var(--theme-text-color-secondary); font-size: 0.9em; font-weight: 400;}
       .project-item .project-status-select { 
-        font-size: 0.9em; padding: 5px; margin-right: 10px; 
+        font-size: 0.9em; padding: 6px 8px; /* Consistent padding */
         border: 1px solid var(--theme-input-border-color); 
-        border-radius: 3px; 
+        border-radius: 4px; /* Consistent radius */
         background-color: var(--theme-background-card);
         color: var(--theme-text-color-primary);
         -webkit-appearance: none; 
@@ -136,9 +184,7 @@
         padding-right: 28px; 
       }
 
-      #loadingSpinner { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(255,255,255,0.7); z-index:10000; justify-content:center; align-items:center; }
-      .loader { border: 8px solid #f3f3f3; border-top: 8px solid var(--theme-primary-color); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      /* Spinner CSS is now in Client/Shared/LoadingSpinner.html */
 
       .edit-controls-group {
         margin-bottom: 20px;
@@ -152,33 +198,92 @@
       .edit-controls-group input[type="file"] { display: block; width: calc(100% - 22px); margin-bottom: 15px; }
       .edit-controls-group button { margin-top: -5px; margin-bottom: 15px; }
 
-      #fabricCanvasContainer { display: flex; justify-content: center; align-items: center; border: 1px dashed var(--theme-border-color); margin-top: 15px; position: relative; }
-      #fabricCanvasElement { border: 1px solid var(--theme-text-color-primary); }
+      #fabricCanvasContainer { 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        border: 1px dashed var(--theme-border-color); 
+        margin-top: 15px; 
+        position: relative; 
+        background-color: var(--theme-background-main); /* Light background for canvas area */
+      }
+      #fabricCanvasElement { 
+        border: 1px solid var(--theme-text-color-secondary); /* Slightly softer border for canvas */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+      }
       .media-placeholder { position: absolute; top: 10px; left: 10px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 5px 10px; font-size: 0.9em; border-radius: 3px; pointer-events: none; z-index: 5; }
 
-      #slideManagementPanel { margin-top: 20px; padding: 10px; background-color: #e8f0fe; border-radius: 5px; border: 1px solid var(--theme-border-color); } /* Light blue for slide panel */
-      #slideThumbnailsContainer { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; min-height: 60px; padding: 5px; border: 1px solid var(--theme-border-color); background-color: var(--theme-background-main); }
-      .slide-thumbnail { width: 100px; height: 75px; border: 2px solid var(--theme-icon-color); background-color: #e6e6fa; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 0.8em; text-align: center; position: relative; border-radius: 3px; }
-      .slide-thumbnail.active-slide { border-color: var(--theme-primary-color); box-shadow: 0 0 5px var(--theme-primary-color); }
-      .slide-thumbnail:hover { border-color: var(--theme-primary-hover); }
-      .delete-slide-btn { position: absolute; top: -8px; right: -8px; background-color: var(--theme-danger-color); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; line-height: 20px; text-align: center; cursor: pointer; display: none; }
-      .slide-thumbnail:hover .delete-slide-btn { display: block; }
+      #slideManagementPanel { 
+        margin-top: 20px; 
+        padding: 15px; /* Consistent padding */
+        background-color: var(--theme-background-card); /* Consistent with .container */
+        border-radius: 8px; /* Consistent with .container */
+        border: 1px solid var(--theme-border-color); /* Consistent border */
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.08), 0 1px 3px 1px rgba(60,64,67,0.05); /* Softer shadow */
+      }
+      #slideThumbnailsContainer { 
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 10px; 
+        margin-top: 10px; 
+        min-height: 70px; /* Slightly taller */
+        padding: 10px; /* More padding */
+        border: 1px solid var(--theme-border-color); 
+        background-color: var(--theme-background-main); 
+        border-radius: 4px; /* Rounded corners for the container */
+      }
+      .slide-thumbnail { 
+        width: 100px; height: 75px; 
+        border: 2px solid var(--theme-border-color); /* Default border */
+        background-color: var(--theme-background-main); /* Use main background for contrast */
+        display: flex; justify-content: center; align-items: center; 
+        cursor: pointer; 
+        font-size: 0.8em; text-align: center; position: relative; 
+        border-radius: 4px; /* Consistent radius */
+        color: var(--theme-text-color-secondary);
+        transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      }
+      .slide-thumbnail.active-slide { 
+        border-color: var(--theme-primary-color); 
+        box-shadow: 0 0 0 2px var(--theme-primary-color); /* More prominent active state */
+        color: var(--theme-text-color-primary);
+      }
+      .slide-thumbnail:hover { 
+        border-color: var(--theme-primary-hover); 
+        box-shadow: 0 0 0 1px var(--theme-primary-hover);
+      }
+      .delete-slide-btn { 
+        position: absolute; top: -8px; right: -8px; 
+        background-color: var(--theme-danger-color); 
+        color: white; border: none; border-radius: 50%; 
+        width: 22px; height: 22px; /* Slightly larger */
+        font-size: 14px; /* Larger icon */
+        line-height: 22px; text-align: center; cursor: pointer; 
+        display: none; 
+        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        transition: background-color 0.2s ease;
+      }
+      .delete-slide-btn:hover {
+        background-color: var(--theme-danger-hover);
+      }
+      .slide-thumbnail:hover .delete-slide-btn { display: flex; align-items: center; justify-content: center; } /* Use flex for centering icon if needed */
+
 
       /* --- NEW TOOLBAR STYLES --- */
       #overlayPropertiesToolbar {
-            padding: 8px 5px; 
+            padding: 6px; /* Reduced padding */
             border: 1px solid var(--theme-border-color);
             background-color: var(--theme-background-card); 
-            border-radius: 5px;
+            border-radius: 8px; /* Consistent radius */
             margin-bottom: 15px;
             display: none; 
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); 
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.15), 0 1px 3px 1px rgba(60,64,67,0.1); /* Softer shadow */
         }
       .fabric-toolbar-row {
         display: flex;
         align-items: center;
-        gap: 5px; 
-        padding: 5px 0;
+        gap: 4px; /* Slightly reduced gap */
+        padding: 4px 0; /* Reduced padding */
         flex-wrap: wrap; 
       }
       .fabric-toolbar-row:not(:last-child) {
@@ -188,9 +293,9 @@
         display: flex;
         align-items: center;
         gap: 2px; 
-            padding: 0 8px; 
-            border-right: 1px solid var(--theme-border-color); 
-        }
+        padding: 0 6px; /* Reduced padding */
+        border-right: 1px solid var(--theme-border-color); 
+      }
       .toolbar-group:last-child {
         border-right: none;
       }
@@ -214,12 +319,13 @@
         }
         .toolbar-button.active, .toolbar-button.popover-active { 
             background-color: var(--theme-primary-color); 
-            color: white; 
+            color: #ffffff; /* Ensure high contrast for active state */
             border-color: var(--theme-primary-color);
         }
         .toolbar-button.active:hover, .toolbar-button.popover-active:hover {
             background-color: var(--theme-primary-hover);
             border-color: var(--theme-primary-hover);
+            color: #ffffff; /* Ensure high contrast for active state */
         }
       .toolbar-button .material-symbols-outlined {
         font-size: 20px; 
@@ -282,6 +388,13 @@
             vertical-align: middle;
             accent-color: var(--theme-primary-color); 
         }
+        #objOpacityValueDisplay { /* Added for opacity value */
+            font-size: 0.8em;
+            color: var(--theme-text-color-secondary);
+            margin-left: 4px;
+            min-width: 30px; /* Ensure space for "100%" */
+            text-align: right;
+        }
         .toolbar-select-compact,
         .toolbar-popover select {
             padding: 6px 8px;
@@ -309,6 +422,9 @@
        #objTextContent { 
            height: 30px; 
            vertical-align: middle; 
+           font-family: var(--theme-font-family); /* Ensure consistent font */
+           background-color: var(--theme-background-card); /* Consistent bg */
+           color: var(--theme-text-color-primary); /* Consistent text color */
         }
         #objFontFamily { 
              width: 100%; 
@@ -321,8 +437,8 @@
         }
 
       .toolbar-group:first-child {
-        margin-right: 10px;
-        padding-right: 5px; 
+        margin-right: 8px; /* Consistent spacing */
+        padding-right: 4px; 
       }
       .toolbar-group:first-child .toolbar-button {
         margin-right: 2px; 
@@ -332,8 +448,8 @@
             position: absolute;
             background-color: var(--theme-background-card);
             border: 1px solid var(--theme-border-color);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.1); 
-            padding: 15px;
+            box-shadow: 0 2px 6px 2px rgba(60,64,67,0.15); /* Google-style popover shadow */
+            padding: 16px; /* Consistent padding */
             border-radius: 8px; 
             z-index: 200; 
             display: none;
@@ -342,19 +458,18 @@
         }
       .toolbar-popover h4 { 
             margin-top: 0;
-            margin-bottom: 10px;
-            font-size: 1rem;
-            font-weight: 500; 
+            margin-bottom: 12px; /* More spacing */
+            font-size: 1rem; /* 16px */
+            font-weight: 500; /* Material Medium */
             border-bottom: 1px solid var(--theme-border-color);
-            padding-bottom: 8px; 
+            padding-bottom: 10px; /* More spacing */
             color: var(--theme-text-color-primary);
         }
-      .toolbar-popover label {
+      .toolbar-popover label { /* Consistent with general label style */
             display: inline-block;
-            width: auto; 
-            margin-bottom: 5px; 
+            margin-bottom: 6px; 
             margin-right: 8px; 
-            font-weight: 400; 
+            font-weight: 500; 
             font-size: 0.875rem;
             color: var(--theme-text-color-secondary);
         }
@@ -363,7 +478,8 @@
       .toolbar-popover input[type="text"],
       .toolbar-popover select,
       .toolbar-popover textarea { 
-        width: 150px; 
+        width: 150px; /* Default width, can be overridden */
+        margin-bottom: 8px; /* Consistent spacing */
       }
       .toolbar-popover input[type="checkbox"] {
             margin-right: 5px; 
@@ -373,20 +489,21 @@
       .toolbar-popover .checkbox-label { 
             width: auto; 
             margin-left: 0; 
-            font-weight: 400; 
+            font-weight: 400; /* Normal weight for checkbox labels */
             color: var(--theme-text-color-primary); 
             vertical-align: middle;
+            font-size: 0.875rem; /* Consistent with other labels */
         }
 
       .config-section { 
-        margin-top: 10px;
-        padding-top: 10px; 
-        padding-left: 10px;
-        border-left: 2px solid var(--theme-primary-color); 
-        border-top: 1px dashed var(--theme-border-color); 
+        margin-top: 12px; /* More spacing */
+        padding-top: 12px; 
+        padding-left: 12px;
+        border-left: 3px solid var(--theme-primary-color); /* Thicker accent border */
+        border-top: 1px solid var(--theme-border-color); /* Use solid instead of dashed for cleaner look */
       }
       .config-section label { width: auto; } 
-      .config-section input, .config-section textarea { width: calc(100% - 10px); max-width: none; }
+      .config-section input, .config-section textarea { width: calc(100% - 16px); max-width: none; } /* Adjust width for padding */
 
       .sr-only {
         position: absolute;
@@ -408,46 +525,51 @@
       .media-tab-btn {
         background: none;
         border: none;
-        padding: 8px 15px;
+        padding: 10px 15px; /* More padding for tappability */
         cursor: pointer;
         color: var(--theme-text-color-secondary); 
-        font-size: 14px;
-        opacity: 0.7;
-        transition: all 0.2s;
+        font-size: 0.875rem; /* 14px */
+        font-weight: 500; /* Medium weight for tabs */
+        opacity: 0.8; /* Slightly more visible */
+        transition: all 0.2s ease-in-out;
         border-bottom: 2px solid transparent;
+      }
+      .media-tab-btn:hover {
+        background-color: rgba(0,0,0,0.03);
+        color: var(--theme-primary-color);
       }
       .media-tab-btn.active {
         opacity: 1;
         border-bottom: 2px solid var(--theme-primary-color);
         color: var(--theme-primary-color); 
-        font-weight: bold;
+        font-weight: 500; /* Keep consistent weight */
       }
       .media-tab-pane {
         display: none;
-        padding: 10px 5px;
+        padding: 15px 5px; /* More padding */
       }
       .media-tab-pane.active {
         display: block;
       }
 
       .media-upload-zone {
-        border: 2px dashed var(--theme-input-border-color);
-        border-radius: 5px;
+        border: 2px dashed var(--theme-border-color); /* Use theme border color */
+        border-radius: 8px; /* Consistent radius */
         padding: 30px 20px;
         text-align: center;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
         margin: 10px 0;
         background-color: var(--theme-background-main); 
         min-height: 100px; 
       }
       .media-upload-zone:hover {
-        border-color: var(--theme-primary-color);
-        background-color: #e8f0fe; 
+        border-color: var(--theme-primary-hover);
+        background-color: #e8f0fe; /* Consistent with existing hover */
       }
       .media-upload-zone.drag-over {
-        border-color: var(--theme-success-color);
-        background-color: #e6f4ea; 
+        border-color: var(--theme-success-hover);
+        background-color: #e6f4ea; /* Consistent with existing hover */
       }
 
       .upload-prompt {
@@ -471,33 +593,41 @@
         display: flex;
         gap: 10px;
         margin-top: 10px;
+        align-items: center; /* Align items vertically */
       }
       .youtube-input-group input {
         flex: 1;
+        margin-bottom: 0; /* Remove bottom margin if it's the only element */
+      }
+      .youtube-input-group button {
+        flex-shrink: 0; /* Prevent button from shrinking */
       }
 
+
       .shapes-buttons { 
-        display: flex;
+        display: grid; /* Use grid for better alignment */
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); /* Responsive columns */
         gap: 10px;
-        flex-wrap: wrap;
-        justify-content: space-around; 
       }
       .shape-button { 
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 10px; 
-        background: var(--theme-background-main); 
+        justify-content: center; /* Center content vertically */
+        padding: 12px 8px; /* Adjusted padding */
+        background: var(--theme-background-card); /* Use card background */
         border: 1px solid var(--theme-border-color);
-        border-radius: 5px;
+        border-radius: 8px; /* Consistent radius */
         cursor: pointer;
-        min-width: 80px; 
-        transition: all 0.2s;
-        font-size: 0.9em;
+        min-height: 70px; /* Ensure consistent height */
+        transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        font-size: 0.875rem; /* Consistent font size */
+        text-align: center;
       }
       .shape-button:hover {
-        background: #e8e8e8; 
+        background-color: rgba(0,0,0,0.03); /* Subtle hover */
         border-color: var(--theme-input-border-color);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
       }
       .shape-button .material-symbols-outlined {
         font-size: 24px; 
@@ -512,7 +642,7 @@
       .position-controls {
         display: flex;
         flex-direction: column;
-        gap: 10px; 
+        gap: 12px; /* Increased gap */
       }
       .position-control-row {
         display: flex;
@@ -523,7 +653,8 @@
       .position-control-row label {
         flex: 0 0 70px; 
         text-align: right;
-        font-size: 0.9em; 
+        font-size: 0.875rem; /* Consistent font size */
+        color: var(--theme-text-color-secondary);
       }
       .position-control-row input { 
         flex: 1;
@@ -600,15 +731,18 @@
         background-color: var(--theme-background-card);
         border: 1px solid var(--theme-border-color);
         border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 6px 2px rgba(60,64,67,0.15); /* Google-style popover shadow */
         padding: 20px;
         overflow-y: auto;
       }
-      #timestampOverlayModal h3 {
+      #timestampOverlayModal h3, #questionModal h3 { /* Shared styling for modal headers */
         margin-top: 0;
         border-bottom: 1px solid var(--theme-border-color);
         padding-bottom: 10px;
         margin-bottom: 15px;
+        font-size: 1.2rem; /* Consistent heading size */
+        font-weight: 500; /* Material Medium */
+        color: var(--theme-text-color-primary);
       }
       #timestampOverlayList {
         list-style: none;
@@ -619,19 +753,230 @@
         border: 1px solid var(--theme-border-color);
         padding: 10px;
         border-radius: 4px;
+        background-color: var(--theme-background-main); /* Light bg for list */
       }
       #timestampOverlayList li {
-        padding: 8px 5px;
-        border-bottom: 1px dashed var(--theme-border-color);
+        padding: 8px 10px; /* More padding */
+        border-bottom: 1px solid var(--theme-border-color); /* Solid border */
+        font-size: 0.9rem;
+        color: var(--theme-text-color-primary);
       }
       #timestampOverlayList li:last-child {
         border-bottom: none;
       }
-      #timestampOverlayModal .checkbox-label { /* Re-use existing checkbox-label style */
-        font-weight: normal;
+      #timestampOverlayModal .checkbox-label,
+      #questionModal .checkbox-label { /* Consistent checkbox labels in modals */
+        font-weight: 400; /* Normal weight */
+        color: var(--theme-text-color-primary);
+        font-size: 0.875rem;
       }
-      #timestampOverlayModal button {
+      #timestampOverlayModal button,
+      #questionModal button { /* Ensure modal buttons follow theme */
         margin-right: 10px;
+      }
+      #timestampOverlayModal button:last-of-type,
+      #questionModal button:last-of-type {
+        margin-right: 0; /* Remove margin for last button */
+      }
+      #addQuestionBtn, #manageTimestampOverlaysButton { /* Style timeline buttons */
+        /* Using .button class would make them uppercase, which might be too strong here. */
+        /* Let's give them a slightly softer primary look */
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        text-transform: none; /* Override default button uppercase */
+        letter-spacing: normal; /* Override default button letter-spacing */
+      }
+      #manageTimestampOverlaysButton {
+        background-color: var(--theme-success-color); /* Use success color for "Manage" */
+      }
+      #manageTimestampOverlaysButton:hover {
+        background-color: var(--theme-success-hover);
+      }
+      #videoTimelineControls input[type="range"] {
+        accent-color: var(--theme-primary-color);
+      }
+      #questionModal .question-option-group label:not(.checkbox-label) { /* Target only textual labels for options */
+        width: 60px; /* Fixed width for "Option X:" */
+        text-align: right;
+        margin-right: 5px;
+      }
+      #questionModal .question-option-group input[type="text"] {
+        flex-grow: 1; /* Allow text input to take remaining space */
+      }
+      #questionModal .question-option-group {
+        display: flex; /* Align label, input, and radio button nicely */
+        align-items: center;
+      }
+
+
+      /* --- Responsive Design --- */
+
+      /* Medium screens (tablets, smaller desktops) */
+      @media (max-width: 768px) {
+        .main-content-wrapper {
+            padding: 15px;
+        }
+        h1 { font-size: 1.6rem; }
+        h2 { font-size: 1.3rem; }
+        h3 { font-size: 1.0rem; }
+
+        .project-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .project-item > div:first-child,
+        .project-item > div:last-child {
+            flex-basis: 100%;
+            width: 100%;
+            justify-content: flex-start; /* Align controls to the left when stacked */
+        }
+        .project-item .project-status-select {
+            margin-right: 0; /* Remove right margin when stacked */
+            margin-top: 5px; /* Add some top margin */
+        }
+
+        #createProjectSection input[type="text"],
+        #createProjectSection button {
+            width: 100%;
+            box-sizing: border-box; /* Ensure padding doesn't make it overflow */
+        }
+        #createProjectSection input[type="text"] {
+            margin-bottom: 10px;
+        }
+
+        .fabric-toolbar-row {
+            flex-wrap: wrap; /* Allow groups to wrap */
+        }
+        .toolbar-group {
+            border-right: none; /* Remove vertical borders between groups when they might wrap */
+            padding: 5px; /* Add some padding for wrapped groups */
+        }
+        #overlayPropertiesToolbar {
+            padding: 5px;
+        }
+
+        .toolbar-popover {
+            width: 80vw; /* Make popovers wider */
+            max-width: 400px; /* But not excessively wide */
+            left: 50% !important; /* Override inline style if JS sets it */
+            transform: translateX(-50%) translateY(5px) !important; /* Adjust position */
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        #timestampOverlayModal {
+            width: 90vw;
+            max-width: 450px;
+        }
+        
+        /* Ensure canvas container can shrink */
+        #fabricCanvasContainer {
+            width: 100%; /* Allow it to shrink */
+            height: auto; /* Adjust height as needed, or let JS handle */
+            min-height: 300px; /* Example minimum height */
+        }
+         /* Ensure video timeline controls are usable */
+        #videoTimelineControls input[type="range"] {
+            width: calc(100% - 20px); /* Adjust for padding */
+        }
+      }
+
+      /* Small screens (mobile phones) */
+      @media (max-width: 480px) {
+        .main-content-wrapper {
+            padding: 10px;
+        }
+        h1 { font-size: 1.4rem; }
+        h2 { font-size: 1.2rem; }
+
+        #slideThumbnailsContainer {
+            justify-content: center; /* Center thumbnails if they don't fill width */
+        }
+        .slide-thumbnail {
+            width: 80px;
+            height: 60px;
+        }
+
+        .toolbar-button {
+            padding: 5px; /* Slightly reduce padding */
+            min-width: 32px; /* Slightly smaller min-width */
+            height: 32px;
+        }
+        .toolbar-button .material-symbols-outlined {
+            font-size: 18px; /* Smaller icons */
+        }
+        .toolbar-input-compact {
+            width: 45px;
+            height: 28px;
+        }
+        #objTextContent {
+            width: 150px; /* Adjust text area in toolbar */
+        }
+
+        .toolbar-popover {
+            width: 95vw; /* Popovers take almost full width */
+            max-width: none; /* Remove max-width constraint */
+            font-size: 0.9rem; /* Slightly smaller font in popovers */
+        }
+         .toolbar-popover label,
+         .toolbar-popover input,
+         .toolbar-popover select,
+         .toolbar-popover textarea {
+            font-size: 0.85rem; /* Ensure inputs are also smaller */
+         }
+        #timestampOverlayModal {
+            width: 95vw;
+        }
+
+        input[type="text"], 
+        input[type="file"], 
+        input[type="number"], 
+        select, 
+        textarea,
+        button { /* General inputs and buttons full width */
+            width: 100%;
+            box-sizing: border-box;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .toolbar-group button, /* Keep toolbar buttons inline */
+        .project-item button, /* Keep project item buttons inline if possible or manage with flex */
+        .edit-controls-group button {
+             width: auto; /* Override general full width for specific cases */
+        }
+        .project-item > div:last-child button { /* Make buttons in project item controls take more width if needed */
+             flex-grow: 1; /* Allow buttons to grow */
+             margin-bottom: 5px;
+        }
+        .project-item > div:last-child {
+            display: flex;
+            flex-direction: column; /* Stack buttons in project item controls */
+        }
+        .project-item .project-status-select {
+             width: 100%; /* Full width for select in project item */
+        }
+
+        #questionModal {
+            width: 95vw; /* Make question modal responsive */
+            font-size: 0.9rem;
+            padding: 15px; /* Adjust padding for smaller modal */
+        }
+        #questionModal input[type="text"],
+        #questionModal textarea {
+            width: calc(100% - 16px); /* Adjust for padding (box-sizing) */
+            font-size: 0.85rem;
+        }
+         #questionModal .question-option-group input[type="text"] {
+            width: calc(100% - 95px); /* Specific adjustment for option text inputs */
+         }
+         #questionModal label { /* Ensure labels in question modal are also responsive */
+            font-size: 0.85rem;
+         }
+         .project-item > div:last-child button { /* Ensure project item buttons have some base style if not covered by .button */
+            padding: 6px 10px;
+            font-size: 0.8rem;
+         }
+
+
       }
 
     </style>

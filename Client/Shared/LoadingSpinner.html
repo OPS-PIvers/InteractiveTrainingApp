@@ -1,4 +1,50 @@
 <!-- Client/Shared/LoadingSpinner.html -->
-<div id="loadingSpinner" style="/* styles are in AdminView.html for now, or can be moved to a shared CSS */">
-    <div class="loader"></div>
-  </div>
+<div id="loadingSpinner">
+  <svg class="spinner-svg" viewBox="0 0 50 50">
+    <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+  </svg>
+</div>
+<style>
+  #loadingSpinner {
+    display: none; /* Hidden by default, JS will toggle this */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8); /* Slightly more opaque background */
+    z-index: 10000; /* High z-index to be on top */
+    justify-content: center; /* Center content horizontally (flex property) */
+    align-items: center; /* Center content vertically (flex property) */
+    /* display: flex; /* This will be set by JS when showing the spinner */
+  }
+  .spinner-svg {
+    animation: rotate 2s linear infinite;
+    width: 50px;
+    height: 50px;
+  }
+  .spinner-svg .path {
+    stroke: var(--theme-primary-color, #1a73e8); /* Use theme color with fallback */
+    stroke-linecap: round;
+    animation: dash 1.5s ease-in-out infinite;
+  }
+  @keyframes rotate {
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes dash {
+    0% {
+      stroke-dasharray: 1, 150;
+      stroke-dashoffset: 0;
+    }
+    50% {
+      stroke-dasharray: 90, 150;
+      stroke-dashoffset: -35;
+    }
+    100% {
+      stroke-dasharray: 90, 150;
+      stroke-dashoffset: -124;
+    }
+  }
+</style>

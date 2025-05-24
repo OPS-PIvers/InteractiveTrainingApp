@@ -37,6 +37,24 @@ function onYouTubeIframeAPIReady() {
   adminApp.state.isYouTubeApiReady = true;
   console.log('Admin YouTube API Ready.');
 }
+
+function isYouTubePlayerAvailable() {
+    return adminApp.state.isYouTubeApiReady &&
+           typeof YT !== 'undefined' &&
+           typeof YT.Player !== 'undefined';
+}
+
+function safeGetCurrentTime(player) {
+    if (!player || typeof player.getCurrentTime !== 'function') {
+        return 0;
+    }
+    try {
+        return player.getCurrentTime();
+    } catch (e) {
+        console.warn("Could not get current time from YouTube player:", e);
+        return 0;
+    }
+}
     // --- DOM Element References ---
     let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
     let listViewContainerEl, adminProjectListContainerEl;
@@ -867,9 +885,9 @@ function onYouTubeIframeAPIReady() {
         }
 
 
+        // In selectSlide() function, before setting up YouTube
         if (adminApp.state.adminYouTubePlayer) {
-            adminApp.state.adminYouTubePlayer.destroy();
-            adminApp.state.adminYouTubePlayer = null;
+            stopAndDestroyAdminYouTubePlayer();
         }
         if (adminYouTubePlayerContainerEl) {
             adminYouTubePlayerContainerEl.style.display = 'none';
@@ -940,7 +958,7 @@ function onYouTubeIframeAPIReady() {
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
             
             const videoId = extractYouTubeVideoId(media.url);
-            if (videoId && adminYouTubePlayerContainerEl && typeof YT !== 'undefined' && YT.Player) {
+            if (videoId && adminYouTubePlayerContainerEl && isYouTubePlayerAvailable()) {
                 adminYouTubePlayerContainerEl.style.display = 'block';
                 // For admin editor, keep canvas fully visible or semi-transparent, not opacity 0
                 if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // MODIFIED for editor visibility
@@ -975,7 +993,7 @@ function onYouTubeIframeAPIReady() {
                             }
                             if (event.data === YT.PlayerState.PLAYING) {
                                 adminApp.state.playerUpdateInterval = setInterval(() => {
-                                    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+                                    const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
                                     if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
                                     if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
                                 }, 250); 
@@ -988,7 +1006,13 @@ function onYouTubeIframeAPIReady() {
                             
                             if (adminMediaPlaceholderEl) {
                                 if (event.data === 150) { 
-                                    adminMediaPlaceholderEl.innerHTML = `<strong>Playback Error (Code 150)</strong><br>The owner of this video has restricted playback in embedded players. Please try a different YouTube video. <br><small>URL: ${media.url}</small>`;
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.innerHTML = '<strong>Playback Error (Code 150)</strong><br>The owner of this video has restricted playback in embedded players. Please try a different YouTube video.<br><small>URL: </small>';
+                                    const urlSpan = document.createElement('span');
+                                    urlSpan.textContent = media.url; // Safe text content
+                                    errorDiv.querySelector('small').appendChild(urlSpan);
+                                    adminMediaPlaceholderEl.innerHTML = ''; // Clear previous content
+                                    adminMediaPlaceholderEl.appendChild(errorDiv);
                                 } else { 
                                     adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Code: ${event.data}. URL: ${media.url}`;
                                 }
@@ -1455,7 +1479,7 @@ function onYouTubeIframeAPIReady() {
         currentSlide.slideMedia.mimeType = 'video/youtube';
         currentSlide.slideMedia.originalName = null;
         currentSlide.slideMedia.videoQuestions = currentSlide.slideMedia.videoQuestions || []; // Ensure array exists
-        currentSlide.slideMedia.videoOverlays = []; // Ensure array exists
+        currentSlide.slideMedia.videoOverlays = currentSlide.slideMedia.videoOverlays || [];
 
 
         console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
@@ -1728,11 +1752,11 @@ function onYouTubeIframeAPIReady() {
 
 // Overlay creation workflow
 function initiateOverlayPlacement() {
-    if (!adminApp.state.adminYouTubePlayer) return;
+    if (!isYouTubePlayerAvailable() || !adminApp.state.adminYouTubePlayer) return;
     
     // Pause video at current time
     adminApp.state.adminYouTubePlayer.pauseVideo();
-    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+    const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
     
     // Show placement overlay
     const placementMode = document.getElementById('overlayPlacementMode');
@@ -1841,9 +1865,9 @@ function createNewOverlay() {
         if (adminApp.state.placingOverlay.position) {
             position = adminApp.state.placingOverlay.position;
         }
-    } else if (adminApp.state.adminYouTubePlayer) {
+    } else if (isYouTubePlayerAvailable() && adminApp.state.adminYouTubePlayer) {
         // Fallback if placingOverlay is not set, use current video time
-        startTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+        startTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
     }
 
 
@@ -1917,14 +1941,14 @@ function renderOverlayTimeline() {
         console.warn("renderOverlayTimeline: overlayTimelineTrack element not found.");
         return;
     }
-    if (!adminApp.state.adminYouTubePlayer) {
+    if (!isYouTubePlayerAvailable() || !adminApp.state.adminYouTubePlayer) {
         console.warn("renderOverlayTimeline: adminYouTubePlayer not available.");
         track.innerHTML = '<p>Video player not ready.</p>'; // User feedback
         return;
     }
     
     track.innerHTML = ''; // Clear previous timeline
-    const duration = adminApp.state.adminYouTubePlayer.getDuration();
+    const duration = adminApp.state.adminYouTubePlayer.getDuration(); // getDuration() is generally safe
     if (duration === 0) { // Handle case where duration might not be available yet
         track.innerHTML = '<p>Video duration not available.</p>'; // User feedback
         return;
@@ -2193,13 +2217,13 @@ function renderVideoOverlaysAdmin() {
 }
 
 function updateOverlayPreview() {
-    if (!adminApp.state.adminYouTubePlayer || typeof adminApp.state.adminYouTubePlayer.getCurrentTime !== 'function') {
+    if (!isYouTubePlayerAvailable() || !adminApp.state.adminYouTubePlayer || typeof adminApp.state.adminYouTubePlayer.getCurrentTime !== 'function') {
         // console.warn("updateOverlayPreview: YouTube player not ready or getCurrentTime not available.");
         return;
     }
     if (!adminApp.state.previewingOverlays) return; // Only run if previewing
 
-    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+    const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
     const currentSlide = getCurrentSlide();
     if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) return;
 
@@ -2932,10 +2956,10 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
 
         if (addQuestionBtnEl) {
             addQuestionBtnEl.addEventListener('click', function() {
-                if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
+                if (isYouTubePlayerAvailable() && adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
                     adminApp.state.adminYouTubePlayer.pauseVideo();
                 }
-                const currentTime = adminApp.state.adminYouTubePlayer ? adminApp.state.adminYouTubePlayer.getCurrentTime() : 0;
+                const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
                 if (questionTimestampDisplayEl) {
                     questionTimestampDisplayEl.textContent = formatTime(currentTime);
                     if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
@@ -3184,4 +3208,37 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
     // Removed handleAddTimestampOverlay, populateTimestampOverlayList, editTimestampOverlayTimes, and editTimestampOverlay functions
+
+function stopAndDestroyAdminYouTubePlayer() {
+    try {
+        // Clear any running intervals
+        if (adminApp.state.playerUpdateInterval) {
+            clearInterval(adminApp.state.playerUpdateInterval);
+            adminApp.state.playerUpdateInterval = null;
+        }
+        
+        // Stop and destroy player
+        if (adminApp.state.adminYouTubePlayer) {
+            if (typeof adminApp.state.adminYouTubePlayer.stopVideo === 'function') {
+                adminApp.state.adminYouTubePlayer.stopVideo();
+            }
+            if (typeof adminApp.state.adminYouTubePlayer.destroy === 'function') {
+                adminApp.state.adminYouTubePlayer.destroy();
+            }
+        }
+    } catch (e) {
+        console.error("Error destroying admin YouTube player:", e);
+    } finally {
+        adminApp.state.adminYouTubePlayer = null;
+        
+        // Clean up container
+        if (adminYouTubePlayerContainerEl) {
+            adminYouTubePlayerContainerEl.innerHTML = '';
+            adminYouTubePlayerContainerEl.style.display = 'none';
+        }
+        
+        // Hide timeline controls
+        updateVideoToolsVisibility(false);
+    }
+}
 </script>

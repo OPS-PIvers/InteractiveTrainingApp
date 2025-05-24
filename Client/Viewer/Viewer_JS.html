@@ -38,8 +38,8 @@
       currentVideoQuestions: [], // Stores questions for the current video
       playerQuestionCheckInterval: null, // Interval ID for checking video time
       askedQuestionIndices: [], // Indices of questions already asked for the current slide view
-      currentTimestampOverlays: [], // Stores full overlay definitions for the current slide
-      activeTimestampOverlayIds: new Set(), // Stores IDs of currently displayed timestamp overlays
+      currentVideoOverlays: [], // Stores full overlay definitions for the current slide
+      activeVideoOverlayIds: new Set(), // Stores IDs of currently displayed timestamp overlays
       currentVideoDuration: 0, // Phase 1: Store current video duration for timeline
       ytPlayer: null, // Holds the YouTube player instance
       deferredYouTubeVideoId: null // Stores videoId if player setup is deferred
@@ -446,8 +446,8 @@
                 }
             });
         }
-        viewerApp.state.currentTimestampOverlays = (slideData && slideData.timestampOverlays && Array.isArray(slideData.timestampOverlays)) ? [...slideData.timestampOverlays] : [];
-        viewerApp.state.activeTimestampOverlayIds = new Set(); // Initialize as a new Set
+        viewerApp.state.currentVideoOverlays = (slideData && slideData.slideMedia && slideData.slideMedia.videoOverlays && Array.isArray(slideData.slideMedia.videoOverlays)) ? [...slideData.slideMedia.videoOverlays] : [];
+        viewerApp.state.activeVideoOverlayIds = new Set(); // Initialize as a new Set
 
         // const slideData = slides[slideIndex]; // Original position
         const canvas = viewerApp.state.viewerFabricCanvas;
@@ -1266,8 +1266,8 @@
         }
 
         // Render Timestamp Overlay Markers
-        if (viewerApp.state.currentTimestampOverlays && viewerApp.state.currentTimestampOverlays.length > 0) {
-            viewerApp.state.currentTimestampOverlays.forEach(overlayDef => {
+        if (viewerApp.state.currentVideoOverlays && viewerApp.state.currentVideoOverlays.length > 0) {
+            viewerApp.state.currentVideoOverlays.forEach(overlayDef => {
                 if (overlayDef && typeof overlayDef.timestampShow !== 'undefined' && overlayDef.fabricObjectJSON) {
                     const marker = document.createElement('div');
                     marker.className = 'timeline-marker overlay-marker'; // Generic and specific class
@@ -1311,30 +1311,131 @@
                         viewerTimelineProgressEl.style.width = (currentTime / viewerApp.state.currentVideoDuration) * 100 + '%';
                     }
                     checkVideoTimeForQuestions();
-                    checkVideoTimeForTimestampOverlays(); 
+                    checkVideoTimeForVideoOverlays(currentTime); 
                 } else { // Player was destroyed or became unavailable
                     if (viewerApp.state.playerQuestionCheckInterval) {
                         clearInterval(viewerApp.state.playerQuestionCheckInterval);
                         viewerApp.state.playerQuestionCheckInterval = null;
                     }
                 }
-
-    function updateViewerCanvasInteractivity() {
-        console.log("Placeholder: updateViewerCanvasInteractivity() called.");
-        // Full logic will be added in a later step.
-        // For now, ensure canvas is non-interactive if no other elements demand attention.
-        // This is a simplified placeholder.
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        if (canvas && !canvas.getObjects().some(obj => obj.evented && obj.customType !== 'clickToBeginButton')) { // Basic check
-             if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
-             if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
-        }
-    }
             }, 250);
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
             // Interval is cleared above, so no need to clear again here.
-            checkVideoTimeForTimestampOverlays(); // Call once on pause/end for overlays
+            // The checkVideoTimeForVideoOverlays(currentTime) call within the interval handles PAUSED/ENDED states implicitly
+            // by virtue of the interval stopping and no longer updating.
+            // If a final check is needed on PAUSE/END, it would be like this:
+            // if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getCurrentTime === 'function') {
+            //    const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
+            //    checkVideoTimeForVideoOverlays(currentTime);
+            // }
         }
+    }
+
+    // Definition of checkVideoTimeForTimestampOverlays is removed / replaced by checkVideoTimeForVideoOverlays
+
+    function createFabricObjectFromOverlayDefinition(overlayDef) {
+        console.log("Attempting to create Fabric object for overlay definition:", overlayDef);
+        // Placeholder: Create a simple rectangle.
+        // Actual implementation will depend on overlayDef.template
+        const rect = new fabric.Rect({
+            left: (overlayDef.position.x / 100) * viewerApp.state.viewerFabricCanvas.width, // Example positioning
+            top: (overlayDef.position.y / 100) * viewerApp.state.viewerFabricCanvas.height,
+            fill: overlayDef.content.backgroundColor || 'rgba(100,100,100,0.7)',
+            width: 200, // Placeholder size
+            height: 50,  // Placeholder size
+            originX: 'left',
+            originY: 'top'
+        });
+        return rect;
+        // return null; // Or return null if you want to test adding/removing logic first without visual objects
+    }
+
+    function checkVideoTimeForVideoOverlays(currentTime) {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || !viewerApp.state.currentVideoOverlays) return;
+
+        let changesMadeToCanvasObjects = false;
+
+        viewerApp.state.currentVideoOverlays.forEach(overlayDef => {
+            if (!overlayDef || typeof overlayDef.id === 'undefined' || typeof overlayDef.startTime === 'undefined' || typeof overlayDef.duration === 'undefined') {
+                console.warn("Skipping invalid overlayDef:", overlayDef);
+                return;
+            }
+
+            const shouldBeVisible = (currentTime >= overlayDef.startTime) && (currentTime < (overlayDef.startTime + overlayDef.duration));
+            const isActive = viewerApp.state.activeVideoOverlayIds.has(overlayDef.id);
+
+            if (shouldBeVisible && !isActive) {
+                const fabricObject = createFabricObjectFromOverlayDefinition(overlayDef);
+                if (fabricObject) {
+                    fabricObject.videoOverlayId = overlayDef.id;
+                    fabricObject.selectable = false;
+                    fabricObject.evented = !!(overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none');
+                    fabricObject.hoverCursor = fabricObject.evented ? 'pointer' : 'default';
+                    
+                    // TODO: Attach specific event listeners based on overlayDef.interaction.action
+
+                    canvas.add(fabricObject);
+                    viewerApp.state.activeVideoOverlayIds.add(overlayDef.id);
+                    changesMadeToCanvasObjects = true;
+
+                    if (overlayDef.interaction && overlayDef.interaction.pauseVideo && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.pauseVideo === 'function') {
+                        viewerApp.state.ytPlayer.pauseVideo();
+                    }
+                    console.log(`Video Overlay ${overlayDef.id} added to canvas.`);
+                }
+            } else if (!shouldBeVisible && isActive) {
+                let objectToRemove = null;
+                canvas.getObjects().forEach(obj => {
+                    if (obj.videoOverlayId === overlayDef.id) {
+                        objectToRemove = obj;
+                    }
+                });
+
+                if (objectToRemove) {
+                    canvas.remove(objectToRemove);
+                    viewerApp.state.activeVideoOverlayIds.delete(overlayDef.id);
+                    changesMadeToCanvasObjects = true;
+                    console.log(`Video Overlay ${overlayDef.id} removed from canvas.`);
+                }
+            }
+        });
+
+        if (changesMadeToCanvasObjects) {
+            canvas.requestRenderAll();
+        }
+        updateViewerCanvasInteractivity(); // Called at the end
+    }
+    
+    function updateViewerCanvasInteractivity() {
+        const canvas = viewerApp.state.viewerFabricCanvas;
+        if (!canvas || !viewerCanvasContainerEl || !viewerFabricCanvasEl) return;
+
+        const isQuestionActive = canvas.getObjects().some(obj => obj.customType === 'videoQuestionOverlay');
+        const isClickToBeginActive = canvas.getObjects().some(obj => obj.customType === 'clickToBeginButton');
+        
+        let isInteractiveOverlayActive = false;
+        if (viewerApp.state.activeVideoOverlayIds && viewerApp.state.activeVideoOverlayIds.size > 0 && Array.isArray(viewerApp.state.currentVideoOverlays)) {
+            for (const overlayId of viewerApp.state.activeVideoOverlayIds) {
+                const overlayDef = viewerApp.state.currentVideoOverlays.find(o => o.id === overlayId);
+                if (overlayDef && overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none') {
+                    isInteractiveOverlayActive = true;
+                    break;
+                }
+            }
+        }
+
+        if (isQuestionActive || isClickToBeginActive || isInteractiveOverlayActive) {
+            viewerFabricCanvasEl.style.opacity = '1';
+            viewerCanvasContainerEl.style.pointerEvents = 'auto';
+        } else if (viewerApp.state.currentMediaType === 'youtube') { // Only make YouTube non-interactive by default
+            viewerFabricCanvasEl.style.opacity = '0';
+            viewerCanvasContainerEl.style.pointerEvents = 'none';
+        } else { // For other media types like image or audio, keep canvas interactive
+            viewerFabricCanvasEl.style.opacity = '1';
+            viewerCanvasContainerEl.style.pointerEvents = 'auto';
+        }
+        console.log(`updateViewerCanvasInteractivity: QuestionActive=${isQuestionActive}, ClickToBeginActive=${isClickToBeginActive}, InteractiveOverlayActive=${isInteractiveOverlayActive}. Canvas Opacity: ${viewerFabricCanvasEl.style.opacity}, PointerEvents: ${viewerCanvasContainerEl.style.pointerEvents}`);
     }
 
     function onPlayerError(event) {
@@ -1373,7 +1474,7 @@
                 const objectsToRemove = [];
                 canvas.getObjects().forEach(obj => {
                     // Check for timestamp overlays by overlayId
-                    if (obj.overlayId && viewerApp.state.activeTimestampOverlayIds.has(obj.overlayId)) {
+                    if (obj.overlayId && viewerApp.state.activeVideoOverlayIds.has(obj.overlayId)) {
                         objectsToRemove.push(obj);
                     }
                     // Check for ClickToBeginButton by customType
@@ -1386,8 +1487,8 @@
                     canvas.requestRenderAll(); // Render after removing objects
                 }
             }
-            viewerApp.state.currentTimestampOverlays = []; // Clear state for timestamp overlays
-            viewerApp.state.activeTimestampOverlayIds.clear();
+            viewerApp.state.currentVideoOverlays = []; // Clear state for timestamp overlays
+            viewerApp.state.activeVideoOverlayIds.clear();
             
             // Phase 1: Timeline cleanup
             viewerApp.state.currentVideoDuration = 0;

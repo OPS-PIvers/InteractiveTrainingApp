@@ -820,6 +820,7 @@
                     if (videoId) {
                         if (isYouTubeApiReady) {
                              setupYouTubePlayer(videoId); 
+                             initializeVideoOverlays(); // Ensure overlays are initialized for YouTube
                              
                              const youtubeOptions = media.youtubeOptions || { showClickToBeginButton: false };
 
@@ -1589,7 +1590,7 @@
                         viewerApp.state.playerQuestionCheckInterval = null;
                     }
                 }
-            }, 250);
+            }, 100);
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
             // Interval is cleared above.
             updateVideoOverlays(); // Call to update overlay states based on final time
@@ -1762,15 +1763,27 @@
             // viewerApp.state.activeVideoOverlayIds.clear(); // OLD
             
             // New cleanup for HTML DOM overlays:
+            // Clear active overlays (DOM elements and map)
+            if (viewerApp.state.activeOverlays) {
+                viewerApp.state.activeOverlays.forEach((element, id) => {
+                    if (element.parentNode) {
+                        element.parentNode.removeChild(element);
+                    }
+                });
+                viewerApp.state.activeOverlays.clear();
+            }
+
+            // Clear videoOverlays array
+            if (viewerApp.state.videoOverlays) { // Ensure it exists before assigning
+                viewerApp.state.videoOverlays = [];
+            } else {
+                viewerApp.state.videoOverlays = []; // Initialize if it doesn't exist
+            }
+
+            // Clear overlay container
             const overlayContainer = document.getElementById('videoOverlayContainer');
             if (overlayContainer) {
                 overlayContainer.innerHTML = '';
-            }
-            if (viewerApp.state.activeOverlays) { // Check if activeOverlays exists
-                viewerApp.state.activeOverlays.clear();
-            }
-            if (viewerApp.state.videoOverlays) { // Check if videoOverlays exists
-                viewerApp.state.videoOverlays = [];
             }
             
             // Phase 1: Timeline cleanup

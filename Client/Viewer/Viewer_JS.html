@@ -207,6 +207,47 @@ function validateYouTubeContainer(containerEl, containerName) {
                 }
             });
         }
+
+        // Keyboard navigation listeners
+        document.addEventListener('keydown', function(event) {
+            // Ensure the main project display area is visible
+            if (viewerProjectDisplayAreaEl && viewerProjectDisplayAreaEl.style.display === 'block') {
+                // Check if a modal is active
+                if (viewerModalEl && viewerModalEl.style.display === 'flex') {
+                    // Modal is active, handle modal navigation or close
+                    if (event.key === 'Escape') {
+                        hideViewerModal();
+                    } else if (event.key === 'ArrowLeft' && modalPrevButtonEl && !modalPrevButtonEl.disabled) {
+                        navigateModalPrevious();
+                    } else if (event.key === 'ArrowRight' && modalNextButtonEl && !modalNextButtonEl.disabled) {
+                        navigateModalNext();
+                    }
+                } else {
+                    // Modal is not active, handle slide navigation
+                    if (event.key === 'ArrowLeft' && viewerPrevSlideButtonEl && !viewerPrevSlideButtonEl.disabled) {
+                        navigateToPrevSlide();
+                    } else if (event.key === 'ArrowRight' && viewerNextSlideButtonEl && !viewerNextSlideButtonEl.disabled) {
+                        navigateToNextSlide();
+                    } else if (event.key === 'Home') {
+                        // Optional: Navigate to the first slide if not already there
+                        if (viewerApp.state.currentSlideIndex > 0) {
+                            renderSlideForViewing(0);
+                        }
+                    } else if (event.key === 'End') {
+                        // Optional: Navigate to the last slide if not already there
+                        if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) {
+                            renderSlideForViewing(viewerApp.state.currentProjectData.slides.length - 1);
+                        }
+                    }
+                }
+            } else if (viewerListViewContainerEl && viewerListViewContainerEl.style.display === 'block') {
+                 // Project list view is active
+                 if (event.key === 'Escape') {
+                     // Potentially, if there was a common way to "go back" or "deselect search" in list view.
+                     // For now, no specific action for Escape in list view unless defined later.
+                 }
+            }
+        });
     };
 
     // --- UI Utils & Server Error Handling ---
@@ -262,6 +303,56 @@ function validateYouTubeContainer(containerEl, containerName) {
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
 
+    // --- Performance Optimization Utilities ---
+    function debounce(func, wait, immediate) {
+        let timeout;
+        return function() {
+            const context = this, args = arguments;
+            const later = function() {
+                timeout = null;
+                if (!immediate) func.apply(context, args);
+            };
+            const callNow = immediate && !timeout;
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+            if (callNow) func.apply(context, args);
+        };
+    }
+
+    // Optimized rendering, especially useful with a debouncer
+    let _optimizedRenderRAFId = null;
+    function optimizedRenderAll(canvasInstance) {
+        if (!canvasInstance) return;
+        if (_optimizedRenderRAFId) {
+            fabric.util.cancelAnimFrame(_optimizedRenderRAFId);
+        }
+        _optimizedRenderRAFId = fabric.util.requestAnimFrame(() => {
+            canvasInstance.renderAll();
+            _optimizedRenderRAFId = null; // Reset after execution
+        }, canvasInstance.getElement());
+    }
+    
+    // A more generic smooth animation function (if fabric.util.animate isn't sufficient or for non-fabric props)
+    function smoothAnimate(drawCallback, duration = 300, easingFunction = easeInOutQuad) {
+        let startTime = null;
+        function animationStep(timestamp) {
+            if (!startTime) startTime = timestamp;
+            const progress = Math.min((timestamp - startTime) / duration, 1);
+            const easedProgress = easingFunction(progress);
+            
+            drawCallback(easedProgress); // Pass the eased progress to the drawing callback
+
+            if (progress < 1) {
+                requestAnimationFrame(animationStep);
+            }
+        }
+        requestAnimationFrame(animationStep);
+    }
+
+    // Standard easing function (if not already using one from a library or Fabric's own)
+    function easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    }
 
     // --- Project List Loading/Display ---
     function loadViewerProjectsList() {
@@ -1268,6 +1359,55 @@ function validateYouTubeContainer(containerEl, containerName) {
         }
     }
 
+function animatePulse(fabricObject, duration, strength, controller, shouldLoop) {
+    const canvas = viewerApp.state.viewerFabricCanvas;
+    if (!canvas) return;
+
+    const originalOpacity = fabricObject._originalState ? fabricObject._originalState.opacity : fabricObject.opacity;
+    // Strength for pulse could be interpreted as the minimum opacity in the pulse
+    // For example, if strength is 0.5, it pulses between originalOpacity and originalOpacity * 0.5
+    const pulseToOpacity = originalOpacity * (1 - (strength || 0.5)); // Default to 50% reduction if strength not defined
+
+    function doPulse(targetOpacity) {
+        fabricObject.animate('opacity', targetOpacity, {
+            duration: duration / 2, // Half duration for fade out, half for fade in
+            onChange: canvas.renderAll.bind(canvas),
+            abort: () => controller.aborted,
+            onComplete: function() {
+                if (controller.aborted) {
+                    fabricObject.set('opacity', originalOpacity);
+                    canvas.renderAll();
+                    viewerApp.state.activeAnimations.delete(fabricObject);
+                    return;
+                }
+                // If it just pulsed to targetOpacity (dimmed), now pulse back to original
+                if (targetOpacity < originalOpacity) {
+                    doPulse(originalOpacity);
+                } else { // Cycle complete (faded in)
+                    if (shouldLoop) {
+                        setTimeout(() => {
+                            // Check if still active before looping
+                            if (viewerApp.state.activeAnimations.has(fabricObject) && !viewerApp.state.activeAnimations.get(fabricObject).aborted) {
+                                animatePulse(fabricObject, duration, strength, controller, shouldLoop);
+                            } else { // If aborted during timeout
+                                fabricObject.set('opacity', originalOpacity);
+                                canvas.renderAll();
+                                viewerApp.state.activeAnimations.delete(fabricObject);
+                            }
+                        }, 50); // Brief pause before looping
+                    } else {
+                        viewerApp.state.activeAnimations.delete(fabricObject);
+                        console.log(`Animation pulse finished.`);
+                    }
+                }
+            },
+            easing: fabric.util.ease.easeInOutSine // A smooth easing function
+        });
+    }
+    // Start by pulsing to the dimmed opacity
+    doPulse(pulseToOpacity);
+}
+
     function animatePanZoom(targetObject, targetZoom) {
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas || !targetObject) return;
@@ -1672,24 +1812,153 @@ function validateYouTubeContainer(containerEl, containerName) {
     // Definition of checkVideoTimeForTimestampOverlays is removed / replaced by checkVideoTimeForVideoOverlays
 
     function createFabricObjectFromOverlayDefinition(overlayDef) {
-        /*
-        // Entire original body commented out
-        console.log("Attempting to create Fabric object for overlay definition:", overlayDef);
-        // Placeholder: Create a simple rectangle.
-        // Actual implementation will depend on overlayDef.template
-        const rect = new fabric.Rect({
-            left: (overlayDef.position.x / 100) * viewerApp.state.viewerFabricCanvas.width, // Example positioning
-            top: (overlayDef.position.y / 100) * viewerApp.state.viewerFabricCanvas.height,
-            fill: overlayDef.content.backgroundColor || 'rgba(100,100,100,0.7)',
-            width: 200, // Placeholder size
-            height: 50,  // Placeholder size
-            originX: 'left',
-            originY: 'top'
-        });
-        return rect;
-        // return null; // Or return null if you want to test adding/removing logic first without visual objects
-        */
+    console.log("Creating Fabric object for overlay definition:", overlayDef);
+    let fabricObject;
+
+    const baseProps = {
+        left: (overlayDef.position.x / 100) * viewerApp.state.viewerFabricCanvas.width,
+        top: (overlayDef.position.y / 100) * viewerApp.state.viewerFabricCanvas.height,
+        originX: 'center', // Default origin to center for easier positioning
+        originY: 'center',
+        selectable: false,
+        evented: !!(overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none'),
+        hoverCursor: (overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none') ? 'pointer' : 'default',
+        videoOverlayId: overlayDef.id, // Store the original overlay ID
+        // Custom properties for easier identification or interaction handling
+        customType: 'videoTimestampOverlay', 
+        overlayDefinition: overlayDef // Store the full definition if needed later
+    };
+
+    // Template-specific creation logic
+    switch (overlayDef.template) {
+        case 'lowerThird':
+            fabricObject = new fabric.Textbox(overlayDef.content.text || 'Lower Third', {
+                ...baseProps,
+                width: viewerApp.state.viewerFabricCanvas.width * 0.4, // 40% of canvas width
+                fontSize: Math.max(16, viewerApp.state.viewerFabricCanvas.width / 40), // Responsive font size
+                fill: overlayDef.content.textColor || 'white',
+                backgroundColor: overlayDef.content.backgroundColor || 'rgba(0,0,0,0.7)',
+                padding: 10,
+                textAlign: 'center'
+            });
+            // Adjust position for lower third (typically bottom of screen)
+            fabricObject.set({ 
+                top: viewerApp.state.viewerFabricCanvas.height * 0.85, // Example: 85% from top
+                originY: 'center' // Recenter after position adjustment
+            });
+            break;
+        case 'cornerCallout':
+            fabricObject = new fabric.Textbox(overlayDef.content.text || 'Callout', {
+                ...baseProps,
+                width: viewerApp.state.viewerFabricCanvas.width * 0.25, // 25% of canvas width
+                fontSize: Math.max(14, viewerApp.state.viewerFabricCanvas.width / 50),
+                fill: overlayDef.content.textColor || 'black',
+                backgroundColor: overlayDef.content.backgroundColor || 'rgba(255,255,255,0.85)',
+                padding: 8,
+                rx: 5, ry: 5, // Rounded corners
+                textAlign: 'left'
+            });
+            // Example: Position to top-right. User can define X/Y in definition.
+            // For true corner, X/Y in definition should be like 5%/5% (top-left) or 95%/5% (top-right)
+            // and originX/originY should be adjusted accordingly (e.g. 'left'/'top' or 'right'/'top')
+            // For simplicity here, we keep origin center and user positions with X/Y percentage.
+            break;
+        case 'centerCard':
+            fabricObject = new fabric.Textbox(overlayDef.content.text || 'Center Card', {
+                ...baseProps,
+                width: viewerApp.state.viewerFabricCanvas.width * 0.5, // 50% of canvas width
+                fontSize: Math.max(18, viewerApp.state.viewerFabricCanvas.width / 35),
+                fill: overlayDef.content.textColor || 'black',
+                backgroundColor: overlayDef.content.backgroundColor || 'rgba(255,255,255,0.9)',
+                padding: 20,
+                rx: 10, ry: 10,
+                textAlign: 'center',
+                shadow: 'rgba(0,0,0,0.3) 5px 5px 10px'
+            });
+            // Position is already centered by baseProps.left/top and originX/Y 'center'
+            break;
+        case 'hotspot':
+            // Hotspot could be a circle with an icon/text, or just a pulsing dot
+            fabricObject = new fabric.Circle({
+                ...baseProps,
+                radius: Math.min(20, viewerApp.state.viewerFabricCanvas.width / 40), // Responsive radius
+                fill: overlayDef.content.backgroundColor || 'rgba(255, 87, 34, 0.8)', // Orangey, semi-transparent
+                stroke: overlayDef.content.textColor || 'white',
+                strokeWidth: 2
+            });
+            // Consider adding a pulsing animation here if desired, or an icon
+            break;
+        case 'quizBubble':
+             // This is a more complex one, might involve multiple Fabric objects grouped,
+             // or a more detailed Textbox. For now, a simple representation.
+             fabricObject = new fabric.Textbox(overlayDef.content.text || 'Quiz Question?', {
+                ...baseProps,
+                width: viewerApp.state.viewerFabricCanvas.width * 0.6,
+                fontSize: Math.max(16, viewerApp.state.viewerFabricCanvas.width / 38),
+                fill: overlayDef.content.textColor || 'white',
+                backgroundColor: overlayDef.content.backgroundColor || 'rgba(103, 58, 183, 0.9)', // Purpleish
+                padding: 15,
+                rx: 8, ry: 8,
+                textAlign: 'center'
+            });
+            break;
+        default:
+            console.warn("Unknown overlay template:", overlayDef.template, "Creating a default rect.");
+            fabricObject = new fabric.Rect({
+                ...baseProps,
+                width: 200, height: 50,
+                fill: overlayDef.content.backgroundColor || 'rgba(150,150,150,0.7)',
+                stroke: overlayDef.content.textColor || 'black'
+            });
+            break;
     }
+
+    // Attach interaction handlers if defined
+    if (fabricObject && overlayDef.interaction && overlayDef.interaction.action !== 'none') {
+        fabricObject.on('mousedown', function(options) {
+            // Prevent click-through to player if canvas is interactive
+            if (options.e) options.e.stopPropagation(); 
+            
+            console.log("Timestamp Overlay clicked:", this.overlayDefinition);
+            // Example: Dismiss action
+            if (this.overlayDefinition.interaction.action === 'dismiss') {
+                viewerApp.state.viewerFabricCanvas.remove(this);
+                viewerApp.state.activeVideoOverlayIds.delete(this.videoOverlayId);
+                 // If this overlay paused the video, resume it
+                if (this.overlayDefinition.interaction.pauseVideo && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.playVideo === 'function') {
+                    // Check if other pausing overlays are still active
+                    let otherPausingOverlayActive = false;
+                    viewerApp.state.activeVideoOverlayIds.forEach(id => {
+                        const ovDef = viewerApp.state.currentVideoOverlays.find(o => o.id === id);
+                        if (ovDef && ovDef.interaction.pauseVideo) {
+                            otherPausingOverlayActive = true;
+                        }
+                    });
+                    if (!otherPausingOverlayActive) {
+                        viewerApp.state.ytPlayer.playVideo();
+                    }
+                }
+                updateViewerCanvasInteractivity(); // Re-evaluate canvas interactivity
+                viewerApp.state.viewerFabricCanvas.requestRenderAll();
+            }
+            // Example: Navigate to slide (conceptual)
+            else if (this.overlayDefinition.interaction.action === 'navigateToSlide') {
+                if (this.overlayDefinition.interaction.actionTarget) {
+                    const targetSlideId = this.overlayDefinition.interaction.actionTarget;
+                    const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
+                    if (targetSlideIndex !== -1) {
+                        renderSlideForViewing(targetSlideIndex);
+                    } else {
+                        console.warn("Target slide for overlay navigation not found:", targetSlideId);
+                    }
+                }
+            }
+            // Add more interaction handlers here as needed (e.g., showModal)
+        });
+    }
+    console.log("Fabric object created:", fabricObject);
+    return fabricObject;
+}
 
     function checkVideoTimeForVideoOverlays(currentTime) {
         /*

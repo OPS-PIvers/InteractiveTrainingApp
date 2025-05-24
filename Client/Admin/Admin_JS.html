@@ -25,7 +25,11 @@
       historyIndex: -1,
       isApplyingHistory: false, // Flag to prevent re-saving state during undo and redo
       adminYouTubePlayer: null, // Reference to the admin's YouTube player instance
-      isYouTubeApiReady: false // Flag for YouTube API readiness
+      isYouTubeApiReady: false, // Flag for YouTube API readiness
+      placingOverlay: null,
+      editingOverlayId: null,
+      previewingOverlays: false,
+      overlayPreviewInterval: null
     };
 
 // --- Global function for YouTube API ---
@@ -857,6 +861,7 @@ function onYouTubeIframeAPIReady() {
         } else if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
             selectedSlideData.slideMedia.videoQuestions = [];
         }
+        // Add this:
         if (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoOverlays)) {
           selectedSlideData.slideMedia.videoOverlays = [];
         }
@@ -1720,6 +1725,516 @@ function onYouTubeIframeAPIReady() {
             showNotification("No object selected to delete.", "info");
         }
     }
+
+// Overlay creation workflow
+function initiateOverlayPlacement() {
+    if (!adminApp.state.adminYouTubePlayer) return;
+    
+    // Pause video at current time
+    adminApp.state.adminYouTubePlayer.pauseVideo();
+    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+    
+    // Show placement overlay
+    const placementMode = document.getElementById('overlayPlacementMode');
+    if (placementMode) { // Added null check
+        placementMode.style.display = 'block';
+    } else {
+        console.warn('initiateOverlayPlacement: overlayPlacementMode element not found.');
+    }
+    
+    // Store placement state
+    adminApp.state.placingOverlay = {
+        startTime: currentTime,
+        position: null
+    };
+}
+
+// Handle click on video to place overlay
+function handleOverlayPlacement(event) {
+    const container = document.getElementById('adminYouTubePlayerContainer');
+    if (!container) { // Added null check
+        console.warn('handleOverlayPlacement: adminYouTubePlayerContainer element not found.');
+        return;
+    }
+    const rect = container.getBoundingClientRect();
+    
+    // Calculate percentage position
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    
+    adminApp.state.placingOverlay.position = { x, y };
+    
+    // Hide placement mode
+    const placementMode = document.getElementById('overlayPlacementMode');
+    if (placementMode) { // Added null check
+        placementMode.style.display = 'none';
+    }
+    
+    // Show editor modal
+    showOverlayEditor();
+}
+
+// Show overlay editor modal
+function showOverlayEditor(overlayId = null) {
+    const modal = document.getElementById('overlayEditorModal');
+    if (!modal) { // Added null check
+        console.warn('showOverlayEditor: overlayEditorModal element not found.');
+        return;
+    }
+    const overlay = overlayId ? findOverlayById(overlayId) : createNewOverlay();
+    
+    if (!overlay) { // Added null check for overlay object
+        console.warn('showOverlayEditor: Overlay object could not be found or created.');
+        return;
+    }
+
+    // Populate form fields
+    const overlayTemplateEl = document.getElementById('overlayTemplate');
+    if (overlayTemplateEl) overlayTemplateEl.value = overlay.template;
+    
+    const overlayStartTimeDisplayEl = document.getElementById('overlayStartTimeDisplay');
+    if (overlayStartTimeDisplayEl) overlayStartTimeDisplayEl.textContent = formatTime(overlay.startTime);
+    
+    const overlayDurationEl = document.getElementById('overlayDuration');
+    if (overlayDurationEl) overlayDurationEl.value = overlay.duration;
+    
+    const overlayTextContentEl = document.getElementById('overlayTextContent');
+    if (overlayTextContentEl) overlayTextContentEl.value = overlay.content.text || '';
+    
+    const overlayPauseVideoEl = document.getElementById('overlayPauseVideo');
+    if (overlayPauseVideoEl) overlayPauseVideoEl.checked = overlay.interaction.pauseVideo;
+    
+    const overlayDismissibleEl = document.getElementById('overlayDismissible');
+    if (overlayDismissibleEl) overlayDismissibleEl.checked = overlay.interaction.dismissible;
+    
+    const overlayActionEl = document.getElementById('overlayAction');
+    if (overlayActionEl) overlayActionEl.value = overlay.interaction.action;
+    
+    // Show position
+    const overlayPositionDisplayEl = document.getElementById('overlayPositionDisplay');
+    if (overlayPositionDisplayEl && overlay.position) { // Added null check for position
+        overlayPositionDisplayEl.textContent = 
+            `X: ${overlay.position.x.toFixed(0)}%, Y: ${overlay.position.y.toFixed(0)}%`;
+    } else if (overlayPositionDisplayEl) {
+        overlayPositionDisplayEl.textContent = 'Position not set';
+    }
+    
+    // Show/hide delete button
+    const deleteOverlayBtnEl = document.getElementById('deleteOverlayBtn');
+    if (deleteOverlayBtnEl) { // Added null check
+        deleteOverlayBtnEl.style.display = overlayId ? 'inline-block' : 'none';
+    }
+    
+    modal.style.display = 'block';
+    adminApp.state.editingOverlayId = overlayId;
+}
+
+// Create new overlay object
+function createNewOverlay() {
+    // Ensure placingOverlay state is valid or provide defaults
+    let startTime = 0;
+    let position = { x: 50, y: 50 }; // Default position
+
+    if (adminApp.state.placingOverlay) {
+        startTime = adminApp.state.placingOverlay.startTime;
+        // Use position from placingOverlay if it exists, otherwise keep default
+        if (adminApp.state.placingOverlay.position) {
+            position = adminApp.state.placingOverlay.position;
+        }
+    } else if (adminApp.state.adminYouTubePlayer) {
+        // Fallback if placingOverlay is not set, use current video time
+        startTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+    }
+
+
+    return {
+        id: 'overlay_' + Utilities.generateUuid(),
+        template: 'lowerThird',
+        startTime: startTime,
+        duration: 5,
+        position: position,
+        content: {
+            text: '',
+            backgroundColor: '#000000',
+            textColor: '#FFFFFF'
+        },
+        interaction: {
+            pauseVideo: false,
+            dismissible: true,
+            action: 'none',
+            actionTarget: ''
+        }
+    };
+}
+
+// Save overlay
+function saveOverlay() {
+    const currentSlide = getCurrentSlide();
+    if (!currentSlide || !currentSlide.slideMedia) { // Added null check for currentSlide and slideMedia
+        console.warn("saveOverlay: Current slide or slide media not found.");
+        return;
+    }
+    if (!currentSlide.slideMedia.videoOverlays) {
+        currentSlide.slideMedia.videoOverlays = [];
+    }
+    
+    const overlay = gatherOverlayFromForm();
+    if (!overlay) { // Added null check for overlay data
+        console.warn("saveOverlay: Could not gather overlay data from form.");
+        return;
+    }
+    
+    if (adminApp.state.editingOverlayId) {
+        // Update existing
+        const index = currentSlide.slideMedia.videoOverlays.findIndex(
+            o => o.id === adminApp.state.editingOverlayId
+        );
+        if (index !== -1) {
+            currentSlide.slideMedia.videoOverlays[index] = overlay;
+        } else {
+            // If for some reason the ID is not found, add as new to prevent data loss
+            currentSlide.slideMedia.videoOverlays.push(overlay);
+            console.warn("saveOverlay: Editing overlay ID not found, added as new.");
+        }
+    } else {
+        // Add new
+        currentSlide.slideMedia.videoOverlays.push(overlay);
+    }
+    
+    // Sort by start time
+    currentSlide.slideMedia.videoOverlays.sort((a, b) => a.startTime - b.startTime);
+    
+    hideOverlayEditor();
+    renderOverlayTimeline();
+    renderOverlayList();
+    showNotification('Overlay saved.', 'success'); // Added user feedback
+}
+
+// Render overlay bars on timeline
+function renderOverlayTimeline() {
+    const track = document.getElementById('overlayTimelineTrack');
+    if (!track) { // Added null check
+        console.warn("renderOverlayTimeline: overlayTimelineTrack element not found.");
+        return;
+    }
+    if (!adminApp.state.adminYouTubePlayer) {
+        console.warn("renderOverlayTimeline: adminYouTubePlayer not available.");
+        track.innerHTML = '<p>Video player not ready.</p>'; // User feedback
+        return;
+    }
+    
+    track.innerHTML = ''; // Clear previous timeline
+    const duration = adminApp.state.adminYouTubePlayer.getDuration();
+    if (duration === 0) { // Handle case where duration might not be available yet
+        track.innerHTML = '<p>Video duration not available.</p>'; // User feedback
+        return;
+    }
+
+    const currentSlide = getCurrentSlide();
+    // Ensure videoOverlays exists and is an array
+    const overlays = (currentSlide && currentSlide.slideMedia && Array.isArray(currentSlide.slideMedia.videoOverlays)) 
+                     ? currentSlide.slideMedia.videoOverlays 
+                     : [];
+    
+    if (overlays.length === 0) {
+        track.innerHTML = '<p style="text-align: center; margin-top: 10px;">No overlays on this slide.</p>'; // User feedback
+        return;
+    }
+
+    overlays.forEach(overlay => {
+        const bar = document.createElement('div');
+        bar.className = 'overlay-timeline-bar';
+        bar.dataset.overlayId = overlay.id;
+        
+        const startPercent = (overlay.startTime / duration) * 100;
+        const widthPercent = (overlay.duration / duration) * 100;
+        
+        bar.style.cssText = `
+            position: absolute;
+            left: ${startPercent}%;
+            width: ${widthPercent}%;
+            height: 100%;
+            background-color: ${getTemplateColor(overlay.template)};
+            opacity: 0.8;
+            cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.3);
+            box-sizing: border-box; /* Added for better layout */
+        `;
+        
+        bar.title = `${overlay.content.text || overlay.template} (${formatTime(overlay.startTime)})`;
+        bar.onclick = () => showOverlayEditor(overlay.id);
+        
+        track.appendChild(bar);
+    });
+}
+
+// Helper to get color for template type
+function getTemplateColor(template) {
+    const colors = {
+        lowerThird: '#2196F3',
+        cornerCallout: '#4CAF50',
+        centerCard: '#FF9800',
+        hotspot: '#E91E63',
+        quizBubble: '#9C27B0'
+    };
+    return colors[template] || '#607D8B'; // Default color
+}
+
+// Preview overlays (toggle preview mode)
+function toggleOverlayPreview() {
+    adminApp.state.previewingOverlays = !adminApp.state.previewingOverlays;
+    const previewButton = document.getElementById('previewOverlaysBtn'); // Get button for text change
+
+    if (adminApp.state.previewingOverlays) {
+        renderVideoOverlaysAdmin();
+        if (adminApp.state.overlayPreviewInterval) { // Clear existing interval just in case
+            clearInterval(adminApp.state.overlayPreviewInterval);
+        }
+        adminApp.state.overlayPreviewInterval = setInterval(updateOverlayPreview, 100);
+        if (previewButton) previewButton.textContent = 'Stop Preview'; // Update button text
+    } else {
+        if (adminApp.state.overlayPreviewInterval) {
+            clearInterval(adminApp.state.overlayPreviewInterval);
+            adminApp.state.overlayPreviewInterval = null;
+        }
+        clearVideoOverlaysAdmin();
+        if (previewButton) previewButton.textContent = 'Preview Overlays'; // Reset button text
+    }
+}
+
+// --- Helper Functions for Overlay Management ---
+function findOverlayById(overlayId) {
+    const currentSlide = getCurrentSlide();
+    if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) { // Check if array
+        return null;
+    }
+    return currentSlide.slideMedia.videoOverlays.find(o => o.id === overlayId);
+}
+
+function hideOverlayEditor() {
+    const modal = document.getElementById('overlayEditorModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    adminApp.state.editingOverlayId = null;
+}
+
+function deleteCurrentOverlay() {
+    if (!adminApp.state.editingOverlayId) {
+        showNotification('No overlay selected to delete.', 'error');
+        return;
+    }
+
+    const currentSlide = getCurrentSlide();
+    if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) { // Check if array
+        showNotification('Cannot find overlay data for this slide.', 'error');
+        return;
+    }
+
+    const overlayIdToDelete = adminApp.state.editingOverlayId;
+    const initialLength = currentSlide.slideMedia.videoOverlays.length;
+    currentSlide.slideMedia.videoOverlays = currentSlide.slideMedia.videoOverlays.filter(
+        o => o.id !== overlayIdToDelete
+    );
+
+    if (currentSlide.slideMedia.videoOverlays.length < initialLength) {
+        showNotification('Overlay deleted.', 'success');
+    } else {
+        showNotification('Could not delete overlay. Not found.', 'error');
+    }
+
+    hideOverlayEditor();
+    renderOverlayTimeline();
+    renderOverlayList();
+}
+
+function gatherOverlayFromForm() {
+    const editingId = adminApp.state.editingOverlayId;
+    const isNew = !editingId;
+    const existingOverlay = editingId ? findOverlayById(editingId) : null;
+    
+    let startTime, position;
+
+    if (isNew && adminApp.state.placingOverlay) {
+        startTime = adminApp.state.placingOverlay.startTime;
+        position = adminApp.state.placingOverlay.position;
+    } else if (existingOverlay) {
+        startTime = existingOverlay.startTime;
+        position = existingOverlay.position;
+    } else { 
+        startTime = (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.getCurrentTime === 'function') 
+                      ? adminApp.state.adminYouTubePlayer.getCurrentTime() 
+                      : 0;
+        position = { x: 50, y: 50 }; // Default
+        console.warn("gatherOverlayFromForm: Could not determine start time or position reliably, using defaults.");
+    }
+    
+    if (!position) { // Ensure position is an object
+        position = { x: 50, y: 50 };
+    }
+    
+    // Get values from form elements, with null checks for each element
+    const overlayTemplateEl = document.getElementById('overlayTemplate');
+    const templateValue = overlayTemplateEl ? overlayTemplateEl.value : 'lowerThird';
+
+    const overlayDurationEl = document.getElementById('overlayDuration');
+    const durationValue = overlayDurationEl ? (parseInt(overlayDurationEl.value, 10) || 5) : 5;
+
+    const overlayTextContentEl = document.getElementById('overlayTextContent');
+    const textContentValue = overlayTextContentEl ? overlayTextContentEl.value : '';
+
+    const overlayPauseVideoEl = document.getElementById('overlayPauseVideo');
+    const pauseVideoValue = overlayPauseVideoEl ? overlayPauseVideoEl.checked : false;
+
+    const overlayDismissibleEl = document.getElementById('overlayDismissible');
+    const dismissibleValue = overlayDismissibleEl ? overlayDismissibleEl.checked : true;
+
+    const overlayActionEl = document.getElementById('overlayAction');
+    const actionValue = overlayActionEl ? overlayActionEl.value : 'none';
+
+    return {
+        id: editingId || ('overlay_' + Utilities.generateUuid()),
+        template: templateValue,
+        startTime: startTime,
+        duration: durationValue,
+        position: position, // Already ensured it's an object
+        content: {
+            text: textContentValue,
+            backgroundColor: (existingOverlay && existingOverlay.content) ? existingOverlay.content.backgroundColor : '#000000',
+            textColor: (existingOverlay && existingOverlay.content) ? existingOverlay.content.textColor : '#FFFFFF'
+        },
+        interaction: {
+            pauseVideo: pauseVideoValue,
+            dismissible: dismissibleValue,
+            action: actionValue,
+            actionTarget: (existingOverlay && existingOverlay.interaction) ? existingOverlay.interaction.actionTarget : ''
+        }
+    };
+}
+
+function renderOverlayList() {
+    const listEl = document.getElementById('adminOverlayList'); 
+    if (!listEl) {
+        console.warn("renderOverlayList: adminOverlayList element not found.");
+        return;
+    }
+    listEl.innerHTML = ''; // Clear previous list
+    const currentSlide = getCurrentSlide();
+    const overlays = (currentSlide && currentSlide.slideMedia && Array.isArray(currentSlide.slideMedia.videoOverlays)) 
+                     ? currentSlide.slideMedia.videoOverlays 
+                     : [];
+
+    if (overlays.length === 0) {
+        listEl.innerHTML = '<li>No overlays added for this video.</li>';
+        return;
+    }
+
+    overlays.forEach(overlay => {
+        const item = document.createElement('li');
+        item.className = 'overlay-list-item'; // Added class for styling
+        item.setAttribute('data-overlay-id', overlay.id); // Set data attribute
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = `[${formatTime(overlay.startTime)}] ${overlay.content.text || overlay.template} (Duration: ${overlay.duration}s)`;
+        
+        const editButton = document.createElement('button');
+        editButton.textContent = 'Edit';
+        editButton.className = 'edit-overlay-list-btn'; // Added class
+        editButton.style.marginLeft = '10px';
+        editButton.onclick = (e) => {
+            e.stopPropagation(); // Prevent li click if button is nested
+            showOverlayEditor(overlay.id);
+        };
+
+        item.appendChild(textSpan);
+        item.appendChild(editButton);
+        // item.onclick = () => showOverlayEditor(overlay.id); // Can be removed if button is preferred
+        listEl.appendChild(item);
+    });
+}
+
+function renderVideoOverlaysAdmin() {
+    const playerContainer = document.getElementById('adminYouTubePlayerContainer');
+    if (!playerContainer) {
+        console.warn("renderVideoOverlaysAdmin: adminYouTubePlayerContainer not found.");
+        return;
+    }
+
+    clearVideoOverlaysAdmin(false); 
+
+    const currentSlide = getCurrentSlide();
+    if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) return;
+
+    const overlaysToDisplay = currentSlide.slideMedia.videoOverlays; 
+
+    overlaysToDisplay.forEach(overlay => {
+        if (!overlay.position) { // Skip if position is somehow missing
+            console.warn("renderVideoOverlaysAdmin: Overlay missing position data", overlay.id);
+            return;
+        }
+        const overlayDiv = document.createElement('div');
+        overlayDiv.className = `video-overlay-preview admin-preview-${overlay.template}`; 
+        overlayDiv.setAttribute('data-preview-overlay-id', overlay.id);
+        overlayDiv.style.position = 'absolute';
+        overlayDiv.style.left = `${overlay.position.x}%`;
+        overlayDiv.style.top = `${overlay.position.y}%`;
+        overlayDiv.style.padding = '5px 10px';
+        overlayDiv.style.backgroundColor = overlay.content.backgroundColor || 'rgba(0,0,0,0.7)';
+        overlayDiv.style.color = overlay.content.textColor || 'white';
+        overlayDiv.style.border = '1px dashed #ccc'; // Dashed to distinguish from real ones
+        overlayDiv.style.zIndex = '1050'; // High z-index for admin preview
+        overlayDiv.style.pointerEvents = 'none'; // Make them non-interactive for admin preview
+        overlayDiv.textContent = overlay.content.text || `[${overlay.template}]`;
+        
+        playerContainer.appendChild(overlayDiv);
+    });
+    // After rendering all, explicitly call updateOverlayPreview to set initial visibility
+    updateOverlayPreview(); 
+}
+
+function updateOverlayPreview() {
+    if (!adminApp.state.adminYouTubePlayer || typeof adminApp.state.adminYouTubePlayer.getCurrentTime !== 'function') {
+        // console.warn("updateOverlayPreview: YouTube player not ready or getCurrentTime not available.");
+        return;
+    }
+    if (!adminApp.state.previewingOverlays) return; // Only run if previewing
+
+    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+    const currentSlide = getCurrentSlide();
+    if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) return;
+
+    const overlays = currentSlide.slideMedia.videoOverlays;
+    const activeOverlaysContainer = document.getElementById('adminYouTubePlayerContainer'); 
+    if (!activeOverlaysContainer) return;
+
+    overlays.forEach(overlay => {
+        const overlayEl = activeOverlaysContainer.querySelector(`.video-overlay-preview[data-preview-overlay-id="${overlay.id}"]`);
+        if (!overlayEl) return; 
+
+        const isVisible = currentTime >= overlay.startTime && currentTime < (overlay.startTime + overlay.duration);
+        overlayEl.style.display = isVisible ? 'block' : 'none';
+    });
+}
+
+function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
+    const playerContainer = document.getElementById('adminYouTubePlayerContainer');
+    if (playerContainer) {
+        const previewOverlays = playerContainer.querySelectorAll('.video-overlay-preview');
+        previewOverlays.forEach(el => el.remove());
+    }
+    
+    if (stopPreviewLogicAndButtonUpdate) {
+        if (adminApp.state.overlayPreviewInterval) {
+            clearInterval(adminApp.state.overlayPreviewInterval);
+            adminApp.state.overlayPreviewInterval = null;
+        }
+        adminApp.state.previewingOverlays = false; 
+        const previewButton = document.getElementById('previewOverlaysBtn');
+        if (previewButton) previewButton.textContent = 'Preview Overlays'; // Reset button text
+    }
+    // console.log("clearVideoOverlaysAdmin called."); // Can be noisy, optional
+}
+
     // --- Overlay Creation ---
     function addRectangle() {
       if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
@@ -2359,7 +2874,12 @@ function onYouTubeIframeAPIReady() {
     }
 
     // --- Utilities ---
-    var Utilities = { getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); } };
+    var Utilities = { 
+        getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); },
+        generateUuid: function() { // Same implementation as getUuid or a new one if preferred
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); });
+        } 
+    };
 
     function extractYouTubeVideoId(url) {
         if (!url) return null;
@@ -2514,6 +3034,39 @@ function onYouTubeIframeAPIReady() {
         //    });
         //    closeTimestampOverlayModalBtnEl.setAttribute('listener-attached', 'true');
         // }
+
+    // --- NEW Video Overlay Event Listeners ---
+    const addVideoOverlayBtn = document.getElementById('addVideoOverlayBtn');
+    if (addVideoOverlayBtn) {
+        addVideoOverlayBtn.addEventListener('click', initiateOverlayPlacement);
+    }
+
+    const placementOverlay = document.getElementById('overlayPlacementOverlay');
+    if (placementOverlay) {
+        placementOverlay.addEventListener('click', handleOverlayPlacement);
+    }
+
+    const saveOverlayBtn = document.getElementById('saveOverlayBtn');
+    if (saveOverlayBtn) {
+        saveOverlayBtn.addEventListener('click', saveOverlay);
+    }
+
+    const cancelOverlayBtn = document.getElementById('cancelOverlayBtn');
+    if (cancelOverlayBtn) {
+        cancelOverlayBtn.addEventListener('click', hideOverlayEditor);
+    }
+
+    const deleteOverlayBtn = document.getElementById('deleteOverlayBtn');
+    if (deleteOverlayBtn) {
+        deleteOverlayBtn.addEventListener('click', deleteCurrentOverlay);
+    }
+
+    const previewOverlaysBtn = document.getElementById('previewOverlaysBtn');
+    if (previewOverlaysBtn) {
+        previewOverlaysBtn.addEventListener('click', toggleOverlayPreview);
+    }
+    
+    console.log("Video overlay event listeners attached.");
     };
 
     function updateVideoToolsVisibility(show) {

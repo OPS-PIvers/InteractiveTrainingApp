@@ -51,12 +51,46 @@
     viewerApp.onYouTubeApiReady = function() {
       isYouTubeApiReady = true;
       console.log("YouTube API is now ready for use");
+      
       if (viewerApp.state.deferredYouTubeVideoId) {
           console.log("Deferred YouTube video found, setting up player for:", viewerApp.state.deferredYouTubeVideoId);
-          setupYouTubePlayer(viewerApp.state.deferredYouTubeVideoId);
-          viewerApp.state.deferredYouTubeVideoId = null; // Clear after setup
+          
+          // Additional validation
+          if (isYouTubePlayerAvailable()) { // <--- New check
+              setupYouTubePlayer(viewerApp.state.deferredYouTubeVideoId);
+              viewerApp.state.deferredYouTubeVideoId = null;
+          } else {
+              console.error("YT.Player still not available despite API ready callback");
+              displayMessageViewer("YouTube player setup failed. Please refresh the page.", false);
+          }
       }
     };
+
+function isYouTubePlayerAvailable() {
+    return isYouTubeApiReady && 
+           typeof YT !== 'undefined' && 
+           typeof YT.Player !== 'undefined';
+}
+
+function safeGetCurrentTime(player) {
+    if (!player || typeof player.getCurrentTime !== 'function') {
+        return 0;
+    }
+    try {
+        return player.getCurrentTime();
+    } catch (e) {
+        console.warn("Could not get current time from YouTube player:", e);
+        return 0;
+    }
+}
+
+function validateYouTubeContainer(containerEl, containerName) {
+    if (!containerEl) {
+        console.error(`${containerName} element not found`);
+        return false;
+    }
+    return true;
+}
 
     // --- DOM Element References ---
     let viewerProjectListContainerEl, messageAreaElViewer, loadingSpinnerElViewer;
@@ -573,9 +607,9 @@
 
     // Check and update overlay visibility
     function updateVideoOverlays() {
-        if (!viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.videoOverlays) return;
+        if (!isYouTubePlayerAvailable() || !viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.videoOverlays) return;
         
-        const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
+        const currentTime = safeGetCurrentTime(viewerApp.state.ytPlayer);
         const container = document.getElementById('videoOverlayContainer');
         if (!container) return; // Make sure container exists
         
@@ -1434,12 +1468,15 @@
     window.onYouTubeIframeAPIReady = function() { console.log("YouTube IFrame API Ready (called by external script)."); isYouTubeApiReady = true;};
 
     function setupYouTubePlayer(videoId) {
-        if (!youtubePlayerContainerEl) { console.error("YouTube player container element not found."); displayMessageViewer("YouTube player setup error: container missing.", false); return; }
+        if (!validateYouTubeContainer(youtubePlayerContainerEl, "YouTube player container")) {
+            displayMessageViewer("YouTube player setup error: container missing.", false);
+            return; 
+        }
         youtubePlayerContainerEl.innerHTML = '<div id="youtube-player-div" style="width: 100%; height: 100%;"></div>';
         youtubePlayerContainerEl.style.display = 'block';
         console.log("Setting up YouTube player for video ID:", videoId);
         
-        if (!isYouTubeApiReady || typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
+        if (!isYouTubePlayerAvailable()) {
             console.error("YT object or YT.Player is not available or API not ready.");
             displayMessageViewer("YouTube Player API not available. Please check your internet connection and refresh.", false); return;
         }
@@ -1479,37 +1516,68 @@
     }
 
     function onPlayerReady(event) {
-        console.log("YouTube Player Ready for video:", event.target.getVideoData().video_id);
-        const videoDuration = event.target.getDuration();
-        viewerApp.state.currentVideoDuration = videoDuration; // Store duration
-        if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(videoDuration);
-        if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0); // Reset current time display
-        if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%'; // Reset progress bar
-        if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'block'; // Show timeline
+        try {
+            const videoData = event.target.getVideoData();
+            console.log("YouTube Player Ready for video:", videoData ? videoData.video_id : "unknown");
+            
+            const videoDuration = event.target.getDuration();
+            if (isNaN(videoDuration) || videoDuration <= 0) {
+                console.warn("Invalid video duration received:", videoDuration);
+                displayMessageViewer("Video duration could not be determined", false);
+                return;
+            }
+            
+            viewerApp.state.currentVideoDuration = videoDuration;
+            if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(videoDuration);
+            if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0);
+            if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%';
+            if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'block';
 
-        // renderQuestionMarkers(); // Call this after duration is known - REPLACED by renderTimelineMarkers
-        renderTimelineMarkers(); // New function to render all timeline markers
+            renderTimelineMarkers();
 
-         if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
-             console.log("Adding click-to-play listener to YT player container.");
-             youtubePlayerContainerEl.addEventListener('click', function() {
-                 console.log("Player container clicked.");
-                 if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.playVideo === 'function' && typeof viewerApp.state.ytPlayer.pauseVideo === 'function' && typeof viewerApp.state.ytPlayer.getPlayerState === 'function') {
-                     const state = viewerApp.state.ytPlayer.getPlayerState();
-                     if (state !== YT.PlayerState.PLAYING) { console.log("Calling playVideo()."); viewerApp.state.ytPlayer.playVideo(); } 
-                     else { console.log("Calling pauseVideo()."); viewerApp.state.ytPlayer.pauseVideo(); }
-                 } else { console.warn("Cannot play/pause: Player or methods not available."); }
-             });
-             youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
-         }
+            // Add click listener with validation
+            if(youtubePlayerContainerEl && !youtubePlayerContainerEl.hasAttribute('click-listener-added')){
+                console.log("Adding click-to-play listener to YT player container.");
+                youtubePlayerContainerEl.addEventListener('click', function() {
+                    console.log("Player container clicked.");
+                    if (viewerApp.state.ytPlayer && 
+                        typeof viewerApp.state.ytPlayer.playVideo === 'function' && 
+                        typeof viewerApp.state.ytPlayer.pauseVideo === 'function' && 
+                        typeof viewerApp.state.ytPlayer.getPlayerState === 'function') {
+                        try {
+                            const state = viewerApp.state.ytPlayer.getPlayerState();
+                            if (state !== YT.PlayerState.PLAYING) { 
+                                console.log("Calling playVideo()."); 
+                                viewerApp.state.ytPlayer.playVideo(); 
+                            } else { 
+                                console.log("Calling pauseVideo()."); 
+                                viewerApp.state.ytPlayer.pauseVideo(); 
+                            }
+                        } catch (e) {
+                            console.error("Error controlling YouTube player:", e);
+                        }
+                    } else { 
+                        console.warn("Cannot play/pause: Player or methods not available."); 
+                    }
+                });
+                youtubePlayerContainerEl.setAttribute('click-listener-added', 'true');
+            }
+        } catch (e) {
+            console.error("Error in onPlayerReady:", e);
+            displayMessageViewer("Error initializing YouTube player", false);
+        }
     }
 
     // New function for Phase 1 to render question markers on the timeline - REPLACED by renderTimelineMarkers
     // function renderQuestionMarkers() { ... } // Removed
 
     function renderTimelineMarkers() {
-        if (!viewerTimelineTrackEl || !viewerApp.state.currentVideoDuration || viewerApp.state.currentVideoDuration <= 0) {
-            console.warn("renderTimelineMarkers: Timeline track or video duration not available.");
+        if (!viewerApp.state.currentVideoDuration || viewerApp.state.currentVideoDuration <= 0) {
+            console.warn("Invalid video duration for timeline markers");
+            return;
+        }
+        if (!viewerTimelineTrackEl) {
+            console.warn("renderTimelineMarkers: Timeline track not available.");
             return;
         }
 
@@ -1529,7 +1597,9 @@
                 marker.style.top = '0px';
                 marker.style.zIndex = '2'; // Ensure visible above progress bar
 
-                const percentagePosition = (question.timestamp / viewerApp.state.currentVideoDuration) * 100;
+                const percentagePosition = Math.max(0, Math.min(100, 
+                    (question.timestamp / viewerApp.state.currentVideoDuration) * 100
+                ));
                 marker.style.left = percentagePosition + '%';
                 marker.title = `Question at ${formatTime(question.timestamp)}: ${question.questionText.substring(0, 30)}...`;
                 viewerTimelineTrackEl.appendChild(marker);
@@ -1557,7 +1627,9 @@
                 }
                 startMarker.style.backgroundColor = markerColor; 
                 
-                const startPercent = (overlay.startTime / viewerApp.state.currentVideoDuration) * 100;
+                const startPercent = Math.max(0, Math.min(100,
+                    (overlay.startTime / viewerApp.state.currentVideoDuration) * 100
+                ));
                 startMarker.style.left = startPercent + '%';
                 startMarker.title = `${overlay.content.text || overlay.template} at ${formatTime(overlay.startTime)}`; // Assumes formatTime exists
                 
@@ -1576,8 +1648,8 @@
 
         if (event.data === YT.PlayerState.PLAYING) {
             viewerApp.state.playerQuestionCheckInterval = setInterval(function() {
-                if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getCurrentTime === 'function') { // Ensure player exists
-                    const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
+                if (isYouTubePlayerAvailable() && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getCurrentTime === 'function') { // Ensure player exists
+                    const currentTime = safeGetCurrentTime(viewerApp.state.ytPlayer);
                     if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(currentTime);
                     if (viewerTimelineProgressEl && viewerApp.state.currentVideoDuration > 0) {
                         viewerTimelineProgressEl.style.width = (currentTime / viewerApp.state.currentVideoDuration) * 100 + '%';
@@ -1828,12 +1900,12 @@
     function removeSpotlightEffect() { /* SVG version preferred, this might be removed */ }
 
     function checkVideoTimeForQuestions() {
-        if (!viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.currentVideoQuestions) return;
-        const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
+        if (!isYouTubePlayerAvailable() || !viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.currentVideoQuestions) return;
+        const currentTime = safeGetCurrentTime(viewerApp.state.ytPlayer);
         for (let i = 0; i < viewerApp.state.currentVideoQuestions.length; i++) {
             const question = viewerApp.state.currentVideoQuestions[i];
             if (currentTime >= question.timestamp && !viewerApp.state.askedQuestionIndices.includes(i)) {
-                if(viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.pauseVideo === 'function') viewerApp.state.ytPlayer.pauseVideo();
+                if(isYouTubePlayerAvailable() && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.pauseVideo === 'function') viewerApp.state.ytPlayer.pauseVideo();
                 viewerApp.state.askedQuestionIndices.push(i);
                 // Interval is cleared in onPlayerStateChange when paused/ended. No need to clear here
                 // if the pause for the question itself triggers the state change that clears it.

@@ -40,6 +40,8 @@
       askedQuestionIndices: [], // Indices of questions already asked for the current slide view
       currentVideoOverlays: [], // Stores full overlay definitions for the current slide
       activeVideoOverlayIds: new Set(), // Stores IDs of currently displayed timestamp overlays
+      videoOverlays: [], // NEW: For DOM-based video overlays
+      activeOverlays: new Map(), // NEW: For DOM-based video overlays
       currentVideoDuration: 0, // Phase 1: Store current video duration for timeline
       ytPlayer: null, // Holds the YouTube player instance
       deferredYouTubeVideoId: null // Stores videoId if player setup is deferred
@@ -378,6 +380,273 @@
         }
     }
 
+    // --- Helper to get current slide data ---
+    function getCurrentSlide() {
+        if (viewerApp.state.currentProjectData && 
+            Array.isArray(viewerApp.state.currentProjectData.slides) &&
+            viewerApp.state.currentSlideIndex >= 0 &&
+            viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length) {
+            return viewerApp.state.currentProjectData.slides[viewerApp.state.currentSlideIndex];
+        }
+        return null;
+    }
+    
+    // --- New Video Overlay Helper Functions ---
+
+    // Create overlay DOM element
+    function createOverlayElement(overlay) {
+        const div = document.createElement('div');
+        div.className = `video-overlay overlay-${overlay.template}`;
+        div.id = `overlay-${overlay.id}`;
+        div.style.cssText = `
+            position: absolute;
+            left: ${overlay.position.x}%;
+            top: ${overlay.position.y}%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            pointer-events: ${overlay.interaction.action !== 'none' || overlay.interaction.dismissible ? 'auto' : 'none'};
+        `;
+        
+        // Apply template-specific styles
+        applyTemplateStyles(div, overlay);
+        
+        // Add content
+        if (overlay.content.text) {
+            const textEl = document.createElement('div');
+            textEl.className = 'overlay-text';
+            textEl.textContent = overlay.content.text;
+            div.appendChild(textEl);
+        }
+        
+        // Add dismiss button if dismissible
+        if (overlay.interaction.dismissible) {
+            const dismissBtn = document.createElement('button');
+            dismissBtn.className = 'overlay-dismiss';
+            dismissBtn.innerHTML = '×'; // HTML entity for multiplication sign
+            dismissBtn.onclick = (e) => {
+                e.stopPropagation();
+                dismissOverlay(overlay.id);
+            };
+            div.appendChild(dismissBtn);
+        }
+        
+        // Add click handler for actions
+        if (overlay.interaction.action !== 'none') {
+            div.style.cursor = 'pointer';
+            div.onclick = () => handleOverlayAction(overlay);
+        }
+        
+        return div;
+    }
+
+    // Apply template-specific styles
+    function applyTemplateStyles(element, overlay) {
+        const templates = {
+            lowerThird: {
+                width: '300px',
+                padding: '10px 20px',
+                background: 'rgba(0, 0, 0, 0.8)',
+                color: 'white',
+                borderRadius: '4px',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                textAlign: 'center'
+            },
+            cornerCallout: {
+                maxWidth: '200px',
+                padding: '8px 12px',
+                background: 'rgba(255, 255, 255, 0.95)',
+                color: '#333',
+                borderRadius: '8px',
+                fontSize: '14px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            },
+            centerCard: {
+                width: '400px',
+                padding: '20px',
+                background: 'rgba(255, 255, 255, 0.98)',
+                color: '#333',
+                borderRadius: '12px',
+                fontSize: '18px',
+                textAlign: 'center',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+            },
+            hotspot: {
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.9)',
+                border: '3px solid #ff5722',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: 'pulse 2s infinite'
+            },
+            quizBubble: {
+                width: '350px',
+                padding: '15px',
+                background: 'rgba(103, 58, 183, 0.95)',
+                color: 'white',
+                borderRadius: '12px',
+                fontSize: '16px'
+            }
+        };
+        
+        const style = templates[overlay.template] || templates.lowerThird; // Default to lowerThird
+        Object.assign(element.style, style);
+        
+        // Apply custom colors if provided
+        if (overlay.content.backgroundColor) {
+            element.style.backgroundColor = overlay.content.backgroundColor;
+        }
+        if (overlay.content.textColor) {
+            element.style.color = overlay.content.textColor;
+        }
+    }
+
+    // Handle overlay interactions
+    function handleOverlayAction(overlay) {
+        switch (overlay.interaction.action) {
+            case 'dismiss':
+                dismissOverlay(overlay.id);
+                break;
+                
+            case 'navigateToSlide':
+                if (overlay.interaction.actionTarget) {
+                    const targetIndex = viewerApp.state.currentProjectData.slides.findIndex(
+                        s => s.slideId === overlay.interaction.actionTarget
+                    );
+                    if (targetIndex !== -1) {
+                        renderSlideForViewing(targetIndex); // Assumes renderSlideForViewing is globally available
+                    }
+                }
+                break;
+                
+            case 'showModal':
+                if (overlay.interaction.actionTarget) {
+                    showViewerModal(overlay.interaction.actionTarget); // Assumes showViewerModal is globally available
+                }
+                break;
+        }
+    }
+
+    // Dismiss overlay manually
+    function dismissOverlay(overlayId) {
+        const element = viewerApp.state.activeOverlays.get(overlayId);
+        if (element) {
+            element.style.opacity = '0';
+            setTimeout(() => {
+                if (element.parentNode) {
+                    element.parentNode.removeChild(element);
+                }
+                viewerApp.state.activeOverlays.delete(overlayId);
+                
+                // Resume video if needed
+                if (element.dataset.pausedVideo === 'true' && 
+                    viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getPlayerState === 'function' &&
+                    viewerApp.state.ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
+                    viewerApp.state.ytPlayer.playVideo();
+                }
+            }, 300); // Match transition duration
+        }
+    }
+
+    // Initialize video overlays for current slide
+    function initializeVideoOverlays() {
+        const currentSlide = getCurrentSlide(); // Assumes getCurrentSlide is globally available
+        if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube') {
+            viewerApp.state.videoOverlays = []; // Clear if not a YouTube slide or no media
+            viewerApp.state.activeOverlays.clear();
+            // Clear the DOM container as well
+            const container = document.getElementById('videoOverlayContainer');
+            if (container) container.innerHTML = '';
+            return;
+        }
+        
+        viewerApp.state.videoOverlays = currentSlide.slideMedia.videoOverlays || [];
+        // Clear any existing DOM overlays and the activeOverlays map before initializing new ones
+        const container = document.getElementById('videoOverlayContainer');
+        if (container) container.innerHTML = '';
+        viewerApp.state.activeOverlays.clear(); 
+    }
+
+    // Check and update overlay visibility
+    function updateVideoOverlays() {
+        if (!viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.videoOverlays) return;
+        
+        const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
+        const container = document.getElementById('videoOverlayContainer');
+        if (!container) return; // Make sure container exists
+        
+        viewerApp.state.videoOverlays.forEach(overlay => {
+            const isActive = viewerApp.state.activeOverlays.has(overlay.id);
+            const shouldShow = currentTime >= overlay.startTime && 
+                              currentTime < (overlay.startTime + overlay.duration);
+            
+            if (shouldShow && !isActive) {
+                // Show overlay
+                const element = createOverlayElement(overlay);
+                container.appendChild(element);
+                viewerApp.state.activeOverlays.set(overlay.id, element);
+                
+                // Handle pause if needed
+                if (overlay.interaction.pauseVideo && viewerApp.state.ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+                    viewerApp.state.ytPlayer.pauseVideo();
+                    element.dataset.pausedVideo = 'true';
+                }
+                
+                // Fade in animation
+                requestAnimationFrame(() => {
+                    // Check if element still exists and is in map, in case of rapid changes
+                    if (viewerApp.state.activeOverlays.get(overlay.id) === element) {
+                         element.style.opacity = '1';
+                    }
+                });
+                
+            } else if (!shouldShow && isActive) {
+                // Hide overlay
+                const element = viewerApp.state.activeOverlays.get(overlay.id);
+                // Check if element exists before trying to access its style
+                if (element) {
+                    element.style.opacity = '0';
+                
+                    setTimeout(() => {
+                        // Check again if element still exists and is the one we expect to remove
+                        if (viewerApp.state.activeOverlays.get(overlay.id) === element && element.parentNode) {
+                             element.parentNode.removeChild(element);
+                        }
+                        // Delete from map only if it was the element we intended to remove
+                        if (viewerApp.state.activeOverlays.get(overlay.id) === element) {
+                            viewerApp.state.activeOverlays.delete(overlay.id);
+                        }
+                        
+                        // Resume video if this overlay paused it
+                        if (element.dataset.pausedVideo === 'true' && 
+                            viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getPlayerState === 'function' &&
+                            viewerApp.state.ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
+                            // Check if other overlays that pause video are still active
+                            let otherPausingOverlayActive = false;
+                            for (const [id, el] of viewerApp.state.activeOverlays) {
+                                const ov = viewerApp.state.videoOverlays.find(o => o.id === id);
+                                if (ov && ov.interaction.pauseVideo && el.dataset.pausedVideo === 'true') {
+                                    otherPausingOverlayActive = true;
+                                    break;
+                                }
+                            }
+                            if (!otherPausingOverlayActive) {
+                                viewerApp.state.ytPlayer.playVideo();
+                            }
+                        }
+                    }, 300); // Match transition duration
+                } else {
+                     // If element is not found but ID is in activeOverlays, remove it from map
+                     viewerApp.state.activeOverlays.delete(overlay.id);
+                }
+            }
+        });
+    }
+
     // --- Canvas & Slide Rendering ---
     function initializeViewerCanvas() {
         if (viewerApp.state.viewerFabricCanvas) {
@@ -436,6 +705,7 @@
         const slideData = slides[slideIndex]; // Moved up to access slideData earlier
 
         viewerApp.state.currentSlideIndex = slideIndex; 
+        initializeVideoOverlays(); // Call the new function here
         
         // Initialize timestamp overlay states for the new slide
         // Clear any existing timestamp overlays from canvas (part of stopAndDestroyYouTubePlayer now, but good to be sure)
@@ -446,8 +716,8 @@
                 }
             });
         }
-        viewerApp.state.currentVideoOverlays = (slideData && slideData.slideMedia && slideData.slideMedia.videoOverlays && Array.isArray(slideData.slideMedia.videoOverlays)) ? [...slideData.slideMedia.videoOverlays] : [];
-        viewerApp.state.activeVideoOverlayIds = new Set(); // Initialize as a new Set
+        // viewerApp.state.currentVideoOverlays = (slideData && slideData.slideMedia && slideData.slideMedia.videoOverlays && Array.isArray(slideData.slideMedia.videoOverlays)) ? [...slideData.slideMedia.videoOverlays] : [];
+        // viewerApp.state.activeVideoOverlayIds = new Set(); // Initialize as a new Set
 
         // const slideData = slides[slideIndex]; // Original position
         const canvas = viewerApp.state.viewerFabricCanvas;
@@ -1266,30 +1536,31 @@
         }
 
         // Render Timestamp Overlay Markers
-        if (viewerApp.state.currentVideoOverlays && viewerApp.state.currentVideoOverlays.length > 0) {
-            viewerApp.state.currentVideoOverlays.forEach(overlayDef => {
-                if (overlayDef && typeof overlayDef.timestampShow !== 'undefined' && overlayDef.fabricObjectJSON) {
-                    const marker = document.createElement('div');
-                    marker.className = 'timeline-marker overlay-marker'; // Generic and specific class
-                    marker.style.position = 'absolute';
-                    marker.style.width = '3px'; 
-                    marker.style.height = '100%';
-                    marker.style.backgroundColor = '#4CAF50'; // Green for overlays
-                    marker.style.top = '0px';
-                    marker.style.zIndex = '2';
-
-                    const percentagePosition = (overlayDef.timestampShow / viewerApp.state.currentVideoDuration) * 100;
-                    marker.style.left = percentagePosition + '%';
-                    // Attempt to get a meaningful name for the overlay from its JSON
-                    let overlayName = 'Overlay';
-                    if (overlayDef.fabricObjectJSON.type) {
-                        overlayName = overlayDef.fabricObjectJSON.type.charAt(0).toUpperCase() + overlayDef.fabricObjectJSON.type.slice(1);
-                    } else if (overlayDef.fabricObjectJSON.text) {
-                         overlayName = `Text: "${overlayDef.fabricObjectJSON.text.substring(0,15)}..."`;
+        // Add overlay markers (This is the new/updated part)
+        if (viewerApp.state.videoOverlays && viewerApp.state.videoOverlays.length > 0) { // Use new state variable
+            viewerApp.state.videoOverlays.forEach(overlay => { // Iterate over new state variable
+                const startMarker = document.createElement('div');
+                startMarker.className = 'timeline-marker overlay-marker';
+                // The issue mentions getTemplateColor(overlay.template)
+                // If getTemplateColor doesn't exist, use a default or a placeholder.
+                // For now, let's use a fixed color if getTemplateColor is not found.
+                let markerColor = '#4CAF50'; // Default green for overlay markers
+                if (typeof getTemplateColor === 'function') {
+                    markerColor = getTemplateColor(overlay.template);
+                } else {
+                    // Fallback for specific templates if getTemplateColor is missing
+                    const templateColors = { hotspot: '#ff5722', quizBubble: '#673ab7' };
+                    if (templateColors[overlay.template]) {
+                        markerColor = templateColors[overlay.template];
                     }
-                    marker.title = `${overlayName} at ${formatTime(overlayDef.timestampShow)}`;
-                    viewerTimelineTrackEl.appendChild(marker);
                 }
+                startMarker.style.backgroundColor = markerColor; 
+                
+                const startPercent = (overlay.startTime / viewerApp.state.currentVideoDuration) * 100;
+                startMarker.style.left = startPercent + '%';
+                startMarker.title = `${overlay.content.text || overlay.template} at ${formatTime(overlay.startTime)}`; // Assumes formatTime exists
+                
+                viewerTimelineTrackEl.appendChild(startMarker);
             });
         }
     }
@@ -1311,7 +1582,7 @@
                         viewerTimelineProgressEl.style.width = (currentTime / viewerApp.state.currentVideoDuration) * 100 + '%';
                     }
                     checkVideoTimeForQuestions();
-                    checkVideoTimeForVideoOverlays(currentTime); 
+                    updateVideoOverlays(); 
                 } else { // Player was destroyed or became unavailable
                     if (viewerApp.state.playerQuestionCheckInterval) {
                         clearInterval(viewerApp.state.playerQuestionCheckInterval);
@@ -1320,20 +1591,16 @@
                 }
             }, 250);
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
-            // Interval is cleared above, so no need to clear again here.
-            // The checkVideoTimeForVideoOverlays(currentTime) call within the interval handles PAUSED/ENDED states implicitly
-            // by virtue of the interval stopping and no longer updating.
-            // If a final check is needed on PAUSE/END, it would be like this:
-            // if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getCurrentTime === 'function') {
-            //    const currentTime = viewerApp.state.ytPlayer.getCurrentTime();
-            //    checkVideoTimeForVideoOverlays(currentTime);
-            // }
+            // Interval is cleared above.
+            updateVideoOverlays(); // Call to update overlay states based on final time
         }
     }
 
     // Definition of checkVideoTimeForTimestampOverlays is removed / replaced by checkVideoTimeForVideoOverlays
 
     function createFabricObjectFromOverlayDefinition(overlayDef) {
+        /*
+        // Entire original body commented out
         console.log("Attempting to create Fabric object for overlay definition:", overlayDef);
         // Placeholder: Create a simple rectangle.
         // Actual implementation will depend on overlayDef.template
@@ -1348,9 +1615,12 @@
         });
         return rect;
         // return null; // Or return null if you want to test adding/removing logic first without visual objects
+        */
     }
 
     function checkVideoTimeForVideoOverlays(currentTime) {
+        /*
+        // Entire original body commented out
         const canvas = viewerApp.state.viewerFabricCanvas;
         if (!canvas || !viewerApp.state.currentVideoOverlays) return;
 
@@ -1405,6 +1675,7 @@
             canvas.requestRenderAll();
         }
         updateViewerCanvasInteractivity(); // Called at the end
+        */
     }
     
     function updateViewerCanvasInteractivity() {
@@ -1487,8 +1758,20 @@
                     canvas.requestRenderAll(); // Render after removing objects
                 }
             }
-            viewerApp.state.currentVideoOverlays = []; // Clear state for timestamp overlays
-            viewerApp.state.activeVideoOverlayIds.clear();
+            // viewerApp.state.currentVideoOverlays = []; // Clear state for timestamp overlays - OLD
+            // viewerApp.state.activeVideoOverlayIds.clear(); // OLD
+            
+            // New cleanup for HTML DOM overlays:
+            const overlayContainer = document.getElementById('videoOverlayContainer');
+            if (overlayContainer) {
+                overlayContainer.innerHTML = '';
+            }
+            if (viewerApp.state.activeOverlays) { // Check if activeOverlays exists
+                viewerApp.state.activeOverlays.clear();
+            }
+            if (viewerApp.state.videoOverlays) { // Check if videoOverlays exists
+                viewerApp.state.videoOverlays = [];
+            }
             
             // Phase 1: Timeline cleanup
             viewerApp.state.currentVideoDuration = 0;

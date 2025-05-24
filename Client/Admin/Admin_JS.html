@@ -82,9 +82,9 @@ function onYouTubeIframeAPIReady() {
     let optionInputsEl = [], correctAnswerRadiosEl = [];
 
     // Timestamp Overlay Elements (from AdminView.html)
-    let manageTimestampOverlaysButtonEl, timestampOverlayModalEl, makeOverlayInteractiveCheckboxEl,
-        addTimestampOverlayButtonEl, timestampOverlayListEl, closeTimestampOverlayModalBtnEl,
-        currentOverlayTimestampInputEl; // Added currentOverlayTimestampInputEl just in case, though it's commented out in HTML
+    // let manageTimestampOverlaysButtonEl, timestampOverlayModalEl, makeOverlayInteractiveCheckboxEl,
+    //     addTimestampOverlayButtonEl, timestampOverlayListEl, closeTimestampOverlayModalBtnEl,
+    //     currentOverlayTimestampInputEl; // These are removed as per plan
 
 
     // --- Initialization ---
@@ -278,12 +278,12 @@ function onYouTubeIframeAPIReady() {
       }
 
       // Timestamp Overlay Elements
-      manageTimestampOverlaysButtonEl = document.getElementById('manageTimestampOverlaysButton');
-      timestampOverlayModalEl = document.getElementById('timestampOverlayModal');
-      makeOverlayInteractiveCheckboxEl = document.getElementById('makeOverlayInteractiveCheckbox');
-      addTimestampOverlayButtonEl = document.getElementById('addTimestampOverlayButton');
-      timestampOverlayListEl = document.getElementById('timestampOverlayList');
-      closeTimestampOverlayModalBtnEl = document.getElementById('closeTimestampOverlayModalBtn'); // Though it has inline JS
+      // manageTimestampOverlaysButtonEl = document.getElementById('manageTimestampOverlaysButton'); // Removed
+      // timestampOverlayModalEl = document.getElementById('timestampOverlayModal'); // Removed
+      // makeOverlayInteractiveCheckboxEl = document.getElementById('makeOverlayInteractiveCheckbox'); // Removed
+      // addTimestampOverlayButtonEl = document.getElementById('addTimestampOverlayButton'); // Removed
+      // timestampOverlayListEl = document.getElementById('timestampOverlayList'); // Removed
+      // closeTimestampOverlayModalBtnEl = document.getElementById('closeTimestampOverlayModalBtn'); // Removed
       // currentOverlayTimestampInputEl = document.getElementById('currentOverlayTimestampInput'); // This is commented out in HTML
 
       if (!messageAreaEl) console.warn("setupDOMReferences: messageAreaEl not found.");
@@ -295,8 +295,8 @@ function onYouTubeIframeAPIReady() {
       if (!shadowPopoverEl || !interactionPopoverEl || !animationPopoverEl || !fontFamilyPopoverEl) {
           console.warn("setupDOMReferences: One or more popover elements not found.");
       }
-      if (!manageTimestampOverlaysButtonEl) console.warn("setupDOMReferences: manageTimestampOverlaysButtonEl not found.");
-      if (!timestampOverlayModalEl) console.warn("setupDOMReferences: timestampOverlayModalEl not found.");
+      // if (!manageTimestampOverlaysButtonEl) console.warn("setupDOMReferences: manageTimestampOverlaysButtonEl not found."); // Removed
+      // if (!timestampOverlayModalEl) console.warn("setupDOMReferences: timestampOverlayModalEl not found."); // Removed
 
 
       console.log("Admin_JS: DOM references set up.");
@@ -489,46 +489,42 @@ function onYouTubeIframeAPIReady() {
 
     // --- Popover Management ---
     function togglePopover(popoverId, triggerButtonEl) {
-        const isTimestampModal = popoverId === 'timestampOverlayModal';
-
-        if (adminApp.state.activePopoverId === popoverId && !isTimestampModal) { // Don't auto-close timestamp modal this way
+        if (adminApp.state.activePopoverId === popoverId) {
             hideActivePopover();
         } else {
-            if (!isTimestampModal) hideActivePopover(); 
+            hideActivePopover(); 
             
             const popover = document.getElementById(popoverId);
             if (popover && triggerButtonEl) {
-                popover.style.display = 'block'; // Keep this for all popovers/modals
-                adminApp.state.activePopoverId = popoverId; // Set active for all
+                popover.style.display = 'block';
+                adminApp.state.activePopoverId = popoverId;
 
-                if (!isTimestampModal) { // Positioning logic only for non-timestamp modals
-                    popover.style.position = 'absolute';
-                    popover.style.top = 'auto';
-                    popover.style.left = 'auto';
-                    
-                    const btnRect = triggerButtonEl.getBoundingClientRect();
-                    const popoverRect = popover.getBoundingClientRect();
-                    const viewportWidth = window.innerWidth;
-                    const viewportHeight = window.innerHeight;
-                    
-                    let posTop = btnRect.bottom + 5;
-                    let posLeft = btnRect.left;
-                    
-                    if (posLeft + popoverRect.width > viewportWidth) {
-                        posLeft = Math.max(5, viewportWidth - popoverRect.width - 5); 
-                    }
-                    if (posLeft < 0) posLeft = 5; 
-
-                    if (posTop + popoverRect.height > viewportHeight && btnRect.top - popoverRect.height - 5 > 0) { 
-                        posTop = btnRect.top - popoverRect.height - 5;
-                    } else if (posTop + popoverRect.height > viewportHeight) { 
-                         posTop = Math.max(5, viewportHeight - popoverRect.height - 5);
-                    }
-                    if (posTop < 0) posTop = 5; 
-                    
-                    popover.style.top = posTop + 'px';
-                    popover.style.left = posLeft + 'px';
+                popover.style.position = 'absolute';
+                popover.style.top = 'auto';
+                popover.style.left = 'auto';
+                
+                const btnRect = triggerButtonEl.getBoundingClientRect();
+                const popoverRect = popover.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+                
+                let posTop = btnRect.bottom + 5;
+                let posLeft = btnRect.left;
+                
+                if (posLeft + popoverRect.width > viewportWidth) {
+                    posLeft = Math.max(5, viewportWidth - popoverRect.width - 5); 
                 }
+                if (posLeft < 0) posLeft = 5; 
+
+                if (posTop + popoverRect.height > viewportHeight && btnRect.top - popoverRect.height - 5 > 0) { 
+                    posTop = btnRect.top - popoverRect.height - 5;
+                } else if (posTop + popoverRect.height > viewportHeight) { 
+                     posTop = Math.max(5, viewportHeight - popoverRect.height - 5);
+                }
+                if (posTop < 0) posTop = 5; 
+                
+                popover.style.top = posTop + 'px';
+                popover.style.left = posLeft + 'px';
                 
                 document.querySelectorAll('.toolbar-button').forEach(btn => {
                     btn.classList.remove('popover-active');
@@ -553,11 +549,7 @@ function onYouTubeIframeAPIReady() {
                            }
                        }
                    }
-                } else if (isTimestampModal) {
-                    // If it's the timestamp modal, ensure the list is populated
-                    populateTimestampOverlayList();
                 }
-
             } else {
                 console.warn("togglePopover: Popover or trigger button not found for ID:", popoverId);
             }
@@ -566,23 +558,13 @@ function onYouTubeIframeAPIReady() {
 
     function hideActivePopover() {
         if (adminApp.state.activePopoverId) {
-            // Do not hide the timestampOverlayModal using this generic function
-            // It has its own close button.
-            if (adminApp.state.activePopoverId === 'timestampOverlayModal') {
-                 // If you want to allow generic hide for it too, remove this check.
-                 // For now, let's assume its close button is the primary way to hide it.
-            } else {
-                const popover = document.getElementById(adminApp.state.activePopoverId);
-                if (popover) popover.style.display = 'none';
-            }
+            const popover = document.getElementById(adminApp.state.activePopoverId);
+            if (popover) popover.style.display = 'none';
             
             document.querySelectorAll('.toolbar-button.popover-active').forEach(btn => {
                 btn.classList.remove('popover-active');
             });
-            // Only nullify if it wasn't the timestamp modal, or if we decide to let it be hidden this way.
-            if (adminApp.state.activePopoverId !== 'timestampOverlayModal') {
-                 adminApp.state.activePopoverId = null;
-            }
+            adminApp.state.activePopoverId = null;
         }
     }
 
@@ -679,9 +661,9 @@ function onYouTubeIframeAPIReady() {
               if (!slide.slideMedia) {
                   slide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null };
               }
-              // Ensure timestampOverlays array exists
-              if (!Array.isArray(slide.timestampOverlays)) {
-                  slide.timestampOverlays = [];
+              // Ensure videoOverlays array exists for slideMedia
+              if (slide.slideMedia && !Array.isArray(slide.slideMedia.videoOverlays)) {
+                  slide.slideMedia.videoOverlays = [];
               }
               if (!slide.fabricCanvasJSON || !slide.fabricCanvasJSON.objects) {
               } else {
@@ -752,13 +734,9 @@ function onYouTubeIframeAPIReady() {
           if(currentSlide.slideMedia.type !== 'image' && currentSlide.slideMedia.url && currentSlide.slideMedia.url.startsWith('data:image')) {
               currentSlide.slideMedia.url = null;
           }
-          // Ensure timestampOverlays array exists on the slide object
-          if (!Array.isArray(currentSlide.timestampOverlays)) {
-              currentSlide.timestampOverlays = [];
-          }
 
 
-          console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Media:`, JSON.stringify(currentSlide.slideMedia), "Overlays:", currentSlide.timestampOverlays.length);
+          console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Media:`, JSON.stringify(currentSlide.slideMedia));
         } catch(e) {
             console.error(`Error saving slide state for index ${adminApp.state.currentSlideIndex}:`, e);
             displayMessage(`Error saving current slide state: ${e.message}`, false);
@@ -779,10 +757,6 @@ function onYouTubeIframeAPIReady() {
                  if (slide.slideMedia && slide.slideMedia.type !== 'image' && 
                      slide.slideMedia.url && slide.slideMedia.url.startsWith('data:image')) {
                      slide.slideMedia.url = null; 
-                 }
-                 // Ensure timestampOverlays is an array
-                 if (!Array.isArray(slide.timestampOverlays)) {
-                     slide.timestampOverlays = [];
                  }
              });
 
@@ -850,8 +824,7 @@ function onYouTubeIframeAPIReady() {
             canvasWidth: adminApp.state.defaultCanvasWidth,
             canvasHeight: adminApp.state.defaultCanvasHeight,
             fabricCanvasJSON: null, 
-            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] },
-            timestampOverlays: [] // Initialize with empty array
+            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] }
         };
         if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
@@ -884,9 +857,8 @@ function onYouTubeIframeAPIReady() {
         } else if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
             selectedSlideData.slideMedia.videoQuestions = [];
         }
-        // Ensure timestampOverlays array exists on the slide
-        if (!Array.isArray(selectedSlideData.timestampOverlays)) {
-            selectedSlideData.timestampOverlays = [];
+        if (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoOverlays)) {
+          selectedSlideData.slideMedia.videoOverlays = [];
         }
 
 
@@ -921,7 +893,7 @@ function onYouTubeIframeAPIReady() {
 
         const media = selectedSlideData.slideMedia;
         updateVideoToolsVisibility(false);
-        if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none'; // Hide by default
+        // if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none'; // Removed
 
         if (media && media.type === 'image' && media.driveFileId) {
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
@@ -984,7 +956,7 @@ function onYouTubeIframeAPIReady() {
                         'onReady': (event) => {
                             console.log("Admin YouTube player ready.");
                             updateVideoToolsVisibility(true); 
-                            if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'inline-block'; // Show button
+                            // if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'inline-block'; // Removed
                             renderVideoQuestionsList(); 
                             const duration = event.target.getDuration();
                             if (videoTotalDurationDisplayEl) videoTotalDurationDisplayEl.textContent = formatTime(duration);
@@ -1007,7 +979,7 @@ function onYouTubeIframeAPIReady() {
                         'onError': (event) => {
                             console.error("Admin YouTube player error", event.data, "for URL:", media.url);
                             updateVideoToolsVisibility(false); 
-                            if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none';
+                            // if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none'; // Removed
                             
                             if (adminMediaPlaceholderEl) {
                                 if (event.data === 150) { 
@@ -1478,7 +1450,7 @@ function onYouTubeIframeAPIReady() {
         currentSlide.slideMedia.mimeType = 'video/youtube';
         currentSlide.slideMedia.originalName = null;
         currentSlide.slideMedia.videoQuestions = currentSlide.slideMedia.videoQuestions || []; // Ensure array exists
-        currentSlide.timestampOverlays = currentSlide.timestampOverlays || []; // Ensure array exists
+        currentSlide.slideMedia.videoOverlays = []; // Ensure array exists
 
 
         console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
@@ -2528,30 +2500,7 @@ function onYouTubeIframeAPIReady() {
         }
 
         // --- Timestamp Overlay Modal Button Listeners ---
-        if (manageTimestampOverlaysButtonEl) { // manageTimestampOverlaysButtonEl from setupDOMReferences
-            if (!manageTimestampOverlaysButtonEl.hasAttribute('listener-attached')) {
-                manageTimestampOverlaysButtonEl.addEventListener('click', () => {
-                    // Use togglePopover to handle the timestampOverlayModal display
-                    // This ensures it's treated like other popovers for hiding logic if needed,
-                    // though its primary close is its own button.
-                    togglePopover('timestampOverlayModal', manageTimestampOverlaysButtonEl);
-                });
-                manageTimestampOverlaysButtonEl.setAttribute('listener-attached', 'true');
-                console.log("Listener attached for manageTimestampOverlaysButtonEl.");
-            }
-        } else {
-            console.warn("manageTimestampOverlaysButtonEl not found for attaching listener.");
-        }
-
-        if (addTimestampOverlayButtonEl) { // addTimestampOverlayButtonEl from setupDOMReferences
-             if (!addTimestampOverlayButtonEl.hasAttribute('listener-attached')) { 
-                addTimestampOverlayButtonEl.addEventListener('click', handleAddTimestampOverlay);
-                addTimestampOverlayButtonEl.setAttribute('listener-attached', 'true');
-                console.log("Listener attached for addTimestampOverlayButtonEl.");
-            }
-        } else {
-            console.warn("addTimestampOverlayButtonEl not found for attaching listener.");
-        }
+        // Removed event listeners for manageTimestampOverlaysButtonEl and addTimestampOverlayButtonEl as per plan
         
         // The close button for timestampOverlayModal already has an inline onclick in AdminView.html
         // If you prefer to manage it here:
@@ -2579,9 +2528,9 @@ function onYouTubeIframeAPIReady() {
             console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
         }
          // Show/hide the "Manage Timestamp Overlays" button along with other video tools
-        if (manageTimestampOverlaysButtonEl) {
-            manageTimestampOverlaysButtonEl.style.display = show ? 'inline-block' : 'none';
-        }
+        // if (manageTimestampOverlaysButtonEl) { // Removed
+        //     manageTimestampOverlaysButtonEl.style.display = show ? 'inline-block' : 'none'; // Removed
+        // } // Removed
     }
 
     function renderVideoQuestionsList() {
@@ -2681,171 +2630,5 @@ function onYouTubeIframeAPIReady() {
         const seconds = totalSeconds % 60;
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
-       
-    function handleAddTimestampOverlay() {
-        const currentSlide = getCurrentSlide();
-        if (!currentSlide || !adminApp.state.fabricCanvasInstance ) {
-            displayMessage("Cannot add timestamp overlay: No slide or canvas active.", false);
-            return;
-        }
-        if (currentSlide.slideMedia.type !== 'youtube' || !adminApp.state.adminYouTubePlayer) {
-            displayMessage("Timestamp overlays can only be added to YouTube video slides with an active player.", false);
-            return;
-        }
-        
-        const selectedObject = adminApp.state.fabricCanvasInstance.getActiveObject();
-        if (!selectedObject) {
-            displayMessage("Please select an object on the canvas to use as an overlay.", false);
-            return;
-        }
-
-        const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
-        const isInteractive = makeOverlayInteractiveCheckboxEl ? makeOverlayInteractiveCheckboxEl.checked : false;
-        const defaultHideTimeOffset = 5; 
-        
-        // Use currentOverlayTimestampInputEl.value if you implement an input field for hide time
-        // For now, it uses the default offset.
-        const hideTimeInputVal = currentOverlayTimestampInputEl ? currentOverlayTimestampInputEl.value : '';
-        const timestampHide = (hideTimeInputVal !== '' && !isNaN(parseFloat(hideTimeInputVal)))
-                              ? parseFloat(hideTimeInputVal)
-                              : currentTime + defaultHideTimeOffset;
-
-
-        const overlayId = 'ts_overlay_' + Utilities.getUuid();
-        const propsToInclude = [
-            'type', 'originX', 'originY', 'left', 'top', 'width', 'height', 'scaleX', 'scaleY', 'flipX', 'flipY', 
-            'opacity', 'angle', 'fill', 'stroke', 'strokeWidth', 'strokeDashArray', 'strokeLineCap', 'strokeLineJoin', 
-            'strokeMiterLimit', 'shadow', 'visible', 'backgroundColor', 'clipPath', 'skewX', 'skewY',
-            'text', 'fontSize', 'fontWeight', 'fontFamily', 'fontStyle', 'lineHeight', 'underline', 'overline', 
-            'linethrough', 'textAlign', 'textBackgroundColor', 'charSpacing', 'path', 'direction',
-            'customInteraction', 'customAnimation', 'sequenceOrder', 'slideId' 
-        ];
-        
-        const fabricObjectJSON = selectedObject.toJSON(propsToInclude);
-
-        const newTimestampOverlay = {
-            overlayId: overlayId,
-            timestampShow: currentTime,
-            timestampHide: timestampHide, 
-            fabricObjectJSON: fabricObjectJSON,
-            isInteractive: isInteractive 
-        };
-
-        if (!Array.isArray(currentSlide.timestampOverlays)) {
-            currentSlide.timestampOverlays = [];
-        }
-        currentSlide.timestampOverlays.push(newTimestampOverlay);
-        currentSlide.timestampOverlays.sort((a, b) => a.timestampShow - b.timestampShow); 
-
-        displayMessage(`Overlay added from ${formatTime(currentTime)} to ${formatTime(timestampHide)}. Save project to persist.`, true);
-        populateTimestampOverlayList(); 
-        if (makeOverlayInteractiveCheckboxEl) makeOverlayInteractiveCheckboxEl.checked = false;
-        if (currentOverlayTimestampInputEl) currentOverlayTimestampInputEl.value = ''; // Reset if used
-    }
-
-    function populateTimestampOverlayList() {
-        if (!timestampOverlayListEl) {
-            console.warn("populateTimestampOverlayList: timestampOverlayListEl not found.");
-            return;
-        }
-        timestampOverlayListEl.innerHTML = ''; 
-
-        const currentSlide = getCurrentSlide();
-        if (!currentSlide || !currentSlide.timestampOverlays || currentSlide.timestampOverlays.length === 0) {
-            const li = document.createElement('li');
-            li.textContent = "No timestamp overlays defined for this slide.";
-            li.style.fontStyle = "italic";
-            timestampOverlayListEl.appendChild(li);
-            return;
-        }
-
-        currentSlide.timestampOverlays.forEach((overlay, index) => {
-            const li = document.createElement('li');
-            li.style.display = 'flex';
-            li.style.justifyContent = 'space-between';
-            li.style.alignItems = 'center';
-            li.style.padding = '5px 0';
-            li.style.borderBottom = '1px solid #eee';
-
-            const infoSpan = document.createElement('span');
-            const overlayType = overlay.fabricObjectJSON.type || 'Object';
-            const shortText = overlay.fabricObjectJSON.text ? `"${overlay.fabricObjectJSON.text.substring(0,15)}..."` : '';
-            const hideTimeText = (overlay.timestampHide !== null && overlay.timestampHide !== undefined) ? ` to ${formatTime(overlay.timestampHide)}` : ' (persists)';
-            
-            infoSpan.textContent = `[${formatTime(overlay.timestampShow)}${hideTimeText}] ${overlayType} ${shortText} (Interactive: ${overlay.isInteractive})`;
-            li.appendChild(infoSpan);
-            
-            const controlsDiv = document.createElement('div');
-
-            const editBtn = document.createElement('button');
-            editBtn.textContent = 'Edit Time'; 
-            editBtn.className = 'edit-button'; 
-            editBtn.style.marginLeft = '10px';
-            editBtn.style.padding = '2px 5px';
-            editBtn.style.fontSize = '0.8em';
-            editBtn.onclick = function() {
-                editTimestampOverlayTimes(index); 
-            };
-            controlsDiv.appendChild(editBtn);
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'Delete';
-            deleteBtn.className = 'danger-button';
-            deleteBtn.style.marginLeft = '5px';
-            deleteBtn.style.padding = '2px 5px';
-            deleteBtn.style.fontSize = '0.8em';
-            deleteBtn.onclick = function() {
-                if (confirm('Are you sure you want to delete this timestamp overlay?')) {
-                    currentSlide.timestampOverlays.splice(index, 1);
-                    populateTimestampOverlayList(); 
-                    displayMessage("Timestamp overlay removed. Save project to persist change.", true);
-                }
-            };
-            controlsDiv.appendChild(deleteBtn);
-            li.appendChild(controlsDiv);
-            timestampOverlayListEl.appendChild(li);
-        });
-    }
-
-    function editTimestampOverlayTimes(index) {
-        const currentSlide = getCurrentSlide();
-        if (!currentSlide || !currentSlide.timestampOverlays || !currentSlide.timestampOverlays[index]) {
-            displayMessage("Overlay not found for editing.", false);
-            return;
-        }
-        const overlay = currentSlide.timestampOverlays[index];
-
-        const newShowTimeStr = prompt(`Edit Show Time for overlay (currently ${formatTime(overlay.timestampShow)}):`, overlay.timestampShow.toFixed(1));
-        if (newShowTimeStr === null) return; 
-
-        const newShowTime = parseFloat(newShowTimeStr);
-        if (isNaN(newShowTime) || newShowTime < 0) {
-            displayMessage("Invalid show time entered.", false);
-            return;
-        }
-
-        const newHideTimeStr = prompt(`Edit Hide Time for overlay (currently ${overlay.timestampHide !== null ? formatTime(overlay.timestampHide) : 'Persists'}). Enter new time or leave blank to persist:`, overlay.timestampHide !== null ? overlay.timestampHide.toFixed(1) : "");
-        if (newHideTimeStr === null) return; 
-
-        let newHideTime = null;
-        if (newHideTimeStr.trim() !== "") {
-            newHideTime = parseFloat(newHideTimeStr);
-            if (isNaN(newHideTime) || newHideTime < newShowTime) {
-                displayMessage("Invalid hide time entered. Must be after show time.", false);
-                return;
-            }
-        }
-
-        overlay.timestampShow = newShowTime;
-        overlay.timestampHide = newHideTime;
-
-        currentSlide.timestampOverlays.sort((a, b) => a.timestampShow - b.timestampShow); 
-        populateTimestampOverlayList(); 
-        displayMessage("Overlay times updated. Save project to persist changes.", true);
-    }
-
-    function editTimestampOverlay(index) { // Placeholder for more advanced editing
-        console.log("Comprehensive edit functionality for timestamp overlay at index", index, "is a TODO.");
-        displayMessage("Advanced editing for overlay content is not yet implemented. Use Delete and Add New.", "info");
-    }
+    // Removed handleAddTimestampOverlay, populateTimestampOverlayList, editTimestampOverlayTimes, and editTimestampOverlay functions
 </script>

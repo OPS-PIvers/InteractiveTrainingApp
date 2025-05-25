@@ -520,29 +520,28 @@ function deleteProject(projectId) {
       Logger.log(`getProjectDataForEditing: Attempting to load data for projectId: ${projectId}`);
       if (!projectId) {
         Logger.log("getProjectDataForEditing: ProjectID is missing.");
-        // For functions that are expected to throw for client's withFailureHandler
-        throw new Error("ProjectID is missing."); 
+        return createResponse(false, null, "ProjectID is missing.");
       }
 
       // Find row index first
       const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
       if (!rowIndex) {
           Logger.log(`getProjectDataForEditing: Project with ID "${projectId}" not found in ProjectIndex.`);
-          throw new Error(`Project index entry not found for ID: ${projectId}.`);
+          return createResponse(false, null, `Project index entry not found for ID: ${projectId}.`);
       }
 
       // Get row data to find the file ID
       const rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
       if (!rowData) {
           Logger.log(`getProjectDataForEditing: Could not retrieve row data for project ${projectId} at row ${rowIndex}.`);
-          throw new Error("Could not retrieve project metadata from sheet.");
+          return createResponse(false, null, "Could not retrieve project metadata from sheet.");
       }
 
       const projectDataFileId = rowData[COL_PROJECT_DATA_FILE_ID - 1];
 
       if (!projectDataFileId) {
         Logger.log(`getProjectDataForEditing: ProjectDataFileID is missing for project "${projectId}" in row ${rowIndex}.`);
-        throw new Error("Project data file reference missing in index.");
+        return createResponse(false, null, "Project data file reference missing in index.");
       }
       Logger.log(`getProjectDataForEditing: Found ProjectDataFileID: ${projectDataFileId} for project ${projectId}.`);
 
@@ -550,19 +549,11 @@ function deleteProject(projectId) {
       const jsonContent = readDriveFileContent(projectDataFileId);
 
       Logger.log(`getProjectDataForEditing: Successfully read content for file ID ${projectDataFileId}. Content length: ${jsonContent ? jsonContent.length : 0}`);
-      // Instead of returning string directly, wrap it for consistency if client is adapted
-      // For now, keeping direct return for this specific function as per initial analysis.
-      // If client expects {success, data}, this should be:
-      // return createResponse(true, { projectDataJSON: jsonContent });
-      return jsonContent;
-
+      return createResponse(true, { projectDataJSON: jsonContent });
 
     } catch (e) {
       Logger.log(`Error in getProjectDataForEditing for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-      // Re-throw for .withFailureHandler on client.
-      // If standardizing all returns, this would be:
-      // return createResponse(false, null, `Failed to get project data: ${e.message}`);
-      throw new Error(`Failed to get project data for editing: ${e.message}`);
+      return createResponse(false, null, `Failed to get project data for editing: ${e.message}`);
     }
   }
 

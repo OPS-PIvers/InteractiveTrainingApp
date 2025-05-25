@@ -32,16 +32,47 @@
       overlayPreviewInterval: null
     };
 
+// ADD after adminApp.state definition:
+adminApp.eventListeners = new WeakMap(); // Track event listeners for cleanup
+adminApp.activeListeners = []; // Array of {element, event, handler} for global listeners
+
 // --- Global function for YouTube API ---
 function onYouTubeIframeAPIReady() {
   adminApp.state.isYouTubeApiReady = true;
   console.log('Admin YouTube API Ready.');
+  
+  // Process any deferred setup
+  if (adminApp.state.deferredYouTubeSetup) {
+    const { videoId, retryCount = 0 } = adminApp.state.deferredYouTubeSetup;
+    setTimeout(() => {
+      if (isYouTubePlayerAvailable()) {
+        setupAdminYouTubePlayer(videoId);
+        adminApp.state.deferredYouTubeSetup = null;
+      } else if (retryCount < 3) {
+        adminApp.state.deferredYouTubeSetup.retryCount = retryCount + 1;
+        onYouTubeIframeAPIReady(); // Retry
+      } else {
+        displayMessage("YouTube player failed to initialize after retries.", false);
+        adminApp.state.deferredYouTubeSetup = null;
+      }
+    }, 100);
+  }
 }
 
 function isYouTubePlayerAvailable() {
     return adminApp.state.isYouTubeApiReady &&
            typeof YT !== 'undefined' &&
            typeof YT.Player !== 'undefined';
+}
+
+// ADD after isYouTubePlayerAvailable function:
+function validateYouTubeEnvironment() {
+    return adminApp.state.isYouTubeApiReady && 
+           typeof YT !== 'undefined' && 
+           typeof YT.Player !== 'undefined' &&
+           typeof YT.PlayerState !== 'undefined' &&
+           adminYouTubePlayerContainerEl && 
+           adminYouTubePlayerContainerEl.parentNode;
 }
 
 function safeGetCurrentTime(player) {
@@ -372,14 +403,73 @@ function safeGetCurrentTime(player) {
       }, true); 
     };
 
+// ADD new comprehensive cleanup function:
+function cleanupAllEventListeners() {
+  console.log("Starting comprehensive event listener cleanup");
+  
+  // 1. Remove paste listener
+  if (adminApp.state.isPasteListenerActive) {
+    document.removeEventListener('paste', handlePasteImage);
+    adminApp.state.isPasteListenerActive = false;
+  }
+  
+  // 2. Remove window resize listener
+  window.removeEventListener('resize', handleWindowResize);
+  
+  // 3. Clean up YouTube player listeners
+  if (adminYouTubePlayerContainerEl && adminYouTubePlayerContainerEl.hasAttribute('click-listener-added')) {
+    // Get the stored handler from WeakMap if available
+    const handler = adminApp.eventListeners.get(adminYouTubePlayerContainerEl);
+    if (handler) {
+      adminYouTubePlayerContainerEl.removeEventListener('click', handler);
+      adminApp.eventListeners.delete(adminYouTubePlayerContainerEl);
+    }
+    adminYouTubePlayerContainerEl.removeAttribute('click-listener-added');
+  }
+  
+  // 4. Clean up all tracked listeners
+  adminApp.activeListeners.forEach(({ element, event, handler }) => {
+    if (element && typeof element.removeEventListener === 'function') {
+      element.removeEventListener(event, handler);
+    }
+  });
+  adminApp.activeListeners = [];
+  
+  // 5. Clean up Fabric canvas listeners
+  if (adminApp.state.fabricCanvasInstance) {
+    adminApp.state.fabricCanvasInstance.off(); // Remove all Fabric listeners
+  }
+  
+  // 6. Clear all intervals
+  if (adminApp.state.playerUpdateInterval) {
+    clearInterval(adminApp.state.playerUpdateInterval);
+    adminApp.state.playerUpdateInterval = null;
+  }
+  
+  console.log("Event listener cleanup completed");
+}
+
     // --- UI View Management ---
     function switchToListView() {
       console.log("Switching to List View");
+      
+      // Critical: Clean up all event listeners first
+      cleanupAllEventListeners();
+      
+      // Hide any active popovers
+      hideActivePopover();
+      
+      // Stop any playing media
+      stopAndDestroyAdminYouTubePlayer();
+      
+      // Clear modal states
+      adminApp.state.editingOverlayId = null;
+      adminApp.state.placingOverlay = null;
+      
       adminApp.state.currentView = 'list';
       adminApp.state.currentProjectId = null;
       adminApp.state.projectData = null;
       adminApp.state.currentSlideIndex = -1;
-      hideActivePopover(); 
 
       if (adminApp.state.fabricCanvasInstance) {
           adminApp.state.fabricCanvasInstance.dispose();
@@ -390,11 +480,6 @@ function safeGetCurrentTime(player) {
       if(editViewContainerEl) editViewContainerEl.style.display = 'none';
       if (messageAreaEl) messageAreaEl.innerHTML = '';
       
-      if (adminApp.state.isPasteListenerActive) {
-          document.removeEventListener('paste', handlePasteImage);
-          adminApp.state.isPasteListenerActive = false;
-          console.log("Admin_JS: Paste event listener for images removed from document.");
-      }
       loadAdminProjectsList(); 
     }
 
@@ -957,82 +1042,37 @@ function safeGetCurrentTime(player) {
             if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
             
-            const videoId = extractYouTubeVideoId(media.url);
-            if (videoId && adminYouTubePlayerContainerEl && isYouTubePlayerAvailable()) {
-                adminYouTubePlayerContainerEl.style.display = 'block';
-                // For admin editor, keep canvas fully visible or semi-transparent, not opacity 0
-                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // MODIFIED for editor visibility
-                canvas.backgroundColor = 'rgba(0,0,0,0)'; 
+            // For admin editor, keep canvas fully visible or semi-transparent, not opacity 0
+            if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // MODIFIED for editor visibility
+            canvas.backgroundColor = 'rgba(0,0,0,0)'; 
 
-                adminApp.state.adminYouTubePlayer = new YT.Player('adminYouTubePlayerContainer', {
-                    height: '100%', 
-                    width: '100%',
-                    videoId: videoId, 
-                    playerVars: {
-                        'playsinline': 1,       
-                        'controls': 1,          
-                        'modestbranding': 1,    
-                        'rel': 0,               
-                        'origin': window.location.origin 
-                    },
-                    events: {
-                        'onReady': (event) => {
-                            console.log("Admin YouTube player ready.");
-                            updateVideoToolsVisibility(true); 
-                            // if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'inline-block'; // Removed
-                            renderVideoQuestionsList(); 
-                            const duration = event.target.getDuration();
-                            if (videoTotalDurationDisplayEl) videoTotalDurationDisplayEl.textContent = formatTime(duration);
-                            if (videoTimelineSliderEl) videoTimelineSliderEl.max = duration;
-                            // event.target.playVideo(); // Autoplay for admin can be distracting, commented out
-                        },
-                        'onStateChange': (event) => {
-                            if (adminApp.state.playerUpdateInterval) {
-                                clearInterval(adminApp.state.playerUpdateInterval);
-                                adminApp.state.playerUpdateInterval = null; 
-                            }
-                            if (event.data === YT.PlayerState.PLAYING) {
-                                adminApp.state.playerUpdateInterval = setInterval(() => {
-                                    const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
-                                    if (videoCurrentTimeDisplayEl) videoCurrentTimeDisplayEl.textContent = formatTime(currentTime);
-                                    if (videoTimelineSliderEl) videoTimelineSliderEl.value = currentTime;
-                                }, 250); 
-                            }
-                        },
-                        'onError': (event) => {
-                            console.error("Admin YouTube player error", event.data, "for URL:", media.url);
-                            updateVideoToolsVisibility(false); 
-                            // if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none'; // Removed
-                            
-                            if (adminMediaPlaceholderEl) {
-                                if (event.data === 150) { 
-                                    const errorDiv = document.createElement('div');
-                                    errorDiv.innerHTML = '<strong>Playback Error (Code 150)</strong><br>The owner of this video has restricted playback in embedded players. Please try a different YouTube video.<br><small>URL: </small>';
-                                    const urlSpan = document.createElement('span');
-                                    urlSpan.textContent = media.url; // Safe text content
-                                    errorDiv.querySelector('small').appendChild(urlSpan);
-                                    adminMediaPlaceholderEl.innerHTML = ''; // Clear previous content
-                                    adminMediaPlaceholderEl.appendChild(errorDiv);
-                                } else { 
-                                    adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Code: ${event.data}. URL: ${media.url}`;
-                                }
-                                adminMediaPlaceholderEl.style.display = 'block'; 
-                            }
-                            if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; 
-                            canvas.backgroundColor = '#444'; 
-                            canvas.renderAll();
-                        }
+            const videoId = extractYouTubeVideoId(media.url);
+            if (videoId && adminYouTubePlayerContainerEl) {
+                if (validateYouTubeEnvironment()) { // Uses the new validation function
+                    adminYouTubePlayerContainerEl.style.display = 'block';
+                    setupAdminYouTubePlayer(videoId); // Assumes setupAdminYouTubePlayer is or will be defined
+                } else {
+                    console.warn("YouTube API not ready or environment invalid. Deferring setup for videoId:", videoId);
+                    adminApp.state.deferredYouTubeSetup = { videoId, retryCount: 0 };
+                    // Potentially show a loading message or placeholder
+                    if (adminMediaPlaceholderEl) {
+                        adminMediaPlaceholderEl.textContent = "YouTube player is loading...";
+                        adminMediaPlaceholderEl.style.display = 'block';
                     }
-                });
+                    // Call onYouTubeIframeAPIReady to trigger retry if API is loaded but player might not be fully ready
+                    if (adminApp.state.isYouTubeApiReady) {
+                         onYouTubeIframeAPIReady();
+                    }
+                }
             } else {
-                console.error("YouTube Player API not ready or videoId invalid or container missing.");
-                updateVideoToolsVisibility(false); 
-                if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none';
+                console.error("Invalid YouTube setup: Video ID could not be extracted or player container missing.", { videoId, container: !!adminYouTubePlayerContainerEl, url: media.url });
+                updateVideoToolsVisibility(false);
                 if (adminMediaPlaceholderEl) {
-                    adminMediaPlaceholderEl.textContent = `Error loading YouTube video. Check URL or API. URL: ${media.url}`;
+                    adminMediaPlaceholderEl.textContent = `Error: Could not load YouTube video. Check URL or player setup. URL: ${media.url}`;
                     adminMediaPlaceholderEl.style.display = 'block';
                 }
-                canvas.backgroundColor = '#444'; 
+                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; 
+                canvas.backgroundColor = '#444';
             }
             canvas.renderAll();
             
@@ -1256,9 +1296,16 @@ function safeGetCurrentTime(player) {
         }
     }
 
+// MODIFY onServerError function to check for session errors:
     function onServerError(errorObject) {
       console.error("onServerError triggered:", errorObject);
       showLoading(false);
+      
+      // Check if it's a session error first
+      if (handleDriveSessionError(errorObject)) {
+        return; // Session error handled
+      }
+      
       let errorMessage = "An unknown server error occurred.";
        if (typeof errorObject === 'string') { errorMessage = errorObject; }
        else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
@@ -1354,6 +1401,42 @@ function safeGetCurrentTime(player) {
        });
       console.log("displayAdminProjects: Finished rendering project list.");
     }
+
+// ADD new function to handle Drive session errors:
+function handleDriveSessionError(error) {
+  console.error("Drive session error:", error);
+  
+  if (error && error.message && 
+      (error.message.includes("authorization") || 
+       error.message.includes("401") || 
+       error.message.includes("403"))) {
+    
+    // Session expired
+    displayMessage("Your session has expired. The page will reload to re-authenticate.", false);
+    
+    // Save current state if possible
+    if (adminApp.state.projectData) {
+      try {
+        localStorage.setItem('adminTempProjectData', JSON.stringify({
+          projectId: adminApp.state.currentProjectId,
+          projectData: adminApp.state.projectData,
+          slideIndex: adminApp.state.currentSlideIndex
+        }));
+      } catch (e) {
+        console.error("Could not save temporary state:", e);
+      }
+    }
+    
+    // Reload after brief delay
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+    
+    return true; // Handled
+  }
+  
+  return false; // Not a session error
+}
 
     // --- Media Handling ---
     function handleImageUpload(event) {

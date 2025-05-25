@@ -53,16 +53,25 @@
       console.log("YouTube API is now ready for use");
       
       if (viewerApp.state.deferredYouTubeVideoId) {
-          console.log("Deferred YouTube video found, setting up player for:", viewerApp.state.deferredYouTubeVideoId);
-          
-          // Additional validation
-          if (isYouTubePlayerAvailable()) { // <--- New check
-              setupYouTubePlayer(viewerApp.state.deferredYouTubeVideoId);
-              viewerApp.state.deferredYouTubeVideoId = null;
+        const maxRetries = 3;
+        let retryCount = 0;
+        
+        const attemptSetup = () => {
+          if (isYouTubePlayerAvailable()) {
+            setupYouTubePlayer(viewerApp.state.deferredYouTubeVideoId);
+            viewerApp.state.deferredYouTubeVideoId = null;
+          } else if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`YouTube setup retry ${retryCount}/${maxRetries}`);
+            setTimeout(attemptSetup, 500 * retryCount); // Exponential backoff
           } else {
-              console.error("YT.Player still not available despite API ready callback");
-              displayMessageViewer("YouTube player setup failed. Please refresh the page.", false);
+            console.error("YouTube player setup failed after retries");
+            displayMessageViewer("YouTube player failed to load. Please refresh.", false);
+            viewerApp.state.deferredYouTubeVideoId = null;
           }
+        };
+        
+        setTimeout(attemptSetup, 100);
       }
     };
 

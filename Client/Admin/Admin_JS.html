@@ -855,8 +855,8 @@ function safeDisposeCanvas() {
                   slide.slideMedia.videoOverlays = [];
               }
         // Ensure youtubeOptions exists for YouTube slides
-        if (slideData.slideMedia && slideData.slideMedia.type === 'youtube' && typeof slideData.slideMedia.youtubeOptions === 'undefined') {
-            slideData.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default
+        if (slide.slideMedia && slide.slideMedia.type === 'youtube' && typeof slide.slideMedia.youtubeOptions === 'undefined') { // CORRECTED
+            slide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // CORRECTED
         }
               if (!slide.fabricCanvasJSON || !slide.fabricCanvasJSON.objects) {
               } else {

@@ -2063,10 +2063,10 @@ function stopAndDestroyYouTubePlayer() {
         console.log("Stopping and destroying YouTube player...");
 
         // Clear intervals
-        if (playerQuestionCheckInterval) { // This is a global variable, ensure it's the one intended.
-            clearInterval(playerQuestionCheckInterval);
-            playerQuestionCheckInterval = null;
-            console.log("Cleared playerQuestionCheckInterval.");
+        if (viewerApp.state.playerQuestionCheckInterval) {
+            clearInterval(viewerApp.state.playerQuestionCheckInterval);
+            viewerApp.state.playerQuestionCheckInterval = null;
+            console.log("Cleared viewerApp.state.playerQuestionCheckInterval.");
         }
         // Assuming overlayPreviewInterval is also a global or appropriately scoped variable
         if (typeof overlayPreviewInterval !== 'undefined' && overlayPreviewInterval) {
@@ -2133,17 +2133,12 @@ function stopAndDestroyYouTubePlayer() {
         }
 
 
-        // Clean up overlays - Assuming cleanupAllVideoOverlays is a global function
-        if (typeof cleanupAllVideoOverlays === 'function') {
-            cleanupAllVideoOverlays();
-            console.log("Called cleanupAllVideoOverlays().");
-        } else {
-            // Fallback/manual cleanup if cleanupAllVideoOverlays is not defined or to be safe
-            // This combines logic from the original function's finally block
-            console.warn("cleanupAllVideoOverlays is not a function. Performing manual overlay cleanup.");
-            if (viewerApp && viewerApp.state) {
-                if (viewerApp.state.viewerFabricCanvas) {
-                    const canvas = viewerApp.state.viewerFabricCanvas;
+        // Clean up overlays
+        // Manual cleanup (previously in else, now primary as cleanupAllVideoOverlays was removed)
+        console.log("Performing manual overlay cleanup."); // Updated console message
+        if (viewerApp && viewerApp.state) {
+            if (viewerApp.state.viewerFabricCanvas) {
+                const canvas = viewerApp.state.viewerFabricCanvas;
                     const objectsToRemove = canvas.getObjects().filter(obj => 
                         obj.customType === 'videoTimestampOverlay' || 
                         obj.customType === 'clickToBeginButton' || 
@@ -2173,8 +2168,6 @@ function stopAndDestroyYouTubePlayer() {
                 overlayContainer.innerHTML = '';
                 console.log("Cleared videoOverlayContainer HTML.");
             }
-        }
-
         // Reset timeline - Assuming resetTimeline is a global function
         if (typeof resetTimeline === 'function') {
             resetTimeline();

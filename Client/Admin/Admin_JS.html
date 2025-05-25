@@ -36,6 +36,22 @@
 adminApp.eventListeners = new WeakMap(); // Track event listeners for cleanup
 adminApp.activeListeners = []; // Array of {element, event, handler} for global listeners
 
+// --- safeDOMUpdate Helper Function ---
+function safeDOMUpdate(element, operation, errorMessage = "DOM operation failed") {
+  if (!element) {
+    console.warn(`${errorMessage}: Element is null/undefined`);
+    return false;
+  }
+  
+  try {
+    operation(element);
+    return true;
+  } catch (e) {
+    console.error(`${errorMessage}:`, e);
+    return false;
+  }
+}
+
 // --- Global function for YouTube API ---
 function onYouTubeIframeAPIReady() {
   adminApp.state.isYouTubeApiReady = true;
@@ -476,9 +492,9 @@ function cleanupAllEventListeners() {
           adminApp.state.fabricCanvasInstance = null;
           console.log("Admin_JS: Disposed fabric canvas instance.");
       }
-      if(listViewContainerEl) listViewContainerEl.style.display = 'block';
-      if(editViewContainerEl) editViewContainerEl.style.display = 'none';
-      if (messageAreaEl) messageAreaEl.innerHTML = '';
+      safeDOMUpdate(listViewContainerEl, el => el.style.display = 'block', "Failed to show list view container");
+      safeDOMUpdate(editViewContainerEl, el => el.style.display = 'none', "Failed to hide edit view container");
+      safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area in switchToListView");
       
       loadAdminProjectsList(); 
     }
@@ -491,19 +507,20 @@ function cleanupAllEventListeners() {
         adminApp.state.currentSlideIndex = -1; 
         hideActivePopover(); 
 
-        if(listViewContainerEl) listViewContainerEl.style.display = 'none';
-        if(editViewContainerEl) editViewContainerEl.style.display = 'block';
+        safeDOMUpdate(listViewContainerEl, el => el.style.display = 'none', "Failed to hide list view container for edit view");
+        safeDOMUpdate(editViewContainerEl, el => el.style.display = 'block', "Failed to show edit view container");
 
-        if(editingProjectTitleEl) { 
-            editingProjectTitleEl.textContent = `Loading Project (ID: ${projectIdToEdit})...`;
-        }
+        safeDOMUpdate(editingProjectTitleEl, 
+          el => el.textContent = `Loading Project (ID: ${projectIdToEdit})...`,
+          "Failed to update editing project title on view switch"
+        );
 
         if (adminApp.state.fabricCanvasInstance) {
             adminApp.state.fabricCanvasInstance.dispose();
             adminApp.state.fabricCanvasInstance = null;
         }
-        if (messageAreaEl) messageAreaEl.innerHTML = '';
-        if (slideThumbnailsContainerEl) slideThumbnailsContainerEl.innerHTML = ''; 
+        safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area for edit view");
+        safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '', "Failed to clear slide thumbnails for edit view"); 
 
         const ensureEditViewListener = (elementVarName, id, eventType, handler, critical = false) => {
             let element = window[elementVarName]; 
@@ -575,7 +592,7 @@ function cleanupAllEventListeners() {
              adminApp.state.fabricCanvasInstance.on('object:removed', () => saveCanvasStateForHistory()); // Save on remove
 
 
-            if(overlayPropertiesToolbarEl) overlayPropertiesToolbarEl.style.display = 'block';
+            safeDOMUpdate(overlayPropertiesToolbarEl, el => el.style.display = 'block', "Failed to show overlay properties toolbar in switchToEditView");
             populateToolbar(null); 
             hideActivePopover(); 
 
@@ -603,35 +620,37 @@ function cleanupAllEventListeners() {
             
             const popover = document.getElementById(popoverId);
             if (popover && triggerButtonEl) {
-                popover.style.display = 'block';
+                safeDOMUpdate(popover, el => {
+                    el.style.display = 'block';
+                    el.style.position = 'absolute';
+                    el.style.top = 'auto';
+                    el.style.left = 'auto';
+
+                    const btnRect = triggerButtonEl.getBoundingClientRect();
+                    const popoverRect = el.getBoundingClientRect(); // Use el here
+                    const viewportWidth = window.innerWidth;
+                    const viewportHeight = window.innerHeight;
+                    
+                    let posTop = btnRect.bottom + 5;
+                    let posLeft = btnRect.left;
+                    
+                    if (posLeft + popoverRect.width > viewportWidth) {
+                        posLeft = Math.max(5, viewportWidth - popoverRect.width - 5); 
+                    }
+                    if (posLeft < 0) posLeft = 5; 
+
+                    if (posTop + popoverRect.height > viewportHeight && btnRect.top - popoverRect.height - 5 > 0) { 
+                        posTop = btnRect.top - popoverRect.height - 5;
+                    } else if (posTop + popoverRect.height > viewportHeight) { 
+                         posTop = Math.max(5, viewportHeight - popoverRect.height - 5);
+                    }
+                    if (posTop < 0) posTop = 5; 
+                    
+                    el.style.top = posTop + 'px';
+                    el.style.left = posLeft + 'px';
+                }, `Failed to display or position popover ${popoverId}`);
+                
                 adminApp.state.activePopoverId = popoverId;
-
-                popover.style.position = 'absolute';
-                popover.style.top = 'auto';
-                popover.style.left = 'auto';
-                
-                const btnRect = triggerButtonEl.getBoundingClientRect();
-                const popoverRect = popover.getBoundingClientRect();
-                const viewportWidth = window.innerWidth;
-                const viewportHeight = window.innerHeight;
-                
-                let posTop = btnRect.bottom + 5;
-                let posLeft = btnRect.left;
-                
-                if (posLeft + popoverRect.width > viewportWidth) {
-                    posLeft = Math.max(5, viewportWidth - popoverRect.width - 5); 
-                }
-                if (posLeft < 0) posLeft = 5; 
-
-                if (posTop + popoverRect.height > viewportHeight && btnRect.top - popoverRect.height - 5 > 0) { 
-                    posTop = btnRect.top - popoverRect.height - 5;
-                } else if (posTop + popoverRect.height > viewportHeight) { 
-                     posTop = Math.max(5, viewportHeight - popoverRect.height - 5);
-                }
-                if (posTop < 0) posTop = 5; 
-                
-                popover.style.top = posTop + 'px';
-                popover.style.left = posLeft + 'px';
                 
                 document.querySelectorAll('.toolbar-button').forEach(btn => {
                     btn.classList.remove('popover-active');
@@ -649,12 +668,14 @@ function cleanupAllEventListeners() {
                                        currentSlide.slideMedia.type === 'audio' && 
                                        currentSlide.slideMedia.driveFileId;
                        const audioControlsEl = document.getElementById('audioControls');
-                       if (audioControlsEl) {
-                           audioControlsEl.style.display = hasAudio ? 'block' : 'none';
-                           if (hasAudio && attachedAudioNameEl) {
-                               attachedAudioNameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`;
+                       safeDOMUpdate(audioControlsEl, audioEl => { // Changed el to audioEl for clarity
+                           audioEl.style.display = hasAudio ? 'block' : 'none';
+                           if (hasAudio) {
+                               safeDOMUpdate(attachedAudioNameEl, 
+                                 nameEl => nameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`, // Changed el to nameEl
+                                 "Failed to update attached audio name in popover");
                            }
-                       }
+                       }, "Failed to update audio controls display in popover");
                    }
                 }
             } else {
@@ -666,7 +687,7 @@ function cleanupAllEventListeners() {
     function hideActivePopover() {
         if (adminApp.state.activePopoverId) {
             const popover = document.getElementById(adminApp.state.activePopoverId);
-            if (popover) popover.style.display = 'none';
+            safeDOMUpdate(popover, el => el.style.display = 'none', "Failed to hide active popover in hideActivePopover");
             
             document.querySelectorAll('.toolbar-button.popover-active').forEach(btn => {
                 btn.classList.remove('popover-active');
@@ -694,12 +715,14 @@ function cleanupAllEventListeners() {
                             currentSlide.slideMedia.type === 'audio' && 
                             currentSlide.slideMedia.driveFileId;
             const audioControlsEl = document.getElementById('audioControls');
-            if (audioControlsEl) { 
-                audioControlsEl.style.display = hasAudio ? 'block' : 'none';
-                if (hasAudio && attachedAudioNameEl) {
-                     attachedAudioNameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`;
+            safeDOMUpdate(audioControlsEl, el => {
+                el.style.display = hasAudio ? 'block' : 'none';
+                if (hasAudio) {
+                    safeDOMUpdate(attachedAudioNameEl, 
+                      nameEl => nameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`,
+                      "Failed to update attached audio name in media tab (switchMediaTab)");
                 }
-            }
+            }, "Failed to update audio controls display in media tab (switchMediaTab)");
         }
     }
 
@@ -733,7 +756,9 @@ function cleanupAllEventListeners() {
           displayMessage(`Error: Could not load project data. Server said: ${jsonString.error}`, false);
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
           adminApp.state.currentSlideIndex = -1;
-          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
+          safeDOMUpdate(editingProjectTitleEl, 
+            el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`,
+            "Failed to update editing project title on server error in onProjectDataLoaded");
           updateSlideThumbnailsUI();
           return;
       }
@@ -744,7 +769,9 @@ function cleanupAllEventListeners() {
           displayMessage("Error: Could not load project data. Project or its data file may not exist or the data is empty.", false);
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
           adminApp.state.currentSlideIndex = -1;
-          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`;
+          safeDOMUpdate(editingProjectTitleEl, 
+            el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`,
+            "Failed to update editing project title on null data in onProjectDataLoaded");
           updateSlideThumbnailsUI();
           return;
       }
@@ -787,9 +814,9 @@ function cleanupAllEventListeners() {
 
           adminApp.state.projectData = loadedData;
 
-          if (editingProjectTitleEl) {
-              editingProjectTitleEl.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`;
-          }
+          safeDOMUpdate(editingProjectTitleEl, 
+            el => el.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`,
+            "Failed to update editing project title after data load in onProjectDataLoaded");
 
           updateSlideThumbnailsUI();
 
@@ -809,7 +836,9 @@ function cleanupAllEventListeners() {
           displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
           adminApp.state.currentSlideIndex = -1;
-          if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`;
+          safeDOMUpdate(editingProjectTitleEl, 
+            el => el.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`,
+            "Failed to update editing project title on parse error in onProjectDataLoaded");
           updateSlideThumbnailsUI(); 
       }
     }
@@ -974,13 +1003,12 @@ function cleanupAllEventListeners() {
         if (adminApp.state.adminYouTubePlayer) {
             stopAndDestroyAdminYouTubePlayer();
         }
-        if (adminYouTubePlayerContainerEl) {
-            adminYouTubePlayerContainerEl.style.display = 'none';
-            adminYouTubePlayerContainerEl.innerHTML = ''; 
-        }
-        if(fabricCanvasEl) { 
-            fabricCanvasEl.style.opacity = '1'; // Default to visible canvas in editor
-        }
+        safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
+            el.style.display = 'none';
+            el.innerHTML = ''; 
+        }, "Failed to reset YouTube player container in selectSlide");
+        
+        safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity in selectSlide");
 
         canvas.clear(); 
         canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
@@ -991,20 +1019,18 @@ function cleanupAllEventListeners() {
         if (imageUploaderEl) imageUploaderEl.value = null;
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
         if (audioUploaderEl) audioUploaderEl.value = null;
-        if (attachedAudioNameEl) {
-            attachedAudioNameEl.textContent = '';
-            const audioControls = document.getElementById('audioControls');
-            if(audioControls) audioControls.style.display = 'none';
-        }
-        if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
-        if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+        
+        safeDOMUpdate(attachedAudioNameEl, el => el.textContent = '', "Failed to clear attached audio name in selectSlide");
+        const audioControls = document.getElementById('audioControls');
+        safeDOMUpdate(audioControls, el => el.style.display = 'none', "Failed to hide audio controls in selectSlide");
+        safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none', "Failed to hide remove audio button in selectSlide");
+        safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder in selectSlide");
 
         const media = selectedSlideData.slideMedia;
         updateVideoToolsVisibility(false);
-        // if (manageTimestampOverlaysButtonEl) manageTimestampOverlaysButtonEl.style.display = 'none'; // Removed
 
         if (media && media.type === 'image' && media.driveFileId) {
-            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for image bg in selectSlide");
             console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
             showLoading(true); 
             displayMessage("Loading slide background...", true);
@@ -1039,27 +1065,24 @@ function cleanupAllEventListeners() {
             
         } else if (media && media.type === 'youtube' && media.url) {
             console.log("Attempting to load YouTube player for URL:", media.url);
-            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for YouTube bg in selectSlide");
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
             
-            // For admin editor, keep canvas fully visible or semi-transparent, not opacity 0
-            if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; // MODIFIED for editor visibility
+            safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity for YouTube bg in selectSlide");
             canvas.backgroundColor = 'rgba(0,0,0,0)'; 
 
             const videoId = extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl) {
-                if (validateYouTubeEnvironment()) { // Uses the new validation function
-                    adminYouTubePlayerContainerEl.style.display = 'block';
-                    setupAdminYouTubePlayer(videoId); // Assumes setupAdminYouTubePlayer is or will be defined
+                if (validateYouTubeEnvironment()) { 
+                    safeDOMUpdate(adminYouTubePlayerContainerEl, el => el.style.display = 'block', "Failed to show YouTube player container in selectSlide");
+                    setupAdminYouTubePlayer(videoId); 
                 } else {
                     console.warn("YouTube API not ready or environment invalid. Deferring setup for videoId:", videoId);
                     adminApp.state.deferredYouTubeSetup = { videoId, retryCount: 0 };
-                    // Potentially show a loading message or placeholder
-                    if (adminMediaPlaceholderEl) {
-                        adminMediaPlaceholderEl.textContent = "YouTube player is loading...";
-                        adminMediaPlaceholderEl.style.display = 'block';
-                    }
-                    // Call onYouTubeIframeAPIReady to trigger retry if API is loaded but player might not be fully ready
+                    safeDOMUpdate(adminMediaPlaceholderEl, el => {
+                        el.textContent = "YouTube player is loading...";
+                        el.style.display = 'block';
+                    }, "Failed to show YouTube loading placeholder in selectSlide");
                     if (adminApp.state.isYouTubeApiReady) {
                          onYouTubeIframeAPIReady();
                     }
@@ -1067,35 +1090,35 @@ function cleanupAllEventListeners() {
             } else {
                 console.error("Invalid YouTube setup: Video ID could not be extracted or player container missing.", { videoId, container: !!adminYouTubePlayerContainerEl, url: media.url });
                 updateVideoToolsVisibility(false);
-                if (adminMediaPlaceholderEl) {
-                    adminMediaPlaceholderEl.textContent = `Error: Could not load YouTube video. Check URL or player setup. URL: ${media.url}`;
-                    adminMediaPlaceholderEl.style.display = 'block';
-                }
-                if(fabricCanvasEl) fabricCanvasEl.style.opacity = '1'; 
+                safeDOMUpdate(adminMediaPlaceholderEl, el => {
+                    el.textContent = `Error: Could not load YouTube video. Check URL or player setup. URL: ${media.url}`;
+                    el.style.display = 'block';
+                }, "Failed to show YouTube error placeholder in selectSlide");
+                safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity on YouTube error in selectSlide");
                 canvas.backgroundColor = '#444';
             }
             canvas.renderAll();
             
         } else if (media && media.type === 'audio' && (media.driveFileId)) {
-            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'block'; 
+            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'block', "Failed to show admin media placeholder for audio in selectSlide"); 
             console.log("Indicating attached audio:", media.originalName || media.driveFileId);
-            if (attachedAudioNameEl) {
-                attachedAudioNameEl.textContent = `Attached: ${media.originalName || 'Audio File'}`;
-                const audioControls = document.getElementById('audioControls');
-                if(audioControls) audioControls.style.display = 'block';
-            }
-            if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
+            safeDOMUpdate(attachedAudioNameEl, el => {
+                el.textContent = `Attached: ${media.originalName || 'Audio File'}`;
+                const currentAudioControls = document.getElementById('audioControls'); // Re-fetch or ensure it's in scope
+                safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block', "Failed to show audio controls for audio in selectSlide");
+            }, "Failed to update attached audio name for audio in selectSlide");
+            safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block', "Failed to show remove audio button for audio in selectSlide");
             
-            if (adminMediaPlaceholderEl) {
-                adminMediaPlaceholderEl.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
-                adminMediaPlaceholderEl.style.display = 'block';
-            }
+            safeDOMUpdate(adminMediaPlaceholderEl, el => {
+                el.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
+                el.style.display = 'block';
+            }, "Failed to update admin media placeholder for audio in selectSlide");
             canvas.backgroundColor = '#e9e9e9'; 
             canvas.renderAll();
             
         } else {
             console.log("No background media found or configured for slide", slideIndex);
-            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for no media in selectSlide");
             canvas.backgroundColor = '#e9e9e9'; 
             canvas.renderAll();
         }
@@ -1135,18 +1158,30 @@ function cleanupAllEventListeners() {
     }
 
     function updateSlideThumbnailsUI() {
-        if (!slideThumbnailsContainerEl || !adminApp.state.projectData) { console.warn("updateSlideThumbnailsUI: Container or project data missing."); return; }
-        slideThumbnailsContainerEl.innerHTML = '';
-        if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
-        adminApp.state.projectData.slides.forEach((slide, index) => {
-            const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
-            thumb.textContent = `Slide ${index + 1}`; thumb.title = `Select Slide ${index + 1}`;
-            if (index === adminApp.state.currentSlideIndex) thumb.classList.add('active-slide');
-            thumb.onclick = function() { selectSlide(index); };
-            const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '×'; deleteBtn.title = "Delete slide";
-            deleteBtn.onclick = function(event) { event.stopPropagation(); handleDeleteSlide(index); };
-            thumb.appendChild(deleteBtn); slideThumbnailsContainerEl.appendChild(thumb);
-        });
+        if (!adminApp.state.projectData) { 
+            console.warn("updateSlideThumbnailsUI: Project data missing."); 
+            // Ensure the container is cleared if there's no project data or no slides.
+            safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '<p>No slides available.</p>', "Failed to clear slide thumbnails container on no project data");
+            return; 
+        }
+        
+        safeDOMUpdate(slideThumbnailsContainerEl, el => {
+            el.innerHTML = ''; // Clear existing thumbnails
+            if (!adminApp.state.projectData.slides || adminApp.state.projectData.slides.length === 0) {
+                el.innerHTML = '<p>No slides. Click "Add Slide" to begin.</p>'; // Message when no slides exist
+                return;
+            }
+            adminApp.state.projectData.slides.forEach((slide, index) => {
+                const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
+                thumb.textContent = `Slide ${index + 1}`; thumb.title = `Select Slide ${index + 1}`;
+                if (index === adminApp.state.currentSlideIndex) thumb.classList.add('active-slide');
+                thumb.onclick = function() { selectSlide(index); };
+                const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '×'; deleteBtn.title = "Delete slide";
+                deleteBtn.onclick = function(event) { event.stopPropagation(); handleDeleteSlide(index); };
+                thumb.appendChild(deleteBtn); 
+                el.appendChild(thumb);
+            });
+        }, "Failed to update slide thumbnails UI");
     }
 
     function handleDeleteSlide(slideIndex) {
@@ -1250,8 +1285,11 @@ function cleanupAllEventListeners() {
     // --- Error Handling & UI Utils ---
     function showLoading(show) {
         adminApp.state.isLoading = show;
-        if (loadingSpinnerEl) loadingSpinnerEl.style.display = show ? 'flex' : 'none';
-        else if (show) console.warn("showLoading(true) loadingSpinnerEl not found.");
+        safeDOMUpdate(loadingSpinnerEl, 
+          el => el.style.display = show ? 'flex' : 'none',
+          "Failed to update loading spinner display"
+        );
+        if (show && !loadingSpinnerEl) console.warn("showLoading(true) loadingSpinnerEl not found."); // Keep console warn if element itself is missing.
     }
 
     function showNotification(message, type = 'info', duration = 5000) {
@@ -1279,19 +1317,21 @@ function cleanupAllEventListeners() {
     function displayMessage(message, isSuccess) {
         showNotification(message, isSuccess ? 'success' : 'error');
         
-        if (messageAreaEl) { 
-            messageAreaEl.innerHTML = ''; 
+        safeDOMUpdate(messageAreaEl, el => {
+            el.innerHTML = ''; 
             const p = document.createElement('p'); 
             p.textContent = message; 
-            messageAreaEl.appendChild(p); 
-            messageAreaEl.className = isSuccess ? 'success' : 'error'; 
+            el.appendChild(p); 
+            el.className = isSuccess ? 'success' : 'error'; 
             setTimeout(() => { 
-            if (messageAreaEl) { 
-                messageAreaEl.innerHTML = ''; 
-                messageAreaEl.className = ''; 
-            } 
+                safeDOMUpdate(el, innerEl => {
+                    innerEl.innerHTML = ''; 
+                    innerEl.className = ''; 
+                }, "Failed to clear message area after timeout in displayMessage");
             }, 7000); 
-        } else { 
+        }, "Failed to display message in messageAreaEl");
+
+        if (!messageAreaEl) { // Keep console warn if element itself is missing.
             console.warn("displayMessage messageAreaEl not found. Message:", message); 
         }
     }
@@ -1342,63 +1382,68 @@ function cleanupAllEventListeners() {
     function displayAdminProjects(projectsArray) {
       console.log("displayAdminProjects (Success Handler) received data:", projectsArray);
       showLoading(false);
-      if (!adminProjectListContainerEl) { console.error("displayAdminProjects: adminProjectListContainerEl not found."); return; }
-      adminProjectListContainerEl.innerHTML = '';
-      if (!projectsArray || projectsArray.length === 0) { adminProjectListContainerEl.innerHTML = '<p>No projects found.</p>'; return; }
+      
+      safeDOMUpdate(adminProjectListContainerEl, el => {
+          el.innerHTML = ''; // Clear previous projects
+          if (!projectsArray || projectsArray.length === 0) { 
+              el.innerHTML = '<p>No projects found. Create one above!</p>'; // Updated message
+              return; 
+          }
 
-      adminApp.state.projectListCache = projectsArray;
+          adminApp.state.projectListCache = projectsArray;
 
-      projectsArray.forEach(project => {
-          if (!project || !project.projectId) return;
-          const projectItem = document.createElement('div');
-          projectItem.className = 'project-item';
+          projectsArray.forEach(project => {
+              if (!project || !project.projectId) return;
+              const projectItem = document.createElement('div');
+              projectItem.className = 'project-item';
 
-          const titleAndStatusDiv = document.createElement('div');
-          const titleSpan = document.createElement('span');
-          titleSpan.textContent = project.projectTitle || 'Untitled Project';
-          titleSpan.style.fontWeight = 'bold';
-          const statusTextSpan = document.createElement('span');
-          statusTextSpan.className = 'status-text';
-          statusTextSpan.textContent = `(${project.status || 'N/A'})`;
-          titleAndStatusDiv.appendChild(titleSpan);
-          titleAndStatusDiv.appendChild(statusTextSpan);
+              const titleAndStatusDiv = document.createElement('div');
+              const titleSpan = document.createElement('span');
+              titleSpan.textContent = project.projectTitle || 'Untitled Project';
+              titleSpan.style.fontWeight = 'bold';
+              const statusTextSpan = document.createElement('span');
+              statusTextSpan.className = 'status-text';
+              statusTextSpan.textContent = `(${project.status || 'N/A'})`;
+              titleAndStatusDiv.appendChild(titleSpan);
+              titleAndStatusDiv.appendChild(statusTextSpan);
 
-          const controlsDiv = document.createElement('div');
-          const statusSelect = document.createElement('select');
-          statusSelect.className = 'project-status-select';
-          statusSelect.setAttribute('data-project-id', project.projectId);
-          statusSelect.setAttribute('data-original-status', project.status || "Draft");
-          ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
-              const option = document.createElement('option');
-              option.value = statusValue;
-              option.textContent = statusValue;
-              if (project.status === statusValue) { option.selected = true; }
-              statusSelect.appendChild(option);
-          });
-          statusSelect.onchange = function() { handleProjectStatusChange(project.projectId, this.value, this); };
+              const controlsDiv = document.createElement('div');
+              const statusSelect = document.createElement('select');
+              statusSelect.className = 'project-status-select';
+              statusSelect.setAttribute('data-project-id', project.projectId);
+              statusSelect.setAttribute('data-original-status', project.status || "Draft");
+              ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
+                  const option = document.createElement('option');
+                  option.value = statusValue;
+                  option.textContent = statusValue;
+                  if (project.status === statusValue) { option.selected = true; }
+                  statusSelect.appendChild(option);
+              });
+              statusSelect.onchange = function() { handleProjectStatusChange(project.projectId, this.value, this); };
 
-          const editButton = document.createElement('button');
-          editButton.textContent = 'Edit';
-          editButton.className = 'edit-button';
-          editButton.setAttribute('data-project-id', project.projectId);
-          editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); };
+              const editButton = document.createElement('button');
+              editButton.textContent = 'Edit';
+              editButton.className = 'edit-button';
+              editButton.setAttribute('data-project-id', project.projectId);
+              editButton.onclick = function() { console.log("Edit button clicked:", project.projectId); switchToEditView(project.projectId); };
 
-          const deleteButton = document.createElement('button');
-          deleteButton.textContent = 'Delete';
-          deleteButton.className = 'danger-button';
-          deleteButton.setAttribute('data-project-id', project.projectId);
-          deleteButton.setAttribute('data-project-title', project.projectTitle || 'Untitled Project');
-          deleteButton.style.marginLeft = '5px';
-          deleteButton.onclick = function() { handleDeleteProject(project.projectId, project.projectTitle || 'Untitled Project'); };
+              const deleteButton = document.createElement('button');
+              deleteButton.textContent = 'Delete';
+              deleteButton.className = 'danger-button';
+              deleteButton.setAttribute('data-project-id', project.projectId);
+              deleteButton.setAttribute('data-project-title', project.projectTitle || 'Untitled Project');
+              deleteButton.style.marginLeft = '5px';
+              deleteButton.onclick = function() { handleDeleteProject(project.projectId, project.projectTitle || 'Untitled Project'); };
 
-          controlsDiv.appendChild(statusSelect);
-          controlsDiv.appendChild(editButton);
-          controlsDiv.appendChild(deleteButton);
+              controlsDiv.appendChild(statusSelect);
+              controlsDiv.appendChild(editButton);
+              controlsDiv.appendChild(deleteButton);
 
-          projectItem.appendChild(titleAndStatusDiv);
-          projectItem.appendChild(controlsDiv);
-          adminProjectListContainerEl.appendChild(projectItem);
-       });
+              projectItem.appendChild(titleAndStatusDiv);
+              projectItem.appendChild(controlsDiv);
+              el.appendChild(projectItem);
+           });
+      }, "Failed to display admin projects in list container");
       console.log("displayAdminProjects: Finished rendering project list.");
     }
 
@@ -1626,12 +1671,12 @@ function handleDriveSessionError(error) {
 
             console.log(`Audio attached for slide ${adminApp.state.currentSlideIndex + 1}:`, currentSlide.slideMedia);
             
-            if (attachedAudioNameEl) {
-                attachedAudioNameEl.textContent = `Attached: ${response.fileName}`;
-                const audioControls = document.getElementById('audioControls');
-                if(audioControls) audioControls.style.display = 'block';
-            }
-            if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'inline-block';
+            safeDOMUpdate(attachedAudioNameEl, el => {
+                el.textContent = `Attached: ${response.fileName}`;
+                const currentAudioControls = document.getElementById('audioControls');
+                safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block', "Failed to show audio controls on audio upload");
+            }, "Failed to update attached audio name on upload");
+            safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block', "Failed to show remove audio button on upload");
 
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
             if (imageUploaderEl) imageUploaderEl.value = null;
@@ -1640,10 +1685,10 @@ function handleDriveSessionError(error) {
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; 
                 adminApp.state.fabricCanvasInstance.renderAll();
             }
-            if (adminMediaPlaceholderEl) {
-                 adminMediaPlaceholderEl.textContent = `Audio Attached: ${response.fileName}`;
-                 adminMediaPlaceholderEl.style.display = 'block';
-             }
+            safeDOMUpdate(adminMediaPlaceholderEl, el => {
+                 el.textContent = `Audio Attached: ${response.fileName}`;
+                 el.style.display = 'block';
+            }, "Failed to update admin media placeholder on audio upload");
 
         } else {
             onServerError((response && response.error) ? response.error : "Failed to process audio.");
@@ -1663,14 +1708,14 @@ function handleDriveSessionError(error) {
             currentSlide.slideMedia.mimeType = null;
             currentSlide.slideMedia.originalName = null;
 
-            if (attachedAudioNameEl) {
-                attachedAudioNameEl.textContent = '';
-                const audioControls = document.getElementById('audioControls');
-                if(audioControls) audioControls.style.display = 'none';
-            }
-            if (removeAudioButtonEl) removeAudioButtonEl.style.display = 'none';
+            safeDOMUpdate(attachedAudioNameEl, el => {
+                el.textContent = '';
+                const currentAudioControls = document.getElementById('audioControls');
+                safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'none', "Failed to hide audio controls on audio removal");
+            }, "Failed to clear attached audio name on removal");
+            safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none', "Failed to hide remove audio button on removal");
             if (audioUploaderEl) audioUploaderEl.value = null; 
-            if (adminMediaPlaceholderEl) adminMediaPlaceholderEl.style.display = 'none';
+            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder on audio removal");
             
             if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9';
@@ -1843,11 +1888,7 @@ function initiateOverlayPlacement() {
     
     // Show placement overlay
     const placementMode = document.getElementById('overlayPlacementMode');
-    if (placementMode) { // Added null check
-        placementMode.style.display = 'block';
-    } else {
-        console.warn('initiateOverlayPlacement: overlayPlacementMode element not found.');
-    }
+    safeDOMUpdate(placementMode, el => el.style.display = 'block', "Failed to show overlay placement mode in initiateOverlayPlacement");
     
     // Store placement state
     adminApp.state.placingOverlay = {
@@ -1873,9 +1914,7 @@ function handleOverlayPlacement(event) {
     
     // Hide placement mode
     const placementMode = document.getElementById('overlayPlacementMode');
-    if (placementMode) { // Added null check
-        placementMode.style.display = 'none';
-    }
+    safeDOMUpdate(placementMode, el => el.style.display = 'none', "Failed to hide overlay placement mode in handleOverlayPlacement");
     
     // Show editor modal
     showOverlayEditor();
@@ -1897,42 +1936,41 @@ function showOverlayEditor(overlayId = null) {
 
     // Populate form fields
     const overlayTemplateEl = document.getElementById('overlayTemplate');
-    if (overlayTemplateEl) overlayTemplateEl.value = overlay.template;
+    if (overlayTemplateEl) overlayTemplateEl.value = overlay.template; // Input value
     
     const overlayStartTimeDisplayEl = document.getElementById('overlayStartTimeDisplay');
-    if (overlayStartTimeDisplayEl) overlayStartTimeDisplayEl.textContent = formatTime(overlay.startTime);
+    safeDOMUpdate(overlayStartTimeDisplayEl, el => el.textContent = formatTime(overlay.startTime), "Failed to set overlay start time display in showOverlayEditor");
     
     const overlayDurationEl = document.getElementById('overlayDuration');
-    if (overlayDurationEl) overlayDurationEl.value = overlay.duration;
+    if (overlayDurationEl) overlayDurationEl.value = overlay.duration; // Input value
     
-    const overlayTextContentEl = document.getElementById('overlayTextContent');
-    if (overlayTextContentEl) overlayTextContentEl.value = overlay.content.text || '';
+    const overlayTextContentEl = document.getElementById('overlayTextContent'); // This is the one in the modal
+    if (overlayTextContentEl) overlayTextContentEl.value = overlay.content.text || ''; // Input value
     
     const overlayPauseVideoEl = document.getElementById('overlayPauseVideo');
-    if (overlayPauseVideoEl) overlayPauseVideoEl.checked = overlay.interaction.pauseVideo;
+    if (overlayPauseVideoEl) overlayPauseVideoEl.checked = overlay.interaction.pauseVideo; // Input checked
     
     const overlayDismissibleEl = document.getElementById('overlayDismissible');
-    if (overlayDismissibleEl) overlayDismissibleEl.checked = overlay.interaction.dismissible;
+    if (overlayDismissibleEl) overlayDismissibleEl.checked = overlay.interaction.dismissible; // Input checked
     
     const overlayActionEl = document.getElementById('overlayAction');
-    if (overlayActionEl) overlayActionEl.value = overlay.interaction.action;
+    if (overlayActionEl) overlayActionEl.value = overlay.interaction.action; // Input value
     
     // Show position
     const overlayPositionDisplayEl = document.getElementById('overlayPositionDisplay');
-    if (overlayPositionDisplayEl && overlay.position) { // Added null check for position
-        overlayPositionDisplayEl.textContent = 
-            `X: ${overlay.position.x.toFixed(0)}%, Y: ${overlay.position.y.toFixed(0)}%`;
-    } else if (overlayPositionDisplayEl) {
-        overlayPositionDisplayEl.textContent = 'Position not set';
-    }
+    safeDOMUpdate(overlayPositionDisplayEl, el => {
+        if (overlay.position) {
+            el.textContent = `X: ${overlay.position.x.toFixed(0)}%, Y: ${overlay.position.y.toFixed(0)}%`;
+        } else {
+            el.textContent = 'Position not set';
+        }
+    }, "Failed to set overlay position display in showOverlayEditor");
     
     // Show/hide delete button
     const deleteOverlayBtnEl = document.getElementById('deleteOverlayBtn');
-    if (deleteOverlayBtnEl) { // Added null check
-        deleteOverlayBtnEl.style.display = overlayId ? 'inline-block' : 'none';
-    }
+    safeDOMUpdate(deleteOverlayBtnEl, el => el.style.display = overlayId ? 'inline-block' : 'none', "Failed to update delete overlay button display in showOverlayEditor");
     
-    modal.style.display = 'block';
+    safeDOMUpdate(modal, el => el.style.display = 'block', "Failed to show overlay editor modal in showOverlayEditor");
     adminApp.state.editingOverlayId = overlayId;
 }
 
@@ -2029,26 +2067,26 @@ function renderOverlayTimeline() {
         track.innerHTML = '<p>Video player not ready.</p>'; // User feedback
         return;
     }
-    
-    track.innerHTML = ''; // Clear previous timeline
-    const duration = adminApp.state.adminYouTubePlayer.getDuration(); // getDuration() is generally safe
-    if (duration === 0) { // Handle case where duration might not be available yet
-        track.innerHTML = '<p>Video duration not available.</p>'; // User feedback
-        return;
-    }
+    safeDOMUpdate(track, el => {
+        el.innerHTML = ''; // Clear previous timeline
+        const duration = adminApp.state.adminYouTubePlayer.getDuration(); // getDuration() is generally safe
+        if (duration === 0) { // Handle case where duration might not be available yet
+            el.innerHTML = '<p>Video duration not available.</p>'; // User feedback
+            return;
+        }
 
-    const currentSlide = getCurrentSlide();
-    // Ensure videoOverlays exists and is an array
-    const overlays = (currentSlide && currentSlide.slideMedia && Array.isArray(currentSlide.slideMedia.videoOverlays)) 
-                     ? currentSlide.slideMedia.videoOverlays 
-                     : [];
-    
-    if (overlays.length === 0) {
-        track.innerHTML = '<p style="text-align: center; margin-top: 10px;">No overlays on this slide.</p>'; // User feedback
-        return;
-    }
+        const currentSlide = getCurrentSlide();
+        // Ensure videoOverlays exists and is an array
+        const overlays = (currentSlide && currentSlide.slideMedia && Array.isArray(currentSlide.slideMedia.videoOverlays)) 
+                         ? currentSlide.slideMedia.videoOverlays 
+                         : [];
+        
+        if (overlays.length === 0) {
+            el.innerHTML = '<p style="text-align: center; margin-top: 10px;">No overlays on this slide.</p>'; // User feedback
+            return;
+        }
 
-    overlays.forEach(overlay => {
+        overlays.forEach(overlay => {
         const bar = document.createElement('div');
         bar.className = 'overlay-timeline-bar';
         bar.dataset.overlayId = overlay.id;
@@ -2071,8 +2109,9 @@ function renderOverlayTimeline() {
         bar.title = `${overlay.content.text || overlay.template} (${formatTime(overlay.startTime)})`;
         bar.onclick = () => showOverlayEditor(overlay.id);
         
-        track.appendChild(bar);
-    });
+        el.appendChild(bar); // Appending to el (the track)
+        });
+    }, "Failed to render overlay timeline");
 }
 
 // Helper to get color for template type
@@ -2090,22 +2129,22 @@ function getTemplateColor(template) {
 // Preview overlays (toggle preview mode)
 function toggleOverlayPreview() {
     adminApp.state.previewingOverlays = !adminApp.state.previewingOverlays;
-    const previewButton = document.getElementById('previewOverlaysBtn'); // Get button for text change
+    const previewButton = document.getElementById('previewOverlaysBtn'); 
 
     if (adminApp.state.previewingOverlays) {
         renderVideoOverlaysAdmin();
-        if (adminApp.state.overlayPreviewInterval) { // Clear existing interval just in case
+        if (adminApp.state.overlayPreviewInterval) { 
             clearInterval(adminApp.state.overlayPreviewInterval);
         }
         adminApp.state.overlayPreviewInterval = setInterval(updateOverlayPreview, 100);
-        if (previewButton) previewButton.textContent = 'Stop Preview'; // Update button text
+        safeDOMUpdate(previewButton, el => el.textContent = 'Stop Preview', "Failed to update preview button text to Stop in toggleOverlayPreview");
     } else {
         if (adminApp.state.overlayPreviewInterval) {
             clearInterval(adminApp.state.overlayPreviewInterval);
             adminApp.state.overlayPreviewInterval = null;
         }
         clearVideoOverlaysAdmin();
-        if (previewButton) previewButton.textContent = 'Preview Overlays'; // Reset button text
+        safeDOMUpdate(previewButton, el => el.textContent = 'Preview Overlays', "Failed to update preview button text to Preview in toggleOverlayPreview");
     }
 }
 
@@ -2120,9 +2159,7 @@ function findOverlayById(overlayId) {
 
 function hideOverlayEditor() {
     const modal = document.getElementById('overlayEditorModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    safeDOMUpdate(modal, el => el.style.display = 'none', "Failed to hide overlay editor modal in hideOverlayEditor");
     adminApp.state.editingOverlayId = null;
 }
 
@@ -2225,39 +2262,40 @@ function renderOverlayList() {
         console.warn("renderOverlayList: adminOverlayList element not found.");
         return;
     }
-    listEl.innerHTML = ''; // Clear previous list
-    const currentSlide = getCurrentSlide();
-    const overlays = (currentSlide && currentSlide.slideMedia && Array.isArray(currentSlide.slideMedia.videoOverlays)) 
-                     ? currentSlide.slideMedia.videoOverlays 
-                     : [];
+    safeDOMUpdate(listEl, el => {
+        el.innerHTML = ''; // Clear previous list
+        const currentSlide = getCurrentSlide();
+        const overlays = (currentSlide && currentSlide.slideMedia && Array.isArray(currentSlide.slideMedia.videoOverlays)) 
+                         ? currentSlide.slideMedia.videoOverlays 
+                         : [];
 
-    if (overlays.length === 0) {
-        listEl.innerHTML = '<li>No overlays added for this video.</li>';
-        return;
-    }
+        if (overlays.length === 0) {
+            el.innerHTML = '<li>No overlays added for this video.</li>';
+            return;
+        }
 
-    overlays.forEach(overlay => {
-        const item = document.createElement('li');
-        item.className = 'overlay-list-item'; // Added class for styling
-        item.setAttribute('data-overlay-id', overlay.id); // Set data attribute
+        overlays.forEach(overlay => {
+            const item = document.createElement('li');
+            item.className = 'overlay-list-item'; 
+            item.setAttribute('data-overlay-id', overlay.id); 
 
-        const textSpan = document.createElement('span');
-        textSpan.textContent = `[${formatTime(overlay.startTime)}] ${overlay.content.text || overlay.template} (Duration: ${overlay.duration}s)`;
-        
-        const editButton = document.createElement('button');
-        editButton.textContent = 'Edit';
-        editButton.className = 'edit-overlay-list-btn'; // Added class
-        editButton.style.marginLeft = '10px';
-        editButton.onclick = (e) => {
-            e.stopPropagation(); // Prevent li click if button is nested
-            showOverlayEditor(overlay.id);
-        };
+            const textSpan = document.createElement('span');
+            textSpan.textContent = `[${formatTime(overlay.startTime)}] ${overlay.content.text || overlay.template} (Duration: ${overlay.duration}s)`;
+            
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Edit';
+            editButton.className = 'edit-overlay-list-btn'; 
+            editButton.style.marginLeft = '10px';
+            editButton.onclick = (e) => {
+                e.stopPropagation(); 
+                showOverlayEditor(overlay.id);
+            };
 
-        item.appendChild(textSpan);
-        item.appendChild(editButton);
-        // item.onclick = () => showOverlayEditor(overlay.id); // Can be removed if button is preferred
-        listEl.appendChild(item);
-    });
+            item.appendChild(textSpan);
+            item.appendChild(editButton);
+            el.appendChild(item);
+        });
+    }, "Failed to render overlay list in renderOverlayList");
 }
 
 function renderVideoOverlaysAdmin() {
@@ -2325,10 +2363,10 @@ function updateOverlayPreview() {
 
 function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     const playerContainer = document.getElementById('adminYouTubePlayerContainer');
-    if (playerContainer) {
-        const previewOverlays = playerContainer.querySelectorAll('.video-overlay-preview');
-        previewOverlays.forEach(el => el.remove());
-    }
+    safeDOMUpdate(playerContainer, el => {
+        const previewOverlays = el.querySelectorAll('.video-overlay-preview');
+        previewOverlays.forEach(previewEl => previewEl.remove());
+    }, "Failed to clear video overlays from admin player container in clearVideoOverlaysAdmin");
     
     if (stopPreviewLogicAndButtonUpdate) {
         if (adminApp.state.overlayPreviewInterval) {
@@ -2337,9 +2375,8 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         }
         adminApp.state.previewingOverlays = false; 
         const previewButton = document.getElementById('previewOverlaysBtn');
-        if (previewButton) previewButton.textContent = 'Preview Overlays'; // Reset button text
+        safeDOMUpdate(previewButton, btnEl => btnEl.textContent = 'Preview Overlays', "Failed to reset preview button text in clearVideoOverlaysAdmin");
     }
-    // console.log("clearVideoOverlaysAdmin called."); // Can be noisy, optional
 }
 
     // --- Overlay Creation ---
@@ -2657,20 +2694,18 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     }
     
     function populateToolbar(activeObject) {
+        safeDOMUpdate(overlayPropertiesToolbarEl, el => el.style.display = 'block', "Failed to show overlay properties toolbar in populateToolbar");
         if (!overlayPropertiesToolbarEl) { console.error("populateToolbar: overlayPropertiesToolbarEl not found."); return; }
-        overlayPropertiesToolbarEl.style.display = 'block'; 
 
         const isObjectSelected = !!activeObject;
         const isTextObject = isObjectSelected && (activeObject.type === 'textbox' || activeObject.type === 'i-text');
 
-        if (deleteObjectButtonEl) deleteObjectButtonEl.disabled = !isObjectSelected;
+        safeDOMUpdate(deleteObjectButtonEl, el => el.disabled = !isObjectSelected, "Failed to set deleteObjectButtonEl disabled state in populateToolbar");
+        
+        if (mediaToolsButtonEl) mediaToolsButtonEl.disabled = false; // These are not selection dependent
+        if (addShapeButtonEl) addShapeButtonEl.disabled = false;   // These are not selection dependent
 
-        if (mediaToolsButtonEl) mediaToolsButtonEl.disabled = false;
-        if (addShapeButtonEl) addShapeButtonEl.disabled = false;
-
-        if (textSpecificControlsEl) {
-            textSpecificControlsEl.style.display = isTextObject ? 'flex' : 'none';
-        }
+        safeDOMUpdate(textSpecificControlsEl, el => el.style.display = isTextObject ? 'flex' : 'none', "Failed to set textSpecificControlsEl display in populateToolbar");
 
         const generalObjectControlsAndTriggers = [
             objFillEl, objStrokeColorEl, objStrokeWidthEl, objOpacityEl, 
@@ -2726,18 +2761,18 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         if (objStrokeColorEl) objStrokeColorEl.value = toHexColor(activeObject.stroke);
         if (objStrokeWidthEl) objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
         if (objOpacityEl) { 
-            objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
-            if (objOpacityValueDisplayEl) { 
-                objOpacityValueDisplayEl.textContent = Math.round(parseFloat(objOpacityEl.value) * 100) + '%';
-            }
+            objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity; // Input value
+            safeDOMUpdate(objOpacityValueDisplayEl, 
+              el => el.textContent = Math.round(parseFloat(objOpacityEl.value) * 100) + '%',
+              "Failed to update opacity value display in populateToolbar");
         }
 
         if (isTextObject) { 
-            if (objTextContentEl) objTextContentEl.value = activeObject.text || '';
-            if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial'; 
-            if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24;
-            if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight === undefined ? 1.16 : activeObject.lineHeight;
-            if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing === undefined ? 0 : activeObject.charSpacing;
+            if (objTextContentEl) objTextContentEl.value = activeObject.text || ''; // Input value
+            if (objFontFamilyEl) objFontFamilyEl.value = activeObject.fontFamily || 'Arial';  // Input value
+            if (objFontSizeEl) objFontSizeEl.value = activeObject.fontSize || 24; // Input value
+            if (objLineHeightEl) objLineHeightEl.value = activeObject.lineHeight === undefined ? 1.16 : activeObject.lineHeight; // Input value
+            if (objCharSpacingEl) objCharSpacingEl.value = activeObject.charSpacing === undefined ? 0 : activeObject.charSpacing; // Input value
 
             if (fontWeightButtonEl) fontWeightButtonEl.classList.toggle('active', activeObject.fontWeight === 'bold');
             if (fontStyleButtonEl) fontStyleButtonEl.classList.toggle('active', activeObject.fontStyle === 'italic');
@@ -2746,18 +2781,18 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
                     btn.classList.toggle('active', btn.dataset.align === activeObject.textAlign);
                 });
             }
-            if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal';
-            if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal';
-            if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left';
+            if (objFontWeightEl) objFontWeightEl.value = activeObject.fontWeight || 'normal'; // Input value
+            if (objFontStyleEl) objFontStyleEl.value = activeObject.fontStyle || 'normal'; // Input value
+            if (objTextAlignEl) objTextAlignEl.value = activeObject.textAlign || 'left'; // Input value
         }
 
         const shadow = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow : null;
-        if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000';
-        if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0;
-        if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0;
-        if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0;
-        if (objShadowAffectStrokeEl) objShadowAffectStrokeEl.checked = shadow ? !!shadow.affectStroke : false;
-        if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false;
+        if (objShadowColorEl) objShadowColorEl.value = shadow ? toHexColor(shadow.color) : '#000000'; // Input value
+        if (objShadowBlurEl) objShadowBlurEl.value = shadow ? shadow.blur : 0; // Input value
+        if (objShadowOffsetXEl) objShadowOffsetXEl.value = shadow ? shadow.offsetX : 0; // Input value
+        if (objShadowOffsetYEl) objShadowOffsetYEl.value = shadow ? shadow.offsetY : 0; // Input value
+        if (objShadowAffectStrokeEl) objShadowAffectStrokeEl.checked = shadow ? !!shadow.affectStroke : false; // Input checked
+        if (objShadowNonScalingEl) objShadowNonScalingEl.checked = shadow ? !!shadow.nonScaling : false; // Input checked
         if (shadowSettingsButtonEl) shadowSettingsButtonEl.classList.toggle('active', !!shadow);
 
         if (fillColorButtonEl) {
@@ -2777,26 +2812,26 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         }
 
         const interaction = activeObject.customInteraction || { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
-        if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || "";
-        if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || "";
-        if (objModalContentEl) objModalContentEl.value = interaction.modalContent || "";
-        if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || "";
-        if (objPanZoomLevelEl) objPanZoomLevelEl.value = interaction.panZoomLevel === undefined ? 1.5 : interaction.panZoomLevel;
+        if (objInteractionTriggerEl) objInteractionTriggerEl.value = interaction.trigger || ""; // Input value
+        if (objInteractionActionEl) objInteractionActionEl.value = interaction.action || ""; // Input value
+        if (objModalContentEl) objModalContentEl.value = interaction.modalContent || ""; // Input value
+        if (objNavigateToEl) objNavigateToEl.value = interaction.navigateTo || ""; // Input value
+        if (objPanZoomLevelEl) objPanZoomLevelEl.value = interaction.panZoomLevel === undefined ? 1.5 : interaction.panZoomLevel; // Input value
         updateInteractionConfigVisibility(interaction.action);
         if (interactionSettingsButtonEl) interactionSettingsButtonEl.classList.toggle('active', !!(interaction.trigger && interaction.action));
 
         const animation = activeObject.customAnimation || { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
-        if (objAnimationTriggerEl) objAnimationTriggerEl.value = animation.trigger || "";
-        if (objAnimationTypeEl) objAnimationTypeEl.value = animation.type || "";
+        if (objAnimationTriggerEl) objAnimationTriggerEl.value = animation.trigger || ""; // Input value
+        if (objAnimationTypeEl) objAnimationTypeEl.value = animation.type || ""; // Input value
         const showAnimParams = !!(animation.trigger && animation.type);
         const animParamsConfig = animationPopoverEl ? animationPopoverEl.querySelector('#animationParamsConfig') : null;
-        if (animParamsConfig) animParamsConfig.style.display = showAnimParams ? 'block' : 'none';
+        safeDOMUpdate(animParamsConfig, el => el.style.display = showAnimParams ? 'block' : 'none', "Failed to update animation params config display in populateToolbar");
         
         if (showAnimParams) {
-            if (objAnimationSpeedEl) objAnimationSpeedEl.value = animation.speed || "normal";
-            if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
+            if (objAnimationSpeedEl) objAnimationSpeedEl.value = animation.speed || "normal"; // Input value
+            if (objAnimationStrengthEl) objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength; // Input value
             updateAnimationStrengthUnit(animation.type);
-            if (objAnimationLoopEl) objAnimationLoopEl.value = animation.loop ? "true" : "false";
+            if (objAnimationLoopEl) objAnimationLoopEl.value = animation.loop ? "true" : "false"; // Input value
         }
         if (animationSettingsButtonEl) animationSettingsButtonEl.classList.toggle('active', showAnimParams);
     }
@@ -2829,9 +2864,9 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         const showNavigate = action === 'navigateToSlide' || action === 'navigateToURL';
         const showPanZoomConfig = action === 'panZoomToTarget';
 
-        if (modalConfig) modalConfig.style.display = showModal ? 'block' : 'none';
-        if (navigateConfig) navigateConfig.style.display = showNavigate ? 'block' : 'none';
-        if (panZoomConfig) panZoomConfig.style.display = showPanZoomConfig ? 'block' : 'none';
+        safeDOMUpdate(modalConfig, el => el.style.display = showModal ? 'block' : 'none', "Failed to update modal config visibility in updateInteractionConfigVisibility");
+        safeDOMUpdate(navigateConfig, el => el.style.display = showNavigate ? 'block' : 'none', "Failed to update navigate config visibility in updateInteractionConfigVisibility");
+        safeDOMUpdate(panZoomConfig, el => el.style.display = showPanZoomConfig ? 'block' : 'none', "Failed to update pan/zoom config visibility in updateInteractionConfigVisibility");
     }
 
     function updateAnimationStrengthUnit(animationType) {
@@ -2844,7 +2879,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
             case 'float': unitText = "(pixels)"; break;
             case 'growShrink': unitText = "(scale factor e.g., 1.2)"; break;
         }
-        strengthUnitEl.textContent = unitText;
+        safeDOMUpdate(strengthUnitEl, el => el.textContent = unitText, "Failed to update animation strength unit text in updateAnimationStrengthUnit");
     }
 
     function handleAnimationChange() {
@@ -2862,7 +2897,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         
         const showAnimParams = !!(activeObject.customAnimation.trigger && activeObject.customAnimation.type);
         const animParamsConfig = animationPopoverEl ? animationPopoverEl.querySelector('#animationParamsConfig') : null;
-        if (animParamsConfig) animParamsConfig.style.display = showAnimParams ? 'block' : 'none';
+        safeDOMUpdate(animParamsConfig, el => el.style.display = showAnimParams ? 'block' : 'none', "Failed to update animation params config display on change in handleAnimationChange");
 
         if (showAnimParams) {
             if (objAnimationSpeedEl) activeObject.customAnimation.speed = objAnimationSpeedEl.value;
@@ -3043,17 +3078,17 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
                     adminApp.state.adminYouTubePlayer.pauseVideo();
                 }
                 const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
-                if (questionTimestampDisplayEl) {
-                    questionTimestampDisplayEl.textContent = formatTime(currentTime);
+                safeDOMUpdate(questionTimestampDisplayEl, el => {
+                    el.textContent = formatTime(currentTime);
                     if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
-                }
+                }, "Failed to set question timestamp display in addQuestionBtn click");
 
                 if(questionTextEl) questionTextEl.value = '';
                 optionInputsEl.forEach(input => { if(input) input.value = ''; });
                 correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
                 if(editingQuestionIndexEl) editingQuestionIndexEl.value = '-1';
 
-                if (questionModalEl) questionModalEl.style.display = 'block';
+                safeDOMUpdate(questionModalEl, el => el.style.display = 'block', "Failed to show question modal in addQuestionBtn click");
             });
         }
 
@@ -3115,14 +3150,14 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
                 console.log("videoQuestions array after save:", currentSlide.slideMedia.videoQuestions); 
 
                 displayMessage("Question saved!", true);
-                if (questionModalEl) questionModalEl.style.display = 'none';
+                safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal after save in saveQuestionBtn click");
                 renderVideoQuestionsList(); 
             });
         }
 
         if (cancelQuestionBtnEl) {
             cancelQuestionBtnEl.addEventListener('click', function() {
-                if (questionModalEl) questionModalEl.style.display = 'none';
+                safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal on cancel in cancelQuestionBtn click");
             });
         }
 
@@ -3177,20 +3212,18 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     };
 
     function updateVideoToolsVisibility(show) {
-        if (videoTimelineControlsEl) {
-            videoTimelineControlsEl.style.display = show ? 'block' : 'none';
-        } else {
+        safeDOMUpdate(videoTimelineControlsEl, 
+          el => el.style.display = show ? 'block' : 'none', 
+          "Failed to update video timeline controls display in updateVideoToolsVisibility");
+        if (show && !videoTimelineControlsEl) { 
             console.warn("updateVideoToolsVisibility: videoTimelineControlsEl not found.");
         }
-        if (videoQuestionsListContainerEl) { 
-            videoQuestionsListContainerEl.style.display = show ? 'block' : 'none';
-        } else {
+        safeDOMUpdate(videoQuestionsListContainerEl, 
+          el => el.style.display = show ? 'block' : 'none',
+          "Failed to update video questions list container display in updateVideoToolsVisibility");
+        if (show && !videoQuestionsListContainerEl) { 
             console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
         }
-         // Show/hide the "Manage Timestamp Overlays" button along with other video tools
-        // if (manageTimestampOverlaysButtonEl) { // Removed
-        //     manageTimestampOverlaysButtonEl.style.display = show ? 'inline-block' : 'none'; // Removed
-        // } // Removed
     }
 
     function renderVideoQuestionsList() {
@@ -3198,90 +3231,92 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
             console.warn("renderVideoQuestionsList: videoQuestionsListEl not found.");
             return;
         }
-        videoQuestionsListEl.innerHTML = ''; 
+        
+        safeDOMUpdate(videoQuestionsListEl, el => {
+            el.innerHTML = ''; // Clear existing list
 
-        const currentSlide = getCurrentSlide();
-        if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube' || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
-            const li = document.createElement('li');
-            li.textContent = "No questions added yet.";
-            li.style.fontStyle = "italic";
-            videoQuestionsListEl.appendChild(li);
-            return;
-        }
+            const currentSlide = getCurrentSlide();
+            if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube' || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = "No questions added yet.";
+                li.style.fontStyle = "italic";
+                el.appendChild(li);
+                return;
+            }
 
-        const questions = currentSlide.slideMedia.videoQuestions;
+            const questions = currentSlide.slideMedia.videoQuestions;
+            console.log("Rendering questions list:", questions); 
 
-        console.log("Rendering questions list:", questions); 
+            questions.forEach((question, index) => {
+                const li = document.createElement('li');
+                li.style.marginBottom = "8px";
+                li.style.padding = "5px";
+                li.style.border = "1px solid #eee"; 
+                li.style.borderRadius = "3px";
+                li.style.display = "flex"; 
+                li.style.justifyContent = "space-between"; 
+                li.style.alignItems = "center"; 
 
-        questions.forEach((question, index) => {
-            const li = document.createElement('li');
-            li.style.marginBottom = "8px";
-            li.style.padding = "5px";
-            li.style.border = "1px solid #eee"; 
-            li.style.borderRadius = "3px";
-            li.style.display = "flex"; 
-            li.style.justifyContent = "space-between"; 
-            li.style.alignItems = "center"; 
-
-            const questionTextSpan = document.createElement('span'); 
-            questionTextSpan.textContent = `[${formatTime(question.timestamp)}] ${question.questionText.substring(0, 40)}${question.questionText.length > 40 ? '...' : ''}`;
-            questionTextSpan.style.flexGrow = "1"; 
-            
-            const actionsDiv = document.createElement('div');
-            actionsDiv.style.whiteSpace = "nowrap"; 
-
-            const editBtn = document.createElement('button');
-            editBtn.textContent = 'Edit';
-            editBtn.style.marginLeft = '5px'; 
-            editBtn.style.padding = '3px 8px';
-            editBtn.style.fontSize = '0.8em';
-            editBtn.className = 'edit-button'; 
-            editBtn.onclick = function() {
-                console.log("Editing question index:", index, questions[index]); 
-
-                if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
-                    adminApp.state.adminYouTubePlayer.pauseVideo();
-                }
+                const questionTextSpan = document.createElement('span'); 
+                questionTextSpan.textContent = `[${formatTime(question.timestamp)}] ${question.questionText.substring(0, 40)}${question.questionText.length > 40 ? '...' : ''}`;
+                questionTextSpan.style.flexGrow = "1"; 
                 
-                if(questionTimestampDisplayEl) questionTimestampDisplayEl.textContent = formatTime(question.timestamp);
-                if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
-                if(questionTextEl) questionTextEl.value = question.questionText;
+                const actionsDiv = document.createElement('div');
+                actionsDiv.style.whiteSpace = "nowrap"; 
 
-                optionInputsEl.forEach((input, i) => {
-                    if(input) input.value = question.options[i] || '';
-                });
-                correctAnswerRadiosEl.forEach((radio, i) => {
-                    if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length);
-                });
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Edit';
+                editBtn.style.marginLeft = '5px'; 
+                editBtn.style.padding = '3px 8px';
+                editBtn.style.fontSize = '0.8em';
+                editBtn.className = 'edit-button'; 
+                editBtn.onclick = function() {
+                    console.log("Editing question index:", index, questions[index]); 
+
+                    if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
+                        adminApp.state.adminYouTubePlayer.pauseVideo();
+                    }
+                    
+                    safeDOMUpdate(questionTimestampDisplayEl, tsEl => tsEl.textContent = formatTime(question.timestamp), "Failed to set question timestamp display on edit in renderVideoQuestionsList");
+                    if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
+                    if(questionTextEl) questionTextEl.value = question.questionText;
+
+                    optionInputsEl.forEach((input, i) => {
+                        if(input) input.value = question.options[i] || '';
+                    });
+                    correctAnswerRadiosEl.forEach((radio, i) => {
+                        if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length);
+                    });
+                    
+                    if(editingQuestionIndexEl) editingQuestionIndexEl.value = index;
+                    safeDOMUpdate(questionModalEl, modalEl => modalEl.style.display = 'block', "Failed to show question modal on edit in renderVideoQuestionsList");
+                };
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'danger-button'; 
+                deleteBtn.style.marginLeft = '5px';
+                deleteBtn.style.padding = '3px 8px'; 
+                deleteBtn.style.fontSize = '0.8em';
+                deleteBtn.onclick = function() {
+                    if (confirm(`Are you sure you want to delete the question: "${question.questionText.substring(0,30)}..."?`)) {
+                        console.log("Deleting question index:", index); 
+
+                        currentSlide.slideMedia.videoQuestions.splice(index, 1);
+                        renderVideoQuestionsList(); 
+                        displayMessage("Question deleted.", true);
+                    }
+                };
                 
-                if(editingQuestionIndexEl) editingQuestionIndexEl.value = index;
-                if(questionModalEl) questionModalEl.style.display = 'block';
-            };
+                actionsDiv.appendChild(editBtn);
+                actionsDiv.appendChild(deleteBtn);
+                
+                li.appendChild(questionTextSpan);
+                li.appendChild(actionsDiv);
 
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'Delete';
-            deleteBtn.className = 'danger-button'; 
-            deleteBtn.style.marginLeft = '5px';
-            deleteBtn.style.padding = '3px 8px'; 
-            deleteBtn.style.fontSize = '0.8em';
-            deleteBtn.onclick = function() {
-                if (confirm(`Are you sure you want to delete the question: "${question.questionText.substring(0,30)}..."?`)) {
-                    console.log("Deleting question index:", index); 
-
-                    currentSlide.slideMedia.videoQuestions.splice(index, 1);
-                    renderVideoQuestionsList(); 
-                    displayMessage("Question deleted.", true);
-                }
-            };
-            
-            actionsDiv.appendChild(editBtn);
-            actionsDiv.appendChild(deleteBtn);
-            
-            li.appendChild(questionTextSpan);
-            li.appendChild(actionsDiv);
-
-            videoQuestionsListEl.appendChild(li);
-        });
+                el.appendChild(li);
+            });
+        }, "Failed to render video questions list");
     }
 
     function formatTime(totalSeconds) {
@@ -3315,10 +3350,10 @@ function stopAndDestroyAdminYouTubePlayer() {
         adminApp.state.adminYouTubePlayer = null;
         
         // Clean up container
-        if (adminYouTubePlayerContainerEl) {
-            adminYouTubePlayerContainerEl.innerHTML = '';
-            adminYouTubePlayerContainerEl.style.display = 'none';
-        }
+        safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
+            el.innerHTML = '';
+            el.style.display = 'none';
+        }, "Failed to clean up YouTube player container on destroy in stopAndDestroyAdminYouTubePlayer");
         
         // Hide timeline controls
         updateVideoToolsVisibility(false);

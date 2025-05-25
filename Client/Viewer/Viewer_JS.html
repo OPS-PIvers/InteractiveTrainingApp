@@ -38,10 +38,10 @@
       currentVideoQuestions: [], // Stores questions for the current video
       playerQuestionCheckInterval: null, // Interval ID for checking video time
       askedQuestionIndices: [], // Indices of questions already asked for the current slide view
-      currentVideoOverlays: [], // Stores full overlay definitions for the current slide
-      activeVideoOverlayIds: new Set(), // Stores IDs of currently displayed timestamp overlays
-      videoOverlays: [], // NEW: For DOM-based video overlays
-      activeOverlays: new Map(), // NEW: For DOM-based video overlays
+      // currentVideoOverlays: [], // Removed as per issue #123
+      // activeVideoOverlayIds: new Set(), // Removed as per issue #123
+      videoOverlays: [], // Stores full overlay definitions for the current slide (formerly currentVideoOverlays)
+      activeOverlays: new Map(), // Stores active DOM overlay elements, mapping ID to DOM element (formerly activeVideoOverlayIds)
       currentVideoDuration: 0, // Phase 1: Store current video duration for timeline
       ytPlayer: null, // Holds the YouTube player instance
       deferredYouTubeVideoId: null // Stores videoId if player setup is deferred
@@ -839,21 +839,22 @@ function validateYouTubeContainer(containerEl, containerName) {
         const slideData = slides[slideIndex]; // Moved up to access slideData earlier
 
         viewerApp.state.currentSlideIndex = slideIndex; 
-        initializeVideoOverlays(); // Call the new function here
+        initializeVideoOverlays(); // This function now correctly uses viewerApp.state.videoOverlays and viewerApp.state.activeOverlays
         
         // Initialize timestamp overlay states for the new slide
-        // Clear any existing timestamp overlays from canvas (part of stopAndDestroyYouTubePlayer now, but good to be sure)
+        // Clear any existing Fabric-based timestamp overlays from canvas (part of stopAndDestroyYouTubePlayer now, but good to be sure)
         if (viewerApp.state.viewerFabricCanvas) {
             viewerApp.state.viewerFabricCanvas.getObjects().forEach(obj => {
-                if (obj.isTimestampOverlay) { // Assuming we add this flag when creating them
+                // Check for the old customType or a specific flag if one was used for Fabric overlays
+                if (obj.customType === 'videoTimestampOverlay' || obj.isTimestampOverlay) { 
                     viewerApp.state.viewerFabricCanvas.remove(obj);
                 }
             });
         }
-        // viewerApp.state.currentVideoOverlays = (slideData && slideData.slideMedia && slideData.slideMedia.videoOverlays && Array.isArray(slideData.slideMedia.videoOverlays)) ? [...slideData.slideMedia.videoOverlays] : [];
-        // viewerApp.state.activeVideoOverlayIds = new Set(); // Initialize as a new Set
+        // The lines for currentVideoOverlays and activeVideoOverlayIds are removed as they are no longer part of the state.
+        // initializeVideoOverlays() handles setting up the new videoOverlays and activeOverlays state.
 
-        // const slideData = slides[slideIndex]; // Original position
+        // const slideData = slides[slideIndex]; 
         const canvas = viewerApp.state.viewerFabricCanvas;
 
          if (!slideData.slideMedia) {
@@ -1757,8 +1758,8 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
 
         // Render Timestamp Overlay Markers
         // Add overlay markers (This is the new/updated part)
-        if (viewerApp.state.videoOverlays && viewerApp.state.videoOverlays.length > 0) { // Use new state variable
-            viewerApp.state.videoOverlays.forEach(overlay => { // Iterate over new state variable
+        if (viewerApp.state.videoOverlays && viewerApp.state.videoOverlays.length > 0) { // This correctly uses the consolidated state variable
+            viewerApp.state.videoOverlays.forEach(overlay => { // This correctly uses the consolidated state variable
                 const startMarker = document.createElement('div');
                 startMarker.className = 'timeline-marker overlay-marker';
                 // The issue mentions getTemplateColor(overlay.template)
@@ -1932,17 +1933,27 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
             // Example: Dismiss action
             if (this.overlayDefinition.interaction.action === 'dismiss') {
                 viewerApp.state.viewerFabricCanvas.remove(this);
-                viewerApp.state.activeVideoOverlayIds.delete(this.videoOverlayId);
+                // viewerApp.state.activeVideoOverlayIds.delete(this.videoOverlayId); // OLD system, activeVideoOverlayIds removed
+                // For Fabric-based objects, if this system was to be kept, activeOverlays might store them.
+                // However, the issue implies moving towards DOM-based overlays managed by activeOverlays (Map of ID -> DOM element).
+                // This Fabric object interaction part for video overlays seems to be legacy.
+                // If this Fabric object is a representation of a DOM overlay, its removal here is fine,
+                // but the actual DOM overlay dismissal is handled by dismissOverlay(overlayId) which uses activeOverlays (Map).
+
                  // If this overlay paused the video, resume it
                 if (this.overlayDefinition.interaction.pauseVideo && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.playVideo === 'function') {
-                    // Check if other pausing overlays are still active
+                    // Check if other pausing overlays are still active (using the new activeOverlays map)
                     let otherPausingOverlayActive = false;
-                    viewerApp.state.activeVideoOverlayIds.forEach(id => {
-                        const ovDef = viewerApp.state.currentVideoOverlays.find(o => o.id === id);
-                        if (ovDef && ovDef.interaction.pauseVideo) {
+                    for (const id of viewerApp.state.activeOverlays.keys()) { // Iterate over active DOM overlays
+                        const ovDef = viewerApp.state.videoOverlays.find(o => o.id === id); // Find its definition
+                        const overlayElement = viewerApp.state.activeOverlays.get(id);
+                        // Check if the active DOM overlay (element) was the one that paused the video (dataset.pausedVideo)
+                        // and its definition indicates it should pause video.
+                        if (ovDef && ovDef.interaction.pauseVideo && overlayElement && overlayElement.dataset.pausedVideo === 'true') {
                             otherPausingOverlayActive = true;
+                            break; 
                         }
-                    });
+                    }
                     if (!otherPausingOverlayActive) {
                         viewerApp.state.ytPlayer.playVideo();
                     }
@@ -1973,59 +1984,16 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
         /*
         // Entire original body commented out
         const canvas = viewerApp.state.viewerFabricCanvas;
-        if (!canvas || !viewerApp.state.currentVideoOverlays) return;
-
-        let changesMadeToCanvasObjects = false;
-
-        viewerApp.state.currentVideoOverlays.forEach(overlayDef => {
-            if (!overlayDef || typeof overlayDef.id === 'undefined' || typeof overlayDef.startTime === 'undefined' || typeof overlayDef.duration === 'undefined') {
-                console.warn("Skipping invalid overlayDef:", overlayDef);
-                return;
-            }
-
-            const shouldBeVisible = (currentTime >= overlayDef.startTime) && (currentTime < (overlayDef.startTime + overlayDef.duration));
-            const isActive = viewerApp.state.activeVideoOverlayIds.has(overlayDef.id);
-
-            if (shouldBeVisible && !isActive) {
-                const fabricObject = createFabricObjectFromOverlayDefinition(overlayDef);
-                if (fabricObject) {
-                    fabricObject.videoOverlayId = overlayDef.id;
-                    fabricObject.selectable = false;
-                    fabricObject.evented = !!(overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none');
-                    fabricObject.hoverCursor = fabricObject.evented ? 'pointer' : 'default';
-                    
-                    // TODO: Attach specific event listeners based on overlayDef.interaction.action
-
-                    canvas.add(fabricObject);
-                    viewerApp.state.activeVideoOverlayIds.add(overlayDef.id);
-                    changesMadeToCanvasObjects = true;
-
-                    if (overlayDef.interaction && overlayDef.interaction.pauseVideo && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.pauseVideo === 'function') {
-                        viewerApp.state.ytPlayer.pauseVideo();
-                    }
-                    console.log(`Video Overlay ${overlayDef.id} added to canvas.`);
-                }
-            } else if (!shouldBeVisible && isActive) {
-                let objectToRemove = null;
-                canvas.getObjects().forEach(obj => {
-                    if (obj.videoOverlayId === overlayDef.id) {
-                        objectToRemove = obj;
-                    }
-                });
-
-                if (objectToRemove) {
-                    canvas.remove(objectToRemove);
-                    viewerApp.state.activeVideoOverlayIds.delete(overlayDef.id);
-                    changesMadeToCanvasObjects = true;
-                    console.log(`Video Overlay ${overlayDef.id} removed from canvas.`);
-                }
-            }
-        });
-
-        if (changesMadeToCanvasObjects) {
-            canvas.requestRenderAll();
-        }
-        updateViewerCanvasInteractivity(); // Called at the end
+        // This function (checkVideoTimeForVideoOverlays) is entirely commented out.
+        // It seems to be the old system for Fabric-based video overlays.
+        // The new system uses updateVideoOverlays() which handles DOM elements.
+        // No changes needed inside this commented block other than noting that
+        // currentVideoOverlays and activeVideoOverlayIds are now replaced by
+        // videoOverlays and activeOverlays (Map) respectively if this code were to be uncommented and adapted.
+        // For example, `viewerApp.state.currentVideoOverlays.forEach` would become `viewerApp.state.videoOverlays.forEach`.
+        // `viewerApp.state.activeVideoOverlayIds.has(overlayDef.id)` would become `viewerApp.state.activeOverlays.has(overlayDef.id)`.
+        // `viewerApp.state.activeVideoOverlayIds.add(overlayDef.id)` would become `viewerApp.state.activeOverlays.set(overlayDef.id, fabricObject)`.
+        // `viewerApp.state.activeVideoOverlayIds.delete(overlayDef.id)` would become `viewerApp.state.activeOverlays.delete(overlayDef.id)`.
         */
     }
     
@@ -2036,12 +2004,31 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
         const isQuestionActive = canvas.getObjects().some(obj => obj.customType === 'videoQuestionOverlay');
         const isClickToBeginActive = canvas.getObjects().some(obj => obj.customType === 'clickToBeginButton');
         
+        // This part needs to check the new activeOverlays (Map) for DOM elements
+        // to determine if any of *those* are interactive.
+        // However, the primary interaction with DOM overlays (like click to dismiss or action)
+        // is handled by the DOM elements themselves.
+        // The canvas interactivity might be relevant if Fabric objects *on top of* the video
+        // (but separate from the DOM overlays) need to be enabled/disabled based on DOM overlay state.
+        // For now, let's assume that if any DOM overlay is active, the canvas might need to be interactive
+        // for other elements or for consistency.
+        // The old logic checked activeVideoOverlayIds (Set for Fabric overlays).
+        // The new logic should check activeOverlays (Map for DOM overlays).
         let isInteractiveOverlayActive = false;
-        if (viewerApp.state.activeVideoOverlayIds && viewerApp.state.activeVideoOverlayIds.size > 0 && Array.isArray(viewerApp.state.currentVideoOverlays)) {
-            for (const overlayId of viewerApp.state.activeVideoOverlayIds) {
-                const overlayDef = viewerApp.state.currentVideoOverlays.find(o => o.id === overlayId);
-                if (overlayDef && overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none') {
-                    isInteractiveOverlayActive = true;
+        if (viewerApp.state.activeOverlays && viewerApp.state.activeOverlays.size > 0 && Array.isArray(viewerApp.state.videoOverlays)) {
+            for (const overlayId of viewerApp.state.activeOverlays.keys()) { // Iterate Map keys
+                const overlayDef = viewerApp.state.videoOverlays.find(o => o.id === overlayId); // Find definition in the array
+                // Check if the definition implies interactivity that would affect the *canvas* layer.
+                // DOM overlays handle their own pointer events. This is more about whether the Fabric canvas layer
+                // itself should be transparent to clicks or not when DOM overlays are present.
+                if (overlayDef && overlayDef.interaction && (overlayDef.interaction.action !== 'none' || overlayDef.interaction.dismissible)) {
+                    // If any active DOM overlay is interactive or dismissible, we might want the canvas to be aware.
+                    // However, the new DOM overlay system places overlays in a separate container ('videoOverlayContainer')
+                    // which is on top of the YouTube player, but potentially sibling to or layered with the Fabric canvas container.
+                    // The logic here is to make the Fabric canvas itself interactive if needed.
+                    // If DOM overlays are present, the canvas itself might not need to be interactive unless there are also Fabric elements.
+                    // Let's simplify: if active DOM overlays exist, we assume the canvas layer might be needed for other things or should be consistent.
+                    isInteractiveOverlayActive = true; 
                     break;
                 }
             }
@@ -2095,8 +2082,17 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
                 const canvas = viewerApp.state.viewerFabricCanvas;
                 const objectsToRemove = [];
                 canvas.getObjects().forEach(obj => {
-                    // Check for timestamp overlays by overlayId
-                    if (obj.overlayId && viewerApp.state.activeVideoOverlayIds.has(obj.overlayId)) {
+                    // Check for old Fabric-based timestamp overlays by videoOverlayId or customType
+                    if (obj.videoOverlayId && viewerApp.state.activeOverlays.has(obj.videoOverlayId)) { 
+                        // This condition is tricky: activeOverlays now stores DOM elements.
+                        // If a Fabric object (obj) has a videoOverlayId that *also* corresponds to a DOM overlay in activeOverlays,
+                        // it means there might be a dual representation. The goal is to remove the Fabric part.
+                        // This line effectively means: if there's a Fabric object that we *used to* track with activeVideoOverlayIds, remove it.
+                        // Since activeVideoOverlayIds is gone, we are checking if its ID is in the new activeOverlays map.
+                        // This is more of a cleanup for any remaining Fabric objects from an older system.
+                        // The primary management of activeOverlays is for DOM elements.
+                        objectsToRemove.push(obj);
+                    } else if (obj.customType === 'videoTimestampOverlay') { // General cleanup for old type
                         objectsToRemove.push(obj);
                     }
                     // Check for ClickToBeginButton by customType
@@ -2109,10 +2105,10 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
                     canvas.requestRenderAll(); // Render after removing objects
                 }
             }
-            // viewerApp.state.currentVideoOverlays = []; // Clear state for timestamp overlays - OLD
-            // viewerApp.state.activeVideoOverlayIds.clear(); // OLD
+            // viewerApp.state.currentVideoOverlays = []; // This state is removed
+            // viewerApp.state.activeVideoOverlayIds.clear(); // This state is removed
             
-            // New cleanup for HTML DOM overlays:
+            // New cleanup for HTML DOM overlays (this part is correct for the new system):
             // Clear active overlays (DOM elements and map)
             if (viewerApp.state.activeOverlays) {
                 viewerApp.state.activeOverlays.forEach((element, id) => {
@@ -2287,11 +2283,12 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
                     canvas.getObjects().forEach(obj => { if (obj.customType === 'videoQuestionOverlay') canvas.remove(obj);});
                     
                     // Determine canvas state after question
-                    if (viewerApp.state.activeTimestampOverlayIds.size > 0) {
-                         if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
-                         // Pointer events depend on whether active overlays are interactive (handled by checkVideoTimeForTimestampOverlays or a new updateCanvasInteractivity)
-                         // For now, assume if overlays are present, canvas might need interaction.
-                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto'; 
+                    // Use the new activeOverlays map (DOM elements)
+                    if (viewerApp.state.activeOverlays && viewerApp.state.activeOverlays.size > 0) {
+                         if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1'; // Or based on updateViewerCanvasInteractivity logic
+                         if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto'; // Or based on updateViewerCanvasInteractivity
+                         // Calling updateViewerCanvasInteractivity directly might be better here
+                         updateViewerCanvasInteractivity();
                     } else {
                          if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0';
                          if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';

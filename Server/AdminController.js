@@ -1,6 +1,20 @@
 // Server/AdminController.gs
 
 /**
+ * Creates a standardized response object.
+ * @param {boolean} success - Indicates whether the operation was successful.
+ * @param {Object} [data=null] - The data to return on success.
+ * @param {string} [error=null] - The error message to return on failure.
+ * @return {Object} The response object.
+ */
+function createResponse(success, data = null, error = null) {
+  if (success) {
+    return { success: true, data: data };
+  }
+  return { success: false, error: error || "An unknown error occurred." };
+}
+
+/**
  * Creates a new project:
  * - Generates a unique ProjectID.
  * - Creates a new folder in Google Drive for the new project.
@@ -13,7 +27,7 @@ function createProject(projectTitle) {
   try {
     if (!projectTitle || projectTitle.trim() === "") {
       Logger.log("createProject: Project title was empty.");
-      return { success: false, error: "Project title cannot be empty." };
+      return createResponse(false, null, "Project title cannot be empty.");
     }
 
     const projectId = Utilities.getUuid();
@@ -24,7 +38,7 @@ function createProject(projectTitle) {
     const projectFolderId = createDriveFolder(projectFolderName, ROOT_PROJECT_FOLDER_ID);
     if (!projectFolderId) {
         Logger.log(`createProject: Failed to create project folder for "${projectFolderName}". createDriveFolder returned falsy.`);
-        return { success: false, error: "Failed to create project folder in Drive." };
+        return createResponse(false, null, "Failed to create project folder in Drive.");
     }
     Logger.log(`createProject: Project folder created: ${projectFolderId} for project ${projectId}`);
 
@@ -47,7 +61,7 @@ function createProject(projectTitle) {
     if (!projectDataFileId) {
         Logger.log(`createProject: Failed to create project data file for project ${projectId}. saveJsonToDriveFile returned falsy.`);
         // Consider cleanup: delete folder if file creation fails? Maybe later enhancement.
-        return { success: false, error: "Failed to create project data file in Drive." };
+        return createResponse(false, null, "Failed to create project data file in Drive.");
     }
     Logger.log(`createProject: Project data file created: ${projectDataFileId} for project ${projectId}`);
 
@@ -65,18 +79,17 @@ function createProject(projectTitle) {
     appendRowToSheet(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, newRowData);
     Logger.log(`createProject: New project row added to sheet for project ${projectId}: ${newRowData.join(', ')}`);
 
-    return {
-      success: true,
+    return createResponse(true, {
       message: "Project created successfully!",
       projectId: projectId,
       projectFolderId: projectFolderId,
       projectDataFileId: projectDataFileId,
-      status: initialJsonContent.status // Return initial status
-    };
+      status: initialJsonContent.status
+    });
 
   } catch (e) {
     Logger.log(`Error in createProject: ${e.toString()} \nStack: ${e.stack ? e.stack : 'No stack available'}`);
-    return { success: false, error: `Failed to create project: ${e.message}` };
+    return createResponse(false, null, `Failed to create project: ${e.message}`);
   }
 }
 
@@ -91,13 +104,13 @@ function getAllProjectsForAdmin() {
 
     if (!projectsData || !Array.isArray(projectsData)) {
       Logger.log("getAllProjectsForAdmin: No data or invalid data returned from getAllSheetData.");
-      return [];
+      return createResponse(true, { projects: [] }); // Return empty list via response object
     }
 
     // getAllSheetData now always returns an array of objects or an empty array.
     if (projectsData.length === 0) {
         Logger.log("getAllProjectsForAdmin: No projects found or sheet is empty/header-only.");
-        return [];
+        return createResponse(true, { projects: [] }); // Return empty list via response object
     }
 
     // Data is an array of objects
@@ -117,11 +130,11 @@ function getAllProjectsForAdmin() {
     }).filter(p => p !== null); // Remove null entries that failed validation
 
     Logger.log(`getAllProjectsForAdmin: Retrieved and formatted ${formattedProjects.length} projects.`);
-    return formattedProjects;
+    return createResponse(true, { projects: formattedProjects });
 
   } catch (e) {
     Logger.log(`Error in getAllProjectsForAdmin: ${e.toString()} \nStack: ${e.stack ? e.stack : 'No stack available'}`);
-    return [];
+    return createResponse(false, null, `Error retrieving projects: ${e.message}`);
   }
 }
 
@@ -162,17 +175,17 @@ function uploadFileToDrive(fileData, projectId, mediaType) {
 
     if (!fileData || !fileData.data || !fileData.fileName || !fileData.mimeType) {
       Logger.log("uploadFileToDrive: Invalid fileData received.");
-      return { success: false, error: "Invalid file data provided." };
+      return createResponse(false, null, "Invalid file data provided.");
     }
     if (!projectId) {
       Logger.log("uploadFileToDrive: ProjectID is missing.");
-      return { success: false, error: "Project ID is required." };
+      return createResponse(false, null, "Project ID is required.");
     }
 
     const projectFolderId = getProjectFolderIdFromSheet(projectId);
     if (!projectFolderId) {
       Logger.log(`uploadFileToDrive: Could not find ProjectFolderID for projectId "${projectId}".`);
-      return { success: false, error: `Project folder not found for project ID: ${projectId}.` };
+      return createResponse(false, null, `Project folder not found for project ID: ${projectId}.`);
     }
 
     const decodedData = Utilities.base64Decode(fileData.data);
@@ -182,7 +195,7 @@ function uploadFileToDrive(fileData, projectId, mediaType) {
 
     if (!driveFile || !driveFile.getId) {
         Logger.log(`uploadFileToDrive: Failed to create file in Drive. createFileInDriveFromBlob returned invalid response for ${fileData.fileName}`);
-        return { success: false, error: "Failed to create file in Google Drive." };
+        return createResponse(false, null, "Failed to create file in Google Drive.");
     }
 
     driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -215,17 +228,16 @@ function uploadFileToDrive(fileData, projectId, mediaType) {
     }
 
     Logger.log(`uploadFileToDrive: File uploaded successfully. ID: ${driveFile.getId()}, Final Link: ${webContentLink}`);
-    return {
-      success: true,
+    return createResponse(true, {
       driveFileId: driveFile.getId(),
-      webContentLink: webContentLink, // May be null for audio if direct link failed
+      webContentLink: webContentLink,
       fileName: driveFile.getName(),
       mimeType: driveFile.getMimeType()
-    };
+    });
 
   } catch (e) {
     Logger.log(`Error in uploadFileToDrive: ${e.toString()} - ProjectID: ${projectId}, FileName: ${fileData ? fileData.fileName : 'N/A'} \nStack: ${e.stack}`);
-    return { success: false, error: `Failed to upload file: ${e.message}` };
+    return createResponse(false, null, `Failed to upload file: ${e.message}`);
   }
 }
 
@@ -238,28 +250,28 @@ function uploadFileToDrive(fileData, projectId, mediaType) {
 function getImageAsBase64(driveFileId) {
   try {
     if (!driveFileId) {
-      return { success: false, error: "Drive File ID is required." };
+      return createResponse(false, null, "Drive File ID is required.");
     }
     const file = DriveApp.getFileById(driveFileId);
     const blob = file.getBlob();
     const mimeType = blob.getContentType();
     if (!mimeType || !mimeType.startsWith('image/')) {
        Logger.log(`getImageAsBase64: File ID ${driveFileId} is not an image (MIME: ${mimeType}).`);
-       return { success: false, error: `File is not an image (type: ${mimeType})` };
+       return createResponse(false, null, `File is not an image (type: ${mimeType})`);
     }
     const base64Data = Utilities.base64Encode(blob.getBytes());
     const dataURI = 'data:' + mimeType + ';base64,' + base64Data;
 
     Logger.log(`getImageAsBase64: Successfully retrieved and encoded file ID: ${driveFileId}. MimeType: ${mimeType}. DataURI length: ${dataURI.length}`);
-    return { success: true, base64Data: dataURI, mimeType: mimeType };
+    return createResponse(true, { base64Data: dataURI, mimeType: mimeType });
 
   } catch (e) {
      if (e.message.toLowerCase().includes("access denied") || e.message.toLowerCase().includes("not found")) {
           Logger.log(`getImageAsBase64: File not found or access denied for ID ${driveFileId}. Error: ${e.toString()}`);
-          return { success: false, error: "Image file not found or access denied." };
+          return createResponse(false, null, "Image file not found or access denied.");
       }
     Logger.log(`Error in getImageAsBase64 for file ID ${driveFileId}: ${e.toString()} \nStack: ${e.stack}`);
-    return { success: false, error: `Failed to retrieve image as base64: ${e.message}` };
+    return createResponse(false, null, `Failed to retrieve image as base64: ${e.message}`);
   }
 }
 
@@ -276,7 +288,7 @@ function saveProjectData(projectId, projectDataJSON) {
     Logger.log(`saveProjectData (Simplified): Attempting to save data for projectId: ${projectId}`);
     if (!projectId || !projectDataJSON) {
       Logger.log("saveProjectData: Missing projectId or projectDataJSON.");
-      return { success: false, error: "Project ID and data are required." };
+      return createResponse(false, null, "Project ID and data are required.");
     }
 
     let projectDataParsed;
@@ -284,7 +296,7 @@ function saveProjectData(projectId, projectDataJSON) {
         projectDataParsed = JSON.parse(projectDataJSON);
     } catch (parseError) {
         Logger.log(`saveProjectData: Error parsing projectDataJSON for projectId ${projectId}: ${parseError.toString()}`);
-        return { success: false, error: "Invalid project data format. Could not parse JSON." };
+        return createResponse(false, null, "Invalid project data format. Could not parse JSON.");
     }
 
     const currentStatusInJson = projectDataParsed.status || "Draft"; // Default if status missing in JSON
@@ -294,14 +306,14 @@ function saveProjectData(projectId, projectDataJSON) {
     const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
     if (!rowIndex) {
       Logger.log(`saveProjectData: Project with ID "${projectId}" not found in ProjectIndex.`);
-      return { success: false, error: `Project metadata not found for ID: ${projectId}. Cannot save.` };
+      return createResponse(false, null, `Project metadata not found for ID: ${projectId}. Cannot save.`);
     }
 
     // 2. Get current row data to find FolderID and FileID
     const rowDataArray = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
      if (!rowDataArray) {
         Logger.log(`saveProjectData: Could not retrieve row data for project ${projectId} at row ${rowIndex}.`);
-        return { success: false, error: "Failed to retrieve project details for saving." };
+        return createResponse(false, null, "Failed to retrieve project details for saving.");
      }
 
     const projectFolderId = rowDataArray[COL_PROJECT_FOLDER_ID - 1];
@@ -309,7 +321,7 @@ function saveProjectData(projectId, projectDataJSON) {
 
     if (!projectFolderId || !projectDataFileIdToOverwrite) {
       Logger.log(`saveProjectData: Missing FolderID or DataFileID for project "${projectId}" in row ${rowIndex}. FolderID: ${projectFolderId}, FileID: ${projectDataFileIdToOverwrite}`);
-      return { success: false, error: "Project folder or data file reference is missing in index sheet. Cannot save." };
+      return createResponse(false, null, "Project folder or data file reference is missing in index sheet. Cannot save.");
     }
     Logger.log(`saveProjectData: Found FolderID: ${projectFolderId}, DataFileID to overwrite: ${projectDataFileIdToOverwrite} for project ${projectId}.`);
 
@@ -331,13 +343,13 @@ function saveProjectData(projectId, projectDataJSON) {
 
     } catch (driveError) {
       Logger.log(`saveProjectData: Error during saveJsonToDriveFile for project ${projectId}, fileIdToOverwrite ${projectDataFileIdToOverwrite}. Error: ${driveError.message}. Aborting sheet update.`);
-      return { success: false, error: `Failed to save project data to Google Drive: ${driveError.message}. Please try again.` };
+      return createResponse(false, null, `Failed to save project data to Google Drive: ${driveError.message}. Please try again.`);
     }
 
     // If saveJsonToDriveFile did not return a fileId (should be caught by try-catch now, but as a safeguard)
     if (!savedFileId) {
       Logger.log(`saveProjectData: saveJsonToDriveFile did not return a fileId and did not throw an error (unexpected). Project ${projectId}.`);
-      return { success: false, error: "Failed to save project data to Google Drive due to an unexpected issue." };
+      return createResponse(false, null, "Failed to save project data to Google Drive due to an unexpected issue.");
     }
     
     // 5. Update the Sheet Row (Status and LastModified)
@@ -346,11 +358,11 @@ function saveProjectData(projectId, projectDataJSON) {
     updateSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex, rowDataArray);
     Logger.log(`saveProjectData: Updated Sheet - LastModified and Status ("${currentStatusInJson}") for project ${projectId} at row ${rowIndex}.`);
 
-    return { success: true, message: "Project data saved successfully." };
+    return createResponse(true, { message: "Project data saved successfully." });
 
   } catch (e) {
     Logger.log(`Error in saveProjectData for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-    return { success: false, error: `Failed to save project data: ${e.message}` };
+    return createResponse(false, null, `Failed to save project data: ${e.message}`);
   }
 }
 
@@ -367,27 +379,27 @@ function updateProjectStatus(projectId, newStatus) {
     Logger.log(`updateProjectStatus (Simplified): Attempting for projectId: ${projectId} to "${newStatus}"`);
     if (!projectId || !newStatus) {
       Logger.log("updateProjectStatus: Missing projectId or newStatus.");
-      return { success: false, error: "Project ID and new status are required." };
+      return createResponse(false, null, "Project ID and new status are required.");
     }
 
     const validStatuses = ["Draft", "Active", "Inactive"];
     if (validStatuses.indexOf(newStatus) === -1) {
         Logger.log(`updateProjectStatus: Invalid status value "${newStatus}" for projectId: ${projectId}`);
-        return { success: false, error: `Invalid status value: ${newStatus}. Must be one of ${validStatuses.join(', ')}.` };
+        return createResponse(false, null, `Invalid status value: ${newStatus}. Must be one of ${validStatuses.join(', ')}.`);
     }
 
     // 1. Find the row index
     const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
     if (!rowIndex) {
       Logger.log(`updateProjectStatus: Project with ID "${projectId}" not found in ProjectIndex.`);
-      return { success: false, error: `Project not found for ID: ${projectId}. Cannot update status.` };
+      return createResponse(false, null, `Project not found for ID: ${projectId}. Cannot update status.`);
     }
 
     // 2. Get current row data
     let rowData = getSheetRowData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
     if (!rowData) {
         Logger.log(`updateProjectStatus: Could not retrieve current row data for project ${projectId} at row ${rowIndex}.`);
-        return { success: false, error: "Could not retrieve project data to update status."};
+        return createResponse(false, null, "Could not retrieve project data to update status.");
     }
 
     const nowISO = new Date().toISOString();
@@ -409,11 +421,11 @@ function updateProjectStatus(projectId, newStatus) {
         Logger.log(`updateProjectStatus: Successfully updated project_data.json for project ${projectId}. Status: ${newStatus}, LastModified: ${nowISO}`);
       } catch (e) {
         Logger.log(`updateProjectStatus: Failed to update project_data.json for project ${projectId} before sheet update. Error: ${e.toString()}. Aborting.`);
-        return { success: false, error: "Failed to update project data file. Status not changed." };
+        return createResponse(false, null, "Failed to update project data file. Status not changed.");
       }
     } else {
       Logger.log(`updateProjectStatus: WARNING - Could not find folderId or dataFileId for project ${projectId} from sheet. Cannot update JSON. FolderID: ${projectFolderId}, FileID: ${projectDataFileId}`);
-      return { success: false, error: "Project data file reference missing. Cannot update status." };
+      return createResponse(false, null, "Project data file reference missing. Cannot update status.");
     }
 
     // 4. Update Sheet Row
@@ -424,15 +436,15 @@ function updateProjectStatus(projectId, newStatus) {
       Logger.log(`updateProjectStatus: Sheet status for project ${projectId} (row ${rowIndex}) updated to "${newStatus}". LastModified also updated.`);
     } catch (e) {
       Logger.log(`updateProjectStatus: Successfully updated project_data.json for project ${projectId}, but failed to update the ProjectIndex sheet. Error: ${e.toString()}. Data may be inconsistent.`);
-      return { success: false, error: "Project data file was updated, but failed to update the project index sheet. Please check project consistency." };
+      return createResponse(false, null, "Project data file was updated, but failed to update the project index sheet. Please check project consistency.");
     }
 
     // 5. Success
-    return { success: true, message: `Project status successfully updated to ${newStatus}.` };
+    return createResponse(true, { message: `Project status successfully updated to ${newStatus}.` });
 
   } catch (e) {
     Logger.log(`Error in updateProjectStatus for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack ? e.stack : 'No stack available'}`);
-    return { success: false, error: `Failed to update project status: ${e.message}` };
+    return createResponse(false, null, `Failed to update project status: ${e.message}`);
   }
 }
 
@@ -448,7 +460,7 @@ function deleteProject(projectId) {
     Logger.log(`deleteProject: Attempting to delete project with ID: ${projectId}`);
     if (!projectId) {
       Logger.log("deleteProject: ProjectID is missing.");
-      return { success: false, error: "Project ID is required for deletion." };
+      return createResponse(false, null, "Project ID is required for deletion.");
     }
 
     // 1. Find the row and ProjectFolderID from the ProjectIndex sheet
@@ -461,14 +473,14 @@ function deleteProject(projectId) {
             projectFolderId = rowData[COL_PROJECT_FOLDER_ID - 1]; // 0-indexed access to array
         } else {
              Logger.log(`deleteProject: Could not retrieve row data for project ${projectId} at row ${rowIndex}, though index was found.`);
-             return { success: false, error: "Failed to retrieve project details for deletion." };
+             return createResponse(false, null, "Failed to retrieve project details for deletion.");
         }
         // 2. Delete the project's row from the "ProjectIndex" sheet
         deleteSheetRow(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, rowIndex);
         Logger.log(`deleteProject: Row ${rowIndex} for project ${projectId} deleted from ProjectIndex sheet.`);
     } else {
          Logger.log(`deleteProject: Project with ID "${projectId}" not found in ProjectIndex. No row to delete.`);
-         return { success: true, message: "Project not found in index, assumed already deleted.", deletedProjectId: projectId };
+         return createResponse(true, { message: "Project not found in index, assumed already deleted.", deletedProjectId: projectId });
     }
 
 
@@ -479,21 +491,20 @@ function deleteProject(projectId) {
         Logger.log(`deleteProject: Project folder ${projectFolderId} for project ${projectId} and its contents have been trashed.`);
       } catch (driveError) {
         Logger.log(`deleteProject: Error while deleting project folder ${projectFolderId} for project ${projectId}. Error: ${driveError.toString()}. Sheet entry was removed.`);
-        return {
-            success: true, // Success because removed from list
+        return createResponse(true, {
             message: `Project removed from index. Warning: Error deleting Drive folder: ${driveError.message}`,
             deletedProjectId: projectId
-        };
+        });
       }
     } else {
       Logger.log(`deleteProject: No ProjectFolderID found for project ${projectId} (row ${rowIndex}). Cannot delete Drive folder.`);
     }
 
-    return { success: true, message: "Project successfully deleted.", deletedProjectId: projectId };
+    return createResponse(true, { message: "Project successfully deleted.", deletedProjectId: projectId });
 
   } catch (e) {
     Logger.log(`Error in deleteProject for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-    return { success: false, error: `Failed to delete project: ${e.message}` };
+    return createResponse(false, null, `Failed to delete project: ${e.message}`);
   }
 }
 
@@ -509,7 +520,8 @@ function deleteProject(projectId) {
       Logger.log(`getProjectDataForEditing: Attempting to load data for projectId: ${projectId}`);
       if (!projectId) {
         Logger.log("getProjectDataForEditing: ProjectID is missing.");
-        throw new Error("ProjectID is missing.");
+        // For functions that are expected to throw for client's withFailureHandler
+        throw new Error("ProjectID is missing."); 
       }
 
       // Find row index first
@@ -538,12 +550,18 @@ function deleteProject(projectId) {
       const jsonContent = readDriveFileContent(projectDataFileId);
 
       Logger.log(`getProjectDataForEditing: Successfully read content for file ID ${projectDataFileId}. Content length: ${jsonContent ? jsonContent.length : 0}`);
-      return jsonContent; // Return the string directly.
+      // Instead of returning string directly, wrap it for consistency if client is adapted
+      // For now, keeping direct return for this specific function as per initial analysis.
+      // If client expects {success, data}, this should be:
+      // return createResponse(true, { projectDataJSON: jsonContent });
+      return jsonContent;
+
 
     } catch (e) {
       Logger.log(`Error in getProjectDataForEditing for projectId ${projectId}: ${e.toString()} \nStack: ${e.stack}`);
-      // Re-throw the error (or a new one with more context)
-      // This ensures it's caught by .withFailureHandler on the client side.
+      // Re-throw for .withFailureHandler on client.
+      // If standardizing all returns, this would be:
+      // return createResponse(false, null, `Failed to get project data: ${e.message}`);
       throw new Error(`Failed to get project data for editing: ${e.message}`);
     }
   }
@@ -556,7 +574,7 @@ function deleteProject(projectId) {
 function getAudioAsBase64(driveFileId) {
   try {
     if (!driveFileId) {
-      return { success: false, error: "Drive File ID is required." };
+      return createResponse(false, null, "Drive File ID is required.");
     }
     const file = DriveApp.getFileById(driveFileId);
     const blob = file.getBlob();
@@ -565,22 +583,22 @@ function getAudioAsBase64(driveFileId) {
     // Check if it's an audio type (basic check)
     if (!mimeType || !mimeType.startsWith('audio/')) {
        Logger.log(`getAudioAsBase64: File ID ${driveFileId} is not audio (MIME: ${mimeType}).`);
-       return { success: false, error: `File is not audio (type: ${mimeType})` };
+       return createResponse(false, null, `File is not audio (type: ${mimeType})`);
     }
 
     const base64Data = Utilities.base64Encode(blob.getBytes());
     const dataURI = 'data:' + mimeType + ';base64,' + base64Data;
 
     Logger.log(`getAudioAsBase64: Successfully retrieved and encoded audio file ID: ${driveFileId}. MimeType: ${mimeType}. DataURI length: ${dataURI.length}`);
-    return { success: true, base64Data: dataURI, mimeType: mimeType };
+    return createResponse(true, { base64Data: dataURI, mimeType: mimeType });
 
   } catch (e) {
       if (e.message.toLowerCase().includes("access denied") || e.message.toLowerCase().includes("not found")) {
           Logger.log(`getAudioAsBase64: File not found or access denied for ID ${driveFileId}. Error: ${e.toString()}`);
-          return { success: false, error: "Audio file not found or access denied." };
+          return createResponse(false, null, "Audio file not found or access denied.");
       }
       Logger.log(`Error in getAudioAsBase64 for file ID ${driveFileId}: ${e.toString()} \nStack: ${e.stack}`);
-      return { success: false, error: `Failed to retrieve audio as base64: ${e.message}` };
+      return createResponse(false, null, `Failed to retrieve audio as base64: ${e.message}`);
   }
 }
 
@@ -592,17 +610,15 @@ function diagnoseFolderAccess() {
   try {
     Logger.log(`diagnoseFolderAccess: Starting diagnostic for ROOT_PROJECT_FOLDER_ID: ${ROOT_PROJECT_FOLDER_ID}`);
     
-    const result = testFolderAccess(ROOT_PROJECT_FOLDER_ID);
+    const result = testFolderAccess(ROOT_PROJECT_FOLDER_ID); // Assuming testFolderAccess also returns a {success, ...} object
     
     Logger.log(`diagnoseFolderAccess: Test result: ${JSON.stringify(result)}`);
-    return result;
+    // If testFolderAccess already returns a standardized response, just return it.
+    // Otherwise, wrap it: createResponse(result.success, result.data, result.error)
+    return result; 
     
   } catch (e) {
     Logger.log(`Error in diagnoseFolderAccess: ${e.toString()}`);
-    return {
-      success: false,
-      error: `Diagnostic function failed: ${e.message}`,
-      step: 'diagnostic wrapper'
-    };
+    return createResponse(false, { step: 'diagnostic wrapper' }, `Diagnostic function failed: ${e.message}`);
   }
 }

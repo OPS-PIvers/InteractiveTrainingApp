@@ -166,12 +166,6 @@ function safeGetCurrentTime(player) {
         videoQuestionsListContainerEl, videoQuestionsListEl; // Added question list elements
     let optionInputsEl = [], correctAnswerRadiosEl = [];
 
-    // Timestamp Overlay Elements (from AdminView.html)
-    // let manageTimestampOverlaysButtonEl, timestampOverlayModalEl, makeOverlayInteractiveCheckboxEl,
-    //     addTimestampOverlayButtonEl, timestampOverlayListEl, closeTimestampOverlayModalBtnEl,
-    //     currentOverlayTimestampInputEl; // These are removed as per plan
-
-
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
       console.log("Admin_JS: DOMContentLoaded event fired!");
@@ -3382,7 +3376,6 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         const seconds = totalSeconds % 60;
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
-    // Removed handleAddTimestampOverlay, populateTimestampOverlayList, editTimestampOverlayTimes, and editTimestampOverlay functions
 
 function stopAndDestroyAdminYouTubePlayer() {
     try {

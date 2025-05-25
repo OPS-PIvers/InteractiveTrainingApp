@@ -13,8 +13,8 @@ function getActiveProjectsList() {
     const allProjectsData = getAllSheetData(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME);
 
     if (!allProjectsData || !Array.isArray(allProjectsData)) {
-      Logger.log("getActiveProjectsList: No data or invalid data returned from getAllSheetData.");
-      return [];
+      Logger.log("getActiveProjectsList: No data or invalid data returned from getAllSheetData. Returning empty list.");
+      return { success: true, data: { projects: [] } };
     }
 
     const activeProjects = [];
@@ -36,11 +36,11 @@ function getActiveProjectsList() {
     });
 
     Logger.log(`getActiveProjectsList: Found ${activeProjects.length} active projects from ${allProjectsData.length} total projects processed.`);
-    return activeProjects;
+    return { success: true, data: { projects: activeProjects } };
 
   } catch (e) {
     Logger.log(`Error in getActiveProjectsList: ${e.toString()} \nStack: ${e.stack ? e.stack : 'No stack available'}`);
-    return [];
+    return { success: false, error: e.message };
   }
 }
 

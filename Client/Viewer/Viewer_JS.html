@@ -2421,4 +2421,51 @@ let audioEventHandlers = {
     // updateCanvasInteractivity was renamed to updateViewerCanvasInteractivity, the placeholder below can be removed.
     // function updateCanvasInteractivity() { ... } // This is now updateViewerCanvasInteractivity
 
+    // --- Timeline Reset Function ---
+    function resetTimeline() {
+        // console.log("Resetting timeline..."); // Removed for reduced noise
+        if (viewerApp && viewerApp.state) {
+            viewerApp.state.currentVideoDuration = 0;
+            // console.log("Timeline: currentVideoDuration reset to 0."); // Commented out
+        } else {
+            console.warn("Timeline: viewerApp.state not available to reset currentVideoDuration.");
+        }
+
+        if (viewerVideoTimelineContainerEl) {
+            viewerVideoTimelineContainerEl.style.display = 'none';
+            // console.log("Timeline: viewerVideoTimelineContainerEl hidden."); // Commented out
+        } else {
+            console.warn("Timeline: viewerVideoTimelineContainerEl not found.");
+        }
+
+        if (viewerTimelineProgressEl) {
+            viewerTimelineProgressEl.style.width = '0%';
+            // console.log("Timeline: viewerTimelineProgressEl width reset to 0%."); // Commented out
+        } else {
+            console.warn("Timeline: viewerTimelineProgressEl not found.");
+        }
+
+        if (viewerCurrentTimeEl) {
+            viewerCurrentTimeEl.textContent = formatTime(0);
+            // console.log("Timeline: viewerCurrentTimeEl reset."); // Commented out
+        } else {
+            console.warn("Timeline: viewerCurrentTimeEl not found.");
+        }
+
+        if (viewerTotalDurationEl) {
+            viewerTotalDurationEl.textContent = formatTime(0);
+            // console.log("Timeline: viewerTotalDurationEl reset."); // Commented out
+        } else {
+            console.warn("Timeline: viewerTotalDurationEl not found.");
+        }
+
+        if (viewerTimelineTrackEl) {
+            const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.timeline-marker');
+            existingMarkers.forEach(marker => marker.remove());
+            // console.log("Timeline: Cleared timeline markers from viewerTimelineTrackEl."); // Commented out
+        } else {
+            console.warn("Timeline: viewerTimelineTrackEl not found.");
+        }
+        // console.log("Timeline reset complete."); // Removed for reduced noise
+    }
   </script>

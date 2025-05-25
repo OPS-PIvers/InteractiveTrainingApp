@@ -1504,8 +1504,33 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
     }
 
     function showViewerModal(htmlContent) {
-        if (viewerModalBodyEl) viewerModalBodyEl.innerHTML = htmlContent;
-        if (viewerModalEl) viewerModalEl.style.display = 'flex';
+        if (viewerModalBodyEl) {
+            // Clear previous content
+            viewerModalBodyEl.innerHTML = ''; 
+            try {
+                if (typeof DOMParser === 'function') {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlContent, 'text/html');
+                    // Append the parsed and sanitized content.
+                    // doc.body will contain the parsed HTML. We append its children.
+                    Array.from(doc.body.childNodes).forEach(node => {
+                        viewerModalBodyEl.appendChild(node.cloneNode(true)); // Use cloneNode to be safe
+                    });
+                } else {
+                    // Fallback for older environments or if DOMParser is unavailable,
+                    // though this is unlikely in modern browsers where Apps Script client-side runs.
+                    // This fallback still uses innerHTML but it's a conscious fallback.
+                    console.warn("DOMParser not available. Using innerHTML with caution for modal content.");
+                    viewerModalBodyEl.innerHTML = htmlContent;
+                }
+            } catch (e) {
+                console.error("Error parsing or appending modal content:", e);
+                viewerModalBodyEl.textContent = 'Error displaying content.';
+            }
+        }
+        if (viewerModalEl) {
+            viewerModalEl.style.display = 'flex';
+        }
     }
 
     function hideViewerModal() {
@@ -1721,6 +1746,18 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
     // New function for Phase 1 to render question markers on the timeline - REPLACED by renderTimelineMarkers
     // function renderQuestionMarkers() { ... } // Removed
 
+    // Helper function to get color based on template name
+    function getTemplateColor(templateName) {
+        switch (templateName) {
+            case 'hotspot':
+                return '#ff5722';
+            case 'quizBubble':
+                return '#673ab7';
+            default:
+                return '#4CAF50'; // Default color
+        }
+    }
+
     function renderTimelineMarkers() {
         if (!viewerApp.state.currentVideoDuration || viewerApp.state.currentVideoDuration <= 0) {
             console.warn("Invalid video duration for timeline markers");
@@ -1762,19 +1799,7 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
             viewerApp.state.videoOverlays.forEach(overlay => { // This correctly uses the consolidated state variable
                 const startMarker = document.createElement('div');
                 startMarker.className = 'timeline-marker overlay-marker';
-                // The issue mentions getTemplateColor(overlay.template)
-                // If getTemplateColor doesn't exist, use a default or a placeholder.
-                // For now, let's use a fixed color if getTemplateColor is not found.
-                let markerColor = '#4CAF50'; // Default green for overlay markers
-                if (typeof getTemplateColor === 'function') {
-                    markerColor = getTemplateColor(overlay.template);
-                } else {
-                    // Fallback for specific templates if getTemplateColor is missing
-                    const templateColors = { hotspot: '#ff5722', quizBubble: '#673ab7' };
-                    if (templateColors[overlay.template]) {
-                        markerColor = templateColors[overlay.template];
-                    }
-                }
+                let markerColor = getTemplateColor(overlay.template);
                 startMarker.style.backgroundColor = markerColor; 
                 
                 const startPercent = Math.max(0, Math.min(100,
@@ -1820,182 +1845,6 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
     }
 
     // Definition of checkVideoTimeForTimestampOverlays is removed / replaced by checkVideoTimeForVideoOverlays
-
-    function createFabricObjectFromOverlayDefinition(overlayDef) {
-    console.log("Creating Fabric object for overlay definition:", overlayDef);
-    let fabricObject;
-
-    const baseProps = {
-        left: (overlayDef.position.x / 100) * viewerApp.state.viewerFabricCanvas.width,
-        top: (overlayDef.position.y / 100) * viewerApp.state.viewerFabricCanvas.height,
-        originX: 'center', // Default origin to center for easier positioning
-        originY: 'center',
-        selectable: false,
-        evented: !!(overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none'),
-        hoverCursor: (overlayDef.interaction && overlayDef.interaction.action && overlayDef.interaction.action !== 'none') ? 'pointer' : 'default',
-        videoOverlayId: overlayDef.id, // Store the original overlay ID
-        // Custom properties for easier identification or interaction handling
-        customType: 'videoTimestampOverlay', 
-        overlayDefinition: overlayDef // Store the full definition if needed later
-    };
-
-    // Template-specific creation logic
-    switch (overlayDef.template) {
-        case 'lowerThird':
-            fabricObject = new fabric.Textbox(overlayDef.content.text || 'Lower Third', {
-                ...baseProps,
-                width: viewerApp.state.viewerFabricCanvas.width * 0.4, // 40% of canvas width
-                fontSize: Math.max(16, viewerApp.state.viewerFabricCanvas.width / 40), // Responsive font size
-                fill: overlayDef.content.textColor || 'white',
-                backgroundColor: overlayDef.content.backgroundColor || 'rgba(0,0,0,0.7)',
-                padding: 10,
-                textAlign: 'center'
-            });
-            // Adjust position for lower third (typically bottom of screen)
-            fabricObject.set({ 
-                top: viewerApp.state.viewerFabricCanvas.height * 0.85, // Example: 85% from top
-                originY: 'center' // Recenter after position adjustment
-            });
-            break;
-        case 'cornerCallout':
-            fabricObject = new fabric.Textbox(overlayDef.content.text || 'Callout', {
-                ...baseProps,
-                width: viewerApp.state.viewerFabricCanvas.width * 0.25, // 25% of canvas width
-                fontSize: Math.max(14, viewerApp.state.viewerFabricCanvas.width / 50),
-                fill: overlayDef.content.textColor || 'black',
-                backgroundColor: overlayDef.content.backgroundColor || 'rgba(255,255,255,0.85)',
-                padding: 8,
-                rx: 5, ry: 5, // Rounded corners
-                textAlign: 'left'
-            });
-            // Example: Position to top-right. User can define X/Y in definition.
-            // For true corner, X/Y in definition should be like 5%/5% (top-left) or 95%/5% (top-right)
-            // and originX/originY should be adjusted accordingly (e.g. 'left'/'top' or 'right'/'top')
-            // For simplicity here, we keep origin center and user positions with X/Y percentage.
-            break;
-        case 'centerCard':
-            fabricObject = new fabric.Textbox(overlayDef.content.text || 'Center Card', {
-                ...baseProps,
-                width: viewerApp.state.viewerFabricCanvas.width * 0.5, // 50% of canvas width
-                fontSize: Math.max(18, viewerApp.state.viewerFabricCanvas.width / 35),
-                fill: overlayDef.content.textColor || 'black',
-                backgroundColor: overlayDef.content.backgroundColor || 'rgba(255,255,255,0.9)',
-                padding: 20,
-                rx: 10, ry: 10,
-                textAlign: 'center',
-                shadow: 'rgba(0,0,0,0.3) 5px 5px 10px'
-            });
-            // Position is already centered by baseProps.left/top and originX/Y 'center'
-            break;
-        case 'hotspot':
-            // Hotspot could be a circle with an icon/text, or just a pulsing dot
-            fabricObject = new fabric.Circle({
-                ...baseProps,
-                radius: Math.min(20, viewerApp.state.viewerFabricCanvas.width / 40), // Responsive radius
-                fill: overlayDef.content.backgroundColor || 'rgba(255, 87, 34, 0.8)', // Orangey, semi-transparent
-                stroke: overlayDef.content.textColor || 'white',
-                strokeWidth: 2
-            });
-            // Consider adding a pulsing animation here if desired, or an icon
-            break;
-        case 'quizBubble':
-             // This is a more complex one, might involve multiple Fabric objects grouped,
-             // or a more detailed Textbox. For now, a simple representation.
-             fabricObject = new fabric.Textbox(overlayDef.content.text || 'Quiz Question?', {
-                ...baseProps,
-                width: viewerApp.state.viewerFabricCanvas.width * 0.6,
-                fontSize: Math.max(16, viewerApp.state.viewerFabricCanvas.width / 38),
-                fill: overlayDef.content.textColor || 'white',
-                backgroundColor: overlayDef.content.backgroundColor || 'rgba(103, 58, 183, 0.9)', // Purpleish
-                padding: 15,
-                rx: 8, ry: 8,
-                textAlign: 'center'
-            });
-            break;
-        default:
-            console.warn("Unknown overlay template:", overlayDef.template, "Creating a default rect.");
-            fabricObject = new fabric.Rect({
-                ...baseProps,
-                width: 200, height: 50,
-                fill: overlayDef.content.backgroundColor || 'rgba(150,150,150,0.7)',
-                stroke: overlayDef.content.textColor || 'black'
-            });
-            break;
-    }
-
-    // Attach interaction handlers if defined
-    if (fabricObject && overlayDef.interaction && overlayDef.interaction.action !== 'none') {
-        fabricObject.on('mousedown', function(options) {
-            // Prevent click-through to player if canvas is interactive
-            if (options.e) options.e.stopPropagation(); 
-            
-            console.log("Timestamp Overlay clicked:", this.overlayDefinition);
-            // Example: Dismiss action
-            if (this.overlayDefinition.interaction.action === 'dismiss') {
-                viewerApp.state.viewerFabricCanvas.remove(this);
-                // viewerApp.state.activeVideoOverlayIds.delete(this.videoOverlayId); // OLD system, activeVideoOverlayIds removed
-                // For Fabric-based objects, if this system was to be kept, activeOverlays might store them.
-                // However, the issue implies moving towards DOM-based overlays managed by activeOverlays (Map of ID -> DOM element).
-                // This Fabric object interaction part for video overlays seems to be legacy.
-                // If this Fabric object is a representation of a DOM overlay, its removal here is fine,
-                // but the actual DOM overlay dismissal is handled by dismissOverlay(overlayId) which uses activeOverlays (Map).
-
-                 // If this overlay paused the video, resume it
-                if (this.overlayDefinition.interaction.pauseVideo && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.playVideo === 'function') {
-                    // Check if other pausing overlays are still active (using the new activeOverlays map)
-                    let otherPausingOverlayActive = false;
-                    for (const id of viewerApp.state.activeOverlays.keys()) { // Iterate over active DOM overlays
-                        const ovDef = viewerApp.state.videoOverlays.find(o => o.id === id); // Find its definition
-                        const overlayElement = viewerApp.state.activeOverlays.get(id);
-                        // Check if the active DOM overlay (element) was the one that paused the video (dataset.pausedVideo)
-                        // and its definition indicates it should pause video.
-                        if (ovDef && ovDef.interaction.pauseVideo && overlayElement && overlayElement.dataset.pausedVideo === 'true') {
-                            otherPausingOverlayActive = true;
-                            break; 
-                        }
-                    }
-                    if (!otherPausingOverlayActive) {
-                        viewerApp.state.ytPlayer.playVideo();
-                    }
-                }
-                updateViewerCanvasInteractivity(); // Re-evaluate canvas interactivity
-                viewerApp.state.viewerFabricCanvas.requestRenderAll();
-            }
-            // Example: Navigate to slide (conceptual)
-            else if (this.overlayDefinition.interaction.action === 'navigateToSlide') {
-                if (this.overlayDefinition.interaction.actionTarget) {
-                    const targetSlideId = this.overlayDefinition.interaction.actionTarget;
-                    const targetSlideIndex = viewerApp.state.currentProjectData.slides.findIndex(s => s.slideId === targetSlideId);
-                    if (targetSlideIndex !== -1) {
-                        renderSlideForViewing(targetSlideIndex);
-                    } else {
-                        console.warn("Target slide for overlay navigation not found:", targetSlideId);
-                    }
-                }
-            }
-            // Add more interaction handlers here as needed (e.g., showModal)
-        });
-    }
-    console.log("Fabric object created:", fabricObject);
-    return fabricObject;
-}
-
-    function checkVideoTimeForVideoOverlays(currentTime) {
-        /*
-        // Entire original body commented out
-        const canvas = viewerApp.state.viewerFabricCanvas;
-        // This function (checkVideoTimeForVideoOverlays) is entirely commented out.
-        // It seems to be the old system for Fabric-based video overlays.
-        // The new system uses updateVideoOverlays() which handles DOM elements.
-        // No changes needed inside this commented block other than noting that
-        // currentVideoOverlays and activeVideoOverlayIds are now replaced by
-        // videoOverlays and activeOverlays (Map) respectively if this code were to be uncommented and adapted.
-        // For example, `viewerApp.state.currentVideoOverlays.forEach` would become `viewerApp.state.videoOverlays.forEach`.
-        // `viewerApp.state.activeVideoOverlayIds.has(overlayDef.id)` would become `viewerApp.state.activeOverlays.has(overlayDef.id)`.
-        // `viewerApp.state.activeVideoOverlayIds.add(overlayDef.id)` would become `viewerApp.state.activeOverlays.set(overlayDef.id, fabricObject)`.
-        // `viewerApp.state.activeVideoOverlayIds.delete(overlayDef.id)` would become `viewerApp.state.activeOverlays.delete(overlayDef.id)`.
-        */
-    }
     
     function updateViewerCanvasInteractivity() {
         const canvas = viewerApp.state.viewerFabricCanvas;
@@ -2068,12 +1917,6 @@ function stopAndDestroyYouTubePlayer() {
             viewerApp.state.playerQuestionCheckInterval = null;
             console.log("Cleared viewerApp.state.playerQuestionCheckInterval.");
         }
-        // Assuming overlayPreviewInterval is also a global or appropriately scoped variable
-        if (typeof overlayPreviewInterval !== 'undefined' && overlayPreviewInterval) {
-            clearInterval(overlayPreviewInterval);
-            overlayPreviewInterval = null;
-            console.log("Cleared overlayPreviewInterval.");
-        }
 
         // Stop and destroy the player robustly
         if (viewerApp && viewerApp.state && viewerApp.state.ytPlayer) {
@@ -2139,8 +1982,7 @@ function stopAndDestroyYouTubePlayer() {
         if (viewerApp && viewerApp.state) {
             if (viewerApp.state.viewerFabricCanvas) {
                 const canvas = viewerApp.state.viewerFabricCanvas;
-                    const objectsToRemove = canvas.getObjects().filter(obj => 
-                        obj.customType === 'videoTimestampOverlay' || 
+                    const objectsToRemove = canvas.getObjects().filter(obj =>  
                         obj.customType === 'clickToBeginButton' || 
                         (obj.videoOverlayId && viewerApp.state.activeOverlays && viewerApp.state.activeOverlays.has(obj.videoOverlayId))
                     );

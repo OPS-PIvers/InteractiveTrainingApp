@@ -2058,95 +2058,166 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
         displayMessageViewer(errorMsg, false);
     }
 
-    function stopAndDestroyYouTubePlayer() {
-        try {
-            if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.stopVideo === 'function') {
-                viewerApp.state.ytPlayer.stopVideo();
+function stopAndDestroyYouTubePlayer() {
+    try {
+        console.log("Stopping and destroying YouTube player...");
+
+        // Clear intervals
+        if (playerQuestionCheckInterval) { // This is a global variable, ensure it's the one intended.
+            clearInterval(playerQuestionCheckInterval);
+            playerQuestionCheckInterval = null;
+            console.log("Cleared playerQuestionCheckInterval.");
+        }
+        // Assuming overlayPreviewInterval is also a global or appropriately scoped variable
+        if (typeof overlayPreviewInterval !== 'undefined' && overlayPreviewInterval) {
+            clearInterval(overlayPreviewInterval);
+            overlayPreviewInterval = null;
+            console.log("Cleared overlayPreviewInterval.");
+        }
+
+        // Stop and destroy the player robustly
+        if (viewerApp && viewerApp.state && viewerApp.state.ytPlayer) {
+            try {
+                if (typeof viewerApp.state.ytPlayer.stopVideo === 'function') {
+                    viewerApp.state.ytPlayer.stopVideo();
+                    console.log("Called stopVideo() on YouTube player.");
+                } else {
+                    console.warn("viewerApp.state.ytPlayer.stopVideo is not a function.");
+                }
+
+                if (typeof viewerApp.state.ytPlayer.destroy === 'function') {
+                    viewerApp.state.ytPlayer.destroy();
+                    console.log("Called destroy() on YouTube player.");
+                } else {
+                    console.warn("viewerApp.state.ytPlayer.destroy is not a function.");
+                }
+            } catch (playerError) {
+                console.error("Error while stopping or destroying YouTube player:", playerError);
+            } finally {
+                viewerApp.state.ytPlayer = null;
+                console.log("Nullified viewerApp.state.ytPlayer.");
             }
-            if (viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.destroy === 'function') {
-                viewerApp.state.ytPlayer.destroy();
-            }
-        } catch (e) {
-            console.error("Error stopping/destroying YouTube player:", e);
-        } finally {
-            viewerApp.state.ytPlayer = null; // Ensure it's nulled out
-            if (youtubePlayerContainerEl) {
-                 youtubePlayerContainerEl.removeAttribute('click-listener-added');
-                 youtubePlayerContainerEl.innerHTML = ''; youtubePlayerContainerEl.style.display = 'none';
-             }
-            if (viewerApp.state.playerQuestionCheckInterval) { clearInterval(viewerApp.state.playerQuestionCheckInterval); viewerApp.state.playerQuestionCheckInterval = null;}
-            viewerApp.state.currentVideoQuestions = []; viewerApp.state.askedQuestionIndices = [];
+        } else {
+            console.log("No YouTube player instance found to stop or destroy.");
+        }
+
+        // Clean up player container element
+        const youtubePlayerContainerEl = document.getElementById("youtubePlayerContainer");
+        if (youtubePlayerContainerEl) {
+            youtubePlayerContainerEl.innerHTML = ''; // Clear the container
+            youtubePlayerContainerEl.removeAttribute('click-listener-added'); // Remove listener if added
+            youtubePlayerContainerEl.classList.remove('active'); // Assuming 'active' class controls visibility or state
+            youtubePlayerContainerEl.style.display = 'none'; // Ensure it's hidden
+            console.log("Cleaned up YouTube player container.");
+        } else {
+            console.warn("youtubePlayerContainer element not found.");
+        }
+        
+        // Clear video-related state arrays (using viewerApp.state for consistency)
+        if (viewerApp && viewerApp.state) {
+            viewerApp.state.currentVideoQuestions = []; // From original function
+            viewerApp.state.askedQuestionIndices = [];   // From original function
             
-            // Cleanup Fabric objects: Timestamp overlays and ClickToBeginButton
-            if (viewerApp.state.viewerFabricCanvas) {
-                const canvas = viewerApp.state.viewerFabricCanvas;
-                const objectsToRemove = [];
-                canvas.getObjects().forEach(obj => {
-                    // Check for old Fabric-based timestamp overlays by videoOverlayId or customType
-                    if (obj.videoOverlayId && viewerApp.state.activeOverlays.has(obj.videoOverlayId)) { 
-                        // This condition is tricky: activeOverlays now stores DOM elements.
-                        // If a Fabric object (obj) has a videoOverlayId that *also* corresponds to a DOM overlay in activeOverlays,
-                        // it means there might be a dual representation. The goal is to remove the Fabric part.
-                        // This line effectively means: if there's a Fabric object that we *used to* track with activeVideoOverlayIds, remove it.
-                        // Since activeVideoOverlayIds is gone, we are checking if its ID is in the new activeOverlays map.
-                        // This is more of a cleanup for any remaining Fabric objects from an older system.
-                        // The primary management of activeOverlays is for DOM elements.
-                        objectsToRemove.push(obj);
-                    } else if (obj.customType === 'videoTimestampOverlay') { // General cleanup for old type
-                        objectsToRemove.push(obj);
-                    }
-                    // Check for ClickToBeginButton by customType
-                    if (obj.customType === 'clickToBeginButton') {
-                        objectsToRemove.push(obj);
-                    }
-                });
-                objectsToRemove.forEach(obj => canvas.remove(obj));
-                if (objectsToRemove.length > 0) {
-                    canvas.requestRenderAll(); // Render after removing objects
+            // These were listed in the prompt but might be redundant if cleanupAllVideoOverlays handles them
+            // For safety, ensure they are cleared if they exist directly on viewerApp.state
+             if (Array.isArray(viewerApp.state.videoPlayerOverlayElements)) { // Example, adapt to actual names if different
+                viewerApp.state.videoPlayerOverlayElements = [];
+             }
+             if (Array.isArray(viewerApp.state.videoPlayerOverlayElementIds)) {
+                viewerApp.state.videoPlayerOverlayElementIds = [];
+             }
+             if (Array.isArray(viewerApp.state.videoPlayerActiveOverlayElements)) {
+                viewerApp.state.videoPlayerActiveOverlayElements = [];
+             }
+            console.log("Cleared video-related state arrays.");
+        }
+
+
+        // Clean up overlays - Assuming cleanupAllVideoOverlays is a global function
+        if (typeof cleanupAllVideoOverlays === 'function') {
+            cleanupAllVideoOverlays();
+            console.log("Called cleanupAllVideoOverlays().");
+        } else {
+            // Fallback/manual cleanup if cleanupAllVideoOverlays is not defined or to be safe
+            // This combines logic from the original function's finally block
+            console.warn("cleanupAllVideoOverlays is not a function. Performing manual overlay cleanup.");
+            if (viewerApp && viewerApp.state) {
+                if (viewerApp.state.viewerFabricCanvas) {
+                    const canvas = viewerApp.state.viewerFabricCanvas;
+                    const objectsToRemove = canvas.getObjects().filter(obj => 
+                        obj.customType === 'videoTimestampOverlay' || 
+                        obj.customType === 'clickToBeginButton' || 
+                        (obj.videoOverlayId && viewerApp.state.activeOverlays && viewerApp.state.activeOverlays.has(obj.videoOverlayId))
+                    );
+                    objectsToRemove.forEach(obj => canvas.remove(obj));
+                    if (objectsToRemove.length > 0) canvas.requestRenderAll();
+                    console.log("Manually removed Fabric overlay objects.");
+                }
+
+                if (viewerApp.state.activeOverlays && typeof viewerApp.state.activeOverlays.clear === 'function') {
+                     viewerApp.state.activeOverlays.forEach((element, id) => {
+                        if (element && element.parentNode) {
+                            element.parentNode.removeChild(element);
+                        }
+                    });
+                    viewerApp.state.activeOverlays.clear();
+                    console.log("Cleared viewerApp.state.activeOverlays (Map).");
+                }
+                 if (Array.isArray(viewerApp.state.videoOverlays)) { // From original
+                    viewerApp.state.videoOverlays = [];
+                    console.log("Cleared viewerApp.state.videoOverlays (Array).");
                 }
             }
-            // viewerApp.state.currentVideoOverlays = []; // This state is removed
-            // viewerApp.state.activeVideoOverlayIds.clear(); // This state is removed
-            
-            // New cleanup for HTML DOM overlays (this part is correct for the new system):
-            // Clear active overlays (DOM elements and map)
-            if (viewerApp.state.activeOverlays) {
-                viewerApp.state.activeOverlays.forEach((element, id) => {
-                    if (element.parentNode) {
-                        element.parentNode.removeChild(element);
-                    }
-                });
-                viewerApp.state.activeOverlays.clear();
-            }
-
-            // Clear videoOverlays array
-            if (viewerApp.state.videoOverlays) { // Ensure it exists before assigning
-                viewerApp.state.videoOverlays = [];
-            } else {
-                viewerApp.state.videoOverlays = []; // Initialize if it doesn't exist
-            }
-
-            // Clear overlay container
             const overlayContainer = document.getElementById('videoOverlayContainer');
             if (overlayContainer) {
                 overlayContainer.innerHTML = '';
+                console.log("Cleared videoOverlayContainer HTML.");
             }
-            
-            // Phase 1: Timeline cleanup
-            viewerApp.state.currentVideoDuration = 0;
+        }
+
+        // Reset timeline - Assuming resetTimeline is a global function
+        if (typeof resetTimeline === 'function') {
+            resetTimeline();
+            console.log("Called resetTimeline().");
+        } else {
+            // Fallback/manual timeline cleanup if resetTimeline is not defined
+            console.warn("resetTimeline is not a function. Performing manual timeline cleanup.");
+            if (viewerApp && viewerApp.state) viewerApp.state.currentVideoDuration = 0;
             if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'none';
             if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%';
-            if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0);
-            if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(0);
-            if (viewerTimelineTrackEl) { // Clear all timeline markers
+            if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0); // formatTime needs to be accessible
+            if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(0); // formatTime needs to be accessible
+            if (viewerTimelineTrackEl) {
                 const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.timeline-marker');
                 existingMarkers.forEach(marker => marker.remove());
+                console.log("Manually cleared timeline markers.");
             }
-
-            if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '0'; 
-            if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'none';
         }
+
+        // Reset canvas visibility
+        const viewerFabricCanvasEl = document.getElementById("viewerFabricCanvas");
+        if (viewerFabricCanvasEl) {
+            viewerFabricCanvasEl.style.visibility = 'hidden'; // As per prompt, though original used opacity
+            viewerFabricCanvasEl.style.opacity = '0'; // Original behavior
+            console.log("Set viewerFabricCanvas visibility to hidden and opacity to 0.");
+        } else {
+            console.warn("viewerFabricCanvas element not found.");
+        }
+
+        const viewerCanvasContainerEl = document.getElementById("viewerCanvasContainer");
+        if (viewerCanvasContainerEl) {
+            viewerCanvasContainerEl.style.display = 'none'; // Original behavior
+            viewerCanvasContainerEl.style.pointerEvents = 'none'; // Original behavior
+            console.log("Set viewerCanvasContainer display to none and pointerEvents to none.");
+        } else {
+            console.warn("viewerCanvasContainer element not found.");
+        }
+
+        console.log("YouTube player stopped and destroyed successfully.");
+    } catch (error) {
+        console.error("Error in stopAndDestroyYouTubePlayer:", error);
     }
+}
 
     function extractYouTubeVideoId(url) {
         if (!url) return null; let videoId = null;
@@ -2165,10 +2236,63 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
              viewerAudioPlayerEl.style.display = 'block'; viewerApp.state.currentAudioElement = viewerAudioPlayerEl;
         } catch (e) { console.error("Error setting up audio player:", e); displayMessageViewer("Error loading audio.", false); }
     }
+
+// ADD audio event handler storage:
+let audioEventHandlers = {
+  ended: null,
+  error: null,
+  loadedmetadata: null
+};
+
     function stopAndClearAudioPlayer() {
+        console.log("stopAndClearAudioPlayer: Starting audio player cleanup.");
         const audioPlayer = viewerApp.state.currentAudioElement || viewerAudioPlayerEl;
-        if (audioPlayer) { try { if (!audioPlayer.paused) audioPlayer.pause(); audioPlayer.removeAttribute('src'); audioPlayer.load(); audioPlayer.style.display = 'none'; console.log("Audio Player Stopped and Cleared."); } catch (e) { console.error("Error stopping/clearing audio player:", e); }}
-         viewerApp.state.currentAudioElement = null;
+
+        if (audioPlayer) {
+            try {
+                console.log("stopAndClearAudioPlayer: Audio player found. Removing event listeners and resetting.");
+
+                // Remove event listeners
+                if (audioEventHandlers.ended) {
+                    audioPlayer.removeEventListener('ended', audioEventHandlers.ended);
+                    console.log("stopAndClearAudioPlayer: Removed 'ended' event listener.");
+                }
+                if (audioEventHandlers.error) {
+                    audioPlayer.removeEventListener('error', audioEventHandlers.error);
+                    console.log("stopAndClearAudioPlayer: Removed 'error' event listener.");
+                }
+                if (audioEventHandlers.loadedmetadata) {
+                    audioPlayer.removeEventListener('loadedmetadata', audioEventHandlers.loadedmetadata);
+                    console.log("stopAndClearAudioPlayer: Removed 'loadedmetadata' event listener.");
+                }
+
+                // Reset handlers object
+                audioEventHandlers = {
+                    ended: null,
+                    error: null,
+                    loadedmetadata: null
+                };
+                console.log("stopAndClearAudioPlayer: Event handlers reset.");
+
+                if (!audioPlayer.paused) {
+                    audioPlayer.pause();
+                    console.log("stopAndClearAudioPlayer: Audio paused.");
+                }
+                
+                audioPlayer.removeAttribute('src'); // Clear the source
+                audioPlayer.load(); // Reset the audio element
+                audioPlayer.style.display = 'none'; // Hide the player
+                
+                console.log("stopAndClearAudioPlayer: Audio player stopped, cleared, and hidden.");
+            } catch (e) {
+                console.error("stopAndClearAudioPlayer: Error during audio player cleanup:", e);
+            }
+        } else {
+            console.log("stopAndClearAudioPlayer: No active audio player instance to clear.");
+        }
+        
+        viewerApp.state.currentAudioElement = null; // Nullify the reference in app state
+        console.log("stopAndClearAudioPlayer: Cleanup complete. currentAudioElement is null.");
     }
     function applySpotlightEffect(targetObject) { /* SVG version preferred, this might be removed */ }
     function removeSpotlightEffect() { /* SVG version preferred, this might be removed */ }

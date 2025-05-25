@@ -32,6 +32,22 @@
       overlayPreviewInterval: null
     };
 
+// ADD interval tracking:
+adminApp.intervals = {
+  playerUpdate: null,
+  overlayPreview: null,
+  autoSave: null // If you add autosave later
+};
+
+// Helper to safely clear interval
+adminApp.clearInterval = function(intervalName) {
+  if (adminApp.intervals[intervalName]) {
+    clearInterval(adminApp.intervals[intervalName]);
+    adminApp.intervals[intervalName] = null;
+    console.log(`Cleared interval: ${intervalName}`);
+  }
+};
+
 // ADD after adminApp.state definition:
 adminApp.eventListeners = new WeakMap(); // Track event listeners for cleanup
 adminApp.activeListeners = []; // Array of {element, event, handler} for global listeners
@@ -457,12 +473,62 @@ function cleanupAllEventListeners() {
   }
   
   // 6. Clear all intervals
-  if (adminApp.state.playerUpdateInterval) {
-    clearInterval(adminApp.state.playerUpdateInterval);
-    adminApp.state.playerUpdateInterval = null;
-  }
+  adminApp.clearInterval('playerUpdate');
+  adminApp.clearInterval('overlayPreview'); // Ensure all potential intervals are cleared here
   
   console.log("Event listener cleanup completed");
+}
+
+// --- Canvas Disposal ---
+function safeDisposeCanvas() {
+    console.log("safeDisposeCanvas: Attempting to dispose Fabric canvas.");
+    const canvas = adminApp.state.fabricCanvasInstance;
+
+    if (canvas) {
+        try {
+            console.log("safeDisposeCanvas: Canvas instance found. Proceeding with disposal.");
+
+            // 1. Stop animations (more robustly)
+            canvas.forEachObject(obj => {
+                if (obj && typeof obj.stopAnim === 'function') { // Check for a potential custom stopAnim method
+                    obj.stopAnim();
+                }
+                // Attempt to cancel Fabric's internal animation handler if it exists
+                if (obj && obj._animateHandler) {
+                    fabric.util.cancelAnimFrame(obj._animateHandler);
+                    obj._animateHandler = null;
+                     console.log("safeDisposeCanvas: Stopped animation frame for object:", obj);
+                }
+                 // Force stop any ongoing fabric.util.animate calls related to this object
+                if (obj && obj.activeOn === 'animation') { // A common flag, or use a custom one if set
+                    obj.animate('left', obj.left, { duration: 1, abort: () => true }); // Abort immediately
+                }
+            });
+            console.log("safeDisposeCanvas: Attempted to stop all object animations.");
+
+            // 2. Clear objects
+            canvas.clear();
+            console.log("safeDisposeCanvas: Canvas cleared of objects.");
+
+            // 3. Remove event listeners (Fabric specific)
+            canvas.off(); // Removes all event listeners from the canvas instance
+            console.log("safeDisposeCanvas: Removed all Fabric event listeners from canvas.");
+            
+            // 4. Dispose canvas
+            canvas.dispose();
+            console.log("safeDisposeCanvas: Fabric canvas disposed successfully.");
+
+        } catch (e) {
+            console.error("safeDisposeCanvas: Error during canvas disposal:", e);
+            displayMessage("Error disposing canvas: " + e.message, false);
+        } finally {
+            // 5. Nullify reference
+            adminApp.state.fabricCanvasInstance = null;
+            console.log("safeDisposeCanvas: fabricCanvasInstance nullified.");
+        }
+    } else {
+        console.log("safeDisposeCanvas: No active Fabric canvas instance to dispose.");
+    }
 }
 
     // --- UI View Management ---
@@ -487,11 +553,8 @@ function cleanupAllEventListeners() {
       adminApp.state.projectData = null;
       adminApp.state.currentSlideIndex = -1;
 
-      if (adminApp.state.fabricCanvasInstance) {
-          adminApp.state.fabricCanvasInstance.dispose();
-          adminApp.state.fabricCanvasInstance = null;
-          console.log("Admin_JS: Disposed fabric canvas instance.");
-      }
+      safeDisposeCanvas(); // Use the new safe disposal function
+
       safeDOMUpdate(listViewContainerEl, el => el.style.display = 'block', "Failed to show list view container");
       safeDOMUpdate(editViewContainerEl, el => el.style.display = 'none', "Failed to hide edit view container");
       safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area in switchToListView");
@@ -515,10 +578,8 @@ function cleanupAllEventListeners() {
           "Failed to update editing project title on view switch"
         );
 
-        if (adminApp.state.fabricCanvasInstance) {
-            adminApp.state.fabricCanvasInstance.dispose();
-            adminApp.state.fabricCanvasInstance = null;
-        }
+        safeDisposeCanvas(); // Use the new safe disposal function before initializing a new one
+
         safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area for edit view");
         safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '', "Failed to clear slide thumbnails for edit view"); 
 
@@ -799,6 +860,10 @@ function cleanupAllEventListeners() {
               if (slide.slideMedia && !Array.isArray(slide.slideMedia.videoOverlays)) {
                   slide.slideMedia.videoOverlays = [];
               }
+        // Ensure youtubeOptions exists for YouTube slides
+        if (slideData.slideMedia && slideData.slideMedia.type === 'youtube' && typeof slideData.slideMedia.youtubeOptions === 'undefined') {
+            slideData.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default
+        }
               if (!slide.fabricCanvasJSON || !slide.fabricCanvasJSON.objects) {
               } else {
                 slide.fabricCanvasJSON.objects.forEach(obj => {
@@ -2133,16 +2198,11 @@ function toggleOverlayPreview() {
 
     if (adminApp.state.previewingOverlays) {
         renderVideoOverlaysAdmin();
-        if (adminApp.state.overlayPreviewInterval) { 
-            clearInterval(adminApp.state.overlayPreviewInterval);
-        }
-        adminApp.state.overlayPreviewInterval = setInterval(updateOverlayPreview, 100);
+        adminApp.clearInterval('overlayPreview'); // Clear previous before setting new
+        adminApp.intervals.overlayPreview = setInterval(updateOverlayPreview, 100);
         safeDOMUpdate(previewButton, el => el.textContent = 'Stop Preview', "Failed to update preview button text to Stop in toggleOverlayPreview");
     } else {
-        if (adminApp.state.overlayPreviewInterval) {
-            clearInterval(adminApp.state.overlayPreviewInterval);
-            adminApp.state.overlayPreviewInterval = null;
-        }
+        adminApp.clearInterval('overlayPreview');
         clearVideoOverlaysAdmin();
         safeDOMUpdate(previewButton, el => el.textContent = 'Preview Overlays', "Failed to update preview button text to Preview in toggleOverlayPreview");
     }
@@ -2369,10 +2429,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     }, "Failed to clear video overlays from admin player container in clearVideoOverlaysAdmin");
     
     if (stopPreviewLogicAndButtonUpdate) {
-        if (adminApp.state.overlayPreviewInterval) {
-            clearInterval(adminApp.state.overlayPreviewInterval);
-            adminApp.state.overlayPreviewInterval = null;
-        }
+        adminApp.clearInterval('overlayPreview');
         adminApp.state.previewingOverlays = false; 
         const previewButton = document.getElementById('previewOverlaysBtn');
         safeDOMUpdate(previewButton, btnEl => btnEl.textContent = 'Preview Overlays', "Failed to reset preview button text in clearVideoOverlaysAdmin");
@@ -3330,10 +3387,8 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
 function stopAndDestroyAdminYouTubePlayer() {
     try {
         // Clear any running intervals
-        if (adminApp.state.playerUpdateInterval) {
-            clearInterval(adminApp.state.playerUpdateInterval);
-            adminApp.state.playerUpdateInterval = null;
-        }
+        adminApp.clearInterval('playerUpdate');
+        adminApp.clearInterval('overlayPreview'); // Also clear overlay preview if player is destroyed
         
         // Stop and destroy player
         if (adminApp.state.adminYouTubePlayer) {

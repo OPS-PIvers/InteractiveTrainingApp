@@ -1504,30 +1504,108 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
     }
 
     function showViewerModal(htmlContent) {
+        // Define a list of safe attributes. Others will be removed.
+        // Added 'width', 'height' for images/iframes, 'frameborder', 'allowfullscreen', 'allow' for iframes.
+        const SAFE_ATTRIBUTES = ['id', 'class', 'alt', 'title', 'src', 'href', 'target', 'rel', 
+                                 'colspan', 'rowspan', 'scope', 'summary', 
+                                 'aria-label', 'aria-labelledby', 'aria-describedby', 'role',
+                                 'width', 'height', 'frameborder', 'allowfullscreen', 'allow'];
+
+        function sanitizeNodeRecursive(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                // For text nodes, just clone them.
+                return node.cloneNode(true);
+            }
+
+            if (node.nodeType !== Node.ELEMENT_NODE) {
+                // We are only interested in element nodes and text nodes.
+                // Other types (like comments, processing instructions) will be ignored/removed.
+                return null;
+            }
+
+            // Create a new element of the same type.
+            const newElement = document.createElement(node.tagName);
+
+            // Copy attributes if they are safe.
+            for (const attr of Array.from(node.attributes)) {
+                const attrName = attr.name.toLowerCase();
+
+                // 1. Remove on* event handlers
+                if (attrName.startsWith('on')) {
+                    continue;
+                }
+
+                // 2. Remove style attributes
+                if (attrName === 'style') {
+                    continue;
+                }
+
+                // 3. Check against the allowlist
+                if (SAFE_ATTRIBUTES.includes(attrName)) {
+                    let value = attr.value;
+
+                    // 3a. Sanitize href and src attributes for javascript:
+                    if (attrName === 'href' || attrName === 'src') {
+                        if (value.trim().toLowerCase().startsWith('javascript:')) {
+                            continue; // Remove javascript: URLs
+                        }
+                    }
+                    
+                    // 3b. For <a> tags with target="_blank", add/ensure rel="noopener noreferrer"
+                    if (newElement.tagName.toLowerCase() === 'a' && attrName === 'href') {
+                        const targetAttr = node.getAttribute('target'); // Check original node's target
+                        if (targetAttr && targetAttr.toLowerCase() === '_blank') {
+                            let currentRel = newElement.getAttribute('rel') || '';
+                            const relValues = new Set(currentRel.toLowerCase().split(' ').filter(Boolean));
+                            
+                            if (!relValues.has('noopener')) {
+                                relValues.add('noopener');
+                            }
+                            if (!relValues.has('noreferrer')) {
+                                relValues.add('noreferrer');
+                            }
+                            newElement.setAttribute('rel', Array.from(relValues).join(' '));
+                        }
+                    }
+                    newElement.setAttribute(attr.name, value);
+                }
+            }
+
+            // Recursively sanitize and append child nodes.
+            for (const child of Array.from(node.childNodes)) {
+                const sanitizedChild = sanitizeNodeRecursive(child);
+                if (sanitizedChild) {
+                    newElement.appendChild(sanitizedChild);
+                }
+            }
+            return newElement;
+        }
+
         if (viewerModalBodyEl) {
-            // Clear previous content
-            viewerModalBodyEl.innerHTML = ''; 
-            try {
-                if (typeof DOMParser === 'function') {
+            viewerModalBodyEl.innerHTML = ''; // Clear previous content
+
+            if (typeof DOMParser === 'function') {
+                try {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(htmlContent, 'text/html');
-                    // Append the parsed and sanitized content.
-                    // doc.body will contain the parsed HTML. We append its children.
-                    Array.from(doc.body.childNodes).forEach(node => {
-                        viewerModalBodyEl.appendChild(node.cloneNode(true)); // Use cloneNode to be safe
+                    
+                    Array.from(doc.body.childNodes).forEach(originalNode => {
+                        const sanitizedNode = sanitizeNodeRecursive(originalNode);
+                        if (sanitizedNode) {
+                            viewerModalBodyEl.appendChild(sanitizedNode);
+                        }
                     });
-                } else {
-                    // Fallback for older environments or if DOMParser is unavailable,
-                    // though this is unlikely in modern browsers where Apps Script client-side runs.
-                    // This fallback still uses innerHTML but it's a conscious fallback.
-                    console.warn("DOMParser not available. Using innerHTML with caution for modal content.");
-                    viewerModalBodyEl.innerHTML = htmlContent;
+                } catch (e) {
+                    console.error("Error parsing or sanitizing modal content:", e);
+                    viewerModalBodyEl.textContent = 'Error: Could not display content due to parsing error.';
                 }
-            } catch (e) {
-                console.error("Error parsing or appending modal content:", e);
-                viewerModalBodyEl.textContent = 'Error displaying content.';
+            } else {
+                // Fail secure: If DOMParser is not available, do not proceed with potentially unsafe content.
+                console.error("DOMParser not available. Cannot securely display modal content.");
+                viewerModalBodyEl.textContent = 'Error: Content cannot be displayed securely.';
             }
         }
+
         if (viewerModalEl) {
             viewerModalEl.style.display = 'flex';
         }

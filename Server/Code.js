@@ -56,7 +56,7 @@ function isAdminUser() {
     return ADMIN_EMAILS.indexOf(currentUserEmail) !== -1;
   } catch (e) {
     // If Session.getActiveUser().getEmail() fails (e.g. script run by anonymous user or in a context without user session)
-    console.error("Error getting active user email: " + e.toString());
+    Logger.log(`Error getting active user email: ${e.toString()}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     return false;
   }
 }

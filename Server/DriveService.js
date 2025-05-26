@@ -78,7 +78,7 @@ function testFolderAccess(folderId) {
     };
     
   } catch (e) {
-    Logger.log(`Error in testFolderAccess: ${e.toString()}`);
+    Logger.log(`Error in testFolderAccess: ${e.toString()}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     return {
       success: false,
       error: `Diagnostic test failed: ${e.message}`,
@@ -267,7 +267,7 @@ function readDriveFileContent(fileId) {
     return content;
     
   } catch (e) {
-    Logger.log(`Error in readDriveFileContent: ${e.toString()} - FileID: ${fileId}`);
+    Logger.log(`Error in readDriveFileContent: ${e.toString()} - FileID: ${fileId}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     
     if (e.toString().includes('not found') || e.toString().includes('does not exist')) {
       throw new Error(`File not found: ${fileId}`);
@@ -297,7 +297,7 @@ function createFileInDriveFromBlob(blob, fileName, folderId) {
     return file;
     
   } catch (e) {
-    Logger.log(`Error in createFileInDriveFromBlob: ${e.toString()} - FileName: ${fileName}, FolderID: ${folderId}`);
+    Logger.log(`Error in createFileInDriveFromBlob: ${e.toString()} - FileName: ${fileName}, FolderID: ${folderId}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     
     if (e.toString().includes('not found') || e.toString().includes('does not exist')) {
       throw new Error(`Folder not found: ${folderId}`);
@@ -342,7 +342,7 @@ function deleteDriveFolderRecursive(folderId) {
     Logger.log(`Trashed folder: ${folderName} (ID: ${folder.getId()})`);
     
   } catch (e) {
-    Logger.log(`Error in deleteDriveFolderRecursive: ${e.toString()} - FolderID: ${folderId}`);
+    Logger.log(`Error in deleteDriveFolderRecursive: ${e.toString()} - FolderID: ${folderId}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     
     // If folder not found, it might have been already deleted or ID is wrong.
     if (e.message.toLowerCase().includes("not found") || e.message.toLowerCase().includes("no item with id")) {

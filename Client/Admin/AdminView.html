@@ -1317,26 +1317,6 @@
             <ul id="videoQuestionsList" style="list-style: none; padding: 0;"></ul>
         </div>
         
-        <div id="timestampOverlayModal" class="toolbar-popover">
-            <h3>Manage Timestamp Overlays</h3>
-            <p style="font-size:0.9em; color: var(--theme-text-color-secondary); margin-bottom:10px;">Select an object on the main canvas, then click "Add Overlay" to use it at the current video time.</p>
-            <div>
-                <label for="makeOverlayInteractiveCheckbox" class="checkbox-label" style="font-weight:normal;">
-                    <input type="checkbox" id="makeOverlayInteractiveCheckbox"> Make this overlay interactive?
-                </label>
-            </div>
-            <!-- Input for Hide Time - For future more detailed editing, for now JS uses a default or prompt -->
-            <!-- <label for="currentOverlayTimestampInput" style="display:block; margin-top:5px;">Hide At (secs, optional):</label>
-            <input type="number" id="currentOverlayTimestampInput" class="toolbar-input-compact" style="width:70px;" step="0.1" min="0"> -->
-
-            <button id="addTimestampOverlayButton" style="margin-top: 10px; margin-bottom:15px;">Add Overlay from Selected Object</button>
-            
-            <h4>Existing Overlays for this Slide:</h4>
-            <ul id="timestampOverlayList">
-                <!-- Dynamically populated by JS: e.g., <li>[0:15 to 0:20] Text: "Hello" (Interactive) <button>Edit</button> <button>Delete</button></li> -->
-            </ul>
-            <button id="closeTimestampOverlayModalBtn" class="danger-button" style="margin-top:15px; float:right;" onclick="document.getElementById('timestampOverlayModal').style.display='none';">Close</button>
-        </div>
 
 
         <div id="slideManagementPanel">

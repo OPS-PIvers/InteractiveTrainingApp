@@ -55,7 +55,8 @@
 adminApp.intervals = {
   playerUpdate: null,
   overlayPreview: null,
-  autoSave: null // If you add autosave later
+  autoSave: null, // If you add autosave later
+  playerQuestionCheckInterval: null
 };
 
 // Helper to safely clear interval
@@ -451,6 +452,12 @@ function safeGetCurrentTime(player) {
 // ADD new comprehensive cleanup function:
 function cleanupAllEventListeners() {
   console.log("Starting comprehensive event listener cleanup");
+
+  // Clear named intervals
+  const intervalsToClear = ['playerUpdate', 'overlayPreview', 'autoSave', 'playerQuestionCheckInterval'];
+  intervalsToClear.forEach(intervalName => {
+      adminApp.clearInterval(intervalName); // adminApp.clearInterval handles logging and nulling
+  });
   
   // 1. Remove paste listener
   if (adminApp.state.isPasteListenerActive) {
@@ -485,11 +492,7 @@ function cleanupAllEventListeners() {
     adminApp.state.fabricCanvasInstance.off(); // Remove all Fabric listeners
   }
   
-  // 6. Clear all intervals
-  adminApp.clearInterval('playerUpdate');
-  adminApp.clearInterval('overlayPreview'); // Ensure all potential intervals are cleared here
-  
-  console.log("Event listener cleanup completed");
+  console.log("Comprehensive event listener cleanup completed");
 }
 
 // --- Canvas Disposal ---
@@ -3421,11 +3424,149 @@ function generateClientUuid() {
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
 
+function setupAdminYouTubePlayer(videoId) {
+    console.log('Setting up Admin YouTube player for video ID:', videoId);
+    if (!adminYouTubePlayerContainerEl) {
+        console.error('Admin YouTube player container not found.');
+        displayMessage('Player container missing. Cannot load video.', false);
+        return;
+    }
+    if (!validateYouTubeEnvironment()) {
+        console.warn('YouTube environment not ready, deferring player setup for videoId:', videoId);
+        adminApp.state.deferredYouTubeSetup = { videoId, retryCount: (adminApp.state.deferredYouTubeSetup?.retryCount || 0) +1 };
+        // Try to re-init API if it was supposed to be ready
+        if (!adminApp.state.isYouTubeApiReady && typeof onYouTubeIframeAPIReady !== 'function') {
+             console.error("onYouTubeIframeAPIReady is not defined. Cannot retry API init.");
+        } else if (!adminApp.state.isYouTubeApiReady) {
+            onYouTubeIframeAPIReady(); // Attempt to re-initialize
+        }
+        return;
+    }
+
+    // Clear existing player and intervals if any
+    if (adminApp.state.adminYouTubePlayer) {
+        stopAndDestroyAdminYouTubePlayer(); 
+    }
+    // Also ensure intervals are cleared here, as stopAndDestroy might not be called if player object doesn't exist yet
+    adminApp.clearInterval('playerUpdate');
+    adminApp.clearInterval('playerQuestionCheckInterval');
+
+
+    adminApp.state.adminYouTubePlayer = new YT.Player('adminYouTubePlayerContainer', {
+        height: '390',
+        width: '640',
+        videoId: videoId,
+        playerVars: {
+            'playsinline': 1,
+            'controls': 1, 
+            'showinfo': 0,
+            'rel': 0 
+        },
+        events: {
+            'onReady': function(event) {
+                console.log("Admin Player Ready. Video ID:", videoId);
+                adminApp.state.adminYouTubePlayer.playVideo(); // Autoplay
+            },
+            'onStateChange': function(event) {
+                // If an interval is already running, clear it
+                adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
+
+                if (event.data === YT.PlayerState.PLAYING) {
+                    console.log("Admin Player PLAYING: Setting up question check interval.");
+                    adminApp.intervals.playerQuestionCheckInterval = setInterval(checkVideoQuestions, 500); 
+                    adminApp.intervals.playerUpdate = setInterval(updateVideoTimeline, 1000);
+                } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+                    console.log("Admin Player PAUSED or ENDED: Clearing question check and player update intervals.");
+                    adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
+                    adminApp.clearInterval('playerUpdate');
+                }
+            },
+            'onError': function(event) {
+                console.error("Admin YouTube Player Error:", event.data);
+                displayMessage("Error with YouTube player: " + event.data, false);
+                updateVideoToolsVisibility(false); // Hide tools on error
+                // Clear intervals on error too
+                adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
+                adminApp.clearInterval('playerUpdate');
+            }
+        }
+    });
+    updateVideoToolsVisibility(true);
+    renderVideoQuestionsList();
+    renderOverlayTimeline(); // Render overlay timeline when player is ready
+}
+
+function checkVideoQuestions() {
+    if (!adminApp.state.adminYouTubePlayer || typeof adminApp.state.adminYouTubePlayer.getCurrentTime !== 'function' || typeof adminApp.state.adminYouTubePlayer.getPlayerState !== 'function') {
+        return;
+    }
+    if (adminApp.state.adminYouTubePlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+        return; 
+    }
+
+    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+    const currentSlide = getCurrentSlide();
+
+    if (!currentSlide || !currentSlide.slideMedia || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
+        return;
+    }
+
+    currentSlide.slideMedia.videoQuestions.forEach((question, index) => {
+        if (!question.triggered && currentTime >= question.timestamp && currentTime < question.timestamp + 1) { // Check within a 1s window
+            console.log(`Triggering question ${index} at ${question.timestamp} (current: ${currentTime})`);
+            adminApp.state.adminYouTubePlayer.pauseVideo();
+            
+            // Mark as triggered to avoid re-triggering if the user scrubs back and forth
+            question.triggered = true; 
+
+            safeDOMUpdate(questionTimestampDisplayEl, el => {
+                el.textContent = formatTime(question.timestamp);
+                if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
+            }, "Failed to set question timestamp display in checkVideoQuestions");
+            
+            if(questionTextEl) questionTextEl.value = question.questionText;
+            optionInputsEl.forEach((input, i) => {
+                if(input) input.value = question.options[i] || '';
+            });
+            correctAnswerRadiosEl.forEach((radio, i) => {
+                if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length);
+            });
+            if(editingQuestionIndexEl) editingQuestionIndexEl.value = index; // Store index for potential re-saving
+
+            safeDOMUpdate(questionModalEl, el => el.style.display = 'block', "Failed to show question modal in checkVideoQuestions");
+
+            // Optional: Clear interval while question is shown, resume on close/save
+            // adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
+        }
+    });
+}
+
+function updateVideoTimeline() {
+    if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.getCurrentTime === 'function' && typeof adminApp.state.adminYouTubePlayer.getDuration === 'function') {
+        const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
+        const duration = adminApp.state.adminYouTubePlayer.getDuration();
+        if (videoTimelineSliderEl) {
+            videoTimelineSliderEl.max = duration;
+            videoTimelineSliderEl.value = currentTime;
+        }
+        safeDOMUpdate(videoCurrentTimeDisplayEl, el => el.textContent = formatTime(currentTime), "Failed to update current time display in updateVideoTimeline");
+        safeDOMUpdate(videoTotalDurationDisplayEl, el => el.textContent = formatTime(duration), "Failed to update total duration display in updateVideoTimeline");
+    } else {
+        // adminApp.clearInterval('playerUpdate'); // Clear if player is no longer valid
+    }
+}
+
 function stopAndDestroyAdminYouTubePlayer() {
     try {
         // Clear any running intervals
         adminApp.clearInterval('playerUpdate');
         adminApp.clearInterval('overlayPreview'); // Also clear overlay preview if player is destroyed
+        // Clear playerQuestionCheckInterval specifically if it's managed here
+        if (adminApp.intervals.playerQuestionCheckInterval) {
+            clearInterval(adminApp.intervals.playerQuestionCheckInterval);
+            adminApp.intervals.playerQuestionCheckInterval = null;
+            console.log('Cleared playerQuestionCheckInterval during YouTube player destruction.');
+        }
         
         // Stop and destroy player
         if (adminApp.state.adminYouTubePlayer) {

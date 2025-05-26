@@ -182,6 +182,57 @@ function createDriveFolder(folderName, parentFolderId) {
 }
 
 /**
+ * Retrieves an image file from Drive, converts it to a base64 data URI.
+ * @param {string} driveFileId The ID of the image file in Google Drive.
+ * @return {object} On success: { success: true, base64Data: string, mimeType: string }.
+ *                  On failure: { success: false, error: string }.
+ */
+function getImageAsBase64(driveFileId) {
+  try {
+    if (!driveFileId) {
+      Logger.log("getImageAsBase64: driveFileId is missing.");
+      return { success: false, error: "File ID is required." };
+    }
+    Logger.log("getImageAsBase64: Processing file ID: " + driveFileId);
+
+    const file = DriveApp.getFileById(driveFileId);
+    const blob = file.getBlob();
+    const mimeType = blob.getContentType();
+    
+    // Check if the file is an image
+    if (!mimeType || !mimeType.startsWith("image/")) {
+      Logger.log("getImageAsBase64: File is not an image. MIME type: " + mimeType + " for file ID: " + driveFileId);
+      return { success: false, error: "The requested file is not an image. MIME type: " + mimeType };
+    }
+    
+    const base64EncodedData = Utilities.base64Encode(blob.getBytes());
+    const dataURI = "data:" + mimeType + ";base64," + base64EncodedData;
+    
+    Logger.log("getImageAsBase64: Successfully encoded image " + driveFileId + ". Data URI length: " + dataURI.length + ". MimeType: " + mimeType);
+    return { 
+      success: true, 
+      base64Data: dataURI,
+      mimeType: mimeType 
+    };
+
+  } catch (e) {
+    Logger.log("Error in getImageAsBase64 for file ID " + driveFileId + ": " + e.toString() + " Stack: " + (e.stack ? e.stack : 'No stack trace available'));
+    
+    // More specific error checking based on common Drive API errors
+    if (e.message.toLowerCase().includes("not found") || e.message.toLowerCase().includes("no item with id")) {
+        return { success: false, error: "Image file not found. Please verify the file ID: " + driveFileId + "." };
+    } else if (e.message.toLowerCase().includes("access denied") || e.message.toLowerCase().includes("unable to identify folder") || e.message.toLowerCase().includes("does not have permission")) {
+        return { success: false, error: "Access denied. Ensure the script has permission to access the image file: " + driveFileId + "." };
+    } else if (e.message.toLowerCase().includes("limit exceeded") || e.message.toLowerCase().includes("quota")) {
+        return { success: false, error: "Google Drive API limit exceeded. Please try again later. File ID: " + driveFileId + "."};
+    }
+    
+    // Generic error for other cases
+    return { success: false, error: "Could not retrieve or process image due to an unexpected error: " + e.message };
+  }
+}
+
+/**
  * Saves or overwrites a JSON string to a file in a specified Drive folder.
  * If fileIdToOverwrite is provided and valid, it overwrites that file. Otherwise, creates a new file.
  * @param {string} fileName The name for the JSON file (e.g., "project_data.json").

@@ -157,7 +157,7 @@ function getProjectFolderIdFromSheet(projectId) {
         Logger.log(`getProjectFolderIdFromSheet: ProjectId "${projectId}" or its folder ID not found in sheet.`);
         return null;
     } catch (e) {
-        Logger.log(`Error in getProjectFolderIdFromSheet for ${projectId}: ${e.toString()}`);
+        Logger.log(`Error in getProjectFolderIdFromSheet for ${projectId}: ${e.toString()}. Stack: ${e.stack ? e.stack : 'N/A'}`);
         return null;
     }
 }
@@ -609,7 +609,7 @@ function diagnoseFolderAccess() {
     return result; 
     
   } catch (e) {
-    Logger.log(`Error in diagnoseFolderAccess: ${e.toString()}`);
+    Logger.log(`Error in diagnoseFolderAccess: ${e.toString()}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     return createResponse(false, { step: 'diagnostic wrapper' }, `Diagnostic function failed: ${e.message}`);
   }
 }

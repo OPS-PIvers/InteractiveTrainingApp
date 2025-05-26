@@ -17,7 +17,7 @@ function appendRowToSheet(sheetId, sheetName, rowData) {
     sheet.appendRow(rowData);
     Logger.log(`Row appended to ${sheetName}: ${rowData.join(', ')}`);
   } catch (e) {
-    Logger.log(`Error in appendRowToSheet: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, Data: ${rowData}`);
+    Logger.log(`Error in appendRowToSheet: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, Data: ${rowData}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     throw new Error(`Failed to append row: ${e.message}`);
   }
 }
@@ -52,7 +52,7 @@ function findRowIndexByValue(sheetId, sheetName, columnIndex, value) {
     Logger.log(`Value "${value}" not found in column ${columnIndex} in sheet ${sheetName}.`);
     return null;
   } catch (e) {
-    Logger.log(`Error in findRowIndexByValue: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, Column: ${columnIndex}, Value: ${value}`);
+    Logger.log(`Error in findRowIndexByValue: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, Column: ${columnIndex}, Value: ${value}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     throw new Error(`Failed to find row: ${e.message}`);
   }
 }
@@ -87,7 +87,7 @@ function updateSheetRow(sheetId, sheetName, rowIndex, rowData) {
     sheet.getRange(rowIndex, 1, 1, numColumns).setValues([rowData]);
     Logger.log(`Row ${rowIndex} updated in ${sheetName} with data: ${rowData.join(', ')}`);
   } catch (e) {
-    Logger.log(`Error in updateSheetRow: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, RowIndex: ${rowIndex}, Data: ${rowData}`);
+    Logger.log(`Error in updateSheetRow: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, RowIndex: ${rowIndex}, Data: ${rowData}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     throw new Error(`Failed to update row: ${e.message}`);
   }
 }
@@ -112,7 +112,7 @@ function deleteSheetRow(sheetId, sheetName, rowIndex) {
     sheet.deleteRow(rowIndex);
     Logger.log(`Row ${rowIndex} deleted from ${sheetName}.`);
   } catch (e) {
-    Logger.log(`Error in deleteSheetRow: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, RowIndex: ${rowIndex}`);
+    Logger.log(`Error in deleteSheetRow: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, RowIndex: ${rowIndex}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     throw new Error(`Failed to delete row: ${e.message}`);
   }
 }
@@ -189,7 +189,7 @@ function getSheetRowData(sheetId, sheetName, rowIndex) {
     Logger.log(`Data for row ${rowIndex} in sheet ${sheetName}: ${rowValues.join(', ')}`);
     return rowValues;
   } catch (e) {
-    Logger.log(`Error in getSheetRowData: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, RowIndex: ${rowIndex}`);
+    Logger.log(`Error in getSheetRowData: ${e.toString()} - SheetID: ${sheetId}, SheetName: ${sheetName}, RowIndex: ${rowIndex}. Stack: ${e.stack ? e.stack : 'N/A'}`);
     throw new Error(`Failed to get row data: ${e.message}`);
   }
 }

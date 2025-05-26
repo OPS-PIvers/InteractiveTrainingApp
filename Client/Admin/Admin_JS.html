@@ -231,14 +231,26 @@ function safeGetCurrentTime(player) {
         fabricCanvasEl.width = contentWidth;
         fabricCanvasEl.height = contentHeight;
         
+        // Calculate cssScaleFactor (similar to how finalZoom was calculated)
         const zoomX = containerWidth / contentWidth;
         const zoomY = containerHeight / contentHeight;
-        const finalZoom = Math.max(0.01, Math.min(zoomX, zoomY)); 
+        const cssScaleFactor = Math.max(0.01, Math.min(zoomX, zoomY)); // Ensure it's at least a tiny value
 
+        // Remove or comment out:
+        // canvas.zoomToPoint(new fabric.Point(contentWidth / 2, contentHeight / 2), finalZoom);
 
-        canvas.zoomToPoint(new fabric.Point(contentWidth / 2, contentHeight / 2), finalZoom);
+        // Add CSS scaling:
+        // Assuming flexbox handles centering, 'center center' should keep it centered.
+        // 'top left' might be an alternative if centering issues arise with flexbox.
+        fabricCanvasEl.style.transformOrigin = 'center center'; 
+        fabricCanvasEl.style.transform = 'scale(' + cssScaleFactor + ')';
         
-        console.log(`Resized canvas. Logical: ${contentWidth}x${contentHeight}. Container: ${containerWidth}x${containerHeight}. Zoom: ${finalZoom}`);
+        // No need to call canvas.setZoom() or canvas.setViewportTransform() for fitting purposes.
+        // Fabric.js will operate on its native 1:1 scale.
+        
+        canvas.renderAll(); // Re-render after changes
+            
+        console.log(`Resized canvas via CSS scale. Logical: ${contentWidth}x${contentHeight}. Container: ${containerWidth}x${containerHeight}. CSS Scale: ${cssScaleFactor}`);
     };
 
     adminApp.setupDOMReferences = function() {

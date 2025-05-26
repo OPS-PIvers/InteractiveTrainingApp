@@ -451,6 +451,19 @@ function safeGetCurrentTime(player) {
 // ADD new comprehensive cleanup function:
 function cleanupAllEventListeners() {
   console.log("Starting comprehensive event listener cleanup");
+
+  // Clear named intervals
+  const intervalsToClear = ['playerUpdate', 'overlayPreview', 'autoSave'];
+  intervalsToClear.forEach(intervalName => {
+      adminApp.clearInterval(intervalName); // adminApp.clearInterval handles logging and nulling
+  });
+
+  // Clear playerQuestionCheckInterval
+  if (adminApp.state.playerQuestionCheckInterval) {
+      clearInterval(adminApp.state.playerQuestionCheckInterval);
+      adminApp.state.playerQuestionCheckInterval = null;
+      console.log('Cleared playerQuestionCheckInterval');
+  }
   
   // 1. Remove paste listener
   if (adminApp.state.isPasteListenerActive) {
@@ -485,11 +498,7 @@ function cleanupAllEventListeners() {
     adminApp.state.fabricCanvasInstance.off(); // Remove all Fabric listeners
   }
   
-  // 6. Clear all intervals
-  adminApp.clearInterval('playerUpdate');
-  adminApp.clearInterval('overlayPreview'); // Ensure all potential intervals are cleared here
-  
-  console.log("Event listener cleanup completed");
+  console.log("Comprehensive event listener cleanup completed");
 }
 
 // --- Canvas Disposal ---

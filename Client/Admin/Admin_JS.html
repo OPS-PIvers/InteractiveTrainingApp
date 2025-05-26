@@ -1045,7 +1045,7 @@ function safeDisposeCanvas() {
         console.log("handleAddSlide called");
         if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
         saveCurrentSlideState(); 
-        const newSlideId = 'slide_' + Utilities.getUuid();
+        const newSlideId = 'slide_' + generateClientUuid();
         const newSlide = {
             slideId: newSlideId,
             canvasWidth: adminApp.state.defaultCanvasWidth,
@@ -2091,7 +2091,7 @@ function createNewOverlay() {
 
 
     return {
-        id: 'overlay_' + Utilities.getUuid(),
+        id: 'overlay_' + generateClientUuid(),
         template: 'lowerThird',
         startTime: startTime,
         duration: 5,
@@ -2330,7 +2330,7 @@ function gatherOverlayFromForm() {
     const actionValue = overlayActionEl ? overlayActionEl.value : 'none';
 
     return {
-        id: editingId || ('overlay_' + Utilities.generateUuid()),
+        id: editingId || ('overlay_' + generateClientUuid()),
         template: templateValue,
         startTime: startTime,
         duration: durationValue,
@@ -3105,10 +3105,18 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
       }
     }
 
+function generateClientUuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, 
+            v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
     // --- Utilities ---
-    var Utilities = { 
-        getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); }
-    };
+    // var Utilities = { 
+    //     getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); }
+    // };
 
     function extractYouTubeVideoId(url) {
         if (!url) return null;

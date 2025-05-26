@@ -124,12 +124,6 @@
         outline-offset: 2px;
       }
 
-      .fabric-spotlight-target-highlight {
-        /* Example: adds a subtle glow */
-        box-shadow: 0 0 15px 5px rgba(255, 255, 150, 0.9);
-        /* Fabric objects don't directly use box-shadow. You'd modify stroke instead. */
-      }
-
       #messageAreaViewer { 
         margin-top: 15px; padding: 10px; border: 1px solid transparent; 
         border-radius: 4px; min-height: 1.5em; font-size: 0.9rem;
@@ -198,7 +192,7 @@
            border: none; /* Remove iframe border */
        }
 
-      button, .button-viewer { /* General button styling for viewer */
+      button { /* General button styling for viewer */
         padding: 8px 16px; 
         cursor: pointer; 
         background-color: var(--theme-primary-color); 
@@ -212,15 +206,15 @@
         transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         box-shadow: 0 1px 2px 0 rgba(60,64,67,0.2), 0 1px 3px 1px rgba(60,64,67,0.1);
       }
-      button:hover, .button-viewer:hover {
+      button:hover {
         background-color: var(--theme-primary-hover);
         box-shadow: 0 1px 3px 0 rgba(60,64,67,0.25), 0 2px 5px 2px rgba(60,64,67,0.15);
       }
-      button:focus, .button-viewer:focus {
+      button:focus {
         outline: 2px solid var(--theme-primary-hover);
         outline-offset: 2px;
       }
-      button:disabled, .button-viewer:disabled {
+      button:disabled {
         background-color: #ccc;
         color: #666;
         cursor: not-allowed;

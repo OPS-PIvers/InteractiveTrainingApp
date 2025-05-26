@@ -4,6 +4,25 @@
 
     // --- Constants ---
     const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"];
+    const ADMIN_DEFAULT_CANVAS_WIDTH = 960;
+    const ADMIN_DEFAULT_CANVAS_HEIGHT = 540;
+    const ADMIN_MAX_HISTORY_SIZE = 20;
+    const ADMIN_MESSAGE_TIMEOUT = 7000; 
+    const ADMIN_DEBOUNCE_DELAY = 250;
+    const ADMIN_SHORT_DELAY = 100; 
+    const ADMIN_RECT_DEFAULT_FILL = 'rgba(255,0,0,0.7)';
+    const ADMIN_RECT_DEFAULT_WIDTH = 150;
+    const ADMIN_RECT_DEFAULT_HEIGHT = 100;
+    const ADMIN_CIRCLE_DEFAULT_FILL = 'rgba(0,0,255,0.7)';
+    const ADMIN_CIRCLE_DEFAULT_RADIUS = 50;
+    const ADMIN_TEXTBOX_DEFAULT_FONT_SIZE = 24;
+    const ADMIN_TEXTBOX_DEFAULT_FILL = '#000000';
+    const ADMIN_TEXTBOX_DEFAULT_WIDTH = 200;
+    const ADMIN_CANVAS_BACKGROUND_COLOR = '#e9e9e9';
+    const ADMIN_MAX_IMAGE_WIDTH_ON_UPLOAD = 960;
+    const ADMIN_NOTIFICATION_DURATION = 5000;
+    const ADMIN_PREVIEW_OVERLAY_Z_INDEX = 1050;
+    // Note: Other Z-indexes (like for modals, popovers) are primarily CSS-controlled.
 
     // --- Application State ---
     adminApp.state = {
@@ -13,8 +32,8 @@
       projectData: null,
       currentSlideIndex: -1,
       fabricCanvasInstance: null,
-      defaultCanvasWidth: 960,
-      defaultCanvasHeight: 540,
+      defaultCanvasWidth: ADMIN_DEFAULT_CANVAS_WIDTH,
+      defaultCanvasHeight: ADMIN_DEFAULT_CANVAS_HEIGHT,
       projectListCache: [], // Added to cache project list for status updates/reverts
       lastUploadedDriveId: null, // Temp store for image uploads before base64 fetch
       lastUploadedMimeType: null,
@@ -2052,7 +2071,7 @@ function createNewOverlay() {
 
 
     return {
-        id: 'overlay_' + Utilities.generateUuid(),
+        id: 'overlay_' + Utilities.getUuid(),
         template: 'lowerThird',
         startTime: startTime,
         duration: 5,
@@ -3068,10 +3087,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
 
     // --- Utilities ---
     var Utilities = { 
-        getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); },
-        generateUuid: function() { // Same implementation as getUuid or a new one if preferred
-          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); });
-        } 
+        getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); }
     };
 
     function extractYouTubeVideoId(url) {

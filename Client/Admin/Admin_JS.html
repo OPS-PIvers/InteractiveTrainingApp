@@ -92,8 +92,8 @@ function onYouTubeIframeAPIReady() {
   adminApp.state.isYouTubeApiReady = true;
   console.log('Admin YouTube API Ready.');
   
-  // Process any deferred setup
-  if (adminApp.state.deferredYouTubeSetup) {
+  // Add null check
+  if (adminApp.state.deferredYouTubeSetup && adminApp.state.deferredYouTubeSetup.videoId) {
     const { videoId, retryCount = 0 } = adminApp.state.deferredYouTubeSetup;
     setTimeout(() => {
       if (isYouTubePlayerAvailable()) {

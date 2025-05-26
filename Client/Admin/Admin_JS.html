@@ -821,40 +821,53 @@ function safeDisposeCanvas() {
           .getProjectDataForEditing(projectId);
     }
 
-    function onProjectDataLoaded(jsonString) {
-      console.log("onProjectDataLoaded: Received data:", jsonString);
+    function onProjectDataLoaded(response) { // Argument changed
+    // Note: showLoading(false) is handled within specific paths below as per original logic,
+    // or in the new error block.
 
-      if (jsonString && typeof jsonString === 'object' && jsonString.error) {
-          showLoading(false);
-          console.error(`onProjectDataLoaded: Received error object from server: ${jsonString.error}`);
-          displayMessage(`Error: Could not load project data. Server said: ${jsonString.error}`, false);
-          adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
-          adminApp.state.currentSlideIndex = -1;
-          safeDOMUpdate(editingProjectTitleEl, 
-            el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`,
-            "Failed to update editing project title on server error in onProjectDataLoaded");
-          updateSlideThumbnailsUI();
-          return;
-      }
+    if (!response || !response.success) {
+        showLoading(false); // Call showLoading(false) in this new error block.
+        onServerError(response || { error: "Failed to load project data" });
+        // Attempt to set a generic error title if project ID is known
+        if (adminApp.state.currentProjectId) {
+             adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading Project", slides: [] };
+             adminApp.state.currentSlideIndex = -1;
+             safeDOMUpdate(editingProjectTitleEl, 
+                el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`,
+                "Failed to update editing project title on server error in onProjectDataLoaded (new handler)");
+             updateSlideThumbnailsUI(); // Update UI to reflect error state
+        }
+        return;
+    }
 
-      if (jsonString === null || jsonString === undefined) {
-          showLoading(false);
-          console.error("onProjectDataLoaded: Received null or undefined data from server (Project or data file likely not found).");
-          displayMessage("Error: Could not load project data. Project or its data file may not exist or the data is empty.", false);
-          adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
-          adminApp.state.currentSlideIndex = -1;
-          safeDOMUpdate(editingProjectTitleEl, 
-            el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`,
+    const jsonString = response.data && response.data.projectDataJSON ? response.data.projectDataJSON : null;
+    console.log("onProjectDataLoaded: Received response. Processing projectDataJSON:", jsonString); // Updated console log
+
+    // The old 'if (jsonString && typeof jsonString === 'object' && jsonString.error)' check is removed
+    // as it's now covered by the '!response.success' check above.
+
+    // Existing null/undefined check for the extracted jsonString
+    if (jsonString === null || jsonString === undefined) {
+        showLoading(false); // Original showLoading(false) call for this path preserved
+        console.error("onProjectDataLoaded: Extracted null or undefined projectDataJSON from server response.");
+        displayMessage("Error: Could not load project data. Project or its data file may not exist or the data is empty.", false);
+        adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
+        adminApp.state.currentSlideIndex = -1;
+        safeDOMUpdate(editingProjectTitleEl, 
+            el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`, // Message consistent with other errors
             "Failed to update editing project title on null data in onProjectDataLoaded");
-          updateSlideThumbnailsUI();
-          return;
-      }
-      
-      try {
-          if (typeof jsonString !== 'string') {
-            throw new Error("Received data is not a JSON string or a recognized error object.");
-          }
-          const loadedData = JSON.parse(jsonString);
+        updateSlideThumbnailsUI();
+        return;
+    }
+    
+    try {
+        if (typeof jsonString !== 'string') {
+            // This specific error implies the data format is incorrect even if response.success was true.
+            // Call showLoading(false) here before throwing, as the catch block will also call it.
+            showLoading(false); 
+            throw new Error("Received project data is not a JSON string.");
+        }
+        const loadedData = JSON.parse(jsonString);
           console.log("Parsed project data:", loadedData);
 
           if (!loadedData || typeof loadedData !== 'object') throw new Error("Parsed data is not a valid object.");
@@ -1457,14 +1470,21 @@ function safeDisposeCanvas() {
         .getAllProjectsForAdmin();
        console.log("loadAdminProjectsList: google.script.run.getAllProjectsForAdmin call initiated.");
     }
-    function displayAdminProjects(projectsArray) {
-      console.log("displayAdminProjects (Success Handler) received data:", projectsArray);
-      showLoading(false);
-      
+    function displayAdminProjects(response) { // Argument changed from projectsArray to response
+    showLoading(false); // Ensure this is at the top
+
+    if (!response || !response.success) {
+        onServerError(response || { error: "Failed to load projects" });
+        return;
+    }
+    
+    const projectsArray = response.data && response.data.projects ? response.data.projects : [];
+    console.log("displayAdminProjects (Success Handler) received response. Processing projects:", projectsArray); // Keep or adapt console log
+
       safeDOMUpdate(adminProjectListContainerEl, el => {
           el.innerHTML = ''; // Clear previous projects
           if (!projectsArray || projectsArray.length === 0) { 
-              el.innerHTML = '<p>No projects found. Create one above!</p>'; // Updated message
+              el.innerHTML = '<p>No projects found. Create one above!</p>';
               return; 
           }
 

@@ -382,18 +382,27 @@ function validateYouTubeContainer(containerEl, containerName) {
         .getActiveProjectsList();
     }
 
-    function displayViewerProjects(projectsArray) {
-      showLoadingViewer(false);
-      console.log("displayViewerProjects received:", projectsArray ? projectsArray.length : 0, "projects");
-      if (!viewerProjectListContainerEl) {
-          console.error("displayViewerProjects: viewerProjectListContainerEl is not found!");
-          return;
-      }
-      viewerProjectListContainerEl.innerHTML = '';
-      if (!projectsArray || projectsArray.length === 0) {
-        viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
+function displayViewerProjects(response) { // Argument changed
+    showLoadingViewer(false); // Ensure this is at the top
+
+    if (!response || !response.success) {
+        onServerErrorViewer(response || { error: "Failed to load projects" }); // Use onServerErrorViewer
         return;
-      }
+    }
+    
+    const projectsArray = response.data && response.data.projects ? response.data.projects : [];
+    console.log("displayViewerProjects received response. Processing projects:", projectsArray ? projectsArray.length : 0, "projects"); // Adapt console log
+
+    // The existing logic for checking viewerProjectListContainerEl and processing projectsArray follows.
+    if (!viewerProjectListContainerEl) {
+        console.error("displayViewerProjects: viewerProjectListContainerEl is not found!");
+        return;
+    }
+    viewerProjectListContainerEl.innerHTML = '';
+    if (!projectsArray || projectsArray.length === 0) {
+      viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
+      return;
+    }
 
       const ul = document.createElement('ul');
       ul.className = 'project-list-viewer';

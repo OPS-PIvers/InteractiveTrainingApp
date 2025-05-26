@@ -1799,7 +1799,7 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
                         typeof viewerApp.state.ytPlayer.getPlayerState === 'function') {
                         try {
                             const state = viewerApp.state.ytPlayer.getPlayerState();
-                            if (state !== YT.PlayerState.PLAYING) { 
+                            if (state !== YT.PlayerState.PLAYING) {
                                 console.log("Calling playVideo()."); 
                                 viewerApp.state.ytPlayer.playVideo(); 
                             } else { 

@@ -44,7 +44,8 @@
       activeOverlays: new Map(), // Stores active DOM overlay elements, mapping ID to DOM element (formerly activeVideoOverlayIds)
       currentVideoDuration: 0, // Phase 1: Store current video duration for timeline
       ytPlayer: null, // Holds the YouTube player instance
-      deferredYouTubeVideoId: null // Stores videoId if player setup is deferred
+      deferredYouTubeVideoId: null, // Stores videoId if player setup is deferred
+      audioTimelineInterval: null // Stores interval ID for audio timeline tracking
     };
 
     // Add callback for when YouTube API is ready
@@ -536,49 +537,71 @@ function displayViewerProjects(response) { // Argument changed
     
     // --- New Video Overlay Helper Functions ---
 
+    function getActionButtonText(action) {
+        switch(action) {
+            case 'navigateToSlide': return 'Go to Slide';
+            case 'showModal': return 'Learn More';
+            case 'navigateToURL': return 'Visit Link';
+            default: return 'Action';
+        }
+    }
+
     // Create overlay DOM element
     function createOverlayElement(overlay) {
         const div = document.createElement('div');
-        div.className = `video-overlay overlay-${overlay.template}`;
+        // 1. Main Div Properties:
+        div.className = `timeline-overlay overlay-${overlay.template}`; // Changed className
         div.id = `overlay-${overlay.id}`;
         div.style.cssText = `
-            position: absolute;
-            left: ${overlay.position.x}%;
-            top: ${overlay.position.y}%;
-            transform: translate(-50%, -50%);
             opacity: 0;
             transition: opacity 0.3s ease-in-out;
-            pointer-events: ${overlay.interaction.action !== 'none' || overlay.interaction.dismissible ? 'auto' : 'none'};
-        `;
-        
-        // Apply template-specific styles
+            position: relative; 
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 60px;
+        `; // Updated cssText, removed pointer-events from here.
+
+        // 2. Keep applyTemplateStyles:
         applyTemplateStyles(div, overlay);
-        
-        // Add content
+
+        // 3. Content (Text Element):
         if (overlay.content.text) {
             const textEl = document.createElement('div');
             textEl.className = 'overlay-text';
             textEl.textContent = overlay.content.text;
+            textEl.style.cssText = 'flex-grow: 1; padding: 0 40px 0 10px;'; // Added specific styling
             div.appendChild(textEl);
         }
-        
-        // Add dismiss button if dismissible
-        if (overlay.interaction.dismissible) {
-            const dismissBtn = document.createElement('button');
-            dismissBtn.className = 'overlay-dismiss';
-            dismissBtn.innerHTML = '×'; // HTML entity for multiplication sign
-            dismissBtn.onclick = (e) => {
-                e.stopPropagation();
-                dismissOverlay(overlay.id);
-            };
-            div.appendChild(dismissBtn);
+
+        // 4. Controls (Dismiss and Action Buttons):
+        if (overlay.interaction.dismissible || overlay.interaction.action !== 'none') {
+            const controlsDiv = document.createElement('div');
+            controlsDiv.className = 'overlay-controls';
+            // controlsDiv.style.cssText = 'position: absolute; right: 5px; top: 50%; transform: translateY(-50%); display: flex; gap: 5px;'; // Example styling, adjust as needed
+
+            if (overlay.interaction.dismissible) {
+                const dismissBtn = document.createElement('button');
+                dismissBtn.className = 'overlay-dismiss';
+                dismissBtn.innerHTML = '×'; // HTML entity for multiplication sign
+                dismissBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    dismissOverlay(overlay.id);
+                };
+                controlsDiv.appendChild(dismissBtn);
+            }
+
+            if (overlay.interaction.action !== 'none') {
+                const actionBtn = document.createElement('button');
+                actionBtn.className = 'overlay-action';
+                actionBtn.textContent = getActionButtonText(overlay.interaction.action); // Use new helper
+                actionBtn.onclick = () => handleOverlayAction(overlay); // No stopPropagation needed here generally unless it causes issues
+                controlsDiv.appendChild(actionBtn);
+            }
+            div.appendChild(controlsDiv);
         }
-        
-        // Add click handler for actions
-        if (overlay.interaction.action !== 'none') {
-            div.style.cursor = 'pointer';
-            div.onclick = () => handleOverlayAction(overlay);
-        }
+        // Old direct click handler and cursor style on main div are removed.
         
         return div;
     }
@@ -676,20 +699,37 @@ function displayViewerProjects(response) { // Argument changed
 
     // Dismiss overlay manually
     function dismissOverlay(overlayId) {
-        const element = viewerApp.state.activeOverlays.get(overlayId);
-        if (element) {
-            element.style.opacity = '0';
-            setTimeout(() => {
+        const element = viewerApp.state.activeOverlays.get(overlayId); // 1. Get Element
+
+        if (element) { // 2. Conditional Execution
+            element.style.opacity = '0'; // Set opacity to 0
+
+            setTimeout(() => { // Start setTimeout
+                // Remove Element from DOM
                 if (element.parentNode) {
                     element.parentNode.removeChild(element);
                 }
+                // Delete from Active Overlays
                 viewerApp.state.activeOverlays.delete(overlayId);
+
+                // Clear Overlay Area (if needed)
+                if (viewerApp.state.activeOverlays.size === 0) {
+                    clearOverlayDisplayArea(); // Assuming clearOverlayDisplayArea is defined
+                }
                 
-                // Resume video if needed
-                if (element.dataset.pausedVideo === 'true' && 
-                    viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getPlayerState === 'function' &&
-                    viewerApp.state.ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
-                    viewerApp.state.ytPlayer.playVideo();
+                // Resume Media Logic
+                if (element.dataset.pausedMedia === 'true') { // Check updated dataset attribute
+                    if (viewerApp.state.currentMediaType === 'youtube') {
+                        if (viewerApp.state.ytPlayer && 
+                            typeof viewerApp.state.ytPlayer.getPlayerState === 'function' &&
+                            viewerApp.state.ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
+                            viewerApp.state.ytPlayer.playVideo();
+                        }
+                    } else if (viewerApp.state.currentMediaType === 'audio') {
+                        if (viewerAudioPlayerEl && viewerAudioPlayerEl.paused) {
+                            viewerAudioPlayerEl.play();
+                        }
+                    }
                 }
             }, 300); // Match transition duration
         }
@@ -697,97 +737,134 @@ function displayViewerProjects(response) { // Argument changed
 
     // Initialize video overlays for current slide
     function initializeVideoOverlays() {
-        const currentSlide = getCurrentSlide(); // Assumes getCurrentSlide is globally available
-        if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube') {
-            viewerApp.state.videoOverlays = []; // Clear if not a YouTube slide or no media
+        const currentSlide = getCurrentSlide();
+        const mediaType = viewerApp.state.currentMediaType; // Get mediaType from state
+
+        // If no slide, no media, or media is not YouTube/Audio, clear overlays and hide timeline
+        if (!currentSlide || !currentSlide.slideMedia || (mediaType !== 'youtube' && mediaType !== 'audio')) {
+            viewerApp.state.videoOverlays = [];
             viewerApp.state.activeOverlays.clear();
-            // Clear the DOM container as well
-            const container = document.getElementById('videoOverlayContainer');
-            if (container) container.innerHTML = '';
+            clearOverlayDisplayArea(); // Clear the dedicated display area
+
+            const timelineBar = document.getElementById('interactiveTimelineBar');
+            if (timelineBar) {
+                timelineBar.style.display = 'none';
+            }
+            // Also clear the old container if it's still in use by other parts or for safety
+            const oldContainer = document.getElementById('videoOverlayContainer');
+            if (oldContainer) oldContainer.innerHTML = '';
             return;
         }
-        
+
         viewerApp.state.videoOverlays = currentSlide.slideMedia.videoOverlays || [];
-        // Clear any existing DOM overlays and the activeOverlays map before initializing new ones
-        const container = document.getElementById('videoOverlayContainer');
-        if (container) container.innerHTML = '';
-        viewerApp.state.activeOverlays.clear(); 
+        
+        // Clear any existing DOM overlays from the dedicated display area
+        clearOverlayDisplayArea(); 
+        
+        // Clear the map of active overlay DOM elements
+        viewerApp.state.activeOverlays.clear();
+
+        // Show timeline bar for YouTube or Audio
+        const timelineBar = document.getElementById('interactiveTimelineBar');
+        if (timelineBar) {
+            timelineBar.style.display = 'block';
+        }
+        
+        // Clear the old container as a safety measure if it was used before
+        const oldContainer = document.getElementById('videoOverlayContainer');
+        if (oldContainer) oldContainer.innerHTML = '';
+    }
+
+    function clearOverlayDisplayArea() {
+        const overlayArea = document.getElementById('overlayDisplayArea');
+        if (overlayArea) {
+            overlayArea.innerHTML = '';
+        }
     }
 
     // Check and update overlay visibility
     function updateVideoOverlays() {
-        if (!isYouTubePlayerAvailable() || !viewerApp.state.ytPlayer || typeof viewerApp.state.ytPlayer.getCurrentTime !== 'function' || !viewerApp.state.videoOverlays) return;
-        
-        const currentTime = safeGetCurrentTime(viewerApp.state.ytPlayer);
-        const container = document.getElementById('videoOverlayContainer');
-        if (!container) return; // Make sure container exists
-        
+        // 1. Early Exit
+        if (!viewerApp.state.videoOverlays || viewerApp.state.videoOverlays.length === 0) {
+            // Ensure overlayArea is clear if no overlays are defined for the slide
+            const overlayArea = document.getElementById('overlayDisplayArea');
+            if (overlayArea) {
+                overlayArea.innerHTML = '';
+            }
+            return;
+        }
+
+        // 2. Current Time Logic
+        let currentTime = 0;
+        if (viewerApp.state.currentMediaType === 'youtube') {
+            if (isYouTubePlayerAvailable() && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getCurrentTime === 'function') {
+                currentTime = safeGetCurrentTime(viewerApp.state.ytPlayer);
+            } else {
+                return; // YouTube player not ready or available
+            }
+        } else if (viewerApp.state.currentMediaType === 'audio') {
+            if (viewerAudioPlayerEl && !isNaN(viewerAudioPlayerEl.currentTime)) {
+                currentTime = viewerAudioPlayerEl.currentTime;
+            } else {
+                return; // Audio player not ready or available
+            }
+        } else {
+            return; // Not a supported media type for timeline overlays
+        }
+
+        // 3. Overlay Display Area
+        const overlayArea = document.getElementById('overlayDisplayArea');
+        if (!overlayArea) {
+            console.warn("updateVideoOverlays: overlayDisplayArea not found!");
+            return;
+        }
+
+        // 4. Iterate Overlays
+        let anOverlayIsBeingShown = false; // Flag to track if any overlay is shown in this cycle
         viewerApp.state.videoOverlays.forEach(overlay => {
             const isActive = viewerApp.state.activeOverlays.has(overlay.id);
-            const shouldShow = currentTime >= overlay.startTime && 
-                              currentTime < (overlay.startTime + overlay.duration);
-            
+            const shouldShow = currentTime >= overlay.startTime && currentTime < (overlay.startTime + overlay.duration);
+
+            // 5. Show Overlay Logic
             if (shouldShow && !isActive) {
-                // Show overlay
+                anOverlayIsBeingShown = true;
+                overlayArea.innerHTML = ''; // Clear area before adding new overlay
+
                 const element = createOverlayElement(overlay);
-                container.appendChild(element);
+                overlayArea.appendChild(element);
                 viewerApp.state.activeOverlays.set(overlay.id, element);
-                
-                // Handle pause if needed
-                if (overlay.interaction.pauseVideo && viewerApp.state.ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
-                    viewerApp.state.ytPlayer.pauseVideo();
-                    element.dataset.pausedVideo = 'true';
+
+                // Pause Media Logic
+                if (overlay.interaction.pauseVideo) {
+                    if (viewerApp.state.currentMediaType === 'youtube' && viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.pauseVideo === 'function') {
+                        viewerApp.state.ytPlayer.pauseVideo();
+                        element.dataset.pausedMedia = 'true'; // Changed from pausedVideo
+                    } else if (viewerApp.state.currentMediaType === 'audio' && viewerAudioPlayerEl && typeof viewerAudioPlayerEl.pause === 'function') {
+                        viewerAudioPlayerEl.pause();
+                        element.dataset.pausedMedia = 'true'; // Changed from pausedVideo
+                    }
                 }
-                
-                // Fade in animation
+
+                // Fade-in Animation
                 requestAnimationFrame(() => {
-                    // Check if element still exists and is in map, in case of rapid changes
+                    // Check if element still exists and is in map
                     if (viewerApp.state.activeOverlays.get(overlay.id) === element) {
-                         element.style.opacity = '1';
+                        element.style.opacity = '1';
                     }
                 });
-                
-            } else if (!shouldShow && isActive) {
-                // Hide overlay
-                const element = viewerApp.state.activeOverlays.get(overlay.id);
-                // Check if element exists before trying to access its style
-                if (element) {
-                    element.style.opacity = '0';
-                
-                    setTimeout(() => {
-                        // Check again if element still exists and is the one we expect to remove
-                        if (viewerApp.state.activeOverlays.get(overlay.id) === element && element.parentNode) {
-                             element.parentNode.removeChild(element);
-                        }
-                        // Delete from map only if it was the element we intended to remove
-                        if (viewerApp.state.activeOverlays.get(overlay.id) === element) {
-                            viewerApp.state.activeOverlays.delete(overlay.id);
-                        }
-                        
-                        // Resume video if this overlay paused it
-                        if (element.dataset.pausedVideo === 'true' && 
-                            viewerApp.state.ytPlayer && typeof viewerApp.state.ytPlayer.getPlayerState === 'function' &&
-                            viewerApp.state.ytPlayer.getPlayerState() === YT.PlayerState.PAUSED) {
-                            // Check if other overlays that pause video are still active
-                            let otherPausingOverlayActive = false;
-                            for (const [id, el] of viewerApp.state.activeOverlays) {
-                                const ov = viewerApp.state.videoOverlays.find(o => o.id === id);
-                                if (ov && ov.interaction.pauseVideo && el.dataset.pausedVideo === 'true') {
-                                    otherPausingOverlayActive = true;
-                                    break;
-                                }
-                            }
-                            if (!otherPausingOverlayActive) {
-                                viewerApp.state.ytPlayer.playVideo();
-                            }
-                        }
-                    }, 300); // Match transition duration
-                } else {
-                     // If element is not found but ID is in activeOverlays, remove it from map
-                     viewerApp.state.activeOverlays.delete(overlay.id);
-                }
+            } 
+            // 6. Hide Overlay Logic
+            else if (!shouldShow && isActive) {
+                // Call dismissOverlay, which handles removing from DOM, activeOverlays, and resuming media
+                dismissOverlay(overlay.id); 
             }
         });
+        
+        // If no overlay was shown in this cycle (e.g., time moved past all overlays) and the area isn't empty, clear it.
+        // This handles cases where the last active overlay was dismissed by time, and the area should become empty.
+        if (!anOverlayIsBeingShown && viewerApp.state.activeOverlays.size === 0 && overlayArea.innerHTML !== '') {
+             overlayArea.innerHTML = '';
+        }
     }
 
     // --- Canvas & Slide Rendering ---
@@ -1048,7 +1125,33 @@ function displayViewerProjects(response) { // Argument changed
                              if (viewerApp.state.currentSlideIndex !== slideIndex) return;
                              if (audioResponse && audioResponse.success && audioResponse.base64Data) {
                                  setupAudioPlayer(audioResponse.base64Data);
-                                 if (viewerAudioPlayerEl) viewerAudioPlayerEl.style.display = 'block';
+                                 if (viewerAudioPlayerEl) {
+                                     viewerAudioPlayerEl.style.display = 'block';
+                                    
+                                     // NEW logic STARTS HERE:
+                                     // Ensure this is only done if the audio player element is truly available and displayed
+                                     // Using 'loadedmetadata' event is more reliable for duration.
+                                     // However, the prompt implies synchronous or near-synchronous availability.
+                                     // We'll try direct access and if duration isn't ready, it might be 0 or NaN.
+                                     // A more robust solution would use an event listener for 'loadedmetadata'.
+                                     if (viewerAudioPlayerEl.style.display === 'block' || viewerAudioPlayerEl.duration > 0) { 
+                                         viewerApp.state.currentVideoDuration = viewerAudioPlayerEl.duration || 0;
+                                         if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(viewerApp.state.currentVideoDuration);
+                                         
+                                         // Show timeline bar for audio
+                                         const timelineBar = document.getElementById('interactiveTimelineBar');
+                                         if (timelineBar) {
+                                             timelineBar.style.display = 'block'; 
+                                         }
+                                         // Also ensure the main video timeline container is visible
+                                         if (viewerVideoTimelineContainerEl) { 
+                                              viewerVideoTimelineContainerEl.style.display = 'block';
+                                         }
+                                 
+                                         startAudioTimelineTracking();
+                                         renderTimelineMarkers(); 
+                                     }
+                                 }
                                  canvas.renderAll();
                              } else {
                                  onServerErrorViewer(audioResponse || {error: "Failed to load audio data."});
@@ -1994,6 +2097,36 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
         displayMessageViewer(errorMsg, false);
     }
 
+    function startAudioTimelineTracking() {
+        // Clear any existing interval
+        if (viewerApp.state.audioTimelineInterval) {
+            clearInterval(viewerApp.state.audioTimelineInterval);
+        }
+        
+        viewerApp.state.audioTimelineInterval = setInterval(() => {
+            if (viewerAudioPlayerEl && !viewerAudioPlayerEl.paused && viewerAudioPlayerEl.duration) {
+                const currentTime = viewerAudioPlayerEl.currentTime;
+                const duration = viewerAudioPlayerEl.duration;
+                
+                // Update timeline display
+                if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(currentTime);
+                if (viewerTimelineProgressEl) {
+                    viewerTimelineProgressEl.style.width = (currentTime / duration) * 100 + '%';
+                }
+                
+                // Update overlays
+                updateVideoOverlays(); // This function should now be able to handle audio context
+            }
+        }, 100);
+    }
+
+    function stopAudioTimelineTracking() {
+        if (viewerApp.state.audioTimelineInterval) {
+            clearInterval(viewerApp.state.audioTimelineInterval);
+            viewerApp.state.audioTimelineInterval = null;
+        }
+    }
+
 function stopAndDestroyYouTubePlayer() {
     try {
         console.log("Stopping and destroying YouTube player...");
@@ -2167,6 +2300,7 @@ let audioEventHandlers = {
 };
 
     function stopAndClearAudioPlayer() {
+        stopAudioTimelineTracking(); // 1. Stop timeline tracking first
         console.log("stopAndClearAudioPlayer: Starting audio player cleanup.");
         const audioPlayer = viewerApp.state.currentAudioElement || viewerAudioPlayerEl;
 
@@ -2206,6 +2340,17 @@ let audioEventHandlers = {
                 audioPlayer.style.display = 'none'; // Hide the player
                 
                 console.log("stopAndClearAudioPlayer: Audio player stopped, cleared, and hidden.");
+
+                // 2. Hide Timeline Bar
+                // NEW: Hide timeline bar
+                const timelineBar = document.getElementById('interactiveTimelineBar');
+                if (timelineBar) timelineBar.style.display = 'none';
+                
+                // Also hide the main video timeline container if it was made visible for audio
+                if (viewerVideoTimelineContainerEl) { // This is the container for YT timeline parts
+                     viewerVideoTimelineContainerEl.style.display = 'none';
+                }
+
             } catch (e) {
                 console.error("stopAndClearAudioPlayer: Error during audio player cleanup:", e);
             }

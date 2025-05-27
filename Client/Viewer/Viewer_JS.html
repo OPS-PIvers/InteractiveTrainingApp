@@ -774,9 +774,6 @@ function displayViewerProjects(response) { // Argument changed
             timelineBar.style.display = 'block';
         }
         
-        // Clear the old container as a safety measure if it was used before
-        const oldContainer = document.getElementById('videoOverlayContainer');
-        if (oldContainer) oldContainer.innerHTML = '';
     }
 
     function clearOverlayDisplayArea() {
@@ -2236,11 +2233,6 @@ function stopAndDestroyYouTubePlayer() {
                     viewerApp.state.videoOverlays = [];
                     console.log("Cleared viewerApp.state.videoOverlays (Array).");
                 }
-            }
-            const overlayContainer = document.getElementById('videoOverlayContainer');
-            if (overlayContainer) {
-                overlayContainer.innerHTML = '';
-                console.log("Cleared videoOverlayContainer HTML.");
             }
         // Reset timeline - Assuming resetTimeline is a global function
         if (typeof resetTimeline === 'function') {

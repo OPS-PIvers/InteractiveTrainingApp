@@ -1606,7 +1606,7 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
                  console.log("[ResetPanZoom] Attempting reset despite isCanvasPannedOrZoomed being false, as original transform exists.");
             } else if (!canvas) {
                 viewerApp.state.isCanvasPannedOrZoomed = false; viewerApp.state.panZoomTargetObject = null; viewerApp.state.originalViewportTransform = null; return;
-            } else { // Not panned or invalid original transform
+            } else { // Not panned or invalid original transform.
                 viewerApp.state.isCanvasPannedOrZoomed = false; viewerApp.state.panZoomTargetObject = null; viewerApp.state.originalViewportTransform = null; return;
             }
         }

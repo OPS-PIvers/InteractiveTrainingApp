@@ -1226,7 +1226,35 @@ function displayViewerProjects(response) { // Argument changed
         }
         updateSlideNavigationUI(); 
     }
+    function startAudioTimelineTracking() {
+        // Clear any existing interval
+        if (viewerApp.state.audioTimelineInterval) {
+            clearInterval(viewerApp.state.audioTimelineInterval);
+        }
+        
+        viewerApp.state.audioTimelineInterval = setInterval(() => {
+            if (viewerAudioPlayerEl && !viewerAudioPlayerEl.paused && viewerAudioPlayerEl.duration) {
+                const currentTime = viewerAudioPlayerEl.currentTime;
+                const duration = viewerAudioPlayerEl.duration;
+                
+                // Update timeline display
+                if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(currentTime);
+                if (viewerTimelineProgressEl) {
+                    viewerTimelineProgressEl.style.width = (currentTime / duration) * 100 + '%';
+                }
+                
+                // Update overlays
+                updateVideoOverlays();
+            }
+        }, 100);
+    }
 
+    function stopAudioTimelineTracking() {
+        if (viewerApp.state.audioTimelineInterval) {
+            clearInterval(viewerApp.state.audioTimelineInterval);
+            viewerApp.state.audioTimelineInterval = null;
+        }
+    }
     // --- Interaction & Modal Handling ---
     function handleOverlayInteraction(fabricObject, eventType) {
         if (!fabricObject.customInteraction) return;

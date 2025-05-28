@@ -1184,7 +1184,15 @@ function safeDisposeCanvas() {
             const videoId = extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl) {
                 if (validateYouTubeEnvironment()) { 
-                    safeDOMUpdate(adminYouTubePlayerContainerEl, el => el.style.display = 'block', "Failed to show YouTube player container in selectSlide");
+                    safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
+                        el.style.display = 'block';
+                        el.style.position = 'absolute';
+                        el.style.top = '0';
+                        el.style.left = '0';
+                        el.style.width = '100%';
+                        el.style.height = '100%';
+                        el.style.pointerEvents = 'none'; // Prevent interference
+                    }, "Failed to show YouTube player container in selectSlide");
                     setupAdminYouTubePlayer(videoId); 
                 } else {
                     console.warn("YouTube API not ready or environment invalid. Deferring setup for videoId:", videoId);

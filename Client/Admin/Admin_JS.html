@@ -199,59 +199,63 @@ function safeGetCurrentTime(player) {
 
     // --- Setup and Listeners ---
     adminApp.resizeCanvasToFit = function(slideData) {
-        const canvas = adminApp.state.fabricCanvasInstance;
-        if (!canvas || !fabricCanvasEl) {
-            console.warn("resizeCanvasToFit: Canvas or fabricCanvasEl not ready.");
-            return;
-        }
+    const canvas = adminApp.state.fabricCanvasInstance;
+    if (!canvas || !fabricCanvasEl) {
+        console.warn("resizeCanvasToFit: Canvas or fabricCanvasEl not ready.");
+        return;
+    }
 
-        const fabricCanvasContainer = document.getElementById('fabricCanvasContainer');
-        if (!fabricCanvasContainer) {
-            console.warn("resizeCanvasToFit: fabricCanvasContainer not found.");
-            return;
-        }
+    const fabricCanvasContainer = document.getElementById('fabricCanvasContainer');
+    if (!fabricCanvasContainer) {
+        console.warn("resizeCanvasToFit: fabricCanvasContainer not found.");
+        return;
+    }
 
-        const containerWidth = fabricCanvasContainer.clientWidth;
-        const containerHeight = fabricCanvasContainer.clientHeight;
+    const containerWidth = fabricCanvasContainer.clientWidth;
+    const containerHeight = fabricCanvasContainer.clientHeight;
 
-        if (containerWidth === 0 || containerHeight === 0) {
-            console.log("resizeCanvasToFit: Container has no dimensions, skipping resize.");
-            return;
-        }
-        
-        let contentWidth = (slideData && slideData.canvasWidth) ? slideData.canvasWidth : adminApp.state.defaultCanvasWidth;
-        let contentHeight = (slideData && slideData.canvasHeight) ? slideData.canvasHeight : adminApp.state.defaultCanvasHeight;
+    if (containerWidth === 0 || containerHeight === 0) {
+        console.log("resizeCanvasToFit: Container has no dimensions, skipping resize.");
+        return;
+    }
+    
+    // Get content dimensions
+    let contentWidth = (slideData && slideData.canvasWidth) ? slideData.canvasWidth : adminApp.state.defaultCanvasWidth;
+    let contentHeight = (slideData && slideData.canvasHeight) ? slideData.canvasHeight : adminApp.state.defaultCanvasHeight;
 
-        if (!contentWidth || contentWidth <= 0) contentWidth = adminApp.state.defaultCanvasWidth;
-        if (!contentHeight || contentHeight <= 0) contentHeight = adminApp.state.defaultCanvasHeight;
+    if (!contentWidth || contentWidth <= 0) contentWidth = adminApp.state.defaultCanvasWidth;
+    if (!contentHeight || contentHeight <= 0) contentHeight = adminApp.state.defaultCanvasHeight;
 
-        canvas.setWidth(contentWidth);
-        canvas.setHeight(contentHeight);
+    // Set canvas dimensions
+    canvas.setDimensions({
+        width: contentWidth,
+        height: contentHeight
+    });
 
-        fabricCanvasEl.width = contentWidth;
-        fabricCanvasEl.height = contentHeight;
-        
-        // Calculate cssScaleFactor (similar to how finalZoom was calculated)
-        const zoomX = containerWidth / contentWidth;
-        const zoomY = containerHeight / contentHeight;
-        const cssScaleFactor = Math.max(0.01, Math.min(zoomX, zoomY)); // Ensure it's at least a tiny value
+    // Calculate zoom to fit container
+    const zoomX = containerWidth / contentWidth;
+    const zoomY = containerHeight / contentHeight;
+    const zoom = Math.min(zoomX, zoomY) * 0.9; // 0.9 gives a little padding
 
-        // Remove or comment out:
-        // canvas.zoomToPoint(new fabric.Point(contentWidth / 2, contentHeight / 2), finalZoom);
-
-        // Add CSS scaling:
-        // Assuming flexbox handles centering, 'center center' should keep it centered.
-        // 'top left' might be an alternative if centering issues arise with flexbox.
-        fabricCanvasEl.style.transformOrigin = 'center center'; 
-        fabricCanvasEl.style.transform = 'scale(' + cssScaleFactor + ')';
-        
-        // No need to call canvas.setZoom() or canvas.setViewportTransform() for fitting purposes.
-        // Fabric.js will operate on its native 1:1 scale.
-        
-        canvas.renderAll(); // Re-render after changes
+    // Apply zoom using Fabric's built-in method
+    canvas.setZoom(zoom);
+    
+    // Center the canvas
+    const scaledWidth = contentWidth * zoom;
+    const scaledHeight = contentHeight * zoom;
+    const left = (containerWidth - scaledWidth) / 2;
+    const top = (containerHeight - scaledHeight) / 2;
+    
+    // Apply positioning
+    canvas.viewportTransform[4] = left;
+    canvas.viewportTransform[5] = top;
+    
+    // Update canvas
+    canvas.calcOffset();
+    canvas.renderAll();
             
-        console.log(`Resized canvas via CSS scale. Logical: ${contentWidth}x${contentHeight}. Container: ${containerWidth}x${containerHeight}. CSS Scale: ${cssScaleFactor}`);
-    };
+    console.log(`Canvas resized: ${contentWidth}x${contentHeight}, Zoom: ${zoom.toFixed(2)}`);
+};
 
     adminApp.setupDOMReferences = function() {
       messageAreaEl = document.getElementById('messageArea');

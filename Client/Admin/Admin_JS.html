@@ -520,43 +520,34 @@ function safeDisposeCanvas() {
         try {
             console.log("safeDisposeCanvas: Canvas instance found. Proceeding with disposal.");
 
-            // 1. Stop animations (more robustly)
+            // 1. Clear all event listeners first
+            canvas.off();
+            
+            // 2. Stop all animations
             canvas.forEachObject(obj => {
-                if (obj && typeof obj.stopAnim === 'function') { // Check for a potential custom stopAnim method
-                    obj.stopAnim();
-                }
-                // Attempt to cancel Fabric's internal animation handler if it exists
                 if (obj && obj._animateHandler) {
                     fabric.util.cancelAnimFrame(obj._animateHandler);
                     obj._animateHandler = null;
-                     console.log("safeDisposeCanvas: Stopped animation frame for object:", obj);
-                }
-                 // Force stop any ongoing fabric.util.animate calls related to this object
-                if (obj && obj.activeOn === 'animation') { // A common flag, or use a custom one if set
-                    obj.animate('left', obj.left, { duration: 1, abort: () => true }); // Abort immediately
                 }
             });
-            console.log("safeDisposeCanvas: Attempted to stop all object animations.");
-
-            // 2. Clear objects
-            canvas.clear();
-            console.log("safeDisposeCanvas: Canvas cleared of objects.");
-
-            // 3. Remove event listeners (Fabric specific)
-            canvas.off(); // Removes all event listeners from the canvas instance
-            console.log("safeDisposeCanvas: Removed all Fabric event listeners from canvas.");
             
-            // 4. Dispose canvas
+            // 3. Clear all objects
+            canvas.clear();
+            
+            // 4. Reset zoom and viewport
+            canvas.setZoom(1);
+            canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+            
+            // 5. Dispose canvas
             canvas.dispose();
+            
             console.log("safeDisposeCanvas: Fabric canvas disposed successfully.");
 
         } catch (e) {
             console.error("safeDisposeCanvas: Error during canvas disposal:", e);
-            displayMessage("Error disposing canvas: " + e.message, false);
         } finally {
-            // 5. Nullify reference
+            // 6. Always nullify reference
             adminApp.state.fabricCanvasInstance = null;
-            console.log("safeDisposeCanvas: fabricCanvasInstance nullified.");
         }
     } else {
         console.log("safeDisposeCanvas: No active Fabric canvas instance to dispose.");

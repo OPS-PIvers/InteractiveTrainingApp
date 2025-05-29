@@ -180,7 +180,7 @@ function safeGetCurrentTime(player) {
     let imageDropZoneEl, audioDropZoneEl;
 
     // Video Question/Timeline Elements
-    let videoTimelineControlsEl, videoTimelineSliderEl, videoCurrentTimeDisplayEl, videoTotalDurationDisplayEl,
+    let mediaTimelineControlsEl, videoTimelineSliderEl, videoCurrentTimeDisplayEl, videoTotalDurationDisplayEl,
         addQuestionBtnEl, questionModalEl, questionTimestampDisplayEl, questionTextEl,
         saveQuestionBtnEl, cancelQuestionBtnEl, editingQuestionIndexEl,
         videoQuestionsListContainerEl, videoQuestionsListEl; // Added question list elements
@@ -374,7 +374,7 @@ function safeGetCurrentTime(player) {
       imageDropZoneEl = document.getElementById('imageDropZone');
       audioDropZoneEl = document.getElementById('audioDropZone');
 
-      videoTimelineControlsEl = document.getElementById('videoTimelineControls');
+      mediaTimelineControlsEl = document.getElementById('mediaTimelineControls');
       videoTimelineSliderEl = document.getElementById('videoTimelineSlider');
       videoCurrentTimeDisplayEl = document.getElementById('videoCurrentTimeDisplay');
       videoTotalDurationDisplayEl = document.getElementById('videoTotalDurationDisplay');
@@ -3315,9 +3315,9 @@ function generateClientUuid() {
         // }
 
     // --- NEW Video Overlay Event Listeners ---
-    const addVideoOverlayBtn = document.getElementById('addVideoOverlayBtn');
-    if (addVideoOverlayBtn) {
-        addVideoOverlayBtn.addEventListener('click', initiateOverlayPlacement);
+    const addTimelineOverlayBtn = document.getElementById('addTimelineOverlayBtn');
+    if (addTimelineOverlayBtn) {
+        addTimelineOverlayBtn.addEventListener('click', initiateOverlayPlacement);
     }
 
     const placementOverlay = document.getElementById('overlayPlacementOverlay');
@@ -3349,11 +3349,11 @@ function generateClientUuid() {
     };
 
     function updateVideoToolsVisibility(show) {
-        safeDOMUpdate(videoTimelineControlsEl, 
+        safeDOMUpdate(mediaTimelineControlsEl, 
           el => el.style.display = show ? 'block' : 'none', 
           "Failed to update video timeline controls display in updateVideoToolsVisibility");
-        if (show && !videoTimelineControlsEl) { 
-            console.warn("updateVideoToolsVisibility: videoTimelineControlsEl not found.");
+        if (show && !mediaTimelineControlsEl) { 
+            console.warn("updateVideoToolsVisibility: mediaTimelineControlsEl not found.");
         }
         safeDOMUpdate(videoQuestionsListContainerEl, 
           el => el.style.display = show ? 'block' : 'none',

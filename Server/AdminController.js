@@ -303,7 +303,12 @@ function saveProjectData(projectId, projectDataJSON) {
     const nowISO = new Date().toISOString(); // Timestamp for modifications
 
     if (projectDataParsed.slides && Array.isArray(projectDataParsed.slides)) {
-        projectDataParsed.slides.forEach(slide => {
+        projectDataParsed.slides.forEach((slide, index) => { // Added index for better logging
+            if (!slide) { // Checks for null or undefined
+                Logger.log(`saveProjectData: Skipping null or undefined slide entry at index ${index}.`);
+                return; // Skip this iteration
+            }
+
             // Check if 'timelineEvents' property exists on the slide
             if (slide.hasOwnProperty('timelineEvents')) { 
                 const originalTimelineEvents = slide.timelineEvents; // For logging original value if needed

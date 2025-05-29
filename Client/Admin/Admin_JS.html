@@ -896,6 +896,14 @@ function safeDisposeCanvas() {
               if (slide.slideMedia && !Array.isArray(slide.slideMedia.videoOverlays)) {
                   slide.slideMedia.videoOverlays = [];
               }
+              // Ensure old video-specific arrays exist for backward compatibility or if still used
+              if (slide.slideMedia && !Array.isArray(slide.slideMedia.videoQuestions)) {
+                  slide.slideMedia.videoQuestions = [];
+              }
+              // Initialize timelineEvents if missing
+              if (!Array.isArray(slide.timelineEvents)) {
+                  slide.timelineEvents = [];
+              }
         // Ensure youtubeOptions exists for YouTube slides
         if (slide.slideMedia && slide.slideMedia.type === 'youtube' && typeof slide.slideMedia.youtubeOptions === 'undefined') { // CORRECTED
             slide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // CORRECTED
@@ -1061,13 +1069,16 @@ function safeDisposeCanvas() {
             canvasWidth: adminApp.state.defaultCanvasWidth,
             canvasHeight: adminApp.state.defaultCanvasHeight,
             fabricCanvasJSON: null, 
-            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] }
+            slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] },
+            timelineEvents: [] // Ensure this line is added
         };
         if (!adminApp.state.projectData.slides) adminApp.state.projectData.slides = [];
         adminApp.state.projectData.slides.push(newSlide);
         const newSlideIndex = adminApp.state.projectData.slides.length - 1;
         selectSlide(newSlideIndex); 
         console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
+        showNotification("New slide added.", "success");
+        saveCanvasStateForHistory(); // Save initial state of new slide
     }
 
     function selectSlide(slideIndex) {
@@ -1083,6 +1094,11 @@ function safeDisposeCanvas() {
 
         adminApp.state.currentSlideIndex = slideIndex;
         const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
+        
+        // Store current slide type
+        adminApp.state.currentSlideType = (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type) ? selectedSlideData.slideMedia.type : 'none';
+        console.log("Current slide type set to:", adminApp.state.currentSlideType);
+
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) { 
             console.error("selectSlide: Canvas not ready!"); 
@@ -1090,15 +1106,23 @@ function safeDisposeCanvas() {
         }
 
         if (!selectedSlideData.slideMedia) {
-            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [] };
-        } else if (selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
-            selectedSlideData.slideMedia.videoQuestions = [];
+            selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] }; // Ensure videoOverlays is also here
+        } else { // Ensure these arrays exist even if media is present
+            if (!Array.isArray(selectedSlideData.slideMedia.videoQuestions)) {
+                selectedSlideData.slideMedia.videoQuestions = [];
+            }
+            if (!Array.isArray(selectedSlideData.slideMedia.videoOverlays)) { // Ensure this check is also here
+                selectedSlideData.slideMedia.videoOverlays = [];
+            }
         }
-        // Add this:
-        if (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'youtube' && !Array.isArray(selectedSlideData.slideMedia.videoOverlays)) {
-          selectedSlideData.slideMedia.videoOverlays = [];
+        // Ensure timelineEvents exists
+        if (!Array.isArray(selectedSlideData.timelineEvents)) {
+            selectedSlideData.timelineEvents = [];
         }
-
+        // Ensure youtubeOptions exists for YouTube slides (this part might already be there from issue snippet)
+        if (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'youtube' && typeof selectedSlideData.slideMedia.youtubeOptions === 'undefined') {
+            selectedSlideData.slideMedia.youtubeOptions = { showClickToBeginButton: false };
+        }
 
         // In selectSlide() function, before setting up YouTube
         if (adminApp.state.adminYouTubePlayer) {

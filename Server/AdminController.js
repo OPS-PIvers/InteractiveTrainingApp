@@ -302,6 +302,48 @@ function saveProjectData(projectId, projectDataJSON) {
     const currentStatusInJson = projectDataParsed.status || "Draft"; // Default if status missing in JSON
     const nowISO = new Date().toISOString(); // Timestamp for modifications
 
+    if (projectDataParsed.slides && Array.isArray(projectDataParsed.slides)) {
+        projectDataParsed.slides.forEach((slide, index) => { // Added index for better logging
+            if (!slide) { // Checks for null or undefined
+                Logger.log(`saveProjectData: Skipping null or undefined slide entry at index ${index}.`);
+                return; // Skip this iteration
+            }
+
+            // Check if 'timelineEvents' property exists on the slide
+            if (slide.hasOwnProperty('timelineEvents')) { 
+                const originalTimelineEvents = slide.timelineEvents; // For logging original value if needed
+
+                if (Array.isArray(originalTimelineEvents)) {
+                    // It's already an array. No change needed to its structure.
+                    // Logger.log(`saveProjectData: Slide ${slide.slideId || 'unknown'} timelineEvents is already an array. Length: ${originalTimelineEvents.length}`);
+                } else if (typeof originalTimelineEvents === 'string') {
+                    // It's a string, try to parse it.
+                    try {
+                        const parsedEvents = JSON.parse(originalTimelineEvents);
+                        if (Array.isArray(parsedEvents)) {
+                            slide.timelineEvents = parsedEvents; // Successfully parsed into an array
+                            // Logger.log(`saveProjectData: Slide ${slide.slideId || 'unknown'} timelineEvents (string) parsed into an array. Length: ${parsedEvents.length}`);
+                        } else {
+                            // Parsed into something other than an array
+                            Logger.log(`saveProjectData: Slide ${slide.slideId || 'unknown'} timelineEvents (string) parsed into non-array (${typeof parsedEvents}). Clearing. Original value: ${originalTimelineEvents}`);
+                            slide.timelineEvents = [];
+                        }
+                    } catch (e) {
+                        // Parsing failed
+                        Logger.log(`saveProjectData: Slide ${slide.slideId || 'unknown'} timelineEvents (string) failed to parse. Clearing. Error: ${e.message}. Original value: ${originalTimelineEvents}`);
+                        slide.timelineEvents = [];
+                    }
+                } else {
+                    // It's not an array and not a string (e.g. number, boolean, object that's not an array)
+                    Logger.log(`saveProjectData: Slide ${slide.slideId || 'unknown'} timelineEvents is invalid type (${typeof originalTimelineEvents}). Clearing. Value: ${String(originalTimelineEvents).substring(0,100)}`);
+                    slide.timelineEvents = [];
+                }
+            }
+            // If 'timelineEvents' was not present on the slide object, it remains absent.
+            // This aligns with the requirement "if present in the projectDataParsed object".
+        });
+    }
+
     // 1. Find the row index for the project
     const rowIndex = findRowIndexByValue(PROJECT_INDEX_SHEET_ID, PROJECT_INDEX_DATA_SHEET_NAME, COL_PROJECT_ID, projectId);
     if (!rowIndex) {

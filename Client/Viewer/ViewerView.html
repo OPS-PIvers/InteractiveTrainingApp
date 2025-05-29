@@ -742,6 +742,56 @@
 
       /* Admin timeline overlay bars */
       /* Note: This style seems more relevant for an admin view, but is included in the issue for ViewerView.html */
+
+        /* Image Event Timeline Specific Styles */
+        #imageEventNavigation {
+            /* Styles for the container of event navigation buttons if needed */
+            /* display: none; is handled inline for initial state */
+            text-align: center; 
+            margin-top: 10px;
+        }
+
+        .image-event-nav-button {
+            background-color: var(--theme-primary-color); /* Or a different color for distinction */
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin: 0 5px;
+        }
+        .image-event-nav-button:hover {
+            background-color: var(--theme-primary-hover);
+        }
+        .image-event-nav-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .timeline-marker.event-marker {
+            background-color: #FFC107; /* Example: Amber color for event markers */
+            width: 8px; /* Make them more prominent if desired */
+            height: 8px;
+            border-radius: 50%; /* Circular markers */
+            top: 50%; /* Center vertically on the track */
+            transform: translate(-50%, -50%); /* Adjust for centering */
+            border: 1px solid #AD8705;
+            z-index: 4; /* Ensure they are above other general markers if overlap occurs */
+        }
+
+        .timeline-marker.event-marker.active {
+            background-color: #FF8F00; /* Example: Darker amber for active event */
+            transform: translate(-50%, -50%) scale(1.3); /* Slightly larger active marker */
+            box-shadow: 0 0 5px #FF8F00;
+        }
+        
+        /* Ensure timeline track itself can host these markers well */
+        #viewerTimelineTrack {
+            /* position: relative; (already set in existing CSS) */
+            display: flex; /* Helps if you want to space out markers using flex properties, though absolute positioning is used by JS */
+            align-items: center; /* Vertically align markers if they were flex items */
+        }
     </style>
   </head>
   <body>
@@ -780,7 +830,14 @@
                 
                 <!-- Overlay Display Area -->
                 <div id="overlayDisplayArea" style="min-height: 80px; background: #f5f5f5; border-radius: 8px; margin-top: 15px; padding: 10px; display: flex; align-items: center; justify-content: center; position: relative;">
-                    <div class="overlay-placeholder" style="color: #666; font-style: italic;">Interactive overlays appear here during playback</div>
+                    <!-- Placeholder text is now handled by CSS :empty::before -->
+                </div>
+
+                <!-- New Image Event Navigation -->
+                <div id="imageEventNavigation" style="display: none;"> <!-- Managed by JS -->
+                    <button id="viewerPrevEventButton" class="image-event-nav-button">&lt; Prev Event</button>
+                    <span id="imageEventIndicator" style="margin: 0 10px; font-size: 0.9em; color: #555;">Event 0 / 0</span>
+                    <button id="viewerNextEventButton" class="image-event-nav-button">Next Event &gt;</button>
                 </div>
             </div>
         </div>

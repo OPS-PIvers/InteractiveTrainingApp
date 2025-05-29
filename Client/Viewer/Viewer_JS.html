@@ -45,7 +45,10 @@
       currentVideoDuration: 0, // Phase 1: Store current video duration for timeline
       ytPlayer: null, // Holds the YouTube player instance
       deferredYouTubeVideoId: null, // Stores videoId if player setup is deferred
-      audioTimelineInterval: null // Stores interval ID for audio timeline tracking
+      audioTimelineInterval: null, // Stores interval ID for audio timeline tracking
+      // --- State for Image Slide Timelines ---
+      imageSlideTimelineEvents: [], // Stores Fabric objects for image slide timeline
+      currentImageSlideEventIndex: -1 // Current index for image slide timeline events
     };
 
     // Add callback for when YouTube API is ready
@@ -115,6 +118,8 @@ function validateYouTubeContainer(containerEl, containerName) {
     // Phase 1: Timeline Elements
     let viewerVideoTimelineContainerEl, viewerTimelineTrackEl, viewerTimelineProgressEl,
         viewerCurrentTimeEl, viewerTotalDurationEl;
+    // Image slide timeline event navigation buttons
+    let viewerNextEventButtonEl, viewerPrevEventButtonEl; 
 
     // --- Initialization ---
     document.addEventListener('DOMContentLoaded', function() {
@@ -176,6 +181,12 @@ function validateYouTubeContainer(containerEl, containerName) {
       if (!viewerProjectDisplayAreaEl) console.error("CRITICAL: viewerProjectDisplayAreaEl not found!"); // Add check
       if (!viewerVideoTimelineContainerEl) console.warn("Timeline container not found (viewerVideoTimelineContainerEl)");
 
+      // Image slide timeline event navigation buttons
+      viewerNextEventButtonEl = document.getElementById('viewerNextEventButton');
+      viewerPrevEventButtonEl = document.getElementById('viewerPrevEventButton');
+      if (!viewerNextEventButtonEl) console.warn("viewerNextEventButtonEl not found!");
+      if (!viewerPrevEventButtonEl) console.warn("viewerPrevEventButtonEl not found!");
+
 
       console.log("Viewer_JS: DOM references set up.");
     };
@@ -195,6 +206,10 @@ function validateYouTubeContainer(containerEl, containerName) {
         // Step 21: Attach listeners for modal navigation buttons
         if (modalPrevButtonEl) modalPrevButtonEl.addEventListener('click', navigateModalPrevious);
         if (modalNextButtonEl) modalNextButtonEl.addEventListener('click', navigateModalNext);
+
+        // Image slide timeline event navigation listeners
+        if (viewerNextEventButtonEl) viewerNextEventButtonEl.addEventListener('click', nextImageEvent);
+        if (viewerPrevEventButtonEl) viewerPrevEventButtonEl.addEventListener('click', prevImageEvent);
 
         // Listener to remove spotlight when clicking outside the spotlighted object
         // This listener on viewerProjectDisplayAreaEl is now less critical for spotlight (SVG catcher handles it),
@@ -923,6 +938,22 @@ function displayViewerProjects(response) { // Argument changed
         hideSpotlightSVG(); 
         if(viewerApp.state.isCanvasPannedOrZoomed) resetPanZoomWithAnimation(true); // Reset immediately if panned/zoomed
 
+        // Reset image timeline state
+        viewerApp.state.imageSlideTimelineEvents = [];
+        viewerApp.state.currentImageSlideEventIndex = -1;
+
+        // Hide interactive timeline bar by default, show explicitly for relevant media types
+        const timelineBarGlobal = document.getElementById('interactiveTimelineBar');
+        if (timelineBarGlobal) {
+            timelineBarGlobal.style.display = 'none';
+        }
+        // Also ensure event buttons are hidden by default (will be updated in updateSlideNavigationUI)
+        const nextEventBtn = document.getElementById('viewerNextEventButton');
+        const prevEventBtn = document.getElementById('viewerPrevEventButton');
+        if (nextEventBtn) nextEventBtn.style.display = 'none';
+        if (prevEventBtn) prevEventBtn.style.display = 'none';
+
+
         const slideData = slides[slideIndex]; // Moved up to access slideData earlier
 
         viewerApp.state.currentSlideIndex = slideIndex; 
@@ -1033,6 +1064,22 @@ function displayViewerProjects(response) { // Argument changed
                 if (viewerMediaContainerEl) viewerMediaContainerEl.style.backgroundColor = '#333';
                 if (viewerFabricCanvasEl) viewerFabricCanvasEl.style.opacity = '1';
                 if (viewerCanvasContainerEl) viewerCanvasContainerEl.style.pointerEvents = 'auto';
+
+                // Image Slide Specific Timeline Logic
+                const timelineBar = document.getElementById('interactiveTimelineBar');
+                if (timelineBar) {
+                    timelineBar.style.display = 'block';
+                }
+                if (document.getElementById('viewerTimelineTimeDisplay')) {
+                    document.getElementById('viewerTimelineTimeDisplay').style.display = 'none';
+                }
+                if (document.getElementById('viewerTimelineProgress')) {
+                    document.getElementById('viewerTimelineProgress').style.width = '0%'; // Reset progress display
+                }
+                if (viewerVideoTimelineContainerEl) { // viewerVideoTimelineContainerEl is the old one
+                    viewerVideoTimelineContainerEl.style.display = 'none';
+                }
+                // Population of imageSlideTimelineEvents and call to renderImageSlideEventMarkers will be after canvas.loadFromJSON
                 break;
 
             case 'youtube':
@@ -1184,6 +1231,7 @@ function displayViewerProjects(response) { // Argument changed
             canvas.loadFromJSON(slideData.fabricCanvasJSON, function() {
                 if (viewerApp.state.currentSlideIndex !== slideIndex) return;
 
+                    const potentialTimelineEvents = [];
                 canvas.forEachObject(function(obj) {
                     obj.selectable = false;
                     obj.evented = true; 
@@ -1216,16 +1264,161 @@ function displayViewerProjects(response) { // Argument changed
                     if (obj.customAnimation && obj.customAnimation.trigger === 'onLoad' && obj.customAnimation.type) {
                         setTimeout(() => executeAnimation(obj, obj.customAnimation), 100);
                     }
+
+                        // Populate timeline events for image slides
+                        if (viewerApp.state.currentMediaType === 'image' && obj.customInteraction && obj.customInteraction.isTimelineEvent === true && typeof obj.customInteraction.sequenceOrder === 'number') {
+                            potentialTimelineEvents.push(obj);
+                        }
                 }); 
+
+                    if (viewerApp.state.currentMediaType === 'image') {
+                        viewerApp.state.imageSlideTimelineEvents = potentialTimelineEvents.sort((a, b) => a.customInteraction.sequenceOrder - b.customInteraction.sequenceOrder);
+                        renderImageSlideEventMarkers();
+                        if (viewerApp.state.imageSlideTimelineEvents.length > 0) {
+                             // Automatically navigate to the first event if events exist
+                             navigateToImageEvent(0);
+                        }
+                    }
                 canvas.renderAll();
             }); 
         } else if (viewerCanvasContainerEl && viewerCanvasContainerEl.style.display !== 'none') {
              if(mediaType !== 'image' && mediaType !== 'audio') { 
                  canvas.renderAll();
+                 } else if (mediaType === 'image' && !slideData.fabricCanvasJSON) {
+                    // If it's an image slide with no Fabric JSON (e.g. just a background image but we still want timeline for it)
+                    // ensure markers are rendered if any manual "events" were planned (though unlikely without Fabric objects)
+                    renderImageSlideEventMarkers();
              }
         }
         updateSlideNavigationUI(); 
     }
+
+        // --- Image Slide Timeline Event Navigation and Rendering ---
+        function renderImageSlideEventMarkers() {
+            if (!viewerTimelineTrackEl) {
+                console.warn("renderImageSlideEventMarkers: Timeline track not available.");
+                return;
+            }
+            // Clear existing non-question/non-overlay markers (event-markers)
+            const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.event-marker');
+            existingMarkers.forEach(marker => marker.remove());
+
+            const events = viewerApp.state.imageSlideTimelineEvents;
+            if (!events || events.length === 0) {
+                updateSlideNavigationUI(); // Update buttons if no events
+                return;
+            }
+
+            const numEvents = events.length;
+            events.forEach((event, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'timeline-marker event-marker'; // Generic and specific class
+                // Basic styling, can be enhanced in CSS
+                marker.style.position = 'absolute';
+                marker.style.width = '8px'; 
+                marker.style.height = '8px';
+                marker.style.borderRadius = '50%';
+                marker.style.backgroundColor = '#007bff'; // Blue for event markers
+                marker.style.top = '50%';
+                marker.style.transform = 'translateY(-50%) translateX(-50%)'; // Center the marker dot
+                marker.style.zIndex = '3'; // Above other markers if needed
+
+                // Position proportionally. If only one event, position at start or center.
+                let percentagePosition = 0;
+                if (numEvents > 1) {
+                    percentagePosition = (index / (numEvents -1)) * 100;
+                } else { // Single event, position in the middle or start
+                    percentagePosition = 0; // Or 50 if preferred for a single item
+                }
+                
+                marker.style.left = percentagePosition + '%';
+                marker.title = `Event ${index + 1}: ${event.customInteraction.action || 'View'}`;
+                
+                marker.addEventListener('click', () => {
+                    navigateToImageEvent(index);
+                });
+                viewerTimelineTrackEl.appendChild(marker);
+            });
+            updateSlideNavigationUI(); // Update buttons based on new event count/index
+        }
+
+        function navigateToImageEvent(eventIndex) {
+            if (!viewerApp.state.imageSlideTimelineEvents || eventIndex < 0 || eventIndex >= viewerApp.state.imageSlideTimelineEvents.length) {
+                console.warn("navigateToImageEvent: Invalid eventIndex or no events.", eventIndex);
+                return;
+            }
+            viewerApp.state.currentImageSlideEventIndex = eventIndex;
+            const targetObject = viewerApp.state.imageSlideTimelineEvents[eventIndex];
+
+            if (targetObject && viewerApp.state.viewerFabricCanvas) {
+                 // Reset pan/zoom if currently active on a different object or no object
+                if (viewerApp.state.isCanvasPannedOrZoomed && viewerApp.state.panZoomTargetObject !== targetObject) {
+                    resetPanZoomWithAnimation(false); // Animate back to default before new pan/zoom
+                    // Wait for reset animation to roughly complete before starting new one
+                    setTimeout(() => {
+                        panZoomToImageEventTarget(targetObject);
+                    }, 500); // Duration of resetPanZoomWithAnimation
+                } else if (!viewerApp.state.isCanvasPannedOrZoomed) {
+                    panZoomToImageEventTarget(targetObject);
+                } else {
+                    // Already panned to this object, perhaps do nothing or re-apply if needed
+                    console.log("Already panned/zoomed to target object.");
+                }
+            }
+            updateImageEventMarkerStyles();
+            updateSlideNavigationUI(); // Update nav button states
+        }
+
+        function panZoomToImageEventTarget(targetObject) {
+            const canvas = viewerApp.state.viewerFabricCanvas;
+            if (!canvas || !targetObject) return;
+
+            if (!viewerApp.state.isCanvasPannedOrZoomed) { 
+                viewerApp.state.originalViewportTransform = canvas.viewportTransform.slice(); 
+            }
+
+            let targetZoom = 1.5; // Default zoom
+            if (targetObject.customInteraction && targetObject.customInteraction.action === 'panZoomToTarget' && targetObject.customInteraction.panZoomLevel) {
+                targetZoom = targetObject.customInteraction.panZoomLevel;
+            } else {
+                // Default pan/zoom to center and fit the object, or a fixed zoom level
+                // For simplicity, let's use a fixed zoom and center it.
+                // More sophisticated: calculate zoom to fit bounding box.
+            }
+            viewerApp.state.panZoomTargetObject = targetObject; 
+            animatePanZoom(targetObject, targetZoom); // animatePanZoom handles isCanvasPannedOrZoomed = true
+        }
+
+
+        function updateImageEventMarkerStyles() {
+            if (!viewerTimelineTrackEl) return;
+            const markers = viewerTimelineTrackEl.querySelectorAll('.event-marker');
+            markers.forEach((marker, index) => {
+                if (index === viewerApp.state.currentImageSlideEventIndex) {
+                    marker.style.backgroundColor = '#ffc107'; // Active color (e.g., yellow)
+                    marker.style.transform = 'translateY(-50%) translateX(-50%) scale(1.5)';
+                } else {
+                    marker.style.backgroundColor = '#007bff'; // Inactive color
+                    marker.style.transform = 'translateY(-50%) translateX(-50%) scale(1)';
+                }
+            });
+        }
+
+        function nextImageEvent() {
+            const currentIndex = viewerApp.state.currentImageSlideEventIndex;
+            const totalEvents = viewerApp.state.imageSlideTimelineEvents.length;
+            if (currentIndex < totalEvents - 1) {
+                navigateToImageEvent(currentIndex + 1);
+            }
+        }
+
+        function prevImageEvent() {
+            const currentIndex = viewerApp.state.currentImageSlideEventIndex;
+            if (currentIndex > 0) {
+                navigateToImageEvent(currentIndex - 1);
+            }
+        }
+
     function startAudioTimelineTracking() {
         // Clear any existing interval
         if (viewerApp.state.audioTimelineInterval) {
@@ -1266,15 +1459,21 @@ function displayViewerProjects(response) { // Argument changed
             console.log(`Interaction Mismatch: Configured trigger '${interaction.trigger}' does not match event '${eventType}'. Ignoring for this handler instance.`);
             return;
         }
-        if (viewerApp.state.isSpotlightActive && interaction.action !== 'spotlight') {
-            hideSpotlightSVG();
+        if (viewerApp.state.isSpotlightActive && interaction.action !== 'spotlight') { // If spotlight is on, and this is not another spotlight action
+            hideSpotlightSVG(); // Hide it first
         }
-         if (viewerApp.state.isCanvasPannedOrZoomed && interaction.action !== 'panZoomToTarget') {
-            if(fabricObject !== viewerApp.state.panZoomTargetObject){
-                console.log("Different object clicked while panned/zoomed. Resetting zoom first."); 
-                resetPanZoomWithAnimation();
-            }
+        
+        // If panned/zoomed to a specific object AND the new interaction is for a DIFFERENT object OR not a pan/zoom action itself
+        if (viewerApp.state.isCanvasPannedOrZoomed && 
+            interaction.action !== 'panZoomToTarget' && 
+            fabricObject !== viewerApp.state.panZoomTargetObject) {
+            
+            console.log("Interaction on a different object while panned/zoomed. Resetting zoom first."); 
+            resetPanZoomWithAnimation(); // Reset zoom before handling the new interaction
+            // Optionally, delay the current interaction if resetPanZoomWithAnimation is not immediate
+            // For now, assume reset is quick or the interaction can proceed after initiating reset.
         }
+
 
         console.log("Handling interaction:", interaction.action, "for object:", fabricObject);
 
@@ -1849,6 +2048,11 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
              if (viewerSlideIndicatorEl) viewerSlideIndicatorEl.textContent = "Slide ? / ?";
              if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = true;
              if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.disabled = true;
+             // Also handle event buttons
+             const nextEventBtn = document.getElementById('viewerNextEventButton');
+             const prevEventBtn = document.getElementById('viewerPrevEventButton');
+             if (nextEventBtn) { nextEventBtn.style.display = 'none'; nextEventBtn.disabled = true;}
+             if (prevEventBtn) { prevEventBtn.style.display = 'none'; prevEventBtn.disabled = true;}
              return;
         }
         const numSlides = viewerApp.state.currentProjectData.slides.length;
@@ -1856,6 +2060,21 @@ function animatePulse(fabricObject, duration, strength, controller, shouldLoop) 
         if (viewerSlideIndicatorEl) viewerSlideIndicatorEl.textContent = `Slide ${currentIndex + 1} / ${numSlides}`;
         if (viewerPrevSlideButtonEl) viewerPrevSlideButtonEl.disabled = (currentIndex <= 0);
         if (viewerNextSlideButtonEl) viewerNextSlideButtonEl.disabled = (currentIndex >= numSlides - 1);
+
+        // Handle Image Slide Event Navigation Buttons
+        const nextEventBtn = document.getElementById('viewerNextEventButton');
+        const prevEventBtn = document.getElementById('viewerPrevEventButton');
+
+        if (viewerApp.state.currentMediaType === 'image' && viewerApp.state.imageSlideTimelineEvents && viewerApp.state.imageSlideTimelineEvents.length > 0) {
+            if (nextEventBtn) nextEventBtn.style.display = 'inline-block';
+            if (prevEventBtn) prevEventBtn.style.display = 'inline-block';
+
+            if (prevEventBtn) prevEventBtn.disabled = (viewerApp.state.currentImageSlideEventIndex <= 0);
+            if (nextEventBtn) nextEventBtn.disabled = (viewerApp.state.currentImageSlideEventIndex >= viewerApp.state.imageSlideTimelineEvents.length - 1);
+        } else {
+            if (nextEventBtn) nextEventBtn.style.display = 'none';
+            if (prevEventBtn) prevEventBtn.style.display = 'none';
+        }
     }
     function navigateToPrevSlide() { if (viewerApp.state.currentSlideIndex > 0) renderSlideForViewing(viewerApp.state.currentSlideIndex - 1); }
     function navigateToNextSlide() { if (viewerApp.state.currentProjectData && viewerApp.state.currentSlideIndex < viewerApp.state.currentProjectData.slides.length - 1) renderSlideForViewing(viewerApp.state.currentSlideIndex + 1); }
@@ -2262,24 +2481,10 @@ function stopAndDestroyYouTubePlayer() {
                     console.log("Cleared viewerApp.state.videoOverlays (Array).");
                 }
             }
-        // Reset timeline - Assuming resetTimeline is a global function
-        if (typeof resetTimeline === 'function') {
-            resetTimeline();
-            console.log("Called resetTimeline().");
-        } else {
-            // Fallback/manual timeline cleanup if resetTimeline is not defined
-            console.warn("resetTimeline is not a function. Performing manual timeline cleanup.");
-            if (viewerApp && viewerApp.state) viewerApp.state.currentVideoDuration = 0;
-            if (viewerVideoTimelineContainerEl) viewerVideoTimelineContainerEl.style.display = 'none';
-            if (viewerTimelineProgressEl) viewerTimelineProgressEl.style.width = '0%';
-            if (viewerCurrentTimeEl) viewerCurrentTimeEl.textContent = formatTime(0); // formatTime needs to be accessible
-            if (viewerTotalDurationEl) viewerTotalDurationEl.textContent = formatTime(0); // formatTime needs to be accessible
-            if (viewerTimelineTrackEl) {
-                const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.timeline-marker');
-                existingMarkers.forEach(marker => marker.remove());
-                console.log("Manually cleared timeline markers.");
-            }
-        }
+        // Reset timeline
+        resetTimeline(); // This function now handles all timeline cleanup including new bar.
+        console.log("Called resetTimeline() in stopAndDestroyYouTubePlayer.");
+
 
         // Reset canvas visibility
         const viewerFabricCanvasEl = document.getElementById("viewerFabricCanvas");
@@ -2374,15 +2579,10 @@ let audioEventHandlers = {
                 console.log("stopAndClearAudioPlayer: Audio player stopped, cleared, and hidden.");
 
                 // 2. Hide Timeline Bar
-                // NEW: Hide timeline bar
-                const timelineBar = document.getElementById('interactiveTimelineBar');
-                if (timelineBar) timelineBar.style.display = 'none';
+                // Reset timeline
+                resetTimeline(); // This function now handles all timeline cleanup.
+                console.log("Called resetTimeline() in stopAndClearAudioPlayer.");
                 
-                // Also hide the main video timeline container if it was made visible for audio
-                if (viewerVideoTimelineContainerEl) { // This is the container for YT timeline parts
-                     viewerVideoTimelineContainerEl.style.display = 'none';
-                }
-
             } catch (e) {
                 console.error("stopAndClearAudioPlayer: Error during audio player cleanup:", e);
             }
@@ -2540,35 +2740,45 @@ let audioEventHandlers = {
         }
         
         // Also explicitly hide the OLD timeline container if its reference exists
-        if (viewerVideoTimelineContainerEl) {
+        if (viewerVideoTimelineContainerEl) { // Old container
             viewerVideoTimelineContainerEl.style.display = 'none';
         }
 
-        // These variables (viewerTimelineProgressEl, etc.) should point to the elements
-        // within the NEW interactiveTimelineBar due to setupDOMReferences.
-        if (viewerTimelineProgressEl) {
-            viewerTimelineProgressEl.style.width = '0%';
+        // Reset components of the interactiveTimelineBar
+        const timeDisplay = document.getElementById('viewerTimelineTimeDisplay');
+        if (timeDisplay) {
+            timeDisplay.style.display = 'flex'; // Default display for video/audio
         } else {
-            console.warn("Timeline: viewerTimelineProgressEl (new) not found for reset.");
+            console.warn("Timeline: viewerTimelineTimeDisplay not found for reset.");
+        }
+        
+        const progressEl = document.getElementById('viewerTimelineProgress'); // Path to new progress bar
+        if (progressEl) {
+            progressEl.style.width = '0%';
+        } else {
+            console.warn("Timeline: viewerTimelineProgress (new) not found for reset.");
         }
 
-        if (viewerCurrentTimeEl) {
-            viewerCurrentTimeEl.textContent = formatTime(0);
+        const currentTimeEl = document.getElementById('viewerCurrentTime'); // Path to new current time
+        if (currentTimeEl) {
+            currentTimeEl.textContent = formatTime(0);
         } else {
-            console.warn("Timeline: viewerCurrentTimeEl (new) not found for reset.");
+            console.warn("Timeline: viewerCurrentTime (new) not found for reset.");
         }
 
-        if (viewerTotalDurationEl) {
-            viewerTotalDurationEl.textContent = formatTime(0);
+        const totalDurationEl = document.getElementById('viewerTotalDuration'); // Path to new total duration
+        if (totalDurationEl) {
+            totalDurationEl.textContent = formatTime(0);
         } else {
-            console.warn("Timeline: viewerTotalDurationEl (new) not found for reset.");
+            console.warn("Timeline: viewerTotalDuration (new) not found for reset.");
         }
-
-        if (viewerTimelineTrackEl) { // This should be the track from interactiveTimelineBar
-            const existingMarkers = viewerTimelineTrackEl.querySelectorAll('.timeline-marker');
+        
+        const trackEl = document.getElementById('viewerTimelineTrack'); // Path to new track
+        if (trackEl) {
+            const existingMarkers = trackEl.querySelectorAll('.timeline-marker');
             existingMarkers.forEach(marker => marker.remove());
         } else {
-            console.warn("Timeline: viewerTimelineTrackEl (new) not found for clearing markers.");
+            console.warn("Timeline: viewerTimelineTrack (new) not found for clearing markers.");
         }
     }
   </script>

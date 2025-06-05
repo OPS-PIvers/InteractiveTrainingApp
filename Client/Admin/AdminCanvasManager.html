@@ -127,16 +127,29 @@
       const container = document.getElementById('fabricCanvasContainer');
       if (!container) { console.warn("AdminCanvasManager.resizeCanvasToFit: fabricCanvasContainer not found."); return; }
 
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
-      if (containerWidth === 0 || containerHeight === 0) { console.warn("AdminCanvasManager.resizeCanvasToFit: Container has zero dimensions."); return; } // Avoid division by zero or weird scaling
-
       let contentWidth = (slideData && slideData.canvasWidth) ? slideData.canvasWidth : adminCanvasManager.state.defaultCanvasWidth;
       let contentHeight = (slideData && slideData.canvasHeight) ? slideData.canvasHeight : adminCanvasManager.state.defaultCanvasHeight;
 
       // Set the logical size of the canvas
       canvas.setWidth(contentWidth);
       canvas.setHeight(contentHeight);
+
+      // Calculate container dimensions with some bounds
+      const containerWidth = container.clientWidth;
+      const maxContainerHeight = Math.min(window.innerHeight * 0.8, 800); // Max 80% of viewport or 800px
+      const minContainerHeight = 300;
+      
+      // Calculate ideal container height based on content aspect ratio
+      const aspectRatio = contentHeight / contentWidth;
+      let idealContainerHeight = containerWidth * aspectRatio;
+      
+      // Clamp the container height within bounds
+      const containerHeight = Math.max(minContainerHeight, Math.min(maxContainerHeight, idealContainerHeight));
+      
+      // Update container height dynamically
+      container.style.height = containerHeight + 'px';
+
+      if (containerWidth === 0 || containerHeight === 0) { console.warn("AdminCanvasManager.resizeCanvasToFit: Container has zero dimensions."); return; } // Avoid division by zero or weird scaling
 
       // Calculate zoom to fit content within container with padding
       const zoomX = containerWidth / contentWidth;
@@ -452,7 +465,7 @@
     }
 
     if (window.adminOverlayManager && typeof adminOverlayManager.setCurrentMediaType === 'function') {
-      adminOverlayManager.setCurrentMediaType(currentMediaTypeForCallbacks);
+      adminOverlayManager.setCurrentMediaType(currentMediaTypeForCallbacks, selectedSlideData);
     }
     if (window.adminToolbar && typeof adminToolbar.updateForSlide === 'function') {
         adminToolbar.updateForSlide(selectedSlideData);

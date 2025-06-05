@@ -1,0 +1,996 @@
+<script>
+  window.adminCanvasManager = window.adminCanvasManager || {};
+  adminCanvasManager.state = {
+    fabricCanvasInstance: null,
+    currentSlideIndex: -1,
+    projectDataRef: null, // Reference to the project data managed by AdminApp/AdminProjectManager
+    defaultCanvasWidth: 960,
+    defaultCanvasHeight: 540,
+    history: [],
+    historyIndex: -1,
+    isApplyingHistory: false,
+    lastUploadedDriveId: null,
+    lastUploadedMimeType: null,
+    lastUploadedFileName: null,
+    isPasteListenerActive: false, // This will be managed by AdminApp's attachEditViewGlobalListeners
+    // currentMediaType: null // This is implicitly handled by slideMedia.type, AOM can also track
+  };
+
+  // DOM elements specific to canvas/slides (will be fetched in initializeEditView)
+  let fabricCanvasEl, slideThumbnailsContainerEl, imageUploaderEl, addSlideButtonEl;
+  let undoButtonEl, redoButtonEl, deleteObjectButtonEl;
+  // Media related elements for canvas background
+  let youtubeUrlInputEl, setYoutubeBackgroundButtonEl, audioUploaderEl, attachedAudioNameEl, removeAudioButtonEl;
+  let adminMediaPlaceholderEl, adminYouTubePlayerContainerEl;
+
+
+  console.log("AdminCanvasManager.html loaded");
+
+  adminCanvasManager.initialize = function() {
+    // General initialization if any, not specific to edit view
+    console.log("AdminCanvasManager initialized (general).");
+  };
+
+  adminCanvasManager.initializeEditView = function(projectData) {
+    console.log("AdminCanvasManager: Initializing Edit View.");
+    adminCanvasManager.state.projectDataRef = projectData;
+    adminCanvasManager.state.currentSlideIndex = -1; // Reset
+    adminCanvasManager.state.history = [];
+    adminCanvasManager.state.historyIndex = -1;
+    adminCanvasManager.state.isApplyingHistory = false;
+    adminCanvasManager.state.lastUploadedDriveId = null;
+    adminCanvasManager.state.lastUploadedMimeType = null;
+    adminCanvasManager.state.lastUploadedFileName = null;
+
+
+    // Fetch DOM elements
+    fabricCanvasEl = document.getElementById('fabricCanvasElement');
+    slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
+    imageUploaderEl = document.getElementById('imageUploader'); // For canvas background image
+    addSlideButtonEl = document.getElementById('addSlideButton');
+    undoButtonEl = document.getElementById('undoButton');
+    redoButtonEl = document.getElementById('redoButton');
+    deleteObjectButtonEl = document.getElementById('deleteObjectButton'); // General delete for selected canvas object
+
+    youtubeUrlInputEl = document.getElementById('youtubeUrlInput');
+    setYoutubeBackgroundButtonEl = document.getElementById('setYoutubeBackgroundButton');
+    audioUploaderEl = document.getElementById('audioUploader'); // For slide audio background
+    attachedAudioNameEl = document.getElementById('attachedAudioName');
+    removeAudioButtonEl = document.getElementById('removeAudioButton'); // For removing audio bg
+
+    adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
+    adminYouTubePlayerContainerEl = document.getElementById('adminYouTubePlayerContainer');
+
+
+    if (!fabricCanvasEl) {
+      console.error("AdminCanvasManager.initializeEditView: fabricCanvasElement not found!");
+      baseApp.displayMessage("Critical error: Canvas element (#fabricCanvasElement) is missing from the HTML structure.", false, "messageArea");
+      return; // Stop initialization if canvas element is not found
+    }
+    if (!slideThumbnailsContainerEl) console.warn("AdminCanvasManager.initializeEditView: slideThumbnailsContainerEl not found.");
+    // Other elements are optional or have specific handlers that check for their existence.
+
+    adminCanvasManager.disposeCanvas(); // Dispose previous instance if any
+
+    try {
+        adminCanvasManager.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
+            width: adminCanvasManager.state.defaultCanvasWidth,
+            height: adminCanvasManager.state.defaultCanvasHeight,
+            backgroundColor: '#e9e9e9',
+            preserveObjectStacking: true
+        });
+        // fabricCanvasEl might be the wrapper, actual canvas dimensions are set by fabric.Canvas
+    } catch (e) {
+        console.error("AdminCanvasManager: Error initializing Fabric.js canvas:", e);
+        baseApp.displayMessage("Critical error: Failed to initialize the canvas. " + e.message, false, "messageArea");
+        return;
+    }
+
+    adminCanvasManager.attachCanvasEventListeners();
+    adminCanvasManager.attachControlListeners();
+
+    if (adminCanvasManager.state.projectDataRef && adminCanvasManager.state.projectDataRef.slides && adminCanvasManager.state.projectDataRef.slides.length > 0) {
+      adminCanvasManager.selectSlide(0);
+    } else {
+      adminCanvasManager.handleAddSlide(); // Add an initial slide if project is new/empty
+    }
+    adminCanvasManager.updateSlideThumbnailsUI(); // Call even if adding initial slide
+    adminCanvasManager.updateUndoRedoButtonStates();
+
+    // Initial resize to fit container
+    // adminCanvasManager.resizeCanvasToFit(adminCanvasManager.getCurrentSlideData()); // selectSlide will call this.
+
+    console.log("AdminCanvasManager: Edit View Initialized successfully.");
+  };
+
+  adminCanvasManager.disposeCanvas = function() {
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (canvas) {
+      try {
+        // Remove custom wheel listener if attached directly to upperCanvasEl
+        if (canvas.upperCanvasEl && canvas.upperCanvasEl.__customWheelListener) {
+            canvas.upperCanvasEl.removeEventListener('wheel', canvas.upperCanvasEl.__customWheelListener);
+            delete canvas.upperCanvasEl.__customWheelListener;
+        }
+        canvas.off(); // Remove all Fabric event listeners
+        canvas.clear(); // Clear objects
+        canvas.dispose(); // Release resources
+      } catch (e) { console.error("Error disposing canvas:", e); }
+      adminCanvasManager.state.fabricCanvasInstance = null;
+      console.log("AdminCanvasManager: Fabric canvas disposed.");
+    }
+  };
+
+  adminCanvasManager.resizeCanvasToFit = function(slideData) {
+      const canvas = adminCanvasManager.state.fabricCanvasInstance;
+      if (!canvas || !fabricCanvasEl) return;
+      const container = document.getElementById('fabricCanvasContainer');
+      if (!container) { console.warn("AdminCanvasManager.resizeCanvasToFit: fabricCanvasContainer not found."); return; }
+
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      if (containerWidth === 0 || containerHeight === 0) { console.warn("AdminCanvasManager.resizeCanvasToFit: Container has zero dimensions."); return; } // Avoid division by zero or weird scaling
+
+      let contentWidth = (slideData && slideData.canvasWidth) ? slideData.canvasWidth : adminCanvasManager.state.defaultCanvasWidth;
+      let contentHeight = (slideData && slideData.canvasHeight) ? slideData.canvasHeight : adminCanvasManager.state.defaultCanvasHeight;
+
+      // Set the logical size of the canvas
+      canvas.setWidth(contentWidth);
+      canvas.setHeight(contentHeight);
+
+      // Calculate zoom to fit content within container with padding
+      const zoomX = containerWidth / contentWidth;
+      const zoomY = containerHeight / contentHeight;
+      const zoom = Math.min(zoomX, zoomY) * 0.95; // 0.95 for a bit of padding
+
+      canvas.setZoom(zoom);
+
+      // Center the canvas within the container
+      canvas.viewportTransform[4] = (containerWidth - (contentWidth * zoom)) / 2;
+      canvas.viewportTransform[5] = (containerHeight - (contentHeight * zoom)) / 2;
+
+      canvas.calcOffset(); // Recalculate canvas offsets
+      canvas.renderAll();  // Re-render the canvas
+  };
+
+  adminCanvasManager.handleResize = function() {
+      if (adminCanvasManager.state.fabricCanvasInstance && adminCanvasManager.state.currentSlideIndex !== -1) {
+          adminCanvasManager.resizeCanvasToFit(adminCanvasManager.getCurrentSlideData());
+      }
+  };
+
+  adminCanvasManager.attachCanvasEventListeners = function() {
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!canvas) return;
+
+    const onObjectModified = (e) => {
+      if (e.target) {
+        if (window.adminToolbar && typeof adminToolbar.populateToolbar === 'function') {
+          adminToolbar.populateToolbar(e.target);
+        }
+        adminCanvasManager.saveCanvasStateForHistory();
+      }
+    };
+    const onSelectionChange = (e) => {
+      const activeObject = canvas.getActiveObject();
+       if (window.adminToolbar && typeof adminToolbar.populateToolbar === 'function') {
+          adminToolbar.populateToolbar(activeObject);
+       }
+    };
+
+    canvas.on('object:modified', onObjectModified);
+    canvas.on('selection:created', onSelectionChange);
+    canvas.on('selection:updated', onSelectionChange);
+    canvas.on('selection:cleared', onSelectionChange);
+
+    const onObjectAddedOrRemoved = () => adminCanvasManager.saveCanvasStateForHistory();
+    canvas.on('object:added', onObjectAddedOrRemoved);
+    canvas.on('object:removed', onObjectAddedOrRemoved);
+
+    const onMouseWheel = function(opt) {
+      if (!canvas) return;
+      const delta = opt.e.deltaY;
+      let zoom = canvas.getZoom();
+      zoom *= 0.999 ** delta;
+      if (zoom > 20) zoom = 20;
+      if (zoom < 0.01) zoom = 0.01;
+      canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
+      // TODO: Update zoom display if any (e.g., in AdminToolbar)
+    };
+
+    if (canvas.upperCanvasEl) {
+        if (canvas.upperCanvasEl.__customWheelListener) { // Remove existing to prevent duplicates if re-attaching
+            canvas.upperCanvasEl.removeEventListener('wheel', canvas.upperCanvasEl.__customWheelListener);
+        }
+        canvas.upperCanvasEl.addEventListener('wheel', onMouseWheel, { passive: false });
+        canvas.upperCanvasEl.__customWheelListener = onMouseWheel; // Store ref for potential removal
+        // Note: This listener is not tracked by baseApp.resourceManager as it's tied to canvas lifecycle.
+        // disposeCanvas should handle its removal if canvas is reinitialized.
+    }
+    console.log("AdminCanvasManager: Canvas event listeners attached.");
+  };
+
+  adminCanvasManager.attachControlListeners = function() {
+    const acm = adminCanvasManager;
+
+    const setupListener = (element, event, handler, id) => {
+        if (element) {
+            // To prevent duplicate listeners if this function is ever called multiple times with same elements
+            // we would ideally remove the old one. But with current structure, it's called once per edit view init.
+            // For safety with baseApp.resourceManager, ensure no duplicates by always calling remove first if element might persist.
+            // However, baseApp.resourceManager itself handles this by overwriting if same ID is used.
+            const wrappedHandler = () => handler(); // Ensure simple call signature for handler
+            element.addEventListener(event, wrappedHandler);
+            baseApp.resourceManager.trackDisposable(id, () => element.removeEventListener(event, wrappedHandler));
+        } else {
+            console.warn(`AdminCanvasManager.attachControlListeners: Element for ID '${id}' not found.`);
+        }
+    };
+
+    setupListener(addSlideButtonEl, 'click', acm.handleAddSlide, 'acm-addSlideButton-click');
+    setupListener(undoButtonEl, 'click', acm.handleUndo, 'acm-undoButton-click');
+    setupListener(redoButtonEl, 'click', acm.handleRedo, 'acm-redoButton-click');
+    setupListener(deleteObjectButtonEl, 'click', acm.handleDeleteObject, 'acm-deleteObjectButton-click');
+
+    if (imageUploaderEl) {
+        const handler = (e) => acm.handleImageUpload(e);
+        imageUploaderEl.addEventListener('change', handler);
+        baseApp.resourceManager.trackDisposable('acm-imageUploader-change', () => imageUploaderEl.removeEventListener('change', handler));
+    }
+    setupListener(setYoutubeBackgroundButtonEl, 'click', () => acm.handleSetMediaBackground('youtube'), 'acm-setYoutubeBackgroundButton-click');
+    if (audioUploaderEl) {
+        const handler = (e) => acm.handleAudioUploadForBackground(e);
+        audioUploaderEl.addEventListener('change', handler);
+        baseApp.resourceManager.trackDisposable('acm-audioUploader-change', () => audioUploaderEl.removeEventListener('change', handler));
+    }
+    setupListener(removeAudioButtonEl, 'click', () => acm.handleRemoveMediaBackground('audio'), 'acm-removeAudioButton-click');
+
+    console.log("AdminCanvasManager: Control listeners attached.");
+  };
+
+  adminCanvasManager.getCurrentSlideData = function(slideIndex) {
+    const index = typeof slideIndex === 'number' ? slideIndex : adminCanvasManager.state.currentSlideIndex;
+    if (index < 0 || !adminCanvasManager.state.projectDataRef || !adminCanvasManager.state.projectDataRef.slides || !adminCanvasManager.state.projectDataRef.slides[index]) {
+      return null;
+    }
+    return adminCanvasManager.state.projectDataRef.slides[index];
+  };
+
+  adminCanvasManager.saveCurrentSlideState = function() {
+    const currentSlide = adminCanvasManager.getCurrentSlideData();
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!currentSlide || !canvas) {
+      // console.log("AdminCanvasManager.saveCurrentSlideState: Skipping, no active slide/canvas/data.");
+      return;
+    }
+    try {
+      const propsToInclude = fabric.Object.prototype.getSvgSrc ? fabric.Object.prototype.getSvgSrc.properties : []; // Fabric 5+
+      currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
+      currentSlide.canvasWidth = canvas.getWidth(); // Use logical width
+      currentSlide.canvasHeight = canvas.getHeight(); // Use logical height
+
+      if (!currentSlide.slideMedia) {
+        currentSlide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] };
+      }
+      if (currentSlide.slideMedia.type !== 'image' && currentSlide.slideMedia.url && currentSlide.slideMedia.url.startsWith('data:image')) {
+        currentSlide.slideMedia.url = null; // Clean up potentially large data URLs if not an image type
+      }
+      // console.log(`AdminCanvasManager: Slide ${adminCanvasManager.state.currentSlideIndex + 1} state saved.`);
+    } catch (e) {
+      console.error(`Error saving slide state for index ${adminCanvasManager.state.currentSlideIndex}:`, e);
+      baseApp.displayMessage(`Error saving current slide state: ${e.message}`, false, 'messageArea');
+    }
+  };
+
+  adminCanvasManager.handleAddSlide = function() {
+    const pd = adminCanvasManager.state.projectDataRef;
+    if (!pd) { console.error("AdminCanvasManager.handleAddSlide: No project data reference."); return; }
+
+    adminCanvasManager.saveCurrentSlideState(); // Save current slide before adding/switching
+
+    const newSlideId = 'slide_' + sharedUtils.generateClientUuid();
+    const newSlide = {
+      slideId: newSlideId,
+      canvasWidth: adminCanvasManager.state.defaultCanvasWidth,
+      canvasHeight: adminCanvasManager.state.defaultCanvasHeight,
+      fabricCanvasJSON: null, // Will be an empty canvas initially
+      slideMedia: { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] },
+      timelineEvents: []
+    };
+    if (!pd.slides) pd.slides = [];
+    pd.slides.push(newSlide);
+    adminCanvasManager.selectSlide(pd.slides.length - 1); // Select the new slide
+    sharedUtils.showNotification("New slide added.", "success");
+    // History for the new slide will be initialized in selectSlide
+  };
+
+  adminCanvasManager.selectSlide = function(slideIndex) {
+    const pd = adminCanvasManager.state.projectDataRef;
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+
+    if (!pd || !pd.slides || slideIndex < 0 || slideIndex >= pd.slides.length || !canvas) {
+      console.error("AdminCanvasManager.selectSlide: Invalid arguments or state.", {slideIndex, pdExists: !!pd, slidesExist: !!(pd && pd.slides), canvasExists: !!canvas});
+      return;
+    }
+
+    if (adminCanvasManager.state.currentSlideIndex !== -1 && adminCanvasManager.state.currentSlideIndex !== slideIndex) {
+      adminCanvasManager.saveCurrentSlideState(); // Save previous slide if different
+    }
+
+    const oldSlideIndex = adminCanvasManager.state.currentSlideIndex;
+    adminCanvasManager.state.currentSlideIndex = slideIndex;
+    const selectedSlideData = pd.slides[slideIndex];
+
+    // --- Media Handling ---
+    if (window.mediaManager && typeof mediaManager.stopAndDestroyPlayer === 'function') mediaManager.stopAndDestroyPlayer();
+    if (window.mediaManager && typeof mediaManager.stopAndClearAudioPlayer === 'function') mediaManager.stopAndClearAudioPlayer();
+
+    sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => { el.style.display = 'none'; el.innerHTML = ''; });
+    sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1'); // Reset opacity
+    canvas.setBackgroundColor('rgba(233,233,233,1)', canvas.renderAll.bind(canvas)); // Default background
+    canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); // Clear previous bg image
+
+    if(imageUploaderEl) imageUploaderEl.value = null; // Reset file inputs
+    if(youtubeUrlInputEl) youtubeUrlInputEl.value = (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type === 'youtube' && selectedSlideData.slideMedia.url) ? selectedSlideData.slideMedia.url : '';
+    if(audioUploaderEl) audioUploaderEl.value = null;
+
+    sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => el.textContent = '');
+    const audioControlsContainer = document.getElementById('audioControlsContainer'); // Assuming this ID exists for the audio controls UI
+    sharedUtils.safeDOMUpdate(audioControlsContainer, el => el.style.display = 'none');
+    sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none');
+    sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => { el.style.display = 'none'; el.textContent = '';});
+
+    // Ensure slide data structure
+    if (!selectedSlideData.slideMedia) selectedSlideData.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] };
+    if (!Array.isArray(selectedSlideData.slideMedia.videoQuestions)) selectedSlideData.slideMedia.videoQuestions = [];
+    if (!Array.isArray(selectedSlideData.slideMedia.videoOverlays)) selectedSlideData.slideMedia.videoOverlays = [];
+    if (!Array.isArray(selectedSlideData.timelineEvents)) selectedSlideData.timelineEvents = [];
+    if (selectedSlideData.slideMedia.type === 'youtube' && typeof selectedSlideData.slideMedia.youtubeOptions === 'undefined') {
+        selectedSlideData.slideMedia.youtubeOptions = { showClickToBeginButton: false };
+    }
+
+    adminCanvasManager.resizeCanvasToFit(selectedSlideData); // Resize canvas based on slide's dimensions
+
+    // Load Media Background
+    const media = selectedSlideData.slideMedia;
+    let currentMediaTypeForCallbacks = media ? media.type : null;
+
+    if (media && media.type === 'image' && media.driveFileId) {
+      baseApp.showLoading(true, 'loadingSpinner');
+      google.script.run
+        .withSuccessHandler(response => {
+          baseApp.showLoading(false, 'loadingSpinner');
+          if (adminCanvasManager.state.currentSlideIndex !== slideIndex) return; // Slide changed during load
+          if (response && response.success && response.base64Data) {
+            fabric.Image.fromURL(response.base64Data, img => {
+              if (!canvas || adminCanvasManager.state.currentSlideIndex !== slideIndex) return;
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                scaleX: canvas.width / img.width, scaleY: canvas.height / img.height // Fit to current canvas logical size
+              });
+            }, { crossOrigin: 'anonymous' });
+          } else { baseApp.displayMessage( (response && response.error) ? response.error.message : "Error loading slide background image.", false, 'messageArea'); }
+        })
+        .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+        .getImageAsBase64(media.driveFileId);
+    } else if (media && media.type === 'youtube' && media.url) {
+      canvas.setBackgroundColor('rgba(0,0,0,0)', canvas.renderAll.bind(canvas)); // Transparent canvas bg
+      sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '0.7'); // Make canvas semi-transparent
+      sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => { el.innerHTML = '<div id="adminYouTubePlayerDiv"></div>'; el.style.display = 'block';});
+
+      if (window.mediaManager && window.adminOverlayManager && typeof adminOverlayManager.setupMediaCallbacks === 'function') {
+          adminOverlayManager.setupMediaCallbacks('youtube'); // Let AOM set the callbacks
+          const videoId = sharedUtils.extractYouTubeVideoId(media.url);
+          if (videoId) {
+            mediaManager.setupPlayer(videoId, 'adminYouTubePlayerDiv', { 'controls': 1, 'showinfo': 0, 'rel': 0, 'width': canvas.width, 'height': canvas.height });
+          } else {
+             console.error("Invalid YouTube URL, cannot extract video ID:", media.url);
+             sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => { el.textContent = `Error: Invalid YouTube URL. ${media.url}`; el.style.display = 'block'; });
+          }
+      } else {
+           console.error("MediaManager or AdminOverlayManager not ready for YouTube playback setup.");
+           sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => { el.textContent = `Error: YouTube player setup failed. URL: ${media.url}`; el.style.display = 'block'; });
+      }
+
+    } else if (media && media.type === 'audio' && media.driveFileId) {
+      sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => el.textContent = `Attached Audio: ${media.originalName || media.driveFileId}`);
+      sharedUtils.safeDOMUpdate(audioControlsContainer, el => el.style.display = 'block');
+      sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block');
+      sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => { el.textContent = `Audio File: ${media.originalName || 'Audio File'}`; el.style.display = 'block'; });
+    }
+
+    if (window.adminOverlayManager && typeof adminOverlayManager.setCurrentMediaType === 'function') {
+      adminOverlayManager.setCurrentMediaType(currentMediaTypeForCallbacks);
+    }
+    if (window.adminToolbar && typeof adminToolbar.updateForSlide === 'function') {
+        adminToolbar.updateForSlide(selectedSlideData);
+    }
+
+
+    // Load Fabric Canvas JSON
+    canvas.clear(); // Clears objects, preserves background
+    if (selectedSlideData.fabricCanvasJSON) {
+      canvas.loadFromJSON(selectedSlideData.fabricCanvasJSON, () => {
+        if (!canvas || adminCanvasManager.state.currentSlideIndex !== slideIndex) return; // Check if still on same slide
+        // Ensure custom props are re-applied after loadFromJSON
+        canvas.getObjects().forEach(obj => {
+          const originalObj = selectedSlideData.fabricCanvasJSON.objects.find(o => o.slideId === obj.slideId || (o.id && o.id === obj.id)); // Try matching by custom ID
+          if (originalObj) {
+              obj.customInteraction = { ...adminCanvasManager.getDefaultInteractionProps(), ...originalObj.customInteraction };
+              obj.customAnimation = { ...adminCanvasManager.getDefaultAnimationProps(), ...originalObj.customAnimation };
+          } else { // Fallback for objects that might not have been in original JSON (e.g. if JSON was partial)
+              if (!obj.customInteraction) obj.customInteraction = adminCanvasManager.getDefaultInteractionProps();
+              if (!obj.customAnimation) obj.customAnimation = adminCanvasManager.getDefaultAnimationProps();
+          }
+        });
+        canvas.renderAll();
+        if (window.adminToolbar && typeof adminToolbar.populateToolbar === 'function') adminToolbar.populateToolbar(canvas.getActiveObject());
+        adminCanvasManager.saveCanvasStateForHistory(); // Save initial state of loaded slide
+      });
+    } else {
+      // No Fabric JSON, canvas is clear of objects.
+      if (window.adminToolbar && typeof adminToolbar.populateToolbar === 'function') adminToolbar.populateToolbar(null);
+      canvas.renderAll();
+      adminCanvasManager.saveCanvasStateForHistory(); // Save state of empty canvas
+    }
+
+    adminCanvasManager.updateSlideThumbnailsUI();
+    if (oldSlideIndex !== slideIndex) { // Only reset history if actually changing slides
+        adminCanvasManager.state.history = [];
+        adminCanvasManager.state.historyIndex = -1;
+        // saveCanvasStateForHistory is called after loadFromJSON or for empty canvas
+    }
+    adminCanvasManager.updateUndoRedoButtonStates();
+    console.log(`AdminCanvasManager: Switched to slide ${slideIndex + 1}.`);
+  };
+
+  adminCanvasManager.getDefaultInteractionProps = function() {
+    return { trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5 };
+  };
+  adminCanvasManager.getDefaultAnimationProps = function() {
+    return { trigger: "", type: "", speed: "normal", strength: 5, loop: false };
+  };
+
+  adminCanvasManager.updateSlideThumbnailsUI = function() {
+    sharedUtils.safeDOMUpdate(slideThumbnailsContainerEl, el => {
+      el.innerHTML = ''; // Clear existing thumbnails
+      const pd = adminCanvasManager.state.projectDataRef;
+      if (!pd || !pd.slides || pd.slides.length === 0) {
+        el.innerHTML = '<p style="text-align:center; padding:10px;">No slides yet. Click "Add Slide" below.</p>'; return;
+      }
+      pd.slides.forEach((slide, index) => {
+        const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
+        thumb.textContent = `Slide ${index + 1}`;
+        if (index === adminCanvasManager.state.currentSlideIndex) thumb.classList.add('active-slide');
+
+        const selectHandler = () => adminCanvasManager.selectSlide(index);
+        thumb.addEventListener('click', selectHandler);
+        // No baseApp.resourceManager tracking needed as parent's innerHTML is cleared.
+
+        const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-slide-btn'; deleteBtn.innerHTML = '&times;';
+        deleteBtn.title = `Delete Slide ${index + 1}`;
+        const deleteHandler = (e) => { e.stopPropagation(); adminCanvasManager.handleDeleteSlide(index); };
+        deleteBtn.addEventListener('click', deleteHandler);
+        thumb.appendChild(deleteBtn);
+        el.appendChild(thumb);
+      });
+    }, "Failed to update slide thumbnails UI");
+  };
+
+  adminCanvasManager.handleDeleteSlide = function(slideIndex) {
+    const pd = adminCanvasManager.state.projectDataRef;
+    if (!pd || !pd.slides || slideIndex < 0 || slideIndex >= pd.slides.length) return;
+    if (pd.slides.length <= 1) {
+      baseApp.displayMessage("Cannot delete the only slide. Add another slide first or modify this one.", false, 'messageArea'); return;
+    }
+    if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}? This action cannot be undone.`)) return;
+
+    const wasCurrent = adminCanvasManager.state.currentSlideIndex === slideIndex;
+    pd.slides.splice(slideIndex, 1); // Remove slide from project data
+
+    if (wasCurrent) {
+      adminCanvasManager.state.currentSlideIndex = -1; // Mark as no slide selected temporarily
+      const newIndexToSelect = Math.max(0, Math.min(slideIndex, pd.slides.length - 1));
+      if (pd.slides.length > 0) {
+        adminCanvasManager.selectSlide(newIndexToSelect);
+      } else { // Should not happen due to "length <= 1" check, but as safeguard
+        if(adminCanvasManager.state.fabricCanvasInstance) adminCanvasManager.state.fabricCanvasInstance.clear();
+        adminCanvasManager.updateSlideThumbnailsUI();
+        if(window.adminToolbar && typeof adminToolbar.populateToolbar === 'function') adminToolbar.populateToolbar(null);
+      }
+    } else {
+      // If deleted slide was before current, adjust current index
+      if (adminCanvasManager.state.currentSlideIndex > slideIndex) {
+        adminCanvasManager.state.currentSlideIndex--;
+      }
+      adminCanvasManager.updateSlideThumbnailsUI(); // Update thumbnails to reflect deletion and new active slide
+    }
+    sharedUtils.showNotification(`Slide ${slideIndex + 1} deleted.`, "info");
+  };
+
+  adminCanvasManager.addShape = function(shapeType) {
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!canvas) { baseApp.displayMessage("Canvas is not initialized. Cannot add shape.", false, "messageArea"); return; }
+    let newObject;
+    const commonProps = {
+      left: canvas.getCenter().left - 50, // Attempt to center with offset
+      top: canvas.getCenter().top - 50,
+      customInteraction: adminCanvasManager.getDefaultInteractionProps(),
+      customAnimation: adminCanvasManager.getDefaultAnimationProps(),
+      sequenceOrder: null, // Placeholder for sequencing
+      slideId: 'obj_' + sharedUtils.generateClientUuid() // Unique ID for the object within the slide
+    };
+
+    switch(shapeType) {
+      case 'rectangle':
+        newObject = new fabric.Rect({ ...commonProps, fill: 'rgba(255,0,0,0.7)', width: 150, height: 100, stroke: 'black', strokeWidth: 1 });
+        break;
+      case 'circle':
+        newObject = new fabric.Circle({ ...commonProps, fill: 'rgba(0,0,255,0.7)', radius: 50, stroke: 'black', strokeWidth: 1 });
+        break;
+      case 'textbox':
+        newObject = new fabric.Textbox('Editable Text', { ...commonProps, width: 200, fontSize: 24, fill: '#000000', fontFamily: 'Arial' });
+        break;
+      default:
+        console.warn("AdminCanvasManager.addShape: Unknown shape type requested:", shapeType); return;
+    }
+    canvas.add(newObject); canvas.setActiveObject(newObject); canvas.renderAll();
+    // saveCanvasStateForHistory is called by 'object:added' event listener.
+    if (window.adminToolbar && typeof adminToolbar.hideActivePopover === 'function') {
+      adminToolbar.hideActivePopover(); // Close shape selection popover
+    }
+  };
+  adminCanvasManager.addRectangle = () => adminCanvasManager.addShape('rectangle');
+  adminCanvasManager.addCircle = () => adminCanvasManager.addShape('circle');
+  adminCanvasManager.addTextbox = () => adminCanvasManager.addShape('textbox');
+
+  adminCanvasManager.saveCanvasStateForHistory = function() {
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!canvas || adminCanvasManager.state.isApplyingHistory) return;
+
+    const propsToInclude = fabric.Object.prototype.getSvgSrc ? fabric.Object.prototype.getSvgSrc.properties : [];
+    const currentState = canvas.toJSON(propsToInclude);
+
+    // If history was undone, and now a new change is made, truncate future history
+    if (adminCanvasManager.state.historyIndex < adminCanvasManager.state.history.length - 1) {
+      adminCanvasManager.state.history = adminCanvasManager.state.history.slice(0, adminCanvasManager.state.historyIndex + 1);
+    }
+    adminCanvasManager.state.history.push(currentState);
+    adminCanvasManager.state.historyIndex = adminCanvasManager.state.history.length - 1;
+
+    const maxHistory = 20;
+    if (adminCanvasManager.state.history.length > maxHistory) {
+      adminCanvasManager.state.history.shift(); // Remove oldest state
+      adminCanvasManager.state.historyIndex--;   // Adjust index accordingly
+    }
+    adminCanvasManager.updateUndoRedoButtonStates();
+  };
+
+  adminCanvasManager.updateUndoRedoButtonStates = function() {
+    if (undoButtonEl) undoButtonEl.disabled = adminCanvasManager.state.historyIndex <= 0;
+    if (redoButtonEl) redoButtonEl.disabled = adminCanvasManager.state.historyIndex >= adminCanvasManager.state.history.length - 1;
+  };
+
+  adminCanvasManager.handleUndo = function() {
+    if (adminCanvasManager.state.historyIndex <= 0) return;
+    adminCanvasManager.state.isApplyingHistory = true;
+    adminCanvasManager.state.historyIndex--;
+    adminCanvasManager.loadStateFromHistory(adminCanvasManager.state.history[adminCanvasManager.state.historyIndex]);
+  };
+
+  adminCanvasManager.handleRedo = function() {
+    if (adminCanvasManager.state.historyIndex >= adminCanvasManager.state.history.length - 1) return;
+    adminCanvasManager.state.isApplyingHistory = true;
+    adminCanvasManager.state.historyIndex++;
+    adminCanvasManager.loadStateFromHistory(adminCanvasManager.state.history[adminCanvasManager.state.historyIndex]);
+  };
+
+  adminCanvasManager.loadStateFromHistory = function(stateToLoad) {
+      const canvas = adminCanvasManager.state.fabricCanvasInstance;
+      if (!canvas) return;
+      canvas.loadFromJSON(stateToLoad, () => {
+          canvas.renderAll();
+          // Restore custom props
+          canvas.getObjects().forEach(obj => {
+              const originalObjInState = stateToLoad.objects.find(sObj => (sObj.slideId && sObj.slideId === obj.slideId) || (sObj.id && sObj.id === obj.id) );
+              if (originalObjInState) {
+                  obj.customInteraction = { ...adminCanvasManager.getDefaultInteractionProps(), ...originalObjInState.customInteraction };
+                  obj.customAnimation = { ...adminCanvasManager.getDefaultAnimationProps(), ...originalObjInState.customAnimation };
+              } else {
+                  if (!obj.customInteraction) obj.customInteraction = adminCanvasManager.getDefaultInteractionProps();
+                  if (!obj.customAnimation) obj.customAnimation = adminCanvasManager.getDefaultAnimationProps();
+              }
+          });
+          if(window.adminToolbar && typeof adminToolbar.populateToolbar === 'function') adminToolbar.populateToolbar(canvas.getActiveObject());
+          adminCanvasManager.state.isApplyingHistory = false;
+          adminCanvasManager.updateUndoRedoButtonStates();
+      });
+  };
+
+  adminCanvasManager.handleDeleteObject = function() {
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject();
+    if (activeObject) {
+      if (activeObject.type === 'activeSelection') { // Group selection
+        activeObject.forEachObject(obj => canvas.remove(obj));
+        canvas.discardActiveObject(); // Clear selection
+      } else { // Single object
+        canvas.remove(activeObject);
+      }
+      canvas.renderAll();
+      // saveCanvasStateForHistory is called by 'object:removed' event
+      if(window.adminToolbar && typeof adminToolbar.populateToolbar === 'function') adminToolbar.populateToolbar(null);
+      sharedUtils.showNotification("Selected object(s) deleted.", "info");
+    } else {
+      sharedUtils.showNotification("No object selected to delete.", "info");
+    }
+  };
+
+  // --- Media Handling for Canvas Background ---
+  adminCanvasManager.handleImageUpload = function(event) {
+    if (adminCanvasManager.state.isLoading) { if (event.target) event.target.value = null; return; }
+    const file = event.target.files[0];
+    if (!file || !file.type.startsWith('image/')) { if(event.target) event.target.value = null; return; }
+    const currentSlide = adminCanvasManager.getCurrentSlideData();
+    if (!currentSlide) { baseApp.displayMessage("No active slide to set background.", false, "messageArea"); if (event.target) event.target.value = null; return; }
+
+    adminCanvasManager.saveCurrentSlideState(); // Save current slide before upload
+    baseApp.showLoading(true, 'loadingSpinner');
+    baseApp.displayMessage("Uploading image for background...", true, 'messageArea');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
+      const currentProjectId = adminCanvasManager.state.projectDataRef ? adminCanvasManager.state.projectDataRef.projectId : null;
+      if (!currentProjectId) {
+          baseApp.showLoading(false, 'loadingSpinner'); baseApp.displayMessage("Error: No project context for upload.", false, 'messageArea'); if(event.target) event.target.value = null; return;
+      }
+      google.script.run
+          .withSuccessHandler(adminCanvasManager.onImageUploadedForBackground)
+          .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+          .uploadFileToDrive(fileData, currentProjectId, 'image'); // 'image' type for subfolder
+    };
+    reader.onerror = function(error) { baseApp.showLoading(false, 'loadingSpinner'); baseApp.displayMessage("Error reading file: " + error.message, false, 'messageArea'); if(event.target) event.target.value = null; };
+    reader.readAsDataURL(file);
+  };
+
+  adminCanvasManager.onImageUploadedForBackground = function(response) {
+    baseApp.showLoading(false, 'loadingSpinner');
+    if (imageUploaderEl) imageUploaderEl.value = null; // Reset input
+    if (response && response.success && response.driveFileId) {
+      baseApp.displayMessage("Image uploaded. Fetching for canvas background...", true, 'messageArea');
+      baseApp.showLoading(true, 'loadingSpinner');
+      adminCanvasManager.state.lastUploadedDriveId = response.driveFileId;
+      adminCanvasManager.state.lastUploadedMimeType = response.mimeType;
+      adminCanvasManager.state.lastUploadedFileName = response.fileName;
+      google.script.run
+        .withSuccessHandler(adminCanvasManager.onBase64ImageReceivedForBackground)
+        .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+        .getImageAsBase64(response.driveFileId);
+    } else {
+      baseApp.onServerError({ message: (response && response.error) ? response.error : "Image upload to Drive failed or did not return expected data." }, 'messageArea');
+    }
+  };
+
+  adminCanvasManager.onBase64ImageReceivedForBackground = function(response) {
+    baseApp.showLoading(false, 'loadingSpinner');
+    const currentSlide = adminCanvasManager.getCurrentSlideData();
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!currentSlide || !canvas) { baseApp.displayMessage("Error: No active slide or canvas to apply background.", false, 'messageArea'); return; }
+
+    if (response && response.success && response.base64Data) {
+      fabric.Image.fromURL(response.base64Data, function(img) {
+        // Check if slide changed during async operation
+        const currentProjectDataRef = adminCanvasManager.state.projectDataRef;
+        if (!canvas || !currentProjectDataRef || !currentProjectDataRef.slides || adminCanvasManager.state.currentSlideIndex === -1 ||
+            adminCanvasManager.state.currentSlideIndex >= currentProjectDataRef.slides.length ||
+            currentProjectDataRef.slides[adminCanvasManager.state.currentSlideIndex].slideId !== currentSlide.slideId) {
+            console.warn("Slide changed before image loaded for background. Aborting set background.");
+            return;
+        }
+
+        // Option: Resize canvas to image dimensions (up to a max) or fit image to canvas
+        // Current behavior: Fit image to current canvas dimensions.
+        // If you want to resize canvas to image:
+        // const imgWidth = img.width; const imgHeight = img.height;
+        // const maxWidth = 1920; // Max canvas width
+        // let cvWidth = imgWidth; let cvHeight = imgHeight;
+        // if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / (imgWidth/imgHeight));}
+        // canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
+        // if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
+
+        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+          scaleX: canvas.width / img.width, scaleY: canvas.height / img.height
+        });
+        baseApp.displayMessage("Canvas background image updated.", true, 'messageArea');
+
+        currentSlide.slideMedia.type = 'image';
+        currentSlide.slideMedia.url = null; // URL is not stored for Drive images, ID is source of truth
+        currentSlide.slideMedia.driveFileId = adminCanvasManager.state.lastUploadedDriveId;
+        currentSlide.slideMedia.mimeType = adminCanvasManager.state.lastUploadedMimeType;
+        currentSlide.slideMedia.originalName = adminCanvasManager.state.lastUploadedFileName;
+        // currentSlide.canvasWidth = canvas.getWidth(); // Update if canvas dimensions changed
+        // currentSlide.canvasHeight = canvas.getHeight();
+
+        adminCanvasManager.state.lastUploadedDriveId = null; // Clear temp state
+        adminCanvasManager.state.lastUploadedMimeType = null;
+        adminCanvasManager.state.lastUploadedFileName = null;
+
+        adminCanvasManager.updateSlideThumbnailsUI(); // Reflect changes if dimensions affected thumbnails
+        adminCanvasManager.saveCanvasStateForHistory(); // Save this background change
+      }, { crossOrigin: 'anonymous' });
+    } else {
+      baseApp.onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data for background." }, 'messageArea');
+    }
+  };
+
+  adminCanvasManager.handlePasteImage = function(event) {
+      const currentSlide = adminCanvasManager.getCurrentSlideData();
+      if (!currentSlide || adminCanvasManager.state.isLoading) return;
+
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+      for (let i = 0; i < items.length; i++) {
+          if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+              event.preventDefault();
+              const blob = items[i].getAsFile();
+              if (!blob) continue;
+
+              adminCanvasManager.saveCurrentSlideState(); // Save before potentially lengthy upload
+              baseApp.showLoading(true, 'loadingSpinner');
+              baseApp.displayMessage("Processing pasted image for background...", true, 'messageArea');
+              const reader = new FileReader();
+              reader.onload = (e_reader) => {
+                  const fileData = {
+                      fileName: blob.name || `pasted_image_${Date.now()}.${blob.type.split('/')[1] || 'png'}`,
+                      mimeType: blob.type,
+                      data: e_reader.target.result.split(',')[1] // Base64 data
+                  };
+                  const currentProjectId = adminCanvasManager.state.projectDataRef ? adminCanvasManager.state.projectDataRef.projectId : null;
+                  if (!currentProjectId) { baseApp.showLoading(false, 'loadingSpinner'); baseApp.displayMessage("Error: Project context missing for paste.", false, 'messageArea'); return; }
+
+                  google.script.run
+                      .withSuccessHandler(adminCanvasManager.onImageUploadedForBackground) // Reuse existing flow
+                      .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+                      .uploadFileToDrive(fileData, currentProjectId, 'image');
+              };
+              reader.onerror = (error) => { baseApp.showLoading(false, 'loadingSpinner'); baseApp.displayMessage("Error reading pasted image: " + error.message, false, 'messageArea'); };
+              reader.readAsDataURL(blob);
+              return; // Process only the first image found
+          }
+      }
+  };
+
+  adminCanvasManager.handleSetMediaBackground = function(mediaType) {
+      const currentSlide = adminCanvasManager.getCurrentSlideData();
+      if (!currentSlide) { baseApp.displayMessage("No active slide selected.", false, "messageArea"); return; }
+
+      adminCanvasManager.saveCurrentSlideState(); // Save any canvas changes before media change
+
+      if (mediaType === 'youtube') {
+          const url = youtubeUrlInputEl ? youtubeUrlInputEl.value.trim() : '';
+          if (!url || (!url.includes("youtube.com/") && !url.includes("youtu.be/"))) {
+              baseApp.displayMessage("Please enter a valid YouTube video URL.", false, "messageArea"); return;
+          }
+          currentSlide.slideMedia.type = 'youtube';
+          currentSlide.slideMedia.url = url;
+          currentSlide.slideMedia.driveFileId = null; // Clear other media types
+          currentSlide.slideMedia.mimeType = 'video/youtube';
+          currentSlide.slideMedia.originalName = null;
+          currentSlide.slideMedia.videoQuestions = currentSlide.slideMedia.videoQuestions || []; // Preserve questions
+          currentSlide.slideMedia.videoOverlays = currentSlide.slideMedia.videoOverlays || [];   // Preserve overlays
+      } else if (mediaType === 'audio') {
+          // This case is typically handled by handleAudioUploadForBackground directly setting the state.
+          // If there was a separate input for audio URL, it would be processed here.
+          console.warn("handleSetMediaBackground for 'audio' called directly, usually handled by upload flow.");
+          // Ensure type is audio, other fields are set by upload handler.
+          currentSlide.slideMedia.type = 'audio';
+      }
+
+      // Reload the slide to apply the new media settings and update UI
+      adminCanvasManager.selectSlide(adminCanvasManager.state.currentSlideIndex);
+      baseApp.displayMessage(`${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} background information updated.`, true, "messageArea");
+      adminCanvasManager.saveCanvasStateForHistory(); // Save this change
+  };
+
+  adminCanvasManager.handleAudioUploadForBackground = function(event) {
+      if (adminCanvasManager.state.isLoading) { if (event.target) event.target.value = null; return; }
+      const file = event.target.files[0];
+      if (!file || !file.type.startsWith('audio/')) { if(event.target) event.target.value = null; return; }
+      const currentSlide = adminCanvasManager.getCurrentSlideData();
+      if (!currentSlide) { baseApp.displayMessage("No active slide for audio upload.", false, "messageArea"); if(event.target) event.target.value = null; return; }
+
+      adminCanvasManager.saveCurrentSlideState();
+      baseApp.showLoading(true, 'loadingSpinner');
+      baseApp.displayMessage("Uploading audio file...", true, 'messageArea');
+      const reader = new FileReader();
+      reader.onload = function(e_reader) {
+          const fileData = { fileName: file.name, mimeType: file.type, data: e_reader.target.result.split(',')[1] };
+          const currentProjectId = adminCanvasManager.state.projectDataRef ? adminCanvasManager.state.projectDataRef.projectId : null;
+          if (!currentProjectId) { baseApp.showLoading(false, 'loadingSpinner'); baseApp.displayMessage("Error: Project context missing for audio upload.", false, 'messageArea'); return; }
+
+          google.script.run
+              .withSuccessHandler(response => {
+                  baseApp.showLoading(false, 'loadingSpinner');
+                  if (audioUploaderEl) audioUploaderEl.value = null; // Reset input
+                  if (response && response.success && response.driveFileId) {
+                      baseApp.displayMessage("Audio file uploaded successfully.", true, 'messageArea');
+                      currentSlide.slideMedia.type = 'audio';
+                      currentSlide.slideMedia.url = null; // No direct URL for Drive audio
+                      currentSlide.slideMedia.driveFileId = response.driveFileId;
+                      currentSlide.slideMedia.mimeType = response.mimeType;
+                      currentSlide.slideMedia.originalName = response.fileName;
+                      // Reload slide to reflect new audio attachment and update UI
+                      adminCanvasManager.selectSlide(adminCanvasManager.state.currentSlideIndex);
+                      adminCanvasManager.saveCanvasStateForHistory();
+                  } else {
+                      baseApp.onServerError((response && response.error) ? response.error : { message: "Audio upload to Drive failed." }, 'messageArea');
+                  }
+              })
+              .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+              .uploadFileToDrive(fileData, currentProjectId, 'audio'); // 'audio' type for subfolder
+      };
+      reader.onerror = function(error) { baseApp.showLoading(false, 'loadingSpinner'); baseApp.displayMessage("Error reading audio file: " + error.message, false, 'messageArea'); };
+      reader.readAsDataURL(file);
+  };
+
+  adminCanvasManager.handleRemoveMediaBackground = function(mediaTypeToClear) {
+      const currentSlide = adminCanvasManager.getCurrentSlideData();
+      if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== mediaTypeToClear) {
+          // baseApp.displayMessage(`No ${mediaTypeToClear} background to remove or type mismatch.`, false, "messageArea");
+          return;
+      }
+
+      currentSlide.slideMedia.type = null;
+      currentSlide.slideMedia.url = null;
+      currentSlide.slideMedia.driveFileId = null;
+      currentSlide.slideMedia.mimeType = null;
+      currentSlide.slideMedia.originalName = null;
+      // Note: videoQuestions and videoOverlays are intentionally NOT cleared here,
+      // as they might be independent of the visual background media.
+      // If they should be cleared, add that logic here.
+
+      adminCanvasManager.selectSlide(adminCanvasManager.state.currentSlideIndex); // Reload slide to reflect change
+      baseApp.displayMessage(`${mediaTypeToClear.charAt(0).toUpperCase() + mediaTypeToClear.slice(1)} background removed.`, true, "messageArea");
+      adminCanvasManager.saveCanvasStateForHistory();
+  };
+
+  adminCanvasManager.getProjectDataForSave = function() {
+    adminCanvasManager.saveCurrentSlideState(); // Crucial: ensure the currently active slide's canvas state is saved to projectDataRef
+    // Iterate through all slides and ensure their canvas dimensions are stored if not already
+    if (adminCanvasManager.state.projectDataRef && adminCanvasManager.state.projectDataRef.slides) {
+        adminCanvasManager.state.projectDataRef.slides.forEach(slide => {
+            if (slide.fabricCanvasJSON && (!slide.canvasWidth || !slide.canvasHeight)) {
+                // This is a fallback, ideally canvasWidth/Height are set when slide is saved or loaded
+                if (slide.fabricCanvasJSON.width) slide.canvasWidth = slide.fabricCanvasJSON.width;
+                else if (slide.fabricCanvasJSON.backgroundImage && slide.fabricCanvasJSON.backgroundImage.width) {
+                     // Approximate from background if needed, though less reliable
+                     slide.canvasWidth = slide.fabricCanvasJSON.backgroundImage.width * (slide.fabricCanvasJSON.backgroundImage.scaleX || 1);
+                } else {
+                    slide.canvasWidth = adminCanvasManager.state.defaultCanvasWidth;
+                }
+
+                if (slide.fabricCanvasJSON.height) slide.canvasHeight = slide.fabricCanvasJSON.height;
+                 else if (slide.fabricCanvasJSON.backgroundImage && slide.fabricCanvasJSON.backgroundImage.height) {
+                    slide.canvasHeight = slide.fabricCanvasJSON.backgroundImage.height * (slide.fabricCanvasJSON.backgroundImage.scaleY || 1);
+                } else {
+                    slide.canvasHeight = adminCanvasManager.state.defaultCanvasHeight;
+                }
+            }
+        });
+    }
+    return adminCanvasManager.state.projectDataRef;
+  };
+
+  adminCanvasManager.getActiveObject = function() {
+    if (adminCanvasManager.state.fabricCanvasInstance) {
+      return adminCanvasManager.state.fabricCanvasInstance.getActiveObject();
+    }
+    return null;
+  };
+
+  adminCanvasManager.updateFabricObjectProperty = function(propertyName, value, inputType, isFloat = false) {
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject(); // Using the helper
+    if (!activeObject) return;
+
+    let parsedValue = value;
+    if (inputType === 'number' || inputType === 'range') {
+      parsedValue = isFloat ? parseFloat(value) : parseInt(value, 10);
+      if (isNaN(parsedValue)) {
+        if ((propertyName === 'strokeWidth' || propertyName === 'charSpacing') && value === '') parsedValue = 0;
+        else if (propertyName === 'fontSize' && value === '') parsedValue = activeObject.fontSize || 12; // Keep last good value or a default
+        else if (value === '') return;
+        else return;
+      }
+    } else if (inputType === 'checkbox') {
+      // This case is not explicitly used by AdminToolbar for direct property updates,
+      // but good to have. Value from checkbox is already boolean.
+      parsedValue = value;
+    }
+
+    if (propertyName === 'width') {
+      const newWidth = parseFloat(value);
+      if (!isNaN(newWidth) && activeObject.width !== 0) { // Prevent division by zero if original width is 0
+        activeObject.scaleX = newWidth > 0 ? (newWidth / activeObject.width) : (0.0001 / activeObject.width) ;
+      } else if (newWidth === 0) {
+         activeObject.scaleX = 0.0001 / (activeObject.width || 1);
+      }
+    } else if (propertyName === 'height') {
+      const newHeight = parseFloat(value);
+      if (!isNaN(newHeight) && activeObject.height !== 0) {
+        activeObject.scaleY = newHeight > 0 ? (newHeight / activeObject.height) : (0.0001 / activeObject.height);
+      } else if (newHeight === 0) {
+        activeObject.scaleY = 0.0001 / (activeObject.height || 1);
+      }
+    } else {
+      activeObject.set(propertyName, parsedValue);
+    }
+
+    if ((activeObject.type === 'textbox' || activeObject.type === 'i-text') &&
+        ['text', 'fontSize', 'fontWeight', 'fontStyle', 'fontFamily', 'lineHeight', 'charSpacing', 'textAlign'].includes(propertyName)) {
+      activeObject.initDimensions();
+    }
+
+    activeObject.setCoords();
+    canvas.renderAll();
+    adminCanvasManager.saveCanvasStateForHistory();
+
+    // AdminToolbar.populateToolbar(activeObject) will be called by canvas selection events,
+    // or for specific button state changes, AdminToolbar itself handles re-population.
+  };
+
+  adminCanvasManager.updateFabricObjectShadowProperty = function(shadowPropertyKey, value, inputType) {
+    const canvas = adminCanvasManager.state.fabricCanvasInstance;
+    if (!canvas) return;
+    const activeObject = canvas.getActiveObject(); // Using the helper
+    if (!activeObject) return;
+
+    let parsedValue = value;
+     if (inputType === 'number' || inputType === 'range') {
+        parsedValue = parseFloat(value);
+        if (isNaN(parsedValue)) parsedValue = 0;
+    } else if (inputType === 'checkbox') {
+        parsedValue = !!value;
+    } else if (inputType === 'color') {
+        // Value is already hex string from color picker, Fabric handles it.
+    }
+
+
+    let shadowOptions = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow.toObject() : {};
+    shadowOptions[shadowPropertyKey] = parsedValue;
+
+    // Consolidate all shadow properties from the form/toolbar state to build a complete shadow object.
+    // This example assumes AdminToolbar.state holds the current values from the shadow popover.
+    // If not, this logic needs to be in AdminToolbar, which then calls a simpler setter here.
+    // For now, making it work with what AdminToolbar would send for a single property change.
+    const ats = window.adminToolbar ? adminToolbar.state : {}; // Access toolbar state if available
+    if(ats.objShadowColorEl) shadowOptions.color = ats.objShadowColorEl.value;
+    if(ats.objShadowBlurEl) shadowOptions.blur = parseFloat(ats.objShadowBlurEl.value) || 0;
+    if(ats.objShadowOffsetXEl) shadowOptions.offsetX = parseFloat(ats.objShadowOffsetXEl.value) || 0;
+    if(ats.objShadowOffsetYEl) shadowOptions.offsetY = parseFloat(ats.objShadowOffsetYEl.value) || 0;
+    if(ats.objShadowAffectStrokeEl) shadowOptions.affectStroke = ats.objShadowAffectStrokeEl.checked;
+    if(ats.objShadowNonScalingEl) shadowOptions.nonScaling = ats.objShadowNonScalingEl.checked;
+
+
+    const hasMeaningfulShadow = shadowOptions.color && shadowOptions.color !== 'rgba(0,0,0,0)' && shadowOptions.color !== '#00000000' &&
+                             (shadowOptions.blur > 0 || shadowOptions.offsetX !== 0 || shadowOptions.offsetY !== 0);
+
+    const hasConfiguredShadowOptions = shadowOptions.affectStroke || shadowOptions.nonScaling;
+
+    if (hasMeaningfulShadow || hasConfiguredShadowOptions) {
+      activeObject.set('shadow', new fabric.Shadow(shadowOptions));
+    } else {
+      activeObject.set('shadow', null);
+    }
+
+    canvas.renderAll();
+    adminCanvasManager.saveCanvasStateForHistory();
+
+    if (window.adminToolbar && adminToolbar.state.shadowSettingsButtonEl) {
+       adminToolbar.state.shadowSettingsButtonEl.classList.toggle('active', !!activeObject.shadow);
+    }
+  };
+
+</script>

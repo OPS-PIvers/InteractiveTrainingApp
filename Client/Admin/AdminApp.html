@@ -1,0 +1,296 @@
+<script>
+  // AdminApp: Main coordinator for the Admin section
+  window.adminApp = window.adminApp || {}; // Ensure namespace exists
+
+  // --- Application State (Core part for AdminApp) ---
+  adminApp.state = adminApp.state || {}; // Ensure state object exists
+  adminApp.state.currentView = 'list'; // Default view
+  adminApp.state.isLoading = false; // Global loading state for Admin
+  adminApp.state.currentProjectId = null; // To store the ID of the project being edited
+  // activePopoverId removed from AdminApp.state, will be managed by modules like AdminToolbar
+
+  // --- DOM Element References (Core for AdminApp) ---
+  // These will be populated by setupDOMReferences
+  let messageAreaEl, loadingSpinnerEl;
+  let listViewContainerEl, editViewContainerEl;
+  let projectTitleInputEl, createProjectButtonEl; // For project creation in list view
+  let adminProjectListContainerEl; // For listing projects
+
+  // --- Constants (if any are super generic and needed early by AdminApp) ---
+  // Example: const ADMIN_APP_VERSION = '1.0.0';
+
+  console.log("AdminApp.html loaded");
+
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("AdminApp: DOMContentLoaded event fired!");
+    // Ensure baseApp and sharedUtils are loaded before initializing adminApp
+    if (typeof baseApp === 'undefined' || typeof sharedUtils === 'undefined') {
+        console.error("AdminApp: BaseApp or SharedUtils not available. Initialization halted.");
+        // Optionally, display an error message to the user in a predefined HTML element if available
+        const criticalErrorArea = document.getElementById('criticalErrorArea'); // Assuming such an element exists
+        if (criticalErrorArea) {
+            criticalErrorArea.innerHTML = "Critical Error: Core application components (BaseApp, SharedUtils) failed to load. Admin panel cannot start. Please contact support.";
+            criticalErrorArea.style.display = 'block';
+        }
+        return; // Stop further execution
+    }
+    adminApp.initializeApp();
+  });
+
+  adminApp.initializeApp = function() {
+    // Initialize Admin-specific parts of BaseApp if needed
+    // e.g., baseApp.setAppName('Admin');
+    if (baseApp && typeof baseApp.setAppName === 'function') {
+        baseApp.setAppName('Admin');
+    }
+
+
+    adminApp.setupDOMReferences(); // DOM refs for AdminApp itself
+    adminApp.attachEventListeners(); // Event listeners for AdminApp itself
+
+    // Initialize other Admin modules (stubs for now)
+    if (window.adminProjectManager && typeof adminProjectManager.initialize === 'function') {
+      adminProjectManager.initialize();
+    } else {
+      console.warn("AdminProjectManager not found or initialize function missing.");
+    }
+    if (window.adminCanvasManager && typeof adminCanvasManager.initialize === 'function') {
+      adminCanvasManager.initialize();
+    } else {
+      console.warn("AdminCanvasManager not found or initialize function missing.");
+    }
+    if (window.adminToolbar && typeof adminToolbar.initialize === 'function') {
+      adminToolbar.initialize();
+    } else {
+      console.warn("AdminToolbar not found or initialize function missing.");
+    }
+    if (window.adminOverlayManager && typeof adminOverlayManager.initialize === 'function') {
+      adminOverlayManager.initialize();
+    } else {
+      console.warn("AdminOverlayManager not found or initialize function missing.");
+    }
+
+    // Initial view setup
+    adminApp.switchToListView(); // Or determine initial view based on URL, etc.
+    console.log("AdminApp: Initialization complete.");
+  };
+
+  adminApp.setupDOMReferences = function() {
+    messageAreaEl = document.getElementById('messageArea');
+    loadingSpinnerEl = document.getElementById('loadingSpinner');
+    listViewContainerEl = document.getElementById('listViewContainer');
+    editViewContainerEl = document.getElementById('editViewContainer');
+
+    // Elements for project creation (part of list view, but AdminApp might coordinate)
+    // These are re-fetched in switchToListView as they are part of that view
+    // projectTitleInputEl = document.getElementById('projectTitleInput');
+    // createProjectButtonEl = document.getElementById('createProjectButton');
+    // adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+
+    if (!messageAreaEl) console.warn("AdminApp.setupDOMReferences: messageAreaEl not found.");
+    if (!loadingSpinnerEl) console.warn("AdminApp.setupDOMReferences: loadingSpinnerEl not found.");
+    if (!listViewContainerEl) console.warn("AdminApp.setupDOMReferences: listViewContainerEl not found.");
+    if (!editViewContainerEl) console.warn("AdminApp.setupDOMReferences: editViewContainerEl not found.");
+
+    console.log("AdminApp: Core DOM references set up.");
+  };
+
+  adminApp.attachEventListeners = function() {
+    // Listener for project creation button is attached in switchToListView
+    // as the button itself is part of the list view.
+
+    // Global click listener for popovers
+    // Global click listener for popovers - defers to modules
+    const popoverGlobalClickHandler = function(event) {
+      // This handler now primarily defers to AdminToolbar or other modules
+      // if they manage their own popovers and need global closing.
+      if (window.adminToolbar && typeof adminToolbar.handleGlobalClickForPopoverHide === 'function') {
+        adminToolbar.handleGlobalClickForPopoverHide(event);
+      }
+      // If other modules have global popovers, they could be checked here too.
+      // Example:
+      // if (window.someOtherModuleWithPopovers && typeof someOtherModuleWithPopovers.handleGlobalClick === 'function') {
+      //   someOtherModuleWithPopovers.handleGlobalClick(event);
+      // }
+    };
+    document.addEventListener('click', popoverGlobalClickHandler, true);
+    baseApp.resourceManager.trackDisposable('adminApp-document-click-popoverManagement', () => {
+        document.removeEventListener('click', popoverGlobalClickHandler, true);
+    });
+
+    // Window resize handler
+    const debouncedResizeHandler = sharedUtils.debounce(adminApp.handleGlobalWindowResize, 250);
+    window.addEventListener('resize', debouncedResizeHandler);
+    baseApp.resourceManager.trackDisposable('adminApp-window-resize', () => {
+        window.removeEventListener('resize', debouncedResizeHandler);
+    });
+
+    console.log("AdminApp: Core event listeners attached.");
+  };
+
+  adminApp.handleGlobalWindowResize = function() {
+    console.log("AdminApp: Window resized.");
+    // Delegate to specific managers if they need to react
+    if (adminApp.state.currentView === 'edit' && window.adminCanvasManager && typeof adminCanvasManager.handleResize === 'function') {
+      adminCanvasManager.handleResize();
+    }
+    // Other modules can also listen to a BaseApp event if preferred
+    if (window.baseApp && typeof baseApp.publish === 'function') {
+        baseApp.publish('globalWindowResize');
+    }
+  };
+
+  adminApp.handleGlobalCreateProjectClick = function() {
+    if (projectTitleInputEl && window.adminProjectManager && typeof adminProjectManager.createProject === 'function') {
+      const projectTitle = projectTitleInputEl.value.trim();
+      adminProjectManager.createProject(projectTitle); // This function should handle clearing the input
+    } else {
+      console.warn("Cannot create project: AdminProjectManager or title input not available.");
+      baseApp.displayMessage("Error: Cannot initiate project creation. Required components are missing.", false, "messageArea");
+    }
+  };
+
+  adminApp.switchToListView = function() {
+    console.log("AdminApp: Switching to List View");
+    adminApp.state.currentView = 'list';
+    adminApp.state.currentProjectId = null; // Clear current project ID
+
+    baseApp.resourceManager.disposeAll(); // Clean up listeners from previous view
+    adminApp.attachEventListeners(); // Re-attach AdminApp's own global listeners
+
+    if (typeof adminApp.hideActivePopover === 'function') adminApp.hideActivePopover();
+
+    if (window.mediaManager && typeof mediaManager.stopAndDestroyPlayer === 'function') {
+      mediaManager.stopAndDestroyPlayer();
+    }
+    if (window.mediaManager && typeof mediaManager.stopAndClearAudioPlayer === 'function') {
+      mediaManager.stopAndClearAudioPlayer();
+    }
+
+    sharedUtils.safeDOMUpdate(listViewContainerEl, el => el.style.display = 'block', "Failed to show list view");
+    sharedUtils.safeDOMUpdate(editViewContainerEl, el => el.style.display = 'none', "Failed to hide edit view");
+
+    // Re-setup DOM references for the list view elements AdminApp interacts with
+    projectTitleInputEl = document.getElementById('projectTitleInput');
+    createProjectButtonEl = document.getElementById('createProjectButton');
+    adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+
+    if (!projectTitleInputEl) console.warn("AdminApp.switchToListView: projectTitleInputEl not found.");
+    if (!createProjectButtonEl) console.warn("AdminApp.switchToListView: createProjectButtonEl not found.");
+    if (!adminProjectListContainerEl) console.warn("AdminApp.switchToListView: adminProjectListContainerEl not found.");
+
+
+    // Re-attach listener for create project button
+    if (createProjectButtonEl) {
+       // Check if listener already attached by this mechanism to prevent duplicates
+       if (!createProjectButtonEl.hasAttribute('data-adminapp-listener')) {
+           const createProjectHandler = adminApp.handleGlobalCreateProjectClick; // Store reference for removal
+           baseApp.resourceManager.trackDisposable('adminApp-createProjectButton-click-listview', () => {
+              createProjectButtonEl.removeEventListener('click', createProjectHandler);
+              createProjectButtonEl.removeAttribute('data-adminapp-listener');
+           });
+           createProjectButtonEl.addEventListener('click', createProjectHandler);
+           createProjectButtonEl.setAttribute('data-adminapp-listener', 'true');
+       }
+    }
+
+    // Delegate to AdminProjectManager to load the list
+    if (window.adminProjectManager && typeof adminProjectManager.loadProjects === 'function') {
+      adminProjectManager.loadProjects();
+    } else {
+      console.error("AdminProjectManager.loadProjects function not available.");
+      baseApp.displayMessage("Error: Could not load project list. Project manager is not available.", false, "messageArea");
+    }
+
+    // Ensure other global listeners that might have been specific to edit view are re-established if needed
+    // For now, attachEventListeners covers the main global ones for AdminApp.
+
+    console.log("AdminApp: Switched to List View.");
+  };
+
+  adminApp.switchToEditView = function(projectId) {
+    console.log("AdminApp: Switching to Edit View for project ID:", projectId);
+    if (!projectId) {
+        console.error("AdminApp.switchToEditView: projectId is undefined or null.");
+        baseApp.displayMessage("Error: Cannot switch to edit view without a project ID.", false, "messageArea");
+        adminApp.switchToListView(); // Go back to safety
+        return;
+    }
+    adminApp.state.currentView = 'edit';
+    adminApp.state.currentProjectId = projectId;
+
+    baseApp.resourceManager.disposeAll(); // Clean up listeners from previous view (e.g., list view)
+    // Note: AdminApp's core listeners (resize) are re-attached here.
+    // Popover global click is also re-attached.
+    adminApp.attachEventListeners();
+
+    // Popovers are managed by AdminToolbar now, it should hide its own if necessary.
+    // if (typeof adminApp.hideActivePopover === 'function') adminApp.hideActivePopover();
+    if (window.adminToolbar && typeof adminToolbar.hideActivePopover === 'function') {
+        adminToolbar.hideActivePopover();
+    }
+
+    sharedUtils.safeDOMUpdate(listViewContainerEl, el => el.style.display = 'none', "Failed to hide list view for edit");
+    sharedUtils.safeDOMUpdate(editViewContainerEl, el => el.style.display = 'block', "Failed to show edit view");
+
+    baseApp.showLoading(true, 'loadingSpinner');
+
+    // Delegate to AdminProjectManager to load project data
+    if (window.adminProjectManager && typeof adminProjectManager.loadProjectForEditing === 'function') {
+      adminProjectManager.loadProjectForEditing(projectId, (projectData) => {
+        // This callback is executed by AdminProjectManager after project data is loaded and parsed
+        if (projectData) {
+          // Initialize modules that depend on projectData
+          if (window.adminToolbar && typeof adminToolbar.initializeEditView === 'function') {
+            adminToolbar.initializeEditView(projectData); // Toolbar might need project data for context
+          } else {
+            console.warn("AdminToolbar.initializeEditView not available or projectData not passed.");
+          }
+          if (window.adminCanvasManager && typeof adminCanvasManager.initializeEditView === 'function') {
+            adminCanvasManager.initializeEditView(projectData);
+          } else {
+            console.error("AdminCanvasManager.initializeEditView not available.");
+          }
+          if (window.adminOverlayManager && typeof adminOverlayManager.initializeEditView === 'function') {
+            adminOverlayManager.initializeEditView(projectData);
+          } else {
+            console.warn("AdminOverlayManager.initializeEditView not available.");
+          }
+
+          adminApp.attachEditViewGlobalListeners(); // Attach edit view specific global listeners
+
+        } else {
+          baseApp.displayMessage("Error: Failed to load project data for editing. The project may not exist or there was a server error.", false, "messageArea");
+          adminApp.switchToListView();
+        }
+        baseApp.showLoading(false, 'loadingSpinner');
+      });
+    } else {
+      console.error("AdminProjectManager.loadProjectForEditing function not available.");
+      baseApp.displayMessage("Critical Error: Cannot load project for editing. Project manager is not available.", false, "messageArea");
+      baseApp.showLoading(false, 'loadingSpinner');
+      adminApp.switchToListView(); // Fallback
+    }
+    console.log("AdminApp: Switched to Edit View.");
+  };
+
+  // adminApp.hideActivePopover and adminApp.togglePopover removed.
+  // Popover logic is now primarily managed by AdminToolbar.
+
+  adminApp.attachEditViewGlobalListeners = function() {
+      // Example: Paste listener, which was global in Admin_JS for edit view
+      const handlePasteImageWrapper = function(event) {
+          if (adminApp.state.currentView === 'edit' && window.adminCanvasManager && typeof adminCanvasManager.handlePasteImage === 'function') {
+              adminCanvasManager.handlePasteImage(event);
+          }
+      };
+
+      document.addEventListener('paste', handlePasteImageWrapper);
+      baseApp.resourceManager.trackDisposable('adminApp-editView-paste-image', () => {
+          document.removeEventListener('paste', handlePasteImageWrapper);
+          // console.log('AdminApp: Removed paste event listener for edit view.');
+      });
+      // console.log("AdminApp: Attached global listeners for Edit View (e.g., paste).");
+  };
+
+</script>

@@ -438,12 +438,6 @@
   // It's now populated into adminToolbar.state.popoverTriggersCache in populateToolbar.
 
   adminToolbar.togglePopover = function(popoverId, triggerButtonEl) {
-      { btnKey: 'opacityButtonEl', popoverId: 'opacityPopover' },
-      { btnKey: 'shadowSettingsButtonEl', popoverId: 'shadowPopover' },
-      { btnKey: 'interactionSettingsButtonEl', popoverId: 'interactionPopover' },
-      { btnKey: 'animationSettingsButtonEl', popoverId: 'animationPopover' },
-      { btnKey: 'mediaToolsButtonEl', popoverId: 'mediaToolsPopover' },
-      { btnKey: 'addShapeButtonEl', popoverId: 'shapesPopover' },
     const ats = adminToolbar.state;
     const atb = adminToolbar;
     const isAlreadyActive = ats.activePopoverId === popoverId;

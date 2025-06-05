@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Toolbar</title>
+</head>
+<body>
+    <h1>Toolbar Debug Test</h1>
+    <button onclick="checkToolbar()">Check Toolbar</button>
+    <button onclick="showToolbar()">Force Show Toolbar</button>
+    <div id="results"></div>
+
+    <script>
+        function checkToolbar() {
+            const toolbar = document.getElementById('overlayPropertiesToolbar');
+            const results = document.getElementById('results');
+            
+            if (toolbar) {
+                const computed = window.getComputedStyle(toolbar);
+                results.innerHTML = `
+                    <h3>Toolbar Found!</h3>
+                    <p>Element exists: Yes</p>
+                    <p>Inline style display: ${toolbar.style.display || 'not set'}</p>
+                    <p>Computed display: ${computed.display}</p>
+                    <p>Computed visibility: ${computed.visibility}</p>
+                    <p>Computed opacity: ${computed.opacity}</p>
+                `;
+            } else {
+                results.innerHTML = '<h3>Toolbar NOT found!</h3>';
+            }
+        }
+        
+        function showToolbar() {
+            const toolbar = document.getElementById('overlayPropertiesToolbar');
+            if (toolbar) {
+                toolbar.style.display = 'block';
+                toolbar.style.visibility = 'visible';
+                toolbar.style.opacity = '1';
+                checkToolbar();
+            }
+        }
+        
+        // Check on page load
+        window.addEventListener('load', checkToolbar);
+    </script>
+</body>
+</html>

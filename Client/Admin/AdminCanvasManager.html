@@ -188,15 +188,15 @@
     canvas.on('object:removed', onObjectAddedOrRemoved);
 
     const onMouseWheel = function(opt) {
-      if (!canvas) return;
-      const delta = opt.e.deltaY;
+      if (!canvas || !opt || !opt.e) return;
+      const delta = opt.e.deltaY || 0;
       let zoom = canvas.getZoom();
       zoom *= 0.999 ** delta;
       if (zoom > 20) zoom = 20;
       if (zoom < 0.01) zoom = 0.01;
-      canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-      opt.e.preventDefault();
-      opt.e.stopPropagation();
+      canvas.zoomToPoint({ x: opt.e.offsetX || 0, y: opt.e.offsetY || 0 }, zoom);
+      if (opt.e.preventDefault) opt.e.preventDefault();
+      if (opt.e.stopPropagation) opt.e.stopPropagation();
       // TODO: Update zoom display if any (e.g., in AdminToolbar)
     };
 
@@ -237,13 +237,17 @@
     if (imageUploaderEl) {
         const handler = (e) => acm.handleImageUpload(e);
         imageUploaderEl.addEventListener('change', handler);
-        baseApp.resourceManager.trackDisposable('acm-imageUploader-change', () => imageUploaderEl.removeEventListener('change', handler));
+        baseApp.resourceManager.trackDisposable('acm-imageUploader-change', () => {
+            if (imageUploaderEl) imageUploaderEl.removeEventListener('change', handler);
+        });
     }
     setupListener(setYoutubeBackgroundButtonEl, 'click', () => acm.handleSetMediaBackground('youtube'), 'acm-setYoutubeBackgroundButton-click');
     if (audioUploaderEl) {
         const handler = (e) => acm.handleAudioUploadForBackground(e);
         audioUploaderEl.addEventListener('change', handler);
-        baseApp.resourceManager.trackDisposable('acm-audioUploader-change', () => audioUploaderEl.removeEventListener('change', handler));
+        baseApp.resourceManager.trackDisposable('acm-audioUploader-change', () => {
+            if (audioUploaderEl) audioUploaderEl.removeEventListener('change', handler);
+        });
     }
     setupListener(removeAudioButtonEl, 'click', () => acm.handleRemoveMediaBackground('audio'), 'acm-removeAudioButton-click');
 
@@ -321,6 +325,7 @@
 
     const oldSlideIndex = adminCanvasManager.state.currentSlideIndex;
     adminCanvasManager.state.currentSlideIndex = slideIndex;
+    console.log(`AdminCanvasManager.selectSlide: Switched from slide ${oldSlideIndex} to slide ${slideIndex}`);
     const selectedSlideData = pd.slides[slideIndex];
 
     // --- Media Handling ---
@@ -453,6 +458,7 @@
   };
 
   adminCanvasManager.updateSlideThumbnailsUI = function() {
+    console.log(`AdminCanvasManager.updateSlideThumbnailsUI: Current slide index is ${adminCanvasManager.state.currentSlideIndex}`);
     sharedUtils.safeDOMUpdate(slideThumbnailsContainerEl, el => {
       el.innerHTML = ''; // Clear existing thumbnails
       const pd = adminCanvasManager.state.projectDataRef;
@@ -462,7 +468,10 @@
       pd.slides.forEach((slide, index) => {
         const thumb = document.createElement('div'); thumb.className = 'slide-thumbnail';
         thumb.textContent = `Slide ${index + 1}`;
-        if (index === adminCanvasManager.state.currentSlideIndex) thumb.classList.add('active-slide');
+        if (index === adminCanvasManager.state.currentSlideIndex) {
+          thumb.classList.add('active-slide');
+          console.log(`AdminCanvasManager.updateSlideThumbnailsUI: Adding active-slide class to slide ${index + 1}`);
+        }
 
         const selectHandler = () => adminCanvasManager.selectSlide(index);
         thumb.addEventListener('click', selectHandler);

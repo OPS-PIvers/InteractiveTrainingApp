@@ -37,8 +37,7 @@
             videoId = urlObj.pathname.substring(1);
         }
     } catch (e) {
-        const regex = /(?:youtube\.com\/(?:[^\/
-\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+        const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
         const match = url.match(regex);
         if (match) videoId = match[1];
     }
@@ -150,7 +149,7 @@
 
     element.addEventListener(event, handler);
 
-    if (resourceManager && resourceId && typeof resourceManager.trackDisposable === 'function') {
+    if (resourceManager && typeof resourceManager === 'object' && resourceId && typeof resourceManager.trackDisposable === 'function') {
       resourceManager.trackDisposable(resourceId, () => {
         element.removeEventListener(event, handler);
       });
@@ -259,11 +258,11 @@
 
   // Element Visibility Helpers
   window.sharedUtils.showElement = function(element) {
-    return this.safeDOMUpdate(element, el => el.style.display = 'block');
+    return element ? this.safeDOMUpdate(element, el => el.style.display = 'block') : false;
   };
 
   window.sharedUtils.hideElement = function(element) {
-    return this.safeDOMUpdate(element, el => el.style.display = 'none');
+    return element ? this.safeDOMUpdate(element, el => el.style.display = 'none') : false;
   };
 
   window.sharedUtils.toggleElement = function(element, show) {

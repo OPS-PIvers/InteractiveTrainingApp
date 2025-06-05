@@ -356,6 +356,13 @@
         selectedSlideData.slideMedia.youtubeOptions = { showClickToBeginButton: false };
     }
 
+    // Ensure slide has canvas dimensions set (use defaults if not set)
+    if (!selectedSlideData.canvasWidth || !selectedSlideData.canvasHeight) {
+      selectedSlideData.canvasWidth = adminCanvasManager.state.defaultCanvasWidth || 960;
+      selectedSlideData.canvasHeight = adminCanvasManager.state.defaultCanvasHeight || 540;
+      console.log(`AdminCanvasManager.selectSlide: Setting default canvas dimensions ${selectedSlideData.canvasWidth}x${selectedSlideData.canvasHeight} for slide ${slideIndex + 1}`);
+    }
+
     adminCanvasManager.resizeCanvasToFit(selectedSlideData); // Resize canvas based on slide's dimensions
 
     // Load Media Background
@@ -371,8 +378,47 @@
           if (response && response.success && response.base64Data) {
             fabric.Image.fromURL(response.base64Data, img => {
               if (!canvas || adminCanvasManager.state.currentSlideIndex !== slideIndex) return;
-              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-                scaleX: canvas.width / img.width, scaleY: canvas.height / img.height // Fit to current canvas logical size
+              
+              // Use stored canvas dimensions if available, otherwise resize to image
+              let cvWidth = selectedSlideData.canvasWidth || img.width;
+              let cvHeight = selectedSlideData.canvasHeight || img.height;
+              
+              // Apply max limits if resizing to image
+              if (!selectedSlideData.canvasWidth || !selectedSlideData.canvasHeight) {
+                const maxWidth = 1920;
+                const maxHeight = 1080;
+                
+                if (cvWidth > maxWidth || cvHeight > maxHeight) {
+                  const scaleX = maxWidth / cvWidth;
+                  const scaleY = maxHeight / cvHeight;
+                  const scale = Math.min(scaleX, scaleY);
+                  cvWidth = Math.round(cvWidth * scale);
+                  cvHeight = Math.round(cvHeight * scale);
+                }
+                
+                // Update slide data with calculated dimensions
+                selectedSlideData.canvasWidth = cvWidth;
+                selectedSlideData.canvasHeight = cvHeight;
+              }
+              
+              console.log(`AdminCanvasManager.selectSlide: Setting canvas dimensions to ${cvWidth}x${cvHeight} for slide ${slideIndex + 1}`);
+              
+              // Update canvas dimensions
+              canvas.setWidth(cvWidth);
+              canvas.setHeight(cvHeight);
+              
+              // Update canvas DOM element dimensions
+              const fabricCanvasEl = document.getElementById('fabricCanvasElement');
+              if (fabricCanvasEl) {
+                fabricCanvasEl.width = cvWidth;
+                fabricCanvasEl.height = cvHeight;
+              }
+              
+              // Set background image without scaling
+              canvas.setBackgroundImage(img, function() {
+                canvas.renderAll();
+                // Re-fit canvas in container after resize
+                adminCanvasManager.resizeCanvasToFit(selectedSlideData);
               });
             }, { crossOrigin: 'anonymous' });
           } else { baseApp.displayMessage( (response && response.error) ? response.error.message : "Error loading slide background image.", false, 'messageArea'); }
@@ -699,18 +745,46 @@
             return;
         }
 
-        // Option: Resize canvas to image dimensions (up to a max) or fit image to canvas
-        // Current behavior: Fit image to current canvas dimensions.
-        // If you want to resize canvas to image:
-        // const imgWidth = img.width; const imgHeight = img.height;
-        // const maxWidth = 1920; // Max canvas width
-        // let cvWidth = imgWidth; let cvHeight = imgHeight;
-        // if (cvWidth > maxWidth) { cvWidth = maxWidth; cvHeight = Math.round(cvWidth / (imgWidth/imgHeight));}
-        // canvas.setWidth(cvWidth); canvas.setHeight(cvHeight);
-        // if (fabricCanvasEl) { fabricCanvasEl.width = cvWidth; fabricCanvasEl.height = cvHeight; }
+        // Resize canvas to match image dimensions (with reasonable max limits)
+        const imgWidth = img.width;
+        const imgHeight = img.height;
+        const maxWidth = 1920; // Max canvas width
+        const maxHeight = 1080; // Max canvas height
+        
+        let cvWidth = imgWidth;
+        let cvHeight = imgHeight;
+        
+        // Scale down if image is too large, maintaining aspect ratio
+        if (cvWidth > maxWidth || cvHeight > maxHeight) {
+          const scaleX = maxWidth / cvWidth;
+          const scaleY = maxHeight / cvHeight;
+          const scale = Math.min(scaleX, scaleY);
+          cvWidth = Math.round(cvWidth * scale);
+          cvHeight = Math.round(cvHeight * scale);
+        }
+        
+        console.log(`AdminCanvasManager: Resizing canvas from ${canvas.width}x${canvas.height} to ${cvWidth}x${cvHeight} to match background image`);
+        
+        // Update canvas dimensions
+        canvas.setWidth(cvWidth);
+        canvas.setHeight(cvHeight);
+        
+        // Update canvas DOM element dimensions
+        const fabricCanvasEl = document.getElementById('fabricCanvasElement');
+        if (fabricCanvasEl) {
+          fabricCanvasEl.width = cvWidth;
+          fabricCanvasEl.height = cvHeight;
+        }
+        
+        // Update slide data to store new canvas dimensions
+        currentSlide.canvasWidth = cvWidth;
+        currentSlide.canvasHeight = cvHeight;
 
-        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
-          scaleX: canvas.width / img.width, scaleY: canvas.height / img.height
+        // Set background image without scaling (image will display at natural size)
+        canvas.setBackgroundImage(img, function() {
+          canvas.renderAll();
+          // Re-fit canvas in container after resize
+          adminCanvasManager.resizeCanvasToFit(currentSlide);
         });
         baseApp.displayMessage("Canvas background image updated.", true, 'messageArea');
 

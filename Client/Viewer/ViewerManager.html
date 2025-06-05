@@ -127,47 +127,45 @@ window.viewerManager = {
       .getActiveProjectsList();
   },
 
-  displayViewerProjects: function(response) { /* ... (same as previous step) ... */
-    baseApp.showLoading(false, 'loadingSpinner');
-    this.state.isLoading = false;
-    if (!response || !response.success) {
+displayViewerProjects: function(response) {
+  baseApp.showLoading(false, 'loadingSpinner');
+  this.state.isLoading = false;
+
+  if (!response || !response.success) return;
+
+  const projectsArray = response.data && response.data.projects ? response.data.projects : [];
+
+  if (!this.dom.viewerProjectListContainerEl) {
+    console.error("ViewerManager: displayViewerProjects - viewerProjectListContainerEl is not found!");
+    return;
+  }
+
+  this.dom.viewerProjectListContainerEl.innerHTML = '';
+
+  if (!projectsArray || projectsArray.length === 0) {
+    this.dom.viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
+    return;
+  }
+
+  const ul = sharedUtils.createElement('ul', { className: 'project-list-viewer' });
+
+  projectsArray.forEach(project => {
+    if (!project || !project.projectId) {
+      console.warn("ViewerManager: Skipping display of invalid project object:", project);
       return;
     }
-    const projectsArray = response.data && response.data.projects ? response.data.projects : [];
-    if (!this.dom.viewerProjectListContainerEl) {
-      console.error("ViewerManager: displayViewerProjects - viewerProjectListContainerEl is not found!");
-      return;
-    }
-    this.dom.viewerProjectListContainerEl.innerHTML = '';
 
-    if (!projectsArray || projectsArray.length === 0) {
-      this.dom.viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
-      return;
-    }
+    const projectCard = sharedUtils.createProjectCard(project, {
+      onView: (projectId) => this.loadProjectForViewing(projectId)
+    }, false);
 
-    const ul = document.createElement('ul');
-    ul.className = 'project-list-viewer';
-    projectsArray.forEach(project => {
-      if (!project || !project.projectId) {
-        console.warn("ViewerManager: Skipping display of invalid project object:", project);
-        return;
-      }
-      const listItem = document.createElement('li');
-      listItem.className = 'project-card-viewer';
-      const titleHeader = document.createElement('h3');
-      titleHeader.textContent = project.projectTitle || 'Untitled Project';
-      const viewButton = document.createElement('button');
-      viewButton.textContent = 'View Project';
-      viewButton.className = 'view-project-button';
-      viewButton.setAttribute('data-project-id', project.projectId);
-      viewButton.onclick = () => this.loadProjectForViewing(project.projectId);
+    const listItem = sharedUtils.createElement('li');
+    listItem.appendChild(projectCard.element);
+    ul.appendChild(listItem);
+  });
 
-      listItem.appendChild(titleHeader);
-      listItem.appendChild(viewButton);
-      ul.appendChild(listItem);
-    });
-    this.dom.viewerProjectListContainerEl.appendChild(ul);
-  },
+  this.dom.viewerProjectListContainerEl.appendChild(ul);
+},
 
   showProjectListView: function() { /* ... (same as previous step, ensure mediaManager calls are correct) ... */
     console.log("ViewerManager: showProjectListView called");

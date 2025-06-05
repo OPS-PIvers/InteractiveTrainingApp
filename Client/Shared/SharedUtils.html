@@ -1,3 +1,4 @@
+<!-- Phase 2: Enhanced with shared utility functions -->
 <script>
   window.sharedUtils = {};
 
@@ -7,7 +8,7 @@
   window.sharedUtils.DEBOUNCE_DELAY = 250;
   window.sharedUtils.NOTIFICATION_DURATION = 5000;
 
-  // --- Utility Functions ---
+  // --- Existing Utility Functions ---
   window.sharedUtils.generateClientUuid = function() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0,
@@ -29,16 +30,15 @@
     if (!url) return null;
     let videoId = null;
     try {
-        const urlObj = new URL(url); // Try direct URL parsing first
+        const urlObj = new URL(url);
         if ((urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') && urlObj.searchParams.has('v')) {
             videoId = urlObj.searchParams.get('v');
         } else if (urlObj.hostname === 'youtu.be') {
             videoId = urlObj.pathname.substring(1);
         }
     } catch (e) {
-        // Fallback for simpler regex if URL parsing fails (e.g. not a full URL)
-        // This regex is more robust for various YouTube URL formats.
-        const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+        const regex = /(?:youtube\.com\/(?:[^\/
+\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
         const match = url.match(regex);
         if (match) videoId = match[1];
     }
@@ -88,4 +88,223 @@
         setTimeout(() => notification.remove(), 300);
     }, duration);
   };
+
+  // --- NEW UTILITY FUNCTIONS ---
+
+  // DOM Creation Helpers
+  window.sharedUtils.createElement = function(tag, options = {}) {
+    const element = document.createElement(tag);
+
+    if (options.className) element.className = options.className;
+    if (options.id) element.id = options.id;
+    if (options.textContent) element.textContent = options.textContent;
+    if (options.innerHTML) element.innerHTML = options.innerHTML;
+
+    if (options.attributes) {
+      Object.keys(options.attributes).forEach(key => {
+        element.setAttribute(key, options.attributes[key]);
+      });
+    }
+
+    if (options.styles) {
+      Object.keys(options.styles).forEach(key => {
+        element.style[key] = options.styles[key];
+      });
+    }
+
+    return element;
+  };
+
+  window.sharedUtils.createButton = function(text, className = 'button-primary', onClick = null) {
+    const button = this.createElement('button', {
+      textContent: text,
+      className: className
+    });
+
+    if (onClick) {
+      button.addEventListener('click', onClick);
+    }
+
+    return button;
+  };
+
+  window.sharedUtils.createInput = function(type = 'text', options = {}) {
+    const input = this.createElement('input', {
+      className: options.className || '',
+      attributes: {
+        type: type,
+        placeholder: options.placeholder || '',
+        value: options.value || ''
+      }
+    });
+
+    return input;
+  };
+
+  // Event Management Helpers
+  window.sharedUtils.attachEventWithCleanup = function(element, event, handler, resourceManager, resourceId) {
+    if (!element) {
+      console.warn(`attachEventWithCleanup: Element not found for ${resourceId}`);
+      return false;
+    }
+
+    element.addEventListener(event, handler);
+
+    if (resourceManager && resourceId && typeof resourceManager.trackDisposable === 'function') {
+      resourceManager.trackDisposable(resourceId, () => {
+        element.removeEventListener(event, handler);
+      });
+    }
+
+    return true;
+  };
+
+  // Project Card Creation
+  window.sharedUtils.createProjectCard = function(project, handlers = {}, isAdmin = false) {
+    const card = this.createElement('div', {
+      className: isAdmin ? 'project-item' : 'project-card-viewer'
+    });
+
+    // Create title section
+    const titleSection = this.createElement('div', {
+      className: isAdmin ? 'project-item-title-status' : ''
+    });
+
+    const titleElement = this.createElement(isAdmin ? 'span' : 'h3', {
+      textContent: project.projectTitle || 'Untitled Project',
+      styles: isAdmin ? { fontWeight: 'bold' } : {}
+    });
+
+    titleSection.appendChild(titleElement);
+
+    if (isAdmin && project.status) {
+      const statusText = this.createElement('span', {
+        className: 'status-text',
+        textContent: ` (${project.status})`
+      });
+      titleSection.appendChild(statusText);
+    }
+
+    // Create controls section
+    const controlsSection = this.createElement('div', {
+      className: isAdmin ? 'project-item-controls' : ''
+    });
+
+    if (isAdmin) {
+      // Status select
+      const statusSelect = this.createStatusSelect(project);
+      controlsSection.appendChild(statusSelect);
+
+      // Edit button
+      if (handlers.onEdit) {
+        const editBtn = this.createButton('Edit', 'edit-button admin-button',
+          () => handlers.onEdit(project.projectId));
+        controlsSection.appendChild(editBtn);
+      }
+
+      // Delete button
+      if (handlers.onDelete) {
+        const deleteBtn = this.createButton('Delete', 'danger-button admin-button admin-button-danger',
+          () => handlers.onDelete(project.projectId, project.projectTitle));
+        controlsSection.appendChild(deleteBtn);
+      }
+    } else {
+      // View button for viewer
+      if (handlers.onView) {
+        const viewBtn = this.createButton('View Project', 'view-project-button',
+          () => handlers.onView(project.projectId));
+        controlsSection.appendChild(viewBtn);
+      }
+    }
+
+    card.appendChild(titleSection);
+    card.appendChild(controlsSection);
+
+    return {
+      element: card,
+      statusSelect: isAdmin ? controlsSection.querySelector('.project-status-select') : null
+    };
+  };
+
+  window.sharedUtils.createStatusSelect = function(project) {
+    const select = this.createElement('select', {
+      className: 'project-status-select admin-form-select',
+      attributes: {
+        'data-project-id': project.projectId,
+        'data-original-status': project.status || 'Draft'
+      }
+    });
+
+    ['Draft', 'Active', 'Inactive'].forEach(status => {
+      const option = this.createElement('option', {
+        textContent: status,
+        attributes: { value: status }
+      });
+
+      if (project.status === status) {
+        option.selected = true;
+      }
+
+      select.appendChild(option);
+    });
+
+    return select;
+  };
+
+  // Text Utilities
+  window.sharedUtils.truncateText = function(text, maxLength) {
+    if (!text || text.length <= maxLength) return text || '';
+    return text.substring(0, maxLength) + '...';
+  };
+
+  // Element Visibility Helpers
+  window.sharedUtils.showElement = function(element) {
+    return this.safeDOMUpdate(element, el => el.style.display = 'block');
+  };
+
+  window.sharedUtils.hideElement = function(element) {
+    return this.safeDOMUpdate(element, el => el.style.display = 'none');
+  };
+
+  window.sharedUtils.toggleElement = function(element, show) {
+    return this.safeDOMUpdate(element, el => el.style.display = show ? 'block' : 'none');
+  };
+
+  // Color Utilities
+  window.sharedUtils.toHexColor = function(color) {
+    if (!color) return '#000000';
+    if (color.startsWith('#')) return color;
+
+    // Handle rgb() format
+    if (color.startsWith('rgb')) {
+      const rgbMatch = color.match(/\d+/g);
+      if (rgbMatch && rgbMatch.length >= 3) {
+        const r = parseInt(rgbMatch[0]).toString(16).padStart(2, '0');
+        const g = parseInt(rgbMatch[1]).toString(16).padStart(2, '0');
+        const b = parseInt(rgbMatch[2]).toString(16).padStart(2, '0');
+        return `#${r}${g}${b}`;
+      }
+    }
+
+    return color;
+  };
+
+  // Logging Utility (Phase 2 addition)
+  window.sharedUtils.logger = {
+    isDebug: false, // Set to true for development
+
+    log: function(...args) {
+      if (this.isDebug) console.log(...args);
+    },
+
+    warn: function(...args) {
+      console.warn(...args);
+    },
+
+    error: function(...args) {
+      console.error(...args);
+    }
+  };
+
+  console.log("SharedUtils Phase 2 enhancements loaded");
 </script>

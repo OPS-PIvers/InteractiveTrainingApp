@@ -1,0 +1,91 @@
+<script>
+  window.sharedUtils = {};
+
+  // --- Constants ---
+  window.sharedUtils.FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"];
+  window.sharedUtils.MESSAGE_TIMEOUT = 7000;
+  window.sharedUtils.DEBOUNCE_DELAY = 250;
+  window.sharedUtils.NOTIFICATION_DURATION = 5000;
+
+  // --- Utility Functions ---
+  window.sharedUtils.generateClientUuid = function() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0,
+            v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+  };
+
+  window.sharedUtils.debounce = function(func, delay) {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+  };
+
+  window.sharedUtils.extractYouTubeVideoId = function(url) {
+    if (!url) return null;
+    let videoId = null;
+    try {
+        const urlObj = new URL(url); // Try direct URL parsing first
+        if ((urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') && urlObj.searchParams.has('v')) {
+            videoId = urlObj.searchParams.get('v');
+        } else if (urlObj.hostname === 'youtu.be') {
+            videoId = urlObj.pathname.substring(1);
+        }
+    } catch (e) {
+        // Fallback for simpler regex if URL parsing fails (e.g. not a full URL)
+        // This regex is more robust for various YouTube URL formats.
+        const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+        const match = url.match(regex);
+        if (match) videoId = match[1];
+    }
+    if (!videoId) console.warn("Could not extract YouTube Video ID from URL:", url);
+    return videoId;
+  };
+
+  window.sharedUtils.formatTime = function(totalSeconds) {
+    totalSeconds = Math.floor(totalSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  window.sharedUtils.safeDOMUpdate = function(element, operation, errorMessage = "DOM operation failed") {
+    if (!element) {
+      console.warn(`${errorMessage}: Element is null/undefined`);
+      return false;
+    }
+    try {
+      operation(element);
+      return true;
+    } catch (e) {
+      console.error(`${errorMessage}:`, e);
+      return false;
+    }
+  };
+
+  window.sharedUtils.showNotification = function(message, type = 'info', duration = window.sharedUtils.NOTIFICATION_DURATION) {
+    let container = document.getElementById('notificationContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notificationContainer';
+        document.body.appendChild(container);
+    }
+
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+
+    container.appendChild(notification);
+
+    setTimeout(() => notification.classList.add('visible'), 10);
+
+    setTimeout(() => {
+        notification.classList.remove('visible');
+        setTimeout(() => notification.remove(), 300);
+    }, duration);
+  };
+</script>

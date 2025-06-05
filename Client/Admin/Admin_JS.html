@@ -58,16 +58,21 @@ adminApp.intervals = {
 
 // Helper to safely clear interval
 adminApp.clearInterval = function(intervalName) {
-  if (adminApp.intervals[intervalName]) {
-    clearInterval(adminApp.intervals[intervalName]);
-    adminApp.intervals[intervalName] = null;
-    console.log(`Cleared interval: ${intervalName}`);
+  const timerId = adminApp.intervals[intervalName];
+  if (timerId) {
+    baseApp.timerManager.clearTimer(timerId); // Use timerManager to clear
+    adminApp.intervals[intervalName] = null; // Nullify in our tracking object
+    console.log(`Cleared interval via timerManager: ${intervalName} (ID: ${timerId})`);
+    // Also remove from resourceManager tracking if it was individually cleared
+    baseApp.resourceManager.disposeByName('interval-' + intervalName);
+  } else {
+    // console.log(`Interval ${intervalName} already clear or not found in adminApp.intervals.`);
   }
 };
 
 // ADD after adminApp.state definition:
-adminApp.eventListeners = new WeakMap(); // Track event listeners for cleanup
-adminApp.activeListeners = []; // Array of {element, event, handler} for global listeners
+// adminApp.eventListeners = new WeakMap(); // No longer needed, replaced by resourceManager
+// adminApp.activeListeners = []; // No longer needed, replaced by resourceManager
 
 // --- Global function for YouTube API is now handled by MediaManager.html ---
 // function onYouTubeIframeAPIReady() { ... } // Removed
@@ -358,20 +363,29 @@ adminApp.activeListeners = []; // Array of {element, event, handler} for global 
     };
 
     adminApp.attachEventListeners = function() {
-      const safelyAddListener = (element, eventType, handler, elementName) => {
+      const safelyAddListener = (element, eventType, handler, resourceName) => {
           if (element) {
               element.addEventListener(eventType, handler);
+              baseApp.resourceManager.trackDisposable(resourceName, () => {
+                  // console.log('Removing listener:', resourceName);
+                  element.removeEventListener(eventType, handler);
+              });
           } else {
-              if (elementName === 'createProjectButtonEl') console.warn(`Could not attach listener - ${elementName} not found initially.`);
+              if (resourceName === 'adminView-createProjectButton-click') console.warn(`Could not attach listener - Element for resource ${resourceName} not found initially.`);
           }
       };
-      safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
+      safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'adminView-createProjectButton-click');
       
-      window.addEventListener('resize', sharedUtils.debounce(handleWindowResize, 250));
+      const debouncedResizeHandler = sharedUtils.debounce(handleWindowResize, 250);
+      window.addEventListener('resize', debouncedResizeHandler);
+      baseApp.resourceManager.trackDisposable('adminView-window-resize', () => {
+          // console.log('Removing listener: adminView-window-resize');
+          window.removeEventListener('resize', debouncedResizeHandler);
+      });
 
       console.log("Admin_JS: Initial event listeners attached.");
 
-      document.addEventListener('click', function(event) {
+      const popoverGlobalClickHandler = function(event) {
         if (adminApp.state.activePopoverId && adminApp.state.currentView === 'edit') {
             const popover = document.getElementById(adminApp.state.activePopoverId);
             let triggerButton = null;
@@ -402,53 +416,27 @@ adminApp.activeListeners = []; // Array of {element, event, handler} for global 
                 hideActivePopover();
             }
         }
-      }, true); 
+      };
+      document.addEventListener('click', popoverGlobalClickHandler, true);
+      baseApp.resourceManager.trackDisposable('adminView-document-click-popoverManagement', () => {
+          // console.log('Removing listener: adminView-document-click-popoverManagement');
+          document.removeEventListener('click', popoverGlobalClickHandler, true);
+      });
     };
 
 // ADD new comprehensive cleanup function:
 function cleanupAllEventListeners() {
-  console.log("Starting comprehensive event listener cleanup");
+  console.log("Starting comprehensive event listener cleanup using resourceManager.");
+  baseApp.resourceManager.disposeAll();
+  // Clear named intervals separately if they are not fully managed by resourceManager yet,
+  // or if their disposal logic in resourceManager doesn't nullify them in adminApp.intervals
+  // For now, assuming disposeAll() handles their registered dispose functions which should include clearInterval.
+  // If adminApp.clearInterval itself was tracked, then disposeAll is enough.
+  // If setInterval was directly tracked with a disposeFn of () => clearInterval(id), it's also fine.
 
-  // Clear named intervals
-  const intervalsToClear = ['playerUpdate', 'overlayPreview', 'autoSave', 'playerQuestionCheckInterval'];
-  intervalsToClear.forEach(intervalName => {
-      adminApp.clearInterval(intervalName); // adminApp.clearInterval handles logging and nulling
-  });
-  
-  // 1. Remove paste listener
-  if (adminApp.state.isPasteListenerActive) {
-    document.removeEventListener('paste', handlePasteImage);
-    adminApp.state.isPasteListenerActive = false;
-  }
-  
-  // 2. Remove window resize listener
-  window.removeEventListener('resize', handleWindowResize);
-  
-  // 3. Clean up YouTube player listeners
-  if (adminYouTubePlayerContainerEl && adminYouTubePlayerContainerEl.hasAttribute('click-listener-added')) {
-    // Get the stored handler from WeakMap if available
-    const handler = adminApp.eventListeners.get(adminYouTubePlayerContainerEl);
-    if (handler) {
-      adminYouTubePlayerContainerEl.removeEventListener('click', handler);
-      adminApp.eventListeners.delete(adminYouTubePlayerContainerEl);
-    }
-    adminYouTubePlayerContainerEl.removeAttribute('click-listener-added');
-  }
-  
-  // 4. Clean up all tracked listeners
-  adminApp.activeListeners.forEach(({ element, event, handler }) => {
-    if (element && typeof element.removeEventListener === 'function') {
-      element.removeEventListener(event, handler);
-    }
-  });
-  adminApp.activeListeners = [];
-  
-  // 5. Clean up Fabric canvas listeners
-  if (adminApp.state.fabricCanvasInstance) {
-    adminApp.state.fabricCanvasInstance.off(); // Remove all Fabric listeners
-  }
-  
-  console.log("Comprehensive event listener cleanup completed");
+  // The old logic for removing paste listener, window resize, etc., is now handled by their tracked disposers.
+  // Fabric canvas listeners are handled by canvas.dispose() or canvas.off() in safeDisposeCanvas.
+  console.log("Comprehensive event listener cleanup via resourceManager completed.");
 }
 
 // --- Canvas Disposal ---
@@ -520,7 +508,7 @@ function safeDisposeCanvas() {
 
       sharedUtils.safeDOMUpdate(listViewContainerEl, el => el.style.display = 'block', "Failed to show list view container");
       sharedUtils.safeDOMUpdate(editViewContainerEl, el => el.style.display = 'none', "Failed to hide edit view container");
-      sharedUtils.safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area in switchToListView");
+      // messageAreaEl will be managed by baseApp.displayMessage or baseApp.onServerError
       
       loadAdminProjectsList(); 
     }
@@ -543,43 +531,55 @@ function safeDisposeCanvas() {
 
         safeDisposeCanvas(); // Use the new safe disposal function before initializing a new one
 
-        sharedUtils.safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area for edit view");
+        // messageAreaEl will be managed by baseApp.displayMessage or baseApp.onServerError
         sharedUtils.safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '', "Failed to clear slide thumbnails for edit view");
 
-        const ensureEditViewListener = (elementVarName, id, eventType, handler, critical = false) => {
-            let element = window[elementVarName]; 
-            if (!element) {
-                element = document.getElementById(id);
-                window[elementVarName] = element; 
-            }
-
-            const listenerAttribute = `listener-${eventType}-attached`;
-            if (element && !element.hasAttribute(listenerAttribute)) {
+        const ensureEditViewListener = (element, eventType, handler, resourceName, critical = false) => {
+            if (element) {
+                // Check if already tracked to avoid duplicates if this function is called multiple times for same element/event
+                // This simple check might not be foolproof if resource names are not perfectly unique across calls.
+                // However, disposeAll() should handle cleanup regardless.
+                // For robust duplicate prevention, a more complex tracking in ensureEditViewListener itself would be needed.
                 element.addEventListener(eventType, handler);
-                element.setAttribute(listenerAttribute, 'true');
-                console.log(`Listener attached for ${eventType} on #${id} in switchToEditView.`);
-            } else if (!element && critical) {
-                 console.warn(`CRITICAL WARN: Element #${id} not found in switchToEditView! Cannot attach listener.`);
+                baseApp.resourceManager.trackDisposable(resourceName, () => {
+                    // console.log('Removing listener:', resourceName);
+                    element.removeEventListener(eventType, handler);
+                });
+                console.log(`Listener attached for ${resourceName} in switchToEditView.`);
+            } else if (critical) {
+                 console.warn(`CRITICAL WARN: Element for resource ${resourceName} not found in switchToEditView! Cannot attach listener.`);
             }
         };
 
         fabricCanvasEl = document.getElementById('fabricCanvasElement');
         slideThumbnailsContainerEl = document.getElementById('slideThumbnailsContainer');
         adminMediaPlaceholderEl = document.getElementById('adminMediaPlaceholder');
-        overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar'); 
+        overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar');
 
-        ensureEditViewListener('backToProjectsListButtonEl', 'backToProjectsListButton', 'click', switchToListView, true);
-        ensureEditViewListener('imageUploaderEl', 'imageUploader', 'change', handleImageUpload, true);
-        ensureEditViewListener('addSlideButtonEl', 'addSlideButton', 'click', handleAddSlide, true);
-        ensureEditViewListener('saveProjectButtonEl', 'saveProjectButton', 'click', handleSaveProject, true);
+        // Re-fetch elements before attaching listeners
+        backToProjectsListButtonEl = document.getElementById('backToProjectsListButton');
+        imageUploaderEl = document.getElementById('imageUploader');
+        addSlideButtonEl = document.getElementById('addSlideButton');
+        saveProjectButtonEl = document.getElementById('saveProjectButton');
+        addRectangleButtonEl = document.getElementById('addRectangleButton');
+        addCircleButtonEl = document.getElementById('addCircleButton');
+        addTextboxButtonEl = document.getElementById('addTextboxButton');
+        setYoutubeBackgroundButtonEl = document.getElementById('setYoutubeBackgroundButton');
+        audioUploaderEl = document.getElementById('audioUploader');
+        removeAudioButtonEl = document.getElementById('removeAudioButton');
+
+        ensureEditViewListener(backToProjectsListButtonEl, 'click', switchToListView, 'editView-backToProjectsListButton-click', true);
+        ensureEditViewListener(imageUploaderEl, 'change', handleImageUpload, 'editView-imageUploader-change', true);
+        ensureEditViewListener(addSlideButtonEl, 'click', handleAddSlide, 'editView-addSlideButton-click', true);
+        ensureEditViewListener(saveProjectButtonEl, 'click', handleSaveProject, 'editView-saveProjectButton-click', true);
         
-        ensureEditViewListener('addRectangleButtonEl', 'addRectangleButton', 'click', addRectangle, true);
-        ensureEditViewListener('addCircleButtonEl', 'addCircleButton', 'click', addCircle, true);
-        ensureEditViewListener('addTextboxButtonEl', 'addTextboxButton', 'click', addTextbox, true);
+        ensureEditViewListener(addRectangleButtonEl, 'click', addRectangle, 'editView-addRectangleButton-click', true);
+        ensureEditViewListener(addCircleButtonEl, 'click', addCircle, 'editView-addCircleButton-click', true);
+        ensureEditViewListener(addTextboxButtonEl, 'click', addTextbox, 'editView-addTextboxButton-click', true);
 
-        ensureEditViewListener('setYoutubeBackgroundButtonEl', 'setYoutubeBackgroundButton', 'click', handleSetYoutubeBackground, true);
-        ensureEditViewListener('audioUploaderEl', 'audioUploader', 'change', handleAudioUpload, true);
-        ensureEditViewListener('removeAudioButtonEl', 'removeAudioButton', 'click', handleRemoveAudio, true);
+        ensureEditViewListener(setYoutubeBackgroundButtonEl, 'click', handleSetYoutubeBackground, 'editView-setYoutubeBackgroundButton-click', true);
+        ensureEditViewListener(audioUploaderEl, 'change', handleAudioUpload, 'editView-audioUploader-change', true);
+        ensureEditViewListener(removeAudioButtonEl, 'click', handleRemoveAudio, 'editView-removeAudioButton-click', true);
 
         if (typeof fabric !== 'undefined' && fabricCanvasEl) {
             adminApp.state.fabricCanvasInstance = new fabric.Canvas('fabricCanvasElement', {
@@ -618,15 +618,24 @@ function safeDisposeCanvas() {
 
             sharedUtils.safeDOMUpdate(overlayPropertiesToolbarEl, el => el.style.display = 'block', "Failed to show overlay properties toolbar in switchToEditView");
             populateToolbar(null); 
-            hideActivePopover(); 
+            hideActivePopover();
 
-            if (!adminApp.state.isPasteListenerActive) {
+            // Check if paste listener needs to be (re-)added and tracked for the edit view
+            // Note: If this listener should be truly global and active even outside edit view, its management might differ.
+            // For now, assuming it's primarily for the edit view context.
+            // If cleanupAllEventListeners (via disposeAll) correctly removes it, it can be re-added here.
+            if (!adminApp.state.isPasteListenerActive) { // This flag might need re-evaluation with resourceManager
                 document.addEventListener('paste', handlePasteImage);
+                baseApp.resourceManager.trackDisposable('editView-document-paste-image', () => {
+                    // console.log('Removing listener: editView-document-paste-image');
+                    document.removeEventListener('paste', handlePasteImage);
+                    adminApp.state.isPasteListenerActive = false; // Reset flag if it's still used
+                });
                 adminApp.state.isPasteListenerActive = true;
-                console.log("Admin_JS: Paste event listener for images attached to document.");
+                console.log("Admin_JS: Paste event listener for images attached and tracked for edit view.");
             }
 
-            loadProjectForEditing(projectIdToEdit); 
+            loadProjectForEditing(projectIdToEdit);
 
         } else {
             console.error("Fabric.js library or canvas element #fabricCanvasElement not found in switchToEditView.");
@@ -1441,7 +1450,7 @@ function safeDisposeCanvas() {
     adminApp.state.isLoading = false;
 
     if (!response || !response.success) {
-        baseApp.onServerError(response || { error: "Failed to load projects" }, 'messageArea');
+        baseApp.onServerError(response || { error: "Failed to load projects" }, 'messageArea'); // Will now use centralized session error check
         return;
     }
     
@@ -1512,7 +1521,8 @@ function safeDisposeCanvas() {
       console.log("displayAdminProjects: Finished rendering project list.");
     }
 
-// ADD new function to handle Drive session errors:
+// REMOVE function handleDriveSessionError(error) as it's now in BaseApp.html
+/*
 function handleDriveSessionError(error) {
   console.error("Drive session error:", error);
   
@@ -1547,6 +1557,7 @@ function handleDriveSessionError(error) {
   
   return false; // Not a session error
 }
+*/
 
     // --- Media Handling ---
     function handleImageUpload(event) {
@@ -2210,15 +2221,38 @@ function getTemplateColor(template) {
 // Preview overlays (toggle preview mode)
 function toggleOverlayPreview() {
     adminApp.state.previewingOverlays = !adminApp.state.previewingOverlays;
-    const previewButton = document.getElementById('previewOverlaysBtn'); 
+    const previewButton = document.getElementById('previewOverlaysBtn');
+    const intervalName = 'overlayPreview';
+    const resourceName = 'interval-' + intervalName; // For resourceManager
 
     if (adminApp.state.previewingOverlays) {
         renderVideoOverlaysAdmin();
-        adminApp.clearInterval('overlayPreview'); // Clear previous before setting new
-        adminApp.intervals.overlayPreview = setInterval(updateOverlayPreview, 100);
-        sharedUtils.safeDOMUpdate(previewButton, el => el.textContent = 'Stop Preview', "Failed to update preview button text to Stop in toggleOverlayPreview");
+        // Clear any existing interval for 'overlayPreview' using the updated clearInterval
+        // This ensures its associated resourceManager entry is also cleaned up if it exists.
+        adminApp.clearInterval(intervalName);
+
+        const timerId = baseApp.timerManager.setInterval(updateOverlayPreview, 100);
+        if (timerId) {
+            adminApp.intervals[intervalName] = timerId; // Store timerManager's ID
+            // Track with resourceManager to clear this specific timer if disposeAll is called
+            baseApp.resourceManager.trackDisposable(resourceName, () => {
+                // This function is called by resourceManager.disposeAll() or disposeByName(resourceName)
+                // It should directly clear the timer using timerManager.
+                // No need to call adminApp.clearInterval here as that would cause a loop with disposeByName.
+                baseApp.timerManager.clearTimer(adminApp.intervals[intervalName]);
+                adminApp.intervals[intervalName] = null; // Ensure it's marked as cleared in local tracking too
+                // console.log(`Cleared interval ${intervalName} (ID: ${timerId}) via resourceManager dispose`);
+            });
+            console.log(`Set and tracked interval ${intervalName} with timerManager ID: ${timerId} and resourceName: ${resourceName}`);
+            sharedUtils.safeDOMUpdate(previewButton, el => el.textContent = 'Stop Preview', "Failed to update preview button text to Stop in toggleOverlayPreview");
+        } else {
+            console.error("Failed to set interval using timerManager for overlayPreview.");
+            adminApp.state.previewingOverlays = false; // Revert state
+        }
     } else {
-        adminApp.clearInterval('overlayPreview');
+        // This calls the updated adminApp.clearInterval, which handles both timerManager.clearTimer
+        // and resourceManager.disposeByName for this specific interval.
+        adminApp.clearInterval(intervalName);
         clearVideoOverlaysAdmin();
         sharedUtils.safeDOMUpdate(previewButton, el => el.textContent = 'Preview Overlays', "Failed to update preview button text to Preview in toggleOverlayPreview");
     }
@@ -3200,137 +3234,104 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
 
 
     adminApp.attachVideoQuestionEventListeners = function() {
-        if (videoTimelineSliderEl) {
-            videoTimelineSliderEl.addEventListener('input', function() {
-                // Use mediaManager.state.ytPlayer
-                if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.seekTo === 'function') {
-                    mediaManager.state.ytPlayer.seekTo(this.value, true);
-                }
-            });
-        }
+        const safelyAttachListener = (element, eventType, handler, resourceName) => {
+            if (element) {
+                element.addEventListener(eventType, handler);
+                baseApp.resourceManager.trackDisposable(resourceName, () => {
+                    element.removeEventListener(eventType, handler);
+                });
+            } else {
+                console.warn(`Could not attach listener for video/overlay - Element for resource ${resourceName} not found.`);
+            }
+        };
 
-        if (addQuestionBtnEl) {
-            addQuestionBtnEl.addEventListener('click', function() {
-                // Use mediaManager.state.ytPlayer and mediaManager.safeGetCurrentTime
-                if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
-                    mediaManager.state.ytPlayer.pauseVideo();
-                }
-                const currentTime = mediaManager.safeGetCurrentTime(); // Uses MediaManager's player
-                safeDOMUpdate(questionTimestampDisplayEl, el => {
-                    el.textContent = sharedUtils.formatTime(currentTime);
-                    if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
-                }, "Failed to set question timestamp display in addQuestionBtn click");
+        const handleVideoTimelineSliderInput = function() {
+            if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.seekTo === 'function') {
+                mediaManager.state.ytPlayer.seekTo(this.value, true);
+            }
+        };
+        safelyAttachListener(videoTimelineSliderEl, 'input', handleVideoTimelineSliderInput, 'admin-videoTimelineSlider-input');
 
-                if(questionTextEl) questionTextEl.value = '';
-                optionInputsEl.forEach(input => { if(input) input.value = ''; });
-                correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
-                if(editingQuestionIndexEl) editingQuestionIndexEl.value = '-1';
+        const handleAddQuestionClick = function() {
+            if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
+                mediaManager.state.ytPlayer.pauseVideo();
+            }
+            const currentTime = mediaManager.safeGetCurrentTime();
+            safeDOMUpdate(questionTimestampDisplayEl, el => {
+                el.textContent = sharedUtils.formatTime(currentTime);
+                if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
+            }, "Failed to set question timestamp display in handleAddQuestionClick");
+            if(questionTextEl) questionTextEl.value = '';
+            optionInputsEl.forEach(input => { if(input) input.value = ''; });
+            correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
+            if(editingQuestionIndexEl) editingQuestionIndexEl.value = '-1';
+            safeDOMUpdate(questionModalEl, el => el.style.display = 'block', "Failed to show question modal in handleAddQuestionClick");
+        };
+        safelyAttachListener(addQuestionBtnEl, 'click', handleAddQuestionClick, 'admin-addQuestionBtn-click');
 
-                safeDOMUpdate(questionModalEl, el => el.style.display = 'block', "Failed to show question modal in addQuestionBtn click");
-            });
-        }
+        const handleSaveQuestionClick = function() {
+            const currentSlide = getCurrentSlide();
+            if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube') {
+                baseApp.displayMessage("Not a YouTube slide or slide data missing.", false, 'messageArea'); return;
+            }
+            const questionText = questionTextEl ? questionTextEl.value.trim() : '';
+            if (!questionText) {
+                baseApp.displayMessage("Question text cannot be empty.", false, 'messageArea'); return;
+            }
+            const options = optionInputsEl.map(input => input ? input.value.trim() : '').filter(opt => opt !== '');
+            if (options.length < 2) {
+                baseApp.displayMessage("Please provide at least two options.", false, 'messageArea'); return;
+            }
+            let correctOptionIndex = -1;
+            for (let i = 0; i < correctAnswerRadiosEl.length; i++) {
+                if (correctAnswerRadiosEl[i] && correctAnswerRadiosEl[i].checked) { correctOptionIndex = i; break; }
+            }
+            if (correctOptionIndex === -1 || correctOptionIndex >= options.length) {
+                baseApp.displayMessage("Please select a correct answer from the provided options.", false, 'messageArea'); return;
+            }
+            const timestamp = questionModalEl && questionModalEl.dataset.rawTimestamp ? parseFloat(questionModalEl.dataset.rawTimestamp) : 0;
+            const questionData = { timestamp, questionText, options, correctOptionIndex };
+            const editIndex = editingQuestionIndexEl ? parseInt(editingQuestionIndexEl.value, 10) : -1;
+            if (!Array.isArray(currentSlide.slideMedia.videoQuestions)) {
+                currentSlide.slideMedia.videoQuestions = [];
+            }
+            if (editIndex === -1) {
+                currentSlide.slideMedia.videoQuestions.push(questionData);
+            } else {
+                currentSlide.slideMedia.videoQuestions[editIndex] = questionData;
+            }
+            currentSlide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp);
+            baseApp.displayMessage("Question saved!", true, 'messageArea');
+            safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal after save in handleSaveQuestionClick");
+            renderVideoQuestionsList();
+        };
+        safelyAttachListener(saveQuestionBtnEl, 'click', handleSaveQuestionClick, 'admin-saveQuestionBtn-click');
 
-        if (saveQuestionBtnEl) {
-            saveQuestionBtnEl.addEventListener('click', function() {
-                const currentSlide = getCurrentSlide();
-                if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube') {
-                    baseApp.displayMessage("Not a YouTube slide or slide data missing.", false, 'messageArea');
-                    return;
-                }
+        const handleCancelQuestionClick = function() {
+            safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal on cancel in handleCancelQuestionClick");
+        };
+        safelyAttachListener(cancelQuestionBtnEl, 'click', handleCancelQuestionClick, 'admin-cancelQuestionBtn-click');
 
-                const questionText = questionTextEl ? questionTextEl.value.trim() : '';
-                if (!questionText) {
-                    baseApp.displayMessage("Question text cannot be empty.", false, 'messageArea');
-                    return;
-                }
+        // Video Overlay Event Listeners
+        const addTimelineOverlayBtn = document.getElementById('addTimelineOverlayBtn');
+        safelyAttachListener(addTimelineOverlayBtn, 'click', initiateOverlayPlacement, 'admin-addTimelineOverlayBtn-click');
 
-                const options = optionInputsEl.map(input => input ? input.value.trim() : '').filter(opt => opt !== '');
-                if (options.length < 2) { 
-                    baseApp.displayMessage("Please provide at least two options.", false, 'messageArea');
-                    return;
-                }
+        const placementOverlay = document.getElementById('overlayPlacementOverlay');
+        safelyAttachListener(placementOverlay, 'click', handleOverlayPlacement, 'admin-overlayPlacementOverlay-click');
 
-                let correctOptionIndex = -1;
-                for (let i = 0; i < correctAnswerRadiosEl.length; i++) {
-                    if (correctAnswerRadiosEl[i] && correctAnswerRadiosEl[i].checked) {
-                        correctOptionIndex = i;
-                        break;
-                    }
-                }
-                if (correctOptionIndex === -1 || correctOptionIndex >= options.length) { 
-                    baseApp.displayMessage("Please select a correct answer from the provided options.", false, 'messageArea');
-                    return;
-                }
-                
-                const timestamp = questionModalEl && questionModalEl.dataset.rawTimestamp ? parseFloat(questionModalEl.dataset.rawTimestamp) : 0;
+        const saveOverlayBtn = document.getElementById('saveOverlayBtn');
+        safelyAttachListener(saveOverlayBtn, 'click', saveOverlay, 'admin-saveOverlayBtn-click');
 
-                const questionData = {
-                    timestamp: timestamp,
-                    questionText: questionText,
-                    options: options,
-                    correctOptionIndex: correctOptionIndex
-                };
+        const cancelOverlayBtn = document.getElementById('cancelOverlayBtn');
+        safelyAttachListener(cancelOverlayBtn, 'click', hideOverlayEditor, 'admin-cancelOverlayBtn-click');
 
-                const editIndex = editingQuestionIndexEl ? parseInt(editingQuestionIndexEl.value, 10) : -1;
+        const deleteOverlayBtn = document.getElementById('deleteOverlayBtn');
+        safelyAttachListener(deleteOverlayBtn, 'click', deleteCurrentOverlay, 'admin-deleteOverlayBtn-click');
 
-                if (!Array.isArray(currentSlide.slideMedia.videoQuestions)) {
-                    currentSlide.slideMedia.videoQuestions = [];
-                }
-
-                if (editIndex === -1) { 
-                    currentSlide.slideMedia.videoQuestions.push(questionData);
-                } else { 
-                    currentSlide.slideMedia.videoQuestions[editIndex] = questionData;
-                }
-                
-                currentSlide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp);
-
-                console.log("videoQuestions array after save:", currentSlide.slideMedia.videoQuestions); 
-
-                baseApp.displayMessage("Question saved!", true, 'messageArea');
-                safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal after save in saveQuestionBtn click");
-                renderVideoQuestionsList(); 
-            });
-        }
-
-        if (cancelQuestionBtnEl) {
-            cancelQuestionBtnEl.addEventListener('click', function() {
-                safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal on cancel in cancelQuestionBtn click");
-            });
-        }
-
-    // --- NEW Video Overlay Event Listeners (These seem fine as they are UI interaction, not core player logic) ---
-    const addTimelineOverlayBtn = document.getElementById('addTimelineOverlayBtn');
-    if (addTimelineOverlayBtn) {
-        addTimelineOverlayBtn.addEventListener('click', initiateOverlayPlacement);
-    }
-
-    const placementOverlay = document.getElementById('overlayPlacementOverlay');
-    if (placementOverlay) {
-        placementOverlay.addEventListener('click', handleOverlayPlacement);
-    }
-
-    const saveOverlayBtn = document.getElementById('saveOverlayBtn');
-    if (saveOverlayBtn) {
-        saveOverlayBtn.addEventListener('click', saveOverlay);
-    }
-
-    const cancelOverlayBtn = document.getElementById('cancelOverlayBtn');
-    if (cancelOverlayBtn) {
-        cancelOverlayBtn.addEventListener('click', hideOverlayEditor);
-    }
-
-    const deleteOverlayBtn = document.getElementById('deleteOverlayBtn');
-    if (deleteOverlayBtn) {
-        deleteOverlayBtn.addEventListener('click', deleteCurrentOverlay);
-    }
-
-    const previewOverlaysBtn = document.getElementById('previewOverlaysBtn');
-    if (previewOverlaysBtn) {
-        previewOverlaysBtn.addEventListener('click', toggleOverlayPreview);
-    }
+        const previewOverlaysBtn = document.getElementById('previewOverlaysBtn');
+        safelyAttachListener(previewOverlaysBtn, 'click', toggleOverlayPreview, 'admin-previewOverlaysBtn-click');
     
-    console.log("Video question and overlay UI event listeners attached.");
+        console.log("Video question and overlay UI event listeners attached using resourceManager.");
     };
 
     function updateVideoToolsVisibility(show) {

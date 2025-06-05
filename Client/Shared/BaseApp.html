@@ -53,19 +53,91 @@
     }
   };
 
+  window.baseApp.handleSessionError = function(error, messageAreaId) {
+    // console.error("Checking for session error:", error); // Keep console.error for actual errors
+
+    if (error && error.message &&
+        (error.message.toLowerCase().includes("authorization") ||
+         error.message.includes("401") || // Typically unauthorized
+         error.message.includes("403"))) { // Typically forbidden
+
+      console.error("Session error detected:", error.message); // Log the specific error message
+
+      // Use baseApp.displayMessage and the provided messageAreaId
+      this.displayMessage(
+        "Your session may have expired or there's an authorization issue. The page will reload to re-authenticate.",
+        false, // isSuccess = false
+        messageAreaId
+      );
+
+      // Attempt to save current state if relevant (original logic from Admin)
+      // This part is somewhat Admin-specific. For a truly generic BaseApp,
+      // this might be handled by the calling app or via a callback.
+      // For now, we'll keep it as it's part of the existing functionality being moved.
+      if (window.adminApp && window.adminApp.state && window.adminApp.state.projectData) {
+        try {
+          localStorage.setItem('adminTempProjectData', JSON.stringify({
+            projectId: window.adminApp.state.currentProjectId,
+            projectData: window.adminApp.state.projectData,
+            slideIndex: window.adminApp.state.currentSlideIndex
+          }));
+          // console.log("Admin temp project data saved to localStorage.");
+        } catch (e) {
+          console.error("Could not save temporary admin state to localStorage:", e);
+        }
+      }
+
+      // Reload after brief delay
+      // Using this.timerManager if available and if this function might be testable without real reloads
+      if (this.timerManager && typeof this.timerManager.setTimeout === 'function') {
+          this.timerManager.setTimeout(() => {
+              window.location.reload();
+          }, 3000); // Increased delay slightly to allow message to be read
+      } else { // Fallback to native if timerManager is not there (should be, but defensive)
+          window.setTimeout(() => {
+              window.location.reload();
+          }, 3000);
+      }
+
+      return true; // Indicates session error was handled
+    }
+    return false; // Not a session error (or not one we're handling this way)
+  };
+
   window.baseApp.onServerError = function(error, messageAreaId) {
+    // First, check if it's a session error that handleSessionError can manage
+    if (this.handleSessionError(error, messageAreaId)) {
+      return; // Session error is being handled (e.g., by page reload)
+    }
+
+    // Proceed with generic server error display if not a session error
     console.error("Server error:", error);
     const userMessage = "An unexpected error occurred. Please try again later. If the issue persists, please contact support.";
-    // Assuming displayMessage is already defined in baseApp
-    if (typeof window.baseApp.displayMessage === 'function') {
-      window.baseApp.displayMessage(userMessage, false, messageAreaId);
+
+    if (typeof this.displayMessage === 'function') {
+      this.displayMessage(userMessage, false, messageAreaId);
     } else {
       console.error("baseApp.displayMessage is not available. Cannot display server error message.");
-      // Fallback for critical failure
       const messageAreaElement = document.getElementById(messageAreaId);
       if (messageAreaElement) {
         messageAreaElement.innerHTML = `<p class="error">${userMessage}</p>`;
       }
+    }
+
+    // Also ensure loading indicators are hidden on server error
+    if (typeof this.showLoading === 'function') {
+        this.showLoading(false, 'loadingSpinner'); // Assuming 'loadingSpinner' is a common ID
+        // If BaseApp serves multiple apps, loadingSpinnerId might also need to be a parameter
+        // or managed by the app calling onServerError. For now, this is a common case.
+    }
+     // If individual apps have their own loading flags, they should also manage them.
+     // e.g., if window.adminApp exists and has isLoading
+    if (window.adminApp && typeof window.adminApp.state !== 'undefined') {
+        window.adminApp.state.isLoading = false;
+    }
+    // e.g., if window.viewerApp exists and has isLoading
+    if (window.viewerApp && typeof window.viewerApp.state !== 'undefined') {
+        window.viewerApp.state.isLoading = false;
     }
   };
 
@@ -99,6 +171,214 @@
       if (messageElement) {
         messageElement.textContent = '';
         messageElement.style.display = 'none';
+      }
+    }
+  };
+
+  window.baseApp.resourceManager = {
+    _trackedResources: [], // Array of { name: string, dispose: function }
+
+    trackDisposable: function(resourceName, disposeFn) {
+      if (typeof resourceName !== 'string' || typeof disposeFn !== 'function') {
+        console.error('trackDisposable: Invalid arguments. resourceName must be a string and disposeFn must be a function.');
+        return;
+      }
+      // console.log('Tracking resource:', resourceName);
+      this._trackedResources.push({ name: resourceName, dispose: disposeFn });
+    },
+
+    disposeAll: function() {
+      // console.log('Disposing all tracked resources. Count:', this._trackedResources.length);
+      // Iterate in reverse order
+      for (let i = this._trackedResources.length - 1; i >= 0; i--) {
+        const resource = this._trackedResources[i];
+        try {
+          // console.log('Disposing resource:', resource.name);
+          resource.dispose();
+        } catch (e) {
+          console.error('Error disposing resource "' + resource.name + '":', e);
+        }
+      }
+      this._trackedResources = [];
+      // console.log('All tracked resources disposed and list cleared.');
+    },
+
+    disposeByName: function(resourceName) {
+      let found = false;
+      for (let i = this._trackedResources.length - 1; i >= 0; i--) {
+        if (this._trackedResources[i].name === resourceName) {
+          const resource = this._trackedResources[i];
+          try {
+            // console.log('Disposing resource by name:', resource.name);
+            resource.dispose();
+            this._trackedResources.splice(i, 1); // Remove from array
+            found = true;
+          } catch (e) {
+            console.error('Error disposing resource "' + resource.name + '":', e);
+          }
+          // Assuming names are unique for this example, break after finding
+          // If not unique, remove this break and it will dispose all with that name
+          break;
+        }
+      }
+      if (!found) {
+        // console.warn('disposeByName: Resource with name "' + resourceName + '" not found.');
+      }
+    }
+  };
+
+  window.baseApp.timerManager = {
+    _trackedTimers: {},
+    _nextTimerId: 1,
+
+    _generateId: function(type) {
+      return 'timer_' + type + '_' + (this._nextTimerId++);
+    },
+
+    setTimeout: function(callback, delay, ...args) {
+      if (typeof callback !== 'function') {
+        console.error('timerManager.setTimeout: callback must be a function.');
+        return null;
+      }
+      const uniqueId = this._generateId('timeout');
+      const wrapperCallback = () => {
+        try {
+          callback.apply(null, args);
+        } catch (e) {
+          console.error('Error in setTimeout callback for timer ' + uniqueId + ':', e);
+        } finally {
+          // Automatically untrack after execution for timeouts
+          if (this._trackedTimers[uniqueId]) {
+            delete this._trackedTimers[uniqueId];
+          }
+        }
+      };
+      const nativeId = window.setTimeout(wrapperCallback, delay);
+      this._trackedTimers[uniqueId] = { nativeId: nativeId, type: 'timeout' };
+      // console.log('setTimeout registered:', uniqueId, 'Native ID:', nativeId);
+      return uniqueId;
+    },
+
+    setInterval: function(callback, delay, ...args) {
+      if (typeof callback !== 'function') {
+        console.error('timerManager.setInterval: callback must be a function.');
+        return null;
+      }
+      const uniqueId = this._generateId('interval');
+      const wrapperCallback = () => {
+        try {
+          callback.apply(null, args);
+        } catch (e) {
+          console.error('Error in setInterval callback for timer ' + uniqueId + ':', e);
+        }
+      };
+      const nativeId = window.setInterval(wrapperCallback, delay);
+      this._trackedTimers[uniqueId] = { nativeId: nativeId, type: 'interval' };
+      // console.log('setInterval registered:', uniqueId, 'Native ID:', nativeId);
+      return uniqueId;
+    },
+
+    clearTimer: function(id) {
+      const timer = this._trackedTimers[id];
+      if (timer) {
+        // console.log('Clearing timer:', id, 'Type:', timer.type, 'Native ID:', timer.nativeId);
+        if (timer.type === 'timeout') {
+          window.clearTimeout(timer.nativeId);
+        } else if (timer.type === 'interval') {
+          window.clearInterval(timer.nativeId);
+        }
+        delete this._trackedTimers[id];
+        return true;
+      } else {
+        // console.warn('clearTimer: Timer with ID "' + id + '" not found or already cleared.');
+        return false;
+      }
+    },
+
+    clearAllTimers: function() {
+      // console.log('Clearing all tracked timers. Count:', Object.keys(this._trackedTimers).length);
+      for (const id in this._trackedTimers) {
+        if (this._trackedTimers.hasOwnProperty(id)) {
+          const timer = this._trackedTimers[id];
+          try {
+            if (timer.type === 'timeout') {
+              window.clearTimeout(timer.nativeId);
+            } else if (timer.type === 'interval') {
+              window.clearInterval(timer.nativeId);
+            }
+          } catch (e) {
+            console.error('Error clearing timer "' + id + '":', e);
+          }
+        }
+      }
+      this._trackedTimers = {};
+      // console.log('All timers cleared and list reset.');
+    }
+  };
+
+  window.baseApp.eventBus = {
+    _listeners: {},
+
+    on: function(eventName, callback) {
+      if (typeof eventName !== 'string' || eventName.trim() === '') {
+        console.error('eventBus.on: eventName must be a non-empty string.');
+        return;
+      }
+      if (typeof callback !== 'function') {
+        console.error('eventBus.on: callback must be a function for event "' + eventName + '".');
+        return;
+      }
+
+      if (!this._listeners[eventName]) {
+        this._listeners[eventName] = [];
+      }
+      this._listeners[eventName].push(callback);
+      // console.log('EventBus: Listener added for', eventName);
+    },
+
+    off: function(eventName, callback) {
+      if (typeof eventName !== 'string' || eventName.trim() === '') {
+        console.error('eventBus.off: eventName must be a non-empty string.');
+        return;
+      }
+      if (typeof callback !== 'function') {
+        console.error('eventBus.off: callback must be a function for event "' + eventName + '".');
+        return;
+      }
+
+      const listeners = this._listeners[eventName];
+      if (listeners && listeners.length) {
+        this._listeners[eventName] = listeners.filter(cb => cb !== callback);
+        if (this._listeners[eventName].length === 0) {
+          delete this._listeners[eventName];
+          // console.log('EventBus: All listeners removed for', eventName, ', event key deleted.');
+        } else {
+          // console.log('EventBus: Listener removed for', eventName);
+        }
+      } else {
+        // console.warn('eventBus.off: No listeners found for event "' + eventName + '" or callback not registered.');
+      }
+    },
+
+    emit: function(eventName, data) {
+      if (typeof eventName !== 'string' || eventName.trim() === '') {
+        console.error('eventBus.emit: eventName must be a non-empty string.');
+        return;
+      }
+
+      const listeners = this._listeners[eventName];
+      if (listeners && listeners.length) {
+        // console.log('EventBus: Emitting event', eventName, 'with data:', data, 'to', listeners.length, 'listener(s)');
+        // Iterate over a copy in case listeners modify the array during emission
+        [...listeners].forEach(callback => {
+          try {
+            callback(data);
+          } catch (e) {
+            console.error('Error in event bus callback for event "' + eventName + '":', e);
+          }
+        });
+      } else {
+        // console.log('EventBus: No listeners for event', eventName);
       }
     }
   };

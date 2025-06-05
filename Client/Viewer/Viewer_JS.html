@@ -149,19 +149,25 @@
         baseApp.displayMessage("Error: Client-server communication bridge unavailable.", false, 'messageAreaViewer'); return;
       }
       if (!viewerProjectListContainerEl) {
-          baseApp.showLoading(false, 'loadingSpinner'); return;
+          // baseApp.showLoading(false, 'loadingSpinner'); // Spinner might not have been shown yet
+          console.warn("loadViewerProjectsList: viewerProjectListContainerEl not found. Cannot display projects.");
+          return;
       }
       baseApp.showLoading(true, 'loadingSpinner');
+      viewerApp.state.isLoading = true;
       google.script.run
         .withSuccessHandler(displayViewerProjects)
-        .withFailureHandler(error => baseApp.onServerError(error, 'messageAreaViewer'))
+        .withFailureHandler(error => baseApp.onServerError(error, 'messageAreaViewer')) // onServerError now handles isLoading=false
         .getActiveProjectsList();
     }
 
     function displayViewerProjects(response) {
-        baseApp.showLoading(false, 'loadingSpinner');
+        baseApp.showLoading(false, 'loadingSpinner'); // Handled by onServerError too, but good for success path
+        viewerApp.state.isLoading = false;
         if (!response || !response.success) {
-            baseApp.onServerError(response || { error: "Failed to load projects" }, 'messageAreaViewer'); return;
+            // Error already handled by withFailureHandler calling baseApp.onServerError
+            // baseApp.onServerError(response || { error: "Failed to load projects" }, 'messageAreaViewer');
+            return;
         }
         const projectsArray = response.data && response.data.projects ? response.data.projects : [];
         if (!viewerProjectListContainerEl) { console.error("displayViewerProjects: viewerProjectListContainerEl is not found!"); return; }
@@ -196,12 +202,58 @@
             viewerApp.state.viewerFabricCanvas.dispose(); viewerApp.state.viewerFabricCanvas = null;
         }
         viewerApp.state.currentProjectData = null; viewerApp.state.currentSlideIndex = 0;
+        // messageAreaElViewer might need clearing if returning to list view with a persistent message
+        // However, loadViewerProjectsList will likely display a new message or clear it if successful (no projects).
         loadViewerProjectsList();
     }
 
     function showProjectView() { /* ... content ... */ }
-    function loadProjectForViewing(projectId) { /* ... uses baseApp ... */ }
-    function onProjectViewDataReceived(response) { /* ... uses baseApp ... */ }
+
+    function loadProjectForViewing(projectId) {
+      if (!projectId) {
+        baseApp.displayMessage("Invalid project ID.", false, 'messageAreaViewer');
+        return;
+      }
+      baseApp.showLoading(true, 'loadingSpinner');
+      viewerApp.state.isLoading = true;
+      google.script.run
+        .withSuccessHandler(onProjectViewDataReceived)
+        .withFailureHandler(error => baseApp.onServerError(error, 'messageAreaViewer'))
+        .getProjectViewById(projectId);
+    }
+
+    function onProjectViewDataReceived(response) {
+      baseApp.showLoading(false, 'loadingSpinner');
+      viewerApp.state.isLoading = false;
+      if (!response || !response.success || !response.data || !response.data.projectDataJSON) {
+        baseApp.onServerError(response || { error: "Failed to load project data." }, 'messageAreaViewer');
+        viewerApp.state.currentProjectData = null;
+        return;
+      }
+      try {
+        const projectData = JSON.parse(response.data.projectDataJSON);
+        if (!projectData.slides || projectData.slides.length === 0) {
+          baseApp.displayMessage("This project has no slides.", false, 'messageAreaViewer');
+          viewerApp.state.currentProjectData = null;
+          return;
+        }
+        viewerApp.state.currentProjectData = projectData;
+        viewerApp.state.currentSlideIndex = 0;
+        if (viewingProjectTitleEl) viewingProjectTitleEl.textContent = projectData.title || 'Untitled Project';
+
+        if (!viewerApp.state.viewerFabricCanvas && viewerFabricCanvasEl) {
+            initializeViewerCanvas();
+        }
+
+        renderSlideForViewing(0);
+        showProjectView(); // Ensure this is called after canvas is potentially initialized
+      } catch (e) {
+        console.error("Error parsing project data:", e);
+        baseApp.onServerError({ message: "Error processing project data." }, 'messageAreaViewer');
+        viewerApp.state.currentProjectData = null;
+      }
+    }
+
     function getCurrentSlide() { /* ... content ... */ }
     function getActionButtonText(action) { /* ... content ... */ }
     function createOverlayElement(overlay) { /* ... content, use mediaManager.getTemplateColor ... */ }
@@ -386,9 +438,11 @@
                 sharedUtils.safeDOMUpdate(interactiveTimelineBar, el => el.style.display = 'block');
                 if (media && media.driveFileId) {
                     baseApp.showLoading(true, 'loadingSpinner');
+                    viewerApp.state.isLoading = true; // Manage isLoading state
                     google.script.run
                         .withSuccessHandler(function(audioResponse) {
                             baseApp.showLoading(false, 'loadingSpinner');
+                            viewerApp.state.isLoading = false; // Manage isLoading state
                             if (viewerApp.state.currentSlideIndex !== slideIndex) return;
                             if (audioResponse && audioResponse.success && audioResponse.base64Data) {
                                 const audioEventHandlers = {
@@ -410,7 +464,12 @@
                                canvas.renderAll();
                             }
                         })
-                        .withFailureHandler(error => { baseApp.showLoading(false, 'loadingSpinner'); baseApp.onServerError(error, 'messageAreaViewer'); canvas.renderAll(); })
+                        .withFailureHandler(error => {
+                            // baseApp.showLoading(false, 'loadingSpinner'); // Handled by onServerError
+                            // viewerApp.state.isLoading = false; // Handled by onServerError
+                            baseApp.onServerError(error, 'messageAreaViewer');
+                            canvas.renderAll();
+                        })
                         .getAudioAsBase64(media.driveFileId);
                 } else { canvas.renderAll(); }
                 updateViewerCanvasInteractivity();

@@ -39,49 +39,47 @@
       history: [],
       historyIndex: -1,
       isApplyingHistory: false, // Flag to prevent re-saving state during undo and redo
-      // adminYouTubePlayer: null, // Will use mediaManager.state.ytPlayer
-      // isYouTubeApiReady: false, // Will use mediaManager.state.isYouTubeApiReady
-      // deferredYouTubeSetup: null, // Will use mediaManager.state.deferredMediaSetup
       placingOverlay: null,
       editingOverlayId: null,
       previewingOverlays: false,
-      overlayPreviewInterval: null // This specific interval for admin preview might remain or be adapted
+      // overlayPreviewInterval is removed, MediaManager handles updates
+      currentMediaType: null // 'youtube', 'audio', or null
     };
 
-// ADD interval tracking:
+// Interval tracking:
 adminApp.intervals = {
-  // playerUpdate: null, // To be managed by MediaManager
-  overlayPreview: null, // This specific interval for admin preview might remain or be adapted
-  autoSave: null, // If you add autosave later
-  // playerQuestionCheckInterval: null // To be managed by MediaManager
+  autoSave: null // playerUpdate and overlayPreview are now handled by MediaManager
 };
 
-// Helper to safely clear interval
+// Helper to safely clear interval (now primarily for autoSave)
 adminApp.clearInterval = function(intervalName) {
   const timerId = adminApp.intervals[intervalName];
   if (timerId) {
-    baseApp.timerManager.clearTimer(timerId); // Use timerManager to clear
-    adminApp.intervals[intervalName] = null; // Nullify in our tracking object
-    console.log(`Cleared interval via timerManager: ${intervalName} (ID: ${timerId})`);
-    // Also remove from resourceManager tracking if it was individually cleared
-    baseApp.resourceManager.disposeByName('interval-' + intervalName);
-  } else {
-    // console.log(`Interval ${intervalName} already clear or not found in adminApp.intervals.`);
+    if (intervalName === 'autoSave') { // Example for autoSave
+        if (window.baseApp && baseApp.timerManager) {
+            baseApp.timerManager.clearTimer(timerId);
+        } else {
+            clearTimeout(timerId); // Fallback if autoSave uses setTimeout
+        }
+    }
+    // For other intervals, if any were managed by standard setInterval:
+    // else { clearInterval(adminApp.intervals[intervalName]); }
+    adminApp.intervals[intervalName] = null;
+    console.log(`Cleared interval: ${intervalName} (ID: ${timerId})`);
+    // No need to call resourceManager.disposeByName here for autoSave unless it was tracked that way.
   }
 };
 
-// ADD after adminApp.state definition:
-// adminApp.eventListeners = new WeakMap(); // No longer needed, replaced by resourceManager
-// adminApp.activeListeners = []; // No longer needed, replaced by resourceManager
-
-// --- Global function for YouTube API is now handled by MediaManager.html ---
-// function onYouTubeIframeAPIReady() { ... } // Removed
-
-// function isYouTubePlayerAvailable() { ... } // Removed, use mediaManager.isYouTubePlayerAvailable()
-
-// function validateYouTubeEnvironment() { ... } // Removed, or logic incorporated into MediaManager or app callbacks
-
-// function safeGetCurrentTime(player) { ... } // Removed, use mediaManager.safeGetCurrentTime()
+// Removed old YouTube specific state and functions as they are now handled by MediaManager.html
+// - adminApp.state.adminYouTubePlayer
+// - adminApp.state.isYouTubeApiReady
+// - adminApp.state.deferredYouTubeSetup
+// - global onYouTubeIframeAPIReady()
+// - isYouTubePlayerAvailable()
+// - validateYouTubeEnvironment()
+// - safeGetCurrentTime(player)
+// - stopAndDestroyAdminYouTubePlayer() - use mediaManager.stopAndDestroyPlayer()
+// - setupAdminYouTubePlayer() - use mediaManager.setupPlayer()
 
     // --- DOM Element References ---
     let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
@@ -203,6 +201,8 @@ adminApp.clearInterval = function(intervalName) {
 };
 
     adminApp.setupDOMReferences = function() {
+      mediaManager.loadYouTubeAPI(); // Load YouTube API early
+
       messageAreaEl = document.getElementById('messageArea');
       loadingSpinnerEl = document.getElementById('loadingSpinner');
       listViewContainerEl = document.getElementById('listViewContainer');
@@ -492,8 +492,10 @@ function safeDisposeCanvas() {
       // Hide any active popovers
       hideActivePopover();
       
-      // Stop any playing media
-      stopAndDestroyAdminYouTubePlayer();
+      // Stop any playing media using MediaManager
+      if (typeof mediaManager !== 'undefined' && mediaManager.stopAndDestroyPlayer) {
+        mediaManager.stopAndDestroyPlayer();
+      }
       
       // Clear modal states
       adminApp.state.editingOverlayId = null;
@@ -1055,9 +1057,9 @@ function safeDisposeCanvas() {
         adminApp.state.currentSlideIndex = slideIndex;
         const selectedSlideData = adminApp.state.projectData.slides[slideIndex];
         
-        // Store current slide type
-        adminApp.state.currentSlideType = (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type) ? selectedSlideData.slideMedia.type : 'none';
-        console.log("Current slide type set to:", adminApp.state.currentSlideType);
+        // Store current media type
+        adminApp.state.currentMediaType = (selectedSlideData.slideMedia && selectedSlideData.slideMedia.type) ? selectedSlideData.slideMedia.type : null;
+        console.log("Current media type set to:", adminApp.state.currentMediaType);
 
         const canvas = adminApp.state.fabricCanvasInstance;
         if (!canvas) { 
@@ -1086,21 +1088,20 @@ function safeDisposeCanvas() {
 
         // In selectSlide() function
         if (typeof mediaManager !== 'undefined') {
-            if (mediaManager.stopAndDestroyPlayer) mediaManager.stopAndDestroyPlayer();
-            if (mediaManager.stopAndClearAudioPlayer) mediaManager.stopAndClearAudioPlayer();
+            if (mediaManager.stopAndDestroyPlayer) mediaManager.stopAndDestroyPlayer(); // Handles YouTube
+            // No specific mediaManager.stopAndClearAudioPlayer needed here as stopAndDestroyPlayer is generic enough if audio was the active type.
         }
 
         sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
             el.style.display = 'none';
-            el.innerHTML = ''; 
+            el.innerHTML = ''; // Clear any previous player div
         }, "Failed to reset YouTube player container in selectSlide");
-        // TODO: Add similar for an admin audio player container if one is introduced
         
-        sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity in selectSlide");
+        sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1'); // Default opacity
+        canvas.setBackgroundColor('rgba(233,233,233,1)', canvas.renderAll.bind(canvas)); // Default background
 
         canvas.clear(); 
         canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
-        canvas.backgroundColor = '#e9e9e9'; 
 
         adminApp.resizeCanvasToFit(selectedSlideData);
 
@@ -1108,17 +1109,17 @@ function safeDisposeCanvas() {
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
         if (audioUploaderEl) audioUploaderEl.value = null;
         
-        sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => el.textContent = '', "Failed to clear attached audio name in selectSlide");
+        sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => el.textContent = '');
         const audioControls = document.getElementById('audioControls');
-        sharedUtils.safeDOMUpdate(audioControls, el => el.style.display = 'none', "Failed to hide audio controls in selectSlide");
-        sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none', "Failed to hide remove audio button in selectSlide");
-        sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder in selectSlide");
+        sharedUtils.safeDOMUpdate(audioControls, el => el.style.display = 'none');
+        sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none');
+        sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none');
 
         const media = selectedSlideData.slideMedia;
-        updateVideoToolsVisibility(false); // Default to false, MediaManager callbacks will enable if YT
+        updateVideoToolsVisibility(false); // Default to false, MediaManager onReady callback will enable if YT
 
         if (media && media.type === 'image' && media.driveFileId) {
-            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for image bg in selectSlide");
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none');
             console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
             baseApp.showLoading(true, 'loadingSpinner');
             adminApp.state.isLoading = true;
@@ -1158,35 +1159,19 @@ function safeDisposeCanvas() {
             sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none');
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
             
-            // Opacity and background color are more complex with MediaManager, as it controls the player visibility.
-            // The canvas itself might remain transparent or be styled via CSS.
-            // sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1');
-            canvas.backgroundColor = 'rgba(0,0,0,0)'; // Keep canvas transparent for YT
+            canvas.setBackgroundColor('rgba(0,0,0,0)', canvas.renderAll.bind(canvas)); // Make Fabric canvas transparent for video
+            sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '0.5'); // Make canvas see-through over player
 
             const videoId = sharedUtils.extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl) {
                 sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
-                    el.style.display = 'block'; // Ensure container is visible for MediaManager
-                    // MediaManager will handle player's internal styling (position, size)
+                    el.innerHTML = '<div id="adminYouTubePlayerDiv"></div>'; // Target for MediaManager
+                    el.style.display = 'block';
                 });
 
-                const playerVars = {
-                    'playsinline': 1,
-                    'controls': 1, // Admin might want controls
-                    'showinfo': 0,
-                    'rel': 0,
-                    // No 'disablekb': 1 for admin, as admin might use keyboard for testing.
-                    // width/height will be set by MediaManager based on container.
-                };
+                const playerVars = { 'controls': 1, 'showinfo': 0, 'rel': 0, 'playsinline': 1 };
 
-                // These are the handlers MediaManager will call internally
-                const eventHandlersForMediaManager = {
-                    'onReady': mediaManager.onPlayerReady,
-                    'onStateChange': mediaManager.onPlayerStateChange,
-                    'onError': mediaManager.onPlayerError
-                };
-
-                // Configure admin-specific callbacks for MediaManager to use
+                // Set MediaManager callbacks
                 mediaManager.state.callbacks.onReady = adminApp.handleMediaPlayerReady;
                 mediaManager.state.callbacks.onStateChange = adminApp.handleMediaPlayerStateChange;
                 mediaManager.state.callbacks.onError = adminApp.handleMediaPlayerError;
@@ -1195,42 +1180,44 @@ function safeDisposeCanvas() {
                 mediaManager.state.callbacks.onOverlayUpdateNeeded = adminApp.handleMediaOverlayUpdate;
                 mediaManager.state.callbacks.onEnded = adminApp.handleMediaEnded;
 
-                mediaManager.setupPlayer(videoId, 'adminYouTubePlayerContainer', playerVars, eventHandlersForMediaManager);
-
+                mediaManager.setupPlayer(videoId, 'adminYouTubePlayerDiv', playerVars);
+                // adminApp.state.currentMediaType is already set to 'youtube'
             } else {
                 console.error("AdminApp: Invalid YouTube setup. Video ID or container missing.", { videoId, container: !!adminYouTubePlayerContainerEl, url: media.url });
-                updateVideoToolsVisibility(false); // Hide YT specific tools
+                updateVideoToolsVisibility(false);
                 sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => {
                     el.textContent = `Error: Could not load YouTube video. Check URL. URL: ${media.url}`;
                     el.style.display = 'block';
                 });
-                canvas.backgroundColor = '#444'; // Show a dark background if player fails
+                canvas.setBackgroundColor('#444', canvas.renderAll.bind(canvas)); // Dark background if player fails
+                sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1');
             }
-            canvas.renderAll();
             
-        } else if (media && media.type === 'audio' && (media.driveFileId)) {
-             // TODO: Integrate with MediaManager for audio if admin needs audio editing features like questions/overlays for audio.
-             // For now, keeping it simple or assuming admin doesn't edit audio timeline events.
+        } else if (media && media.type === 'audio' && media.driveFileId) {
+            // Admin does not have a player UI for audio, so no mediaManager.setupAudio call.
+            // Display info as before.
             sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'block');
             console.log("Indicating attached audio:", media.originalName || media.driveFileId);
             sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => {
                 el.textContent = `Attached: ${media.originalName || 'Audio File'}`;
-                const currentAudioControls = document.getElementById('audioControls'); // Re-fetch or ensure it's in scope
-                sharedUtils.safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block', "Failed to show audio controls for audio in selectSlide");
-            }, "Failed to update attached audio name for audio in selectSlide");
-            sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block', "Failed to show remove audio button for audio in selectSlide");
-            
+                const currentAudioControls = document.getElementById('audioControls');
+                sharedUtils.safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block');
+            });
+            sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block');
             sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => {
                 el.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
                 el.style.display = 'block';
-            }, "Failed to update admin media placeholder for audio in selectSlide");
-            canvas.backgroundColor = '#e9e9e9'; 
-            canvas.renderAll();
+            });
+            // Ensure canvas is opaque for audio slides
+            sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1');
+            canvas.setBackgroundColor('rgba(233,233,233,1)', canvas.renderAll.bind(canvas));
             
-        } else {
-            console.log("No background media found or configured for slide", slideIndex);
-            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for no media in selectSlide");
-            canvas.backgroundColor = '#e9e9e9'; 
+        } else { // No media, or other types like PDF/Website (not handled by MediaManager)
+            console.log("No media player background for slide", slideIndex, "Media type:", media ? media.type : "N/A");
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none');
+            // Ensure canvas is opaque for non-media player slides
+            sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1');
+            canvas.setBackgroundColor('rgba(233,233,233,1)', canvas.renderAll.bind(canvas));
             canvas.renderAll();
         }
 
@@ -3141,32 +3128,39 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         }
     }
 
-    // --- New AdminApp Media Handling Callbacks ---
-    adminApp.handleMediaPlayerReady = function(event) {
-        // event.target is the player instance (from MediaManager)
-        console.log("AdminApp: Media Player Ready. Video ID:", mediaManager.state.ytPlayer.getVideoData().video_id);
-        updateVideoToolsVisibility(true);
-        renderVideoQuestionsList(); // Questions for the current slide
-        renderOverlayTimeline();    // Overlays for the current slide
-        // If admin wants to autoplay or do other things on ready, it can be done here.
-        // For example: mediaManager.state.ytPlayer.playVideo();
+    // --- AdminApp Media Handling Callbacks (to be assigned to mediaManager.state.callbacks) ---
+    adminApp.handleMediaPlayerReady = function(mediaTypeInfo) { // mediaTypeInfo is {type: 'youtube'} or {type: 'audio'}
+        console.log("AdminApp: Media Player Ready. Type:", mediaTypeInfo.type);
+        if (mediaTypeInfo.type === 'youtube') {
+            updateVideoToolsVisibility(true);
+            renderVideoQuestionsList();
+            renderOverlayTimeline();
+        }
+        // Add audio specific ready logic if Admin ever plays audio with timeline
     };
 
-    adminApp.handleMediaPlayerStateChange = function(event) {
-        console.log("AdminApp: Media Player State Change:", event.data);
-        // Admin-specific logic based on player state, if any, beyond what MediaManager handles.
-        // For example, if specific UI elements need to change based on PLAYING, PAUSED, ENDED.
-        // The core interval for time updates and question/overlay checks is managed by MediaManager.
+    adminApp.handleMediaPlayerStateChange = function(eventData) { // eventData is {type: 'youtube', data: YT.PlayerState} or {type: 'audio', data: 'playing'/'paused'}
+        console.log("AdminApp: Media Player State Change - Type:", eventData.type, "Data:", eventData.data);
+        if (eventData.type === 'youtube' && eventData.data === YT.PlayerState.ENDED) {
+            const currentSlide = getCurrentSlide();
+            if (currentSlide && currentSlide.slideMedia && currentSlide.slideMedia.videoQuestions) {
+                currentSlide.slideMedia.videoQuestions.forEach(q => q.triggered = false); // Reset for replay
+            }
+        }
+         // Add audio specific state change logic if needed
     };
 
-    adminApp.handleMediaPlayerError = function(eventData) { // eventData is { type: 'youtube', errorData: event.data }
-        console.error("AdminApp: Media Player Error:", eventData.errorData);
-        baseApp.displayMessage(`YouTube Player Error in Admin: Code ${eventData.errorData}`, false, 'messageArea');
+    adminApp.handleMediaPlayerError = function(errorData) { // errorData is {type: 'youtube', data: YT.OnErrorEvent} or {type: 'audio', error: Event}
+        console.error("AdminApp: Media Player Error - Type:", errorData.type, "Data:", errorData.data || errorData.error);
+        if (errorData.type === 'youtube') {
+            baseApp.displayMessage(`YouTube Player Error in Admin: Code ${errorData.data}`, false, 'messageArea');
+        } else if (errorData.type === 'audio') {
+             baseApp.displayMessage("Audio player error in Admin.", false, 'messageArea');
+        }
         updateVideoToolsVisibility(false);
     };
 
-    adminApp.handleMediaTimeUpdate = function(currentTime, duration) {
-        // Update Admin-specific timeline UI
+    adminApp.handleMediaTimeUpdate = function(currentTime, duration, mediaType) { // mediaType is 'youtube' or 'audio'
         if (videoTimelineSliderEl) {
             videoTimelineSliderEl.max = duration;
             videoTimelineSliderEl.value = currentTime;
@@ -3175,47 +3169,42 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         safeDOMUpdate(videoTotalDurationDisplayEl, el => el.textContent = sharedUtils.formatTime(duration));
     };
 
-    adminApp.handleMediaQuestionTrigger = function(currentTime) {
+    adminApp.handleMediaQuestionTrigger = function(currentTime) { // Primarily for YouTube
         const currentSlide = getCurrentSlide();
         if (!currentSlide || !currentSlide.slideMedia || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
             return;
         }
-
         currentSlide.slideMedia.videoQuestions.forEach((question, index) => {
-            // Check if question should be triggered (within a small window, not already triggered)
-            // The 'triggered' flag management needs to be robust, potentially reset when a video starts over.
-            // For now, let's assume 'triggered' is a property on the question object in projectData.
             if (!question.triggered && currentTime >= question.timestamp && currentTime < question.timestamp + 1.5) { // 1.5s window
                 console.log(`AdminApp: Triggering question ${index} at ${sharedUtils.formatTime(question.timestamp)} (current: ${sharedUtils.formatTime(currentTime)})`);
-                if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
-                    mediaManager.state.ytPlayer.pauseVideo();
-                }
-                question.triggered = true; // Mark as triggered
+                mediaManager.pauseVideo(); // Use MediaManager to pause
+                question.triggered = true;
 
                 safeDOMUpdate(questionTimestampDisplayEl, el => {
                     el.textContent = sharedUtils.formatTime(question.timestamp);
                     if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
                 });
                 if(questionTextEl) questionTextEl.value = question.questionText;
-                optionInputsEl.forEach((input, i) => { if(input) input.value = question.options[i] || ''; });
-                correctAnswerRadiosEl.forEach((radio, i) => { if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length); });
+                optionInputsEl.forEach((input, i) => { if(input) input.value = (question.options && question.options[i]) ? question.options[i] : ''; });
+                correctAnswerRadiosEl.forEach((radio, i) => { if(radio) radio.checked = (i === question.correctOptionIndex && question.options && i < question.options.length); });
                 if(editingQuestionIndexEl) editingQuestionIndexEl.value = index;
-
                 safeDOMUpdate(questionModalEl, el => el.style.display = 'block');
             }
         });
     };
 
-    adminApp.handleMediaOverlayUpdate = function(currentTime) {
-        // This is where Admin's specific overlay preview logic would go, if it depends on media time.
-        // This replaces the core logic of the old `updateOverlayPreview`.
-        if (!adminApp.state.previewingOverlays || !mediaManager.state.ytPlayer) return;
+    adminApp.handleMediaOverlayUpdate = function(currentTime, mediaType) { // mediaType is 'youtube' or 'audio'
+        // This replaces the core logic of the old `updateOverlayPreview` interval.
+        if (!adminApp.state.previewingOverlays) return;
+        // This check might need to be adapted if overlays are supported for audio in admin.
+        if (mediaType !== 'youtube' && mediaType !== 'audio') return;
+
 
         const currentSlide = getCurrentSlide();
         if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) return;
 
         const overlays = currentSlide.slideMedia.videoOverlays;
-        const activeOverlaysContainer = document.getElementById('adminYouTubePlayerContainer');
+        const activeOverlaysContainer = document.getElementById('adminYouTubePlayerContainer'); // Or a generic media container if audio gets visual overlays
         if (!activeOverlaysContainer) return;
 
         overlays.forEach(overlay => {
@@ -3227,11 +3216,15 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         });
     };
 
-    adminApp.handleMediaEnded = function(mediaType) { // mediaType is {type: 'youtube'} or {type: 'audio'}
-        console.log(`AdminApp: ${mediaType.type} media ended.`);
-        // Admin-specific logic for when media finishes, if any.
+    adminApp.handleMediaEnded = function(mediaTypeInfo) { // mediaTypeInfo is {type: 'youtube'} or {type: 'audio'}
+        console.log(`AdminApp: ${mediaTypeInfo.type} media ended.`);
+        if (mediaTypeInfo.type === 'youtube') {
+            const currentSlide = getCurrentSlide();
+            if (currentSlide && currentSlide.slideMedia && currentSlide.slideMedia.videoQuestions) {
+                currentSlide.slideMedia.videoQuestions.forEach(q => q.triggered = false); // Reset for replay
+            }
+        }
     };
-
 
     adminApp.attachVideoQuestionEventListeners = function() {
         const safelyAttachListener = (element, eventType, handler, resourceName) => {
@@ -3246,26 +3239,32 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         };
 
         const handleVideoTimelineSliderInput = function() {
-            if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.seekTo === 'function') {
-                mediaManager.state.ytPlayer.seekTo(this.value, true);
+            // Use MediaManager to seek
+            if (adminApp.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+                mediaManager.seekTo(this.value);
+            } else if (adminApp.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable()) {
+                // If admin ever gets audio timeline controls for preview
+                // mediaManager.seekAudioTo(this.value);
             }
         };
         safelyAttachListener(videoTimelineSliderEl, 'input', handleVideoTimelineSliderInput, 'admin-videoTimelineSlider-input');
 
         const handleAddQuestionClick = function() {
-            if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
-                mediaManager.state.ytPlayer.pauseVideo();
+            if (adminApp.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+                mediaManager.pauseVideo();
+                const currentTime = mediaManager.safeGetCurrentTime();
+                safeDOMUpdate(questionTimestampDisplayEl, el => {
+                    el.textContent = sharedUtils.formatTime(currentTime);
+                    if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
+                });
+                if(questionTextEl) questionTextEl.value = '';
+                optionInputsEl.forEach(input => { if(input) input.value = ''; });
+                correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
+                if(editingQuestionIndexEl) editingQuestionIndexEl.value = '-1';
+                safeDOMUpdate(questionModalEl, el => el.style.display = 'block');
+            } else {
+                baseApp.displayMessage("YouTube player not ready for adding questions.", false, "messageArea");
             }
-            const currentTime = mediaManager.safeGetCurrentTime();
-            safeDOMUpdate(questionTimestampDisplayEl, el => {
-                el.textContent = sharedUtils.formatTime(currentTime);
-                if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
-            }, "Failed to set question timestamp display in handleAddQuestionClick");
-            if(questionTextEl) questionTextEl.value = '';
-            optionInputsEl.forEach(input => { if(input) input.value = ''; });
-            correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
-            if(editingQuestionIndexEl) editingQuestionIndexEl.value = '-1';
-            safeDOMUpdate(questionModalEl, el => el.style.display = 'block', "Failed to show question modal in handleAddQuestionClick");
         };
         safelyAttachListener(addQuestionBtnEl, 'click', handleAddQuestionClick, 'admin-addQuestionBtn-click');
 
@@ -3275,44 +3274,35 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
                 baseApp.displayMessage("Not a YouTube slide or slide data missing.", false, 'messageArea'); return;
             }
             const questionText = questionTextEl ? questionTextEl.value.trim() : '';
-            if (!questionText) {
-                baseApp.displayMessage("Question text cannot be empty.", false, 'messageArea'); return;
-            }
+            if (!questionText) { baseApp.displayMessage("Question text cannot be empty.", false, 'messageArea'); return; }
             const options = optionInputsEl.map(input => input ? input.value.trim() : '').filter(opt => opt !== '');
-            if (options.length < 2) {
-                baseApp.displayMessage("Please provide at least two options.", false, 'messageArea'); return;
-            }
+            if (options.length < 2) { baseApp.displayMessage("Please provide at least two options.", false, 'messageArea'); return; }
             let correctOptionIndex = -1;
             for (let i = 0; i < correctAnswerRadiosEl.length; i++) {
                 if (correctAnswerRadiosEl[i] && correctAnswerRadiosEl[i].checked) { correctOptionIndex = i; break; }
             }
-            if (correctOptionIndex === -1 || correctOptionIndex >= options.length) {
-                baseApp.displayMessage("Please select a correct answer from the provided options.", false, 'messageArea'); return;
-            }
+            if (correctOptionIndex === -1 || correctOptionIndex >= options.length) { baseApp.displayMessage("Please select a correct answer.", false, 'messageArea'); return; }
             const timestamp = questionModalEl && questionModalEl.dataset.rawTimestamp ? parseFloat(questionModalEl.dataset.rawTimestamp) : 0;
-            const questionData = { timestamp, questionText, options, correctOptionIndex };
+            const questionData = { timestamp, questionText, options, correctOptionIndex, triggered: false }; // Ensure triggered is reset/set
             const editIndex = editingQuestionIndexEl ? parseInt(editingQuestionIndexEl.value, 10) : -1;
-            if (!Array.isArray(currentSlide.slideMedia.videoQuestions)) {
-                currentSlide.slideMedia.videoQuestions = [];
-            }
-            if (editIndex === -1) {
-                currentSlide.slideMedia.videoQuestions.push(questionData);
-            } else {
-                currentSlide.slideMedia.videoQuestions[editIndex] = questionData;
-            }
+
+            if (!Array.isArray(currentSlide.slideMedia.videoQuestions)) currentSlide.slideMedia.videoQuestions = [];
+            if (editIndex === -1) currentSlide.slideMedia.videoQuestions.push(questionData);
+            else currentSlide.slideMedia.videoQuestions[editIndex] = questionData;
+
             currentSlide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp);
             baseApp.displayMessage("Question saved!", true, 'messageArea');
-            safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal after save in handleSaveQuestionClick");
+            safeDOMUpdate(questionModalEl, el => el.style.display = 'none');
             renderVideoQuestionsList();
+            renderOverlayTimeline(); // Questions are also markers on the timeline
         };
         safelyAttachListener(saveQuestionBtnEl, 'click', handleSaveQuestionClick, 'admin-saveQuestionBtn-click');
 
         const handleCancelQuestionClick = function() {
-            safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal on cancel in handleCancelQuestionClick");
+            safeDOMUpdate(questionModalEl, el => el.style.display = 'none');
         };
         safelyAttachListener(cancelQuestionBtnEl, 'click', handleCancelQuestionClick, 'admin-cancelQuestionBtn-click');
 
-        // Video Overlay Event Listeners
         const addTimelineOverlayBtn = document.getElementById('addTimelineOverlayBtn');
         safelyAttachListener(addTimelineOverlayBtn, 'click', initiateOverlayPlacement, 'admin-addTimelineOverlayBtn-click');
 
@@ -3335,119 +3325,72 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     };
 
     function updateVideoToolsVisibility(show) {
-        safeDOMUpdate(mediaTimelineControlsEl, 
-          el => el.style.display = show ? 'block' : 'none', 
-          "Failed to update video timeline controls display in updateVideoToolsVisibility");
-        if (show && !mediaTimelineControlsEl) { 
-            console.warn("updateVideoToolsVisibility: mediaTimelineControlsEl not found.");
-        }
-        safeDOMUpdate(videoQuestionsListContainerEl, 
-          el => el.style.display = show ? 'block' : 'none',
-          "Failed to update video questions list container display in updateVideoToolsVisibility");
-        if (show && !videoQuestionsListContainerEl) { 
-            console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
-        }
+        safeDOMUpdate(mediaTimelineControlsEl, el => el.style.display = show ? 'block' : 'none');
+        if (show && !mediaTimelineControlsEl) console.warn("updateVideoToolsVisibility: mediaTimelineControlsEl not found.");
+
+        safeDOMUpdate(videoQuestionsListContainerEl, el => el.style.display = show ? 'block' : 'none');
+        if (show && !videoQuestionsListContainerEl) console.warn("updateVideoToolsVisibility: videoQuestionsListContainerEl not found.");
+
+        // Also ensure overlay related buttons are shown/hidden if they are part of video tools
+        const addOverlayButton = document.getElementById('addTimelineOverlayBtn'); // Example
+        if (addOverlayButton) addOverlayButton.style.display = show ? 'inline-block' : 'none';
+        const previewOverlayButton = document.getElementById('previewOverlaysBtn');
+        if (previewOverlayButton) previewOverlayButton.style.display = show ? 'inline-block' : 'none';
+
     }
 
     function renderVideoQuestionsList() {
-        if (!videoQuestionsListEl) {
-            console.warn("renderVideoQuestionsList: videoQuestionsListEl not found.");
-            return;
-        }
+        if (!videoQuestionsListEl) { console.warn("renderVideoQuestionsList: videoQuestionsListEl not found."); return; }
         
         safeDOMUpdate(videoQuestionsListEl, el => {
-            el.innerHTML = ''; // Clear existing list
-
+            el.innerHTML = '';
             const currentSlide = getCurrentSlide();
-            if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube' || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
-                const li = document.createElement('li');
-                li.textContent = "No questions added yet.";
-                li.style.fontStyle = "italic";
-                el.appendChild(li);
-                return;
+            if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube' || !Array.isArray(currentSlide.slideMedia.videoQuestions) || currentSlide.slideMedia.videoQuestions.length === 0) {
+                el.innerHTML = '<li>No questions added yet.</li>'; return;
             }
-
             const questions = currentSlide.slideMedia.videoQuestions;
-            console.log("Rendering questions list:", questions); 
-
             questions.forEach((question, index) => {
                 const li = document.createElement('li');
-                li.style.marginBottom = "8px";
-                li.style.padding = "5px";
-                li.style.border = "1px solid #eee"; 
-                li.style.borderRadius = "3px";
-                li.style.display = "flex"; 
-                li.style.justifyContent = "space-between"; 
-                li.style.alignItems = "center"; 
-
+                li.style.cssText = "margin-bottom: 8px; padding: 5px; border: 1px solid #eee; border-radius: 3px; display: flex; justify-content: space-between; align-items: center;";
                 const questionTextSpan = document.createElement('span'); 
                 questionTextSpan.textContent = `[${sharedUtils.formatTime(question.timestamp)}] ${question.questionText.substring(0, 40)}${question.questionText.length > 40 ? '...' : ''}`;
                 questionTextSpan.style.flexGrow = "1"; 
-                
                 const actionsDiv = document.createElement('div');
                 actionsDiv.style.whiteSpace = "nowrap"; 
-
                 const editBtn = document.createElement('button');
-                editBtn.textContent = 'Edit';
-                editBtn.style.marginLeft = '5px'; 
-                editBtn.style.padding = '3px 8px';
-                editBtn.style.fontSize = '0.8em';
-                editBtn.className = 'edit-button'; 
+                editBtn.textContent = 'Edit'; editBtn.className = 'edit-button';
+                editBtn.style.cssText = "margin-left: 5px; padding: 3px 8px; font-size: 0.8em;";
                 editBtn.onclick = function() {
-                    console.log("Editing question index:", index, questions[index]); 
-
-                    // Use mediaManager.state.ytPlayer
-                    if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
-                        mediaManager.state.ytPlayer.pauseVideo();
+                    if (adminApp.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+                        mediaManager.pauseVideo();
                     }
-                    
-                    safeDOMUpdate(questionTimestampDisplayEl, tsEl => tsEl.textContent = sharedUtils.formatTime(question.timestamp), "Failed to set question timestamp display on edit in renderVideoQuestionsList");
+                    safeDOMUpdate(questionTimestampDisplayEl, tsEl => tsEl.textContent = sharedUtils.formatTime(question.timestamp));
                     if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
                     if(questionTextEl) questionTextEl.value = question.questionText;
-
-                    optionInputsEl.forEach((input, i) => {
-                        if(input) input.value = question.options[i] || '';
-                    });
-                    correctAnswerRadiosEl.forEach((radio, i) => {
-                        if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length);
-                    });
-                    
+                    optionInputsEl.forEach((input, i) => { if(input) input.value = (question.options && question.options[i]) ? question.options[i] : ''; });
+                    correctAnswerRadiosEl.forEach((radio, i) => { if(radio) radio.checked = (i === question.correctOptionIndex && question.options && i < question.options.length); });
                     if(editingQuestionIndexEl) editingQuestionIndexEl.value = index;
-                    safeDOMUpdate(questionModalEl, modalEl => modalEl.style.display = 'block', "Failed to show question modal on edit in renderVideoQuestionsList");
+                    safeDOMUpdate(questionModalEl, modalEl => modalEl.style.display = 'block');
                 };
-
                 const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'Delete';
-                deleteBtn.className = 'danger-button'; 
-                deleteBtn.style.marginLeft = '5px';
-                deleteBtn.style.padding = '3px 8px'; 
-                deleteBtn.style.fontSize = '0.8em';
+                deleteBtn.textContent = 'Delete'; deleteBtn.className = 'danger-button';
+                deleteBtn.style.cssText = "margin-left: 5px; padding: 3px 8px; font-size: 0.8em;";
                 deleteBtn.onclick = function() {
                     if (confirm(`Are you sure you want to delete the question: "${question.questionText.substring(0,30)}..."?`)) {
-                        console.log("Deleting question index:", index); 
-
                         currentSlide.slideMedia.videoQuestions.splice(index, 1);
                         renderVideoQuestionsList(); 
+                        renderOverlayTimeline(); // Re-render timeline as questions are markers too
                         baseApp.displayMessage("Question deleted.", true, 'messageArea');
                     }
                 };
-                
-                actionsDiv.appendChild(editBtn);
-                actionsDiv.appendChild(deleteBtn);
-                
-                li.appendChild(questionTextSpan);
-                li.appendChild(actionsDiv);
-
+                actionsDiv.appendChild(editBtn); actionsDiv.appendChild(deleteBtn);
+                li.appendChild(questionTextSpan); li.appendChild(actionsDiv);
                 el.appendChild(li);
             });
-        }, "Failed to render video questions list");
+        });
     }
 
-// function setupAdminYouTubePlayer(videoId) { ... } // Removed;
-// function checkVideoQuestions() { ... } // Removed;
-// function updateVideoTimeline() { ... } // Removed;
-// function stopAndDestroyAdminYouTubePlayer() { ... } // Removed
-
-// --- All old commented out YouTube functions are now fully removed ---
+// --- All old YouTube functions (setupAdminYouTubePlayer, stopAndDestroyAdminYouTubePlayer, etc.) are removed ---
+// Their functionality is replaced by calls to mediaManager or new adminApp.handleMedia... callbacks.
 </script>
 [end of Client/Admin/Admin_JS.html]

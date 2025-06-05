@@ -3,6 +3,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <!-- Codebase Optimization Phase 1: Cleanup Complete -->
     <base target="_top">
     <title>Admin Dashboard</title>
     <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube IFrame API -->
@@ -1236,9 +1237,9 @@
 
     <?!= include('Client/Shared/LoadingSpinner'); ?>
     <!-- Shared Libraries -->
-    <script src="../Shared/SharedUtils.html"></script>
-    <script src="../Shared/BaseApp.html"></script>
-    <script src="../Shared/MediaManager.html"></script>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/SharedUtils.html').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/BaseApp.html').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/MediaManager.html').getContent(); ?>
 
     <!-- Admin Modules -->
     <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminApp').getContent(); ?>

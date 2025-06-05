@@ -290,7 +290,46 @@
           document.removeEventListener('paste', handlePasteImageWrapper);
           // console.log('AdminApp: Removed paste event listener for edit view.');
       });
-      // console.log("AdminApp: Attached global listeners for Edit View (e.g., paste).");
+
+      // Add missing button handlers for edit view
+      const backToListButton = document.getElementById('backToProjectsListButton');
+      const saveProjectButton = document.getElementById('saveProjectButton');
+      
+      if (backToListButton) {
+          const backHandler = () => adminApp.switchToListView();
+          backToListButton.addEventListener('click', backHandler);
+          baseApp.resourceManager.trackDisposable('adminApp-editView-backToList', () => {
+              backToListButton.removeEventListener('click', backHandler);
+          });
+      } else {
+          console.warn('AdminApp: backToProjectsListButton not found in edit view');
+      }
+      
+      if (saveProjectButton) {
+          const saveHandler = () => {
+              if (window.adminProjectManager && typeof adminProjectManager.saveProject === 'function') {
+                  // Get project data from canvas manager and save
+                  if (window.adminCanvasManager && typeof adminCanvasManager.getProjectDataForSave === 'function') {
+                      const projectData = adminCanvasManager.getProjectDataForSave();
+                      adminProjectManager.saveProject(projectData);
+                  } else {
+                      console.warn('AdminApp: Cannot save - adminCanvasManager.getProjectDataForSave not available');
+                      baseApp.displayMessage("Error: Cannot save project. Canvas manager is not available.", false, "messageArea");
+                  }
+              } else {
+                  console.warn('AdminApp: Cannot save - adminProjectManager.saveProject not available');
+                  baseApp.displayMessage("Error: Cannot save project. Project manager is not available.", false, "messageArea");
+              }
+          };
+          saveProjectButton.addEventListener('click', saveHandler);
+          baseApp.resourceManager.trackDisposable('adminApp-editView-saveProject', () => {
+              saveProjectButton.removeEventListener('click', saveHandler);
+          });
+      } else {
+          console.warn('AdminApp: saveProjectButton not found in edit view');
+      }
+
+      // console.log("AdminApp: Attached global listeners for Edit View (e.g., paste, buttons).");
   };
 
 </script>

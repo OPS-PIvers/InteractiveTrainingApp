@@ -13,133 +13,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Shared Styles -->
+    <?!= include('Client/Shared/Theme'); ?>
+    <?!= include('Client/Shared/CommonStyles'); ?>
     <style>
-      :root { /* Using :root for global scope */
-            --theme-primary-color: #1a73e8; /* Google Blue */
-            --theme-primary-hover: #1765cc; 
-            --theme-text-color-primary: #202124;    /* Dark grey for main text */
-            --theme-text-color-secondary: #5f6368; /* Lighter grey for secondary text/icons */
-            --theme-icon-color: #5f6368;
-            --theme-background-main: #f8f9fa;
-            --theme-background-card: #ffffff;
-            --theme-border-color: #dadce0;
-            --theme-input-border-color: #80868b; 
-            --theme-input-focus-border: #1a73e8; 
-            --theme-font-family: 'Roboto', Arial, sans-serif;
-            --theme-danger-color: #d93025; /* Google Red for danger */
-            --theme-danger-hover: #c5221f;
-            --theme-success-color: #1e8e3e; /* Google Green for success */
-            --theme-success-hover: #187332;
-        }
-      body { 
-            font-family: var(--theme-font-family);
-            margin: 0; 
-            background-color: var(--theme-background-main); 
-            color: var(--theme-text-color-primary); 
-        }
+      /* Admin-specific styles */
       .main-content-wrapper {
             padding: 20px;
         }
-      .container { 
-            background-color: var(--theme-background-card); 
-            padding: 20px; 
-            margin-bottom: 20px; 
-            border-radius: 8px; 
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); /* Google-style shadow */
-            border: 1px solid var(--theme-border-color);
-        }
-      h1, h2 { 
-            color: var(--theme-text-color-primary); 
-            font-weight: 400; /* Lighter weight for headings, common in Material */
-        }
-        h1 { font-size: 1.8rem; margin-bottom: 1rem;} /* Adjust sizes as needed */
-        h2 { font-size: 1.4rem; margin-bottom: 0.75rem;}
-        h3 { font-size: 1.1rem; color: var(--theme-text-color-primary); font-weight: 500; margin-bottom: 0.5rem;} /* For "Slides" in slide panel */
-      label { 
-        display: inline-block; 
-        margin-bottom: 6px; /* Slightly more breathing room */
-        font-weight: 500; /* Material Medium */
-        font-size: 0.875rem; /* 14px */
-        color: var(--theme-text-color-secondary); 
-      }
-      
-      button, .button { /* Added .button class for elements that should look like buttons */
-            padding: 8px 16px; 
-            cursor: pointer; 
-            background-color: var(--theme-primary-color); 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
-            font-size: 0.875rem; /* 14px if base is 16px */
-            font-weight: 500; 
-            text-transform: uppercase; 
-            letter-spacing: 0.089em; /* Material spec */
-            transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15); /* Subtle shadow for buttons */
-            display: inline-flex; /* For aligning icons if any */
-            align-items: center;
-            justify-content: center;
-            text-decoration: none; /* For .button used on <a> tags */
-        }
-        button:hover, .button:hover { 
-            background-color: var(--theme-primary-hover); 
-            box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 2px 5px 2px rgba(60,64,67,0.15); /* Slightly elevated shadow on hover */
-        }
-      button.edit-button, .button.edit-button { background-color: var(--theme-success-color); }
-      button.edit-button:hover, .button.edit-button:hover { background-color: var(--theme-success-hover); }
-      button.danger-button, .button.danger-button { background-color: var(--theme-danger-color); }
-      button.danger-button:hover, .button.danger-button:hover { background-color: var(--theme-danger-hover); }
-      button.secondary-button, .button.secondary-button { /* For less prominent actions */
-        background-color: var(--theme-background-card);
-        color: var(--theme-primary-color);
-        border: 1px solid var(--theme-input-border-color);
-        box-shadow: none;
-      }
-      button.secondary-button:hover, .button.secondary-button:hover {
-        background-color: rgba(0,0,0,0.03);
-        border-color: var(--theme-primary-hover);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-      }
-      
-      /* General input styling - some of these will be overridden by more specific toolbar/popover rules */
-      input[type="text"], 
-      input[type="file"], 
-      input[type="number"], 
-      select, 
-      textarea { 
-        padding: 8px; 
-        margin-bottom: 10px; 
-        border: 1px solid var(--theme-input-border-color); 
-        border-radius: 4px; 
-        box-sizing: border-box; 
-        width: auto; 
-        font-family: var(--theme-font-family);
-        font-size: 0.875rem;
-        color: var(--theme-text-color-primary);
-        background-color: var(--theme-background-card);
-      }
-      input[type="text"]::placeholder,
-      textarea::placeholder {
-        color: var(--theme-text-color-secondary);
-        opacity: 0.7;
-      }
-      input[type="text"]:focus, 
-      input[type="file"]:focus, 
-      input[type="number"]:focus, 
-      select:focus, 
-      textarea:focus {
-        border-color: var(--theme-input-focus-border);
-        box-shadow: 0 0 0 1px var(--theme-input-focus-border);
-        outline: none;
-      }
-      input[type="checkbox"] { 
-        margin-right: 5px; 
-        accent-color: var(--theme-primary-color);
-      }
 
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; font-size: 0.9rem;}
-      .success { border-color: var(--theme-success-color); background-color: #e6f4ea; color: var(--theme-success-hover); } /* Light green bg */
-      .error { border-color: var(--theme-danger-color); background-color: #fce8e6; color: var(--theme-danger-hover); } /* Light red bg */
 
       #adminProjectListContainer { margin-top: 15px; }
       .project-item { 
@@ -1362,7 +1246,6 @@
     <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminCanvasManager').getContent(); ?>
     <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminOverlayManager').getContent(); ?>
     <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminToolbar').getContent(); ?>
-    <!-- <?!= include('Client/Admin/Admin_JS'); ?> --> <!-- Old script removed -->
 
     </div> <!-- End of main-content-wrapper -->
 

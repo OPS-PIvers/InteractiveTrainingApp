@@ -1,0 +1,159 @@
+<!-- Client/Shared/CommonStyles.html -->
+<style>
+  /* Base Styles */
+  body { 
+    font-family: var(--theme-font-family);
+    margin: 0; 
+    background-color: var(--theme-background-main); 
+    color: var(--theme-text-color-primary); 
+  }
+
+  /* Typography */
+  h1, h2 { 
+    color: var(--theme-text-color-primary); 
+    font-weight: 400;
+  }
+  h1 { font-size: 1.8rem; margin-bottom: 1rem; }
+  h2 { font-size: 1.4rem; margin-bottom: 0.75rem; }
+  h3 { font-size: 1.1rem; color: var(--theme-text-color-primary); font-weight: 500; margin-bottom: 0.5rem; }
+
+  /* Labels */
+  label { 
+    display: inline-block; 
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--theme-text-color-secondary); 
+  }
+
+  /* Buttons */
+  button, .button {
+    padding: 8px 16px; 
+    cursor: pointer; 
+    background-color: var(--theme-primary-color); 
+    color: white; 
+    border: none; 
+    border-radius: 4px; 
+    font-size: 0.875rem;
+    font-weight: 500; 
+    text-transform: uppercase; 
+    letter-spacing: 0.089em;
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  button:hover, .button:hover { 
+    background-color: var(--theme-primary-hover); 
+    box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 2px 5px 2px rgba(60,64,67,0.15);
+  }
+
+  /* Button Variants */
+  button.edit-button, .button.edit-button { 
+    background-color: var(--theme-success-color); 
+  }
+  button.edit-button:hover, .button.edit-button:hover { 
+    background-color: var(--theme-success-hover); 
+  }
+  button.danger-button, .button.danger-button { 
+    background-color: var(--theme-danger-color); 
+  }
+  button.danger-button:hover, .button.danger-button:hover { 
+    background-color: var(--theme-danger-hover); 
+  }
+  button.secondary-button, .button.secondary-button {
+    background-color: var(--theme-background-card);
+    color: var(--theme-primary-color);
+    border: 1px solid var(--theme-input-border-color);
+    box-shadow: none;
+  }
+  button.secondary-button:hover, .button.secondary-button:hover {
+    background-color: rgba(0,0,0,0.03);
+    border-color: var(--theme-primary-hover);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  /* Inputs */
+  input[type="text"], 
+  input[type="file"], 
+  input[type="number"], 
+  select, 
+  textarea { 
+    padding: 8px; 
+    margin-bottom: 10px; 
+    border: 1px solid var(--theme-input-border-color); 
+    border-radius: 4px; 
+    box-sizing: border-box; 
+    width: auto; 
+    font-family: var(--theme-font-family);
+    font-size: 0.875rem;
+    color: var(--theme-text-color-primary);
+    background-color: var(--theme-background-card);
+  }
+  input[type="text"]::placeholder,
+  textarea::placeholder {
+    color: var(--theme-text-color-secondary);
+    opacity: 0.7;
+  }
+  input[type="text"]:focus, 
+  input[type="file"]:focus, 
+  input[type="number"]:focus, 
+  select:focus, 
+  textarea:focus {
+    border-color: var(--theme-input-focus-border);
+    box-shadow: 0 0 0 1px var(--theme-input-focus-border);
+    outline: none;
+  }
+  input[type="checkbox"] { 
+    margin-right: 5px; 
+    accent-color: var(--theme-primary-color);
+  }
+
+  /* Containers */
+  .container { 
+    background-color: var(--theme-background-card); 
+    padding: 20px; 
+    margin-bottom: 20px; 
+    border-radius: 8px; 
+    box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+    border: 1px solid var(--theme-border-color);
+  }
+
+  /* Message Areas */
+  .success { 
+    border-color: var(--theme-success-color); 
+    background-color: #e6f4ea; 
+    color: var(--theme-success-hover); 
+  }
+  .error { 
+    border-color: var(--theme-danger-color); 
+    background-color: #fce8e6; 
+    color: var(--theme-danger-hover); 
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    h1 { font-size: 1.6rem; }
+    h2 { font-size: 1.3rem; }
+    h3 { font-size: 1.0rem; }
+    
+    input[type="text"], 
+    input[type="file"], 
+    input[type="number"], 
+    select, 
+    textarea,
+    button {
+      width: 100%;
+      box-sizing: border-box;
+      margin-left: 0;
+      margin-right: 0;
+    }
+  }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 1.4rem; }
+    h2 { font-size: 1.2rem; }
+  }
+</style>

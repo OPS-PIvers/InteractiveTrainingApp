@@ -3,6 +3,10 @@
   <head>
     <base target="_top">
     <title>Interactive Training Viewer</title>
+    
+    <!-- Shared Styles -->
+    <?!= include('Client/Shared/Theme'); ?>
+    <?!= include('Client/Shared/CommonStyles'); ?>
   </head>
   <body>
     <?!= HtmlService.createHtmlOutputFromFile('Client/Viewer/ViewerApp.html').getContent(); ?>

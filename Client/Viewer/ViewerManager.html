@@ -310,8 +310,15 @@ displayViewerProjects: function(response) {
         preserveObjectStacking: true,
         renderOnAddRemove: false // Manual renderAll for performance
     });
-    console.log("ViewerManager: Fabric.js canvas initialized.");
-    // Add any default event listeners or configurations for the canvas if needed
+    
+    // Add click event handler for interactive objects
+    this.state.viewerFabricCanvas.on('mouse:down', (e) => {
+      if (e.target && e.target.customInteraction) {
+        this.handleObjectInteraction(e.target, e.target.customInteraction);
+      }
+    });
+    
+    console.log("ViewerManager: Fabric.js canvas initialized with interaction handlers.");
   },
 
   renderSlideForViewing: function(slideIndex) {
@@ -395,12 +402,30 @@ displayViewerProjects: function(response) {
                                 });
                             });
                         } else { baseApp.onServerError(imageResponse || {error:"Failed to load image"}, 'messageAreaViewer');}
-                        if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                        if (slideData.fabricCanvasJSON) {
+                          canvas.loadFromJSON(slideData.fabricCanvasJSON, () => {
+                            this.restoreObjectInteractions(canvas, slideData.fabricCanvasJSON);
+                            canvas.renderAll();
+                            this.updateViewerCanvasInteractivity();
+                          });
+                        } else {
+                          canvas.renderAll();
+                          this.updateViewerCanvasInteractivity();
+                        }
                     })
                     .withFailureHandler(error => {baseApp.onServerError(error, 'messageAreaViewer'); canvas.renderAll(); this.state.isLoading = false;})
                     .getImageAsBase64(media.driveFileId);
             } else {
-                 if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                if (slideData.fabricCanvasJSON) {
+                  canvas.loadFromJSON(slideData.fabricCanvasJSON, () => {
+                    this.restoreObjectInteractions(canvas, slideData.fabricCanvasJSON);
+                    canvas.renderAll();
+                    this.updateViewerCanvasInteractivity();
+                  });
+                } else {
+                  canvas.renderAll();
+                  this.updateViewerCanvasInteractivity();
+                }
             }
             break;
         case 'youtube':
@@ -421,7 +446,16 @@ displayViewerProjects: function(response) {
             } else {
                 baseApp.displayMessage("Invalid YouTube URL for this slide.", false, 'messageAreaViewer');
             }
-            if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+            if (slideData.fabricCanvasJSON) {
+              canvas.loadFromJSON(slideData.fabricCanvasJSON, () => {
+                this.restoreObjectInteractions(canvas, slideData.fabricCanvasJSON);
+                canvas.renderAll();
+                this.updateViewerCanvasInteractivity();
+              });
+            } else {
+              canvas.renderAll();
+              this.updateViewerCanvasInteractivity();
+            }
             break;
         case 'audio':
             sharedUtils.safeDOMUpdate(this.dom.viewerMediaContainerEl, el => el.style.backgroundColor = slideData.backgroundColor || '#EEEEEE');
@@ -442,22 +476,58 @@ displayViewerProjects: function(response) {
                         } else {
                            baseApp.onServerError(audioResponse || {error: "Failed to load audio data."}, 'messageAreaViewer');
                         }
-                        if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                        if (slideData.fabricCanvasJSON) {
+              canvas.loadFromJSON(slideData.fabricCanvasJSON, () => {
+                this.restoreObjectInteractions(canvas, slideData.fabricCanvasJSON);
+                canvas.renderAll();
+                this.updateViewerCanvasInteractivity();
+              });
+            } else {
+              canvas.renderAll();
+              this.updateViewerCanvasInteractivity();
+            }
                     })
                     .withFailureHandler(error => {
                         baseApp.onServerError(error, 'messageAreaViewer');
                         this.state.isLoading = false;
-                        if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                        if (slideData.fabricCanvasJSON) {
+              canvas.loadFromJSON(slideData.fabricCanvasJSON, () => {
+                this.restoreObjectInteractions(canvas, slideData.fabricCanvasJSON);
+                canvas.renderAll();
+                this.updateViewerCanvasInteractivity();
+              });
+            } else {
+              canvas.renderAll();
+              this.updateViewerCanvasInteractivity();
+            }
                     })
                     .getAudioAsBase64(media.driveFileId);
             } else {
                 baseApp.displayMessage("Audio source missing for this slide.", false, 'messageAreaViewer');
-                if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                if (slideData.fabricCanvasJSON) {
+              canvas.loadFromJSON(slideData.fabricCanvasJSON, () => {
+                this.restoreObjectInteractions(canvas, slideData.fabricCanvasJSON);
+                canvas.renderAll();
+                this.updateViewerCanvasInteractivity();
+              });
+            } else {
+              canvas.renderAll();
+              this.updateViewerCanvasInteractivity();
+            }
             }
             break;
         default: // 'none' or unknown
             sharedUtils.safeDOMUpdate(this.dom.viewerMediaContainerEl, el => el.style.backgroundColor = slideData.backgroundColor || '#FFFFFF');
-            if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+            if (slideData.fabricCanvasJSON) {
+              canvas.loadFromJSON(slideData.fabricCanvasJSON, () => {
+                this.restoreObjectInteractions(canvas, slideData.fabricCanvasJSON);
+                canvas.renderAll();
+                this.updateViewerCanvasInteractivity();
+              });
+            } else {
+              canvas.renderAll();
+              this.updateViewerCanvasInteractivity();
+            }
             break;
     }
     this.updateViewerCanvasInteractivity(); // Placeholder
@@ -756,38 +826,149 @@ updateViewerCanvasInteractivity: function() {
 
   const canvas = this.state.viewerFabricCanvas;
   const currentMediaType = this.state.currentMediaType;
-  let allowInteraction = false;
+  let allowClicking = false;
 
+  // In viewer mode, we want objects to be clickable for interactions, but NEVER selectable/editable
   if (currentMediaType === 'image' || currentMediaType === 'none' || !currentMediaType) {
-    allowInteraction = true; // Allow interaction for static images or non-media slides
+    allowClicking = true; // Allow clicking for static images or non-media slides
   } else if (currentMediaType === 'youtube' || currentMediaType === 'audio') {
-    // For media, usually non-interactive unless specific overlays or elements require it.
-    // Or if media is paused and interaction is desired.
-    // This is a simplified version. The original might have had more nuanced logic.
-    const playerState = (currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) ? mediaManager.getPlayerState() : null;
-    const audioPaused = (currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable() && mediaManager.state.audioPlayer) ? mediaManager.state.audioPlayer.paused : true;
+    // For media slides, allow clicking on interactive objects
+    allowClicking = true;
+  }
 
-    if ((currentMediaType === 'youtube' && (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.ENDED || playerState === YT.PlayerState.CUED)) ||
-        (currentMediaType === 'audio' && audioPaused)) {
-      // Potentially allow interaction when media is paused/ended.
-      // For now, let's keep it simple: canvas is generally not interactive during media playback.
-      // allowInteraction = true;
+  // Check if there are any interactive objects on the canvas
+  const hasInteractiveObjects = canvas.getObjects().some(obj => 
+    obj.customInteraction && 
+    obj.customInteraction.trigger && 
+    obj.customInteraction.trigger !== ''
+  );
+
+  // Enable pointer events if we need clicking or have interactive objects
+  const enablePointerEvents = allowClicking || hasInteractiveObjects;
+  this.dom.viewerCanvasContainerEl.style.pointerEvents = enablePointerEvents ? 'auto' : 'none';
+
+  // CRITICAL: In viewer mode, objects should NEVER be selectable or moveable
+  // But they should be clickable for interactions
+  canvas.selection = false; // Disable selection box
+  canvas.forEachObject(obj => {
+    obj.selectable = false;  // Objects cannot be selected
+    obj.evented = enablePointerEvents; // Objects can receive click events
+    obj.moveable = false;    // Objects cannot be moved
+    obj.hasControls = false; // Hide resize/rotate controls
+    obj.hasBorders = false;  // Hide selection borders
+    obj.lockMovementX = true; // Lock horizontal movement
+    obj.lockMovementY = true; // Lock vertical movement
+    obj.lockRotation = true;  // Lock rotation
+    obj.lockScalingX = true;  // Lock horizontal scaling
+    obj.lockScalingY = true;  // Lock vertical scaling
+  });
+
+  console.log(`ViewerManager: Canvas clicking ${enablePointerEvents ? 'enabled' : 'disabled'}, selection disabled, interactive objects: ${hasInteractiveObjects}`);
+},
+
+handleObjectInteraction: function(obj, interaction) {
+  console.log("ViewerManager: handleObjectInteraction called", { obj, interaction });
+  
+  if (!interaction || !interaction.trigger || !interaction.action) {
+    console.log("ViewerManager: No valid interaction defined for object");
+    return;
+  }
+
+  // Check if the trigger is appropriate (click, hover, etc.)
+  if (interaction.trigger !== 'click' && interaction.trigger !== 'onClick') {
+    console.log(`ViewerManager: Interaction trigger '${interaction.trigger}' not supported for click events`);
+    return;
+  }
+
+  console.log(`ViewerManager: Executing ${interaction.action} interaction`);
+
+  switch (interaction.action) {
+    case 'showModal':
+      if (interaction.modalContent) {
+        this.showViewerModal(`<div>${interaction.modalContent}</div>`);
+      } else {
+        this.showViewerModal('<div>Modal content not specified</div>');
+      }
+      break;
+      
+    case 'navigateToSlide':
+      if (interaction.navigateTo) {
+        // Find slide by ID or use index
+        const slideIndex = this.findSlideIndexById(interaction.navigateTo);
+        if (slideIndex !== -1) {
+          this.renderSlideForViewing(slideIndex);
+        } else {
+          console.warn(`ViewerManager: Could not find slide with ID: ${interaction.navigateTo}`);
+        }
+      }
+      break;
+      
+    case 'navigateToURL':
+      if (interaction.navigateTo) {
+        window.open(interaction.navigateTo, '_blank');
+      }
+      break;
+      
+    case 'spotlight':
+      // Future implementation for spotlight effect
+      console.log("ViewerManager: Spotlight effect not yet implemented");
+      break;
+      
+    case 'reveal':
+      // Future implementation for reveal effect
+      console.log("ViewerManager: Reveal effect not yet implemented");
+      break;
+      
+    case 'panZoomToTarget':
+      // Future implementation for pan/zoom
+      console.log("ViewerManager: Pan/zoom effect not yet implemented");
+      break;
+      
+    default:
+      console.warn(`ViewerManager: Unknown interaction action: ${interaction.action}`);
+  }
+},
+
+findSlideIndexById: function(slideId) {
+  if (!this.state.currentProjectData || !this.state.currentProjectData.slides) {
+    return -1;
+  }
+  
+  return this.state.currentProjectData.slides.findIndex(slide => slide.slideId === slideId);
+},
+
+restoreObjectInteractions: function(canvas, fabricCanvasJSON) {
+  console.log("ViewerManager: Restoring object interactions...");
+  
+  if (!fabricCanvasJSON || !fabricCanvasJSON.objects) {
+    console.log("ViewerManager: No objects to restore interactions for");
+    return;
+  }
+  
+  // Restore custom interaction and animation properties that Fabric.js might not serialize properly
+  canvas.getObjects().forEach((obj, index) => {
+    const originalObj = fabricCanvasJSON.objects[index];
+    if (originalObj) {
+      // Restore custom interaction properties
+      if (originalObj.customInteraction) {
+        obj.customInteraction = { ...originalObj.customInteraction };
+        console.log(`ViewerManager: Restored interaction for object ${index}:`, obj.customInteraction);
+      }
+      
+      // Restore custom animation properties (for future use)
+      if (originalObj.customAnimation) {
+        obj.customAnimation = { ...originalObj.customAnimation };
+      }
+      
+      // Set cursor style based on interaction
+      if (obj.customInteraction && obj.customInteraction.trigger && obj.customInteraction.action) {
+        obj.hoverCursor = 'pointer';
+        obj.moveCursor = 'pointer';
+      }
     }
-  }
-
-  // This logic might need to be more refined based on specific interactive canvas elements.
-  // For now, if there are ANY objects on the canvas, assume it might need to be interactive.
-  // A more robust approach would be to check if any of those objects are themselves interactive.
-  if (canvas.getObjects().length > 0) {
-      allowInteraction = true;
-  }
-
-
-  this.dom.viewerCanvasContainerEl.style.pointerEvents = allowInteraction ? 'auto' : 'none';
-  canvas.selection = allowInteraction; // Enable/disable fabric object selection
-  canvas.forEachObject(obj => obj.selectable = allowInteraction);
-
-  console.log(`ViewerManager: Canvas interactivity set to ${allowInteraction ? 'auto' : 'none'}`);
+  });
+  
+  console.log(`ViewerManager: Restored interactions for ${canvas.getObjects().length} objects`);
 },
 
   navigateToPrevSlide: function() {

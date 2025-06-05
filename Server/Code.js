@@ -37,7 +37,7 @@ function doGet(e) {
         .setTitle('Interactive Training App - Admin Dashboard')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } else {
-    const template = HtmlService.createTemplateFromFile('Client/Viewer/ViewerView.html');
+    const template = HtmlService.createTemplateFromFile('Client/Viewer/ViewerApp.html');
     htmlOutput = template.evaluate()
       .setTitle('Interactive Training App - Viewer')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

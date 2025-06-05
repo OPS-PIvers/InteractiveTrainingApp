@@ -17,6 +17,24 @@
           return false;
         }
       });
+      
+      // Additional suppression for unhandled promise rejections
+      window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && event.reason.message && 
+            (event.reason.message.includes('PresentationRequest') || 
+             event.reason.message.includes('cast_sender') ||
+             event.reason.message.includes('allow-presentation'))) {
+          console.warn('YouTube cast functionality disabled in sandboxed environment');
+          event.preventDefault();
+        }
+      });
+      
+      // Polyfill PresentationRequest to prevent SecurityError
+      if (typeof PresentationRequest === 'undefined') {
+        window.PresentationRequest = function() {
+          throw new Error('PresentationRequest is not available in sandboxed environment');
+        };
+      }
     </script>
     <!-- Add Material Symbols (recommended) -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
@@ -104,13 +122,14 @@
     width: 100%;
     min-height: 400px; /* Minimum height instead of fixed */
     max-height: 80vh; /* Maximum height relative to viewport */
-    overflow: auto; /* Allow scrolling when needed */
+    overflow: hidden; /* Hide overflow to prevent scrollbars */
 }
 #fabricCanvasElement { 
     border: 1px solid var(--theme-text-color-secondary);
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    position: absolute !important; /* Force absolute positioning */
-    transform-origin: left top; /* Important for Fabric.js zoom */
+    position: relative; /* Change from absolute to relative */
+    transform-origin: center center; /* Center transform origin */
+    display: block; /* Ensure proper display */
 }
       .media-placeholder { position: absolute; top: 10px; left: 10px; background-color: rgba(0, 0, 0, 0.7); color: white; padding: 5px 10px; font-size: 0.9em; border-radius: 3px; pointer-events: none; z-index: 5; }
 

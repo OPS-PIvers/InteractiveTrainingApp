@@ -47,6 +47,27 @@ function getActiveProjectsList() {
 // Server/ViewerController.gs
 
 /**
+ * Alias for getProjectViewData - used by ViewerManager
+ * @param {string} projectId The ID of the project.
+ * @return {object} An object like { success: true, data: { projectDataJSON: string } } or { success: false, error: string }
+ */
+function getProjectViewById(projectId) {
+  const result = getProjectViewData(projectId);
+  
+  // Wrap the result in the expected format for ViewerManager
+  if (result.success) {
+    return {
+      success: true,
+      data: {
+        projectDataJSON: result.data
+      }
+    };
+  } else {
+    return result;
+  }
+}
+
+/**
  * Retrieves the project's data JSON string from its file in Google Drive for viewer.
  * Ensures the project is "Active".
  * @param {string} projectId The ID of the project.

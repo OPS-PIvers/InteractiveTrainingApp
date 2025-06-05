@@ -134,36 +134,40 @@
       canvas.setWidth(contentWidth);
       canvas.setHeight(contentHeight);
 
-      // Calculate container dimensions with some bounds
-      const containerWidth = container.clientWidth;
-      const maxContainerHeight = Math.min(window.innerHeight * 0.8, 800); // Max 80% of viewport or 800px
+      // Get container available space (accounting for padding/borders)
+      const containerPadding = 20; // Reserve space for padding
+      const availableWidth = container.clientWidth - containerPadding;
+      const maxContainerHeight = Math.min(window.innerHeight * 0.7, 600); // Reduced max height
       const minContainerHeight = 300;
       
-      // Calculate ideal container height based on content aspect ratio
-      const aspectRatio = contentHeight / contentWidth;
-      let idealContainerHeight = containerWidth * aspectRatio;
+      // Calculate zoom to fit content within available space
+      const scaleX = availableWidth / contentWidth;
+      const scaleY = maxContainerHeight / contentHeight;
+      const scale = Math.min(scaleX, scaleY, 1); // Never scale up beyond 100%
       
-      // Clamp the container height within bounds
-      const containerHeight = Math.max(minContainerHeight, Math.min(maxContainerHeight, idealContainerHeight));
+      // Calculate actual display size
+      const displayWidth = contentWidth * scale;
+      const displayHeight = contentHeight * scale;
       
-      // Update container height dynamically
+      // Set container height to fit the scaled content
+      const containerHeight = Math.max(minContainerHeight, displayHeight + containerPadding);
       container.style.height = containerHeight + 'px';
 
-      if (containerWidth === 0 || containerHeight === 0) { console.warn("AdminCanvasManager.resizeCanvasToFit: Container has zero dimensions."); return; } // Avoid division by zero or weird scaling
+      // Apply zoom to canvas
+      canvas.setZoom(scale);
+      
+      // Reset viewport transform to origin
+      canvas.viewportTransform[4] = 0;
+      canvas.viewportTransform[5] = 0;
 
-      // Calculate zoom to fit content within container with padding
-      const zoomX = containerWidth / contentWidth;
-      const zoomY = containerHeight / contentHeight;
-      const zoom = Math.min(zoomX, zoomY) * 0.95; // 0.95 for a bit of padding
-
-      canvas.setZoom(zoom);
-
-      // Center the canvas within the container
-      canvas.viewportTransform[4] = (containerWidth - (contentWidth * zoom)) / 2;
-      canvas.viewportTransform[5] = (containerHeight - (contentHeight * zoom)) / 2;
+      // Update canvas DOM element size to match display size
+      fabricCanvasEl.style.width = displayWidth + 'px';
+      fabricCanvasEl.style.height = displayHeight + 'px';
 
       canvas.calcOffset(); // Recalculate canvas offsets
       canvas.renderAll();  // Re-render the canvas
+      
+      console.log(`Canvas resized: logical=${contentWidth}x${contentHeight}, display=${displayWidth}x${displayHeight}, scale=${scale.toFixed(2)}`);
   };
 
   adminCanvasManager.handleResize = function() {
@@ -416,21 +420,14 @@
               
               console.log(`AdminCanvasManager.selectSlide: Setting canvas dimensions to ${cvWidth}x${cvHeight} for slide ${slideIndex + 1}`);
               
-              // Update canvas dimensions
+              // Update canvas logical dimensions
               canvas.setWidth(cvWidth);
               canvas.setHeight(cvHeight);
-              
-              // Update canvas DOM element dimensions
-              const fabricCanvasEl = document.getElementById('fabricCanvasElement');
-              if (fabricCanvasEl) {
-                fabricCanvasEl.width = cvWidth;
-                fabricCanvasEl.height = cvHeight;
-              }
               
               // Set background image without scaling
               canvas.setBackgroundImage(img, function() {
                 canvas.renderAll();
-                // Re-fit canvas in container after resize
+                // Re-fit canvas in container after setting background
                 adminCanvasManager.resizeCanvasToFit(selectedSlideData);
               });
             }, { crossOrigin: 'anonymous' });
@@ -778,16 +775,9 @@
         
         console.log(`AdminCanvasManager: Resizing canvas from ${canvas.width}x${canvas.height} to ${cvWidth}x${cvHeight} to match background image`);
         
-        // Update canvas dimensions
+        // Update canvas logical dimensions
         canvas.setWidth(cvWidth);
         canvas.setHeight(cvHeight);
-        
-        // Update canvas DOM element dimensions
-        const fabricCanvasEl = document.getElementById('fabricCanvasElement');
-        if (fabricCanvasEl) {
-          fabricCanvasEl.width = cvWidth;
-          fabricCanvasEl.height = cvHeight;
-        }
         
         // Update slide data to store new canvas dimensions
         currentSlide.canvasWidth = cvWidth;

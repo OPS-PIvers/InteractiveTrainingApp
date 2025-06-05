@@ -1,4 +1,8 @@
 <script>
+// Ensure ViewerManager is properly initialized
+console.log("ViewerManager: Script starting to load...");
+
+// Define ViewerManager immediately on window
 window.viewerManager = {
   state: {
     isLoading: false,
@@ -25,38 +29,63 @@ window.viewerManager = {
   },
 
   setupDOMReferences: function() {
-    // ... (same as previous step, ensure all IDs from ViewerView.html are captured)
-    this.dom.viewerProjectListContainerEl = document.getElementById('viewerProjectListContainer');
-    this.dom.messageAreaElViewer = document.getElementById('messageAreaViewer');
-    this.dom.loadingSpinnerElViewer = document.getElementById('loadingSpinner');
-    this.dom.viewerListViewContainerEl = document.getElementById('viewerListViewContainer');
-    this.dom.viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
-    this.dom.viewingProjectTitleEl = document.getElementById('viewingProjectTitle');
-    this.dom.viewerMediaContainerEl = document.getElementById('viewerMediaContainer');
-    this.dom.youtubePlayerContainerEl = document.getElementById('youtubePlayerContainer');
-    this.dom.viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer');
-    this.dom.viewerCanvasContainerEl = document.getElementById('viewerCanvasContainer');
-    this.dom.viewerFabricCanvasEl = document.getElementById('viewerFabricCanvas');
-    this.dom.viewerPrevSlideButtonEl = document.getElementById('viewerPrevSlideButton');
-    this.dom.viewerNextSlideButtonEl = document.getElementById('viewerNextSlideButton');
-    this.dom.viewerSlideIndicatorEl = document.getElementById('viewerSlideIndicator');
-    this.dom.backToViewerListButtonEl = document.getElementById('backToViewerListButton');
-    this.dom.viewerModalEl = document.getElementById('viewerModal');
-    this.dom.viewerModalCloseButtonEl = document.getElementById('viewerModalCloseButton');
-    this.dom.viewerModalBodyEl = document.getElementById('viewerModalBody');
-    this.dom.modalPrevButtonEl = document.getElementById('modalPrevButton');
-    this.dom.modalNextButtonEl = document.getElementById('modalNextButton');
-    this.dom.viewerTimelineTrackEl = document.getElementById('viewerTimelineTrack');
-    this.dom.viewerTimelineProgressEl = document.getElementById('viewerTimelineProgress');
-    this.dom.viewerCurrentTimeEl = document.getElementById('viewerCurrentTime');
-    this.dom.viewerTotalDurationEl = document.getElementById('viewerTotalDuration');
-    this.dom.viewerPrevImageEventButtonEl = document.getElementById('viewerPrevImageEventButton');
-    this.dom.viewerImageEventIndicatorEl = document.getElementById('viewerImageEventIndicator');
-    this.dom.viewerNextImageEventButtonEl = document.getElementById('viewerNextImageEventButton');
-    this.dom.interactiveTimelineBarEl = document.getElementById('interactiveTimelineBar'); // Added for renderSlide
-    this.dom.overlayDisplayAreaEl = document.getElementById('overlayDisplayArea'); // Added
-    this.dom.imageEventNavigationEl = document.getElementById('imageEventNavigation'); // Added
-    console.log("ViewerManager: DOM references set up.");
+    console.log("ViewerManager: Setting up DOM references...");
+    
+    // Map element IDs to property names for easier debugging
+    const elementMap = {
+      'viewerProjectListContainer': 'viewerProjectListContainerEl',
+      'messageAreaViewer': 'messageAreaElViewer',
+      'loadingSpinner': 'loadingSpinnerElViewer',
+      'viewerListViewContainer': 'viewerListViewContainerEl',
+      'viewerProjectDisplayArea': 'viewerProjectDisplayAreaEl',
+      'viewingProjectTitle': 'viewingProjectTitleEl',
+      'viewerMediaContainer': 'viewerMediaContainerEl',
+      'youtubePlayerContainer': 'youtubePlayerContainerEl',
+      'viewerAudioPlayer': 'viewerAudioPlayerEl',
+      'viewerCanvasContainer': 'viewerCanvasContainerEl',
+      'viewerFabricCanvas': 'viewerFabricCanvasEl',
+      'viewerPrevSlideButton': 'viewerPrevSlideButtonEl',
+      'viewerNextSlideButton': 'viewerNextSlideButtonEl',
+      'viewerSlideIndicator': 'viewerSlideIndicatorEl',
+      'backToViewerListButton': 'backToViewerListButtonEl',
+      'viewerModal': 'viewerModalEl',
+      'viewerModalCloseButton': 'viewerModalCloseButtonEl',
+      'viewerModalBody': 'viewerModalBodyEl',
+      'modalPrevButton': 'modalPrevButtonEl',
+      'modalNextButton': 'modalNextButtonEl',
+      'viewerTimelineTrack': 'viewerTimelineTrackEl',
+      'viewerTimelineProgress': 'viewerTimelineProgressEl',
+      'viewerCurrentTime': 'viewerCurrentTimeEl',
+      'viewerTotalDuration': 'viewerTotalDurationEl',
+      'viewerPrevImageEventButton': 'viewerPrevImageEventButtonEl',
+      'viewerImageEventIndicator': 'viewerImageEventIndicatorEl',
+      'viewerNextImageEventButton': 'viewerNextImageEventButtonEl',
+      'interactiveTimelineBar': 'interactiveTimelineBarEl',
+      'overlayDisplayArea': 'overlayDisplayAreaEl',
+      'imageEventNavigation': 'imageEventNavigationEl'
+    };
+    
+    let missingElements = [];
+    
+    // Get all DOM references and track missing ones
+    for (const [elementId, propertyName] of Object.entries(elementMap)) {
+      const element = document.getElementById(elementId);
+      this.dom[propertyName] = element;
+      
+      if (!element) {
+        missingElements.push(elementId);
+        console.warn(`ViewerManager: Element '${elementId}' not found in DOM`);
+      } else {
+        console.log(`ViewerManager: ✓ Found element '${elementId}'`);
+      }
+    }
+    
+    if (missingElements.length > 0) {
+      console.warn("ViewerManager: Missing DOM elements:", missingElements);
+      console.warn("ViewerManager: Some functionality may not work properly");
+    }
+    
+    console.log("ViewerManager: DOM references setup completed.");
   },
 
   attachEventListeners: function() {
@@ -99,14 +128,30 @@ window.viewerManager = {
   },
 
   setupMediaManagerCallbacks: function() {
-    mediaManager.state.callbacks.onReady = this.handleMediaPlayerReady.bind(this);
-    mediaManager.state.callbacks.onStateChange = this.handleMediaPlayerStateChange.bind(this);
-    mediaManager.state.callbacks.onError = this.handleMediaPlayerError.bind(this);
-    mediaManager.state.callbacks.onTimeUpdate = this.handleMediaTimeUpdate.bind(this);
-    mediaManager.state.callbacks.onQuestionTrigger = this.handleMediaQuestionTrigger.bind(this);
-    mediaManager.state.callbacks.onOverlayUpdateNeeded = this.handleMediaOverlayUpdate.bind(this);
-    mediaManager.state.callbacks.onEnded = this.handleMediaEnded.bind(this);
-    console.log("ViewerManager: MediaManager callbacks configured.");
+    console.log("ViewerManager: Setting up MediaManager callbacks...");
+    
+    if (!window.mediaManager) {
+      console.error("ViewerManager: MediaManager not available - cannot setup callbacks");
+      return;
+    }
+    
+    if (!mediaManager.state || !mediaManager.state.callbacks) {
+      console.error("ViewerManager: MediaManager state or callbacks not initialized");
+      return;
+    }
+    
+    try {
+      mediaManager.state.callbacks.onReady = this.handleMediaPlayerReady.bind(this);
+      mediaManager.state.callbacks.onStateChange = this.handleMediaPlayerStateChange.bind(this);
+      mediaManager.state.callbacks.onError = this.handleMediaPlayerError.bind(this);
+      mediaManager.state.callbacks.onTimeUpdate = this.handleMediaTimeUpdate.bind(this);
+      mediaManager.state.callbacks.onQuestionTrigger = this.handleMediaQuestionTrigger.bind(this);
+      mediaManager.state.callbacks.onOverlayUpdateNeeded = this.handleMediaOverlayUpdate.bind(this);
+      mediaManager.state.callbacks.onEnded = this.handleMediaEnded.bind(this);
+      console.log("ViewerManager: MediaManager callbacks configured successfully.");
+    } catch (error) {
+      console.error("ViewerManager: Error setting up MediaManager callbacks:", error);
+    }
   },
 
   loadViewerProjectsList: function() { /* ... (same as previous step) ... */
@@ -792,4 +837,6 @@ navigateModalNext: function() {
   // Add logic if sequence modals are used
 }
 };
+
+console.log("ViewerManager: Module loaded successfully. Available methods:", Object.keys(window.viewerManager));
 </script>

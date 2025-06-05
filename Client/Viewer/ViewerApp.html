@@ -81,15 +81,58 @@
         window.addEventListener('unhandledrejection', function(event) {
           console.error('Unhandled promise rejection:', event.reason);
         });
-        console.log("ViewerApp: DOMContentLoaded. Initializing ViewerManager.");
-        if (window.viewerManager && typeof window.viewerManager.init === 'function') {
-          window.viewerManager.init();
-        } else {
-          console.error('ViewerApp: viewerManager or viewerManager.init() is not available.');
-          if(window.baseApp && baseApp.displayMessage) {
-            baseApp.displayMessage("Error: Viewer application core components failed to load. Please try again or contact support.", false, "messageAreaViewer");
+        
+        console.log("ViewerApp: DOMContentLoaded. Checking dependencies...");
+        
+        // Check dependencies
+        const dependencies = {
+          'window.sharedUtils': window.sharedUtils,
+          'window.baseApp': window.baseApp,
+          'window.mediaManager': window.mediaManager,
+          'window.viewerManager': window.viewerManager
+        };
+        
+        let missingDeps = [];
+        for (const [name, dep] of Object.entries(dependencies)) {
+          if (!dep) {
+            missingDeps.push(name);
+            console.error(`ViewerApp: Missing dependency: ${name}`);
+          } else {
+            console.log(`ViewerApp: ✓ ${name} loaded`);
           }
         }
+        
+        if (missingDeps.length > 0) {
+          console.error('ViewerApp: Missing dependencies:', missingDeps);
+          if (window.baseApp && baseApp.displayMessage) {
+            baseApp.displayMessage(`Error: Missing core components: ${missingDeps.join(', ')}. Please refresh the page.`, false, "messageAreaViewer");
+          }
+          return;
+        }
+        
+        console.log("ViewerApp: All dependencies loaded. Initializing ViewerManager.");
+        
+        // Add a small delay to ensure all scripts are fully loaded
+        setTimeout(function() {
+          if (window.viewerManager && typeof window.viewerManager.init === 'function') {
+            try {
+              window.viewerManager.init();
+              console.log("ViewerApp: ViewerManager initialization completed successfully.");
+            } catch (error) {
+              console.error('ViewerApp: Error during ViewerManager initialization:', error);
+              if (window.baseApp && baseApp.displayMessage) {
+                baseApp.displayMessage("Error: Failed to initialize viewer. " + error.message, false, "messageAreaViewer");
+              }
+            }
+          } else {
+            console.error('ViewerApp: viewerManager.init() is not a function. Available methods:', Object.keys(window.viewerManager || {}));
+            console.error('ViewerApp: window.viewerManager type:', typeof window.viewerManager);
+            console.error('ViewerApp: window.viewerManager value:', window.viewerManager);
+            if (window.baseApp && baseApp.displayMessage) {
+              baseApp.displayMessage("Error: Viewer initialization method not available. Please refresh the page.", false, "messageAreaViewer");
+            }
+          }
+        }, 100); // 100ms delay
       });
     </script>
 </body>

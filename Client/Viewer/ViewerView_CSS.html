@@ -1,0 +1,102 @@
+<style>
+      :root {
+            --theme-primary-color: #1a73e8;
+            --theme-primary-hover: #1765cc;
+            --theme-text-color-primary: #202124;
+            --theme-text-color-secondary: #5f6368;
+            --theme-background-main: #f8f9fa;
+            --theme-background-card: #ffffff;
+            --theme-border-color: #dadce0;
+            --theme-input-border-color: #80868b;
+            --theme-danger-color: #d93025;
+            --theme-danger-hover: #c5221f;
+            --theme-success-color: #1e8e3e;
+            --theme-success-hover: #187332;
+            --theme-font-family: 'Roboto', Arial, sans-serif;
+        }
+      body {
+        font-family: var(--theme-font-family);
+        margin: 0;
+        background-color: var(--theme-background-main);
+        color: var(--theme-text-color-primary);
+        padding: 20px;
+      }
+      .container {
+        background-color: var(--theme-background-card);
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+        border: 1px solid var(--theme-border-color);
+      }
+      h1 {
+        color: var(--theme-text-color-primary);
+        text-align: center;
+        margin-bottom: 24px;
+        font-size: 1.8rem;
+        font-weight: 400;
+      }
+      h2 {
+        color: var(--theme-text-color-primary);
+        font-size: 1.4rem;
+        font-weight: 400;
+        margin-bottom: 1rem;
+      }
+      .project-list-viewer { list-style-type: none; padding: 0; }
+      .project-card-viewer {
+        background-color: var(--theme-background-card);
+        border: 1px solid var(--theme-border-color);
+        padding: 16px 20px; margin-bottom: 12px; border-radius: 8px;
+        display: flex; justify-content: space-between; align-items: center;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.08), 0 1px 3px 1px rgba(60,64,67,0.05);
+        transition: box-shadow 0.2s ease-in-out;
+      }
+      .project-card-viewer:hover { box-shadow: 0 1px 3px 0 rgba(60,64,67,0.12), 0 2px 5px 2px rgba(60,64,67,0.08); }
+      .project-card-viewer h3 { margin: 0; font-size: 1.2em; color: var(--theme-text-color-primary); font-weight: 500; }
+      .view-project-button {
+        padding: 8px 16px; cursor: pointer; background-color: var(--theme-primary-color); color: white;
+        border: none; border-radius: 4px; font-size: 0.875rem; font-weight: 500; text-transform: uppercase;
+        letter-spacing: 0.089em; transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        box-shadow: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+      }
+      .view-project-button:hover { background-color: var(--theme-primary-hover); box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 2px 5px 2px rgba(60,64,67,0.15); }
+      .view-project-button:focus { outline: 2px solid var(--theme-primary-hover); outline-offset: 2px; }
+      #messageAreaViewer { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 4px; min-height: 1.5em; font-size: 0.9rem; }
+      .success { border-color: var(--theme-success-color); background-color: #e6f4ea; color: var(--theme-success-hover); }
+      .error { border-color: var(--theme-danger-color); background-color: #fce8e6; color: var(--theme-danger-hover); }
+      #viewerMediaContainer { position: relative; width: 100%; margin: 20px auto; background-color: #000; overflow: hidden; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
+      #interactiveTimelineBar { background: var(--theme-background-card); border-top: 2px solid var(--theme-border-color); padding: 15px; margin-top: 0; border-radius: 0 0 8px 8px; }
+      #mediaPlayerSection { position: relative; background: #000; border-radius: 8px 8px 0 0; }
+      #overlayDisplayArea { min-height: 80px; background: #f5f5f5; border-radius: 8px; margin-top: 15px; padding: 10px; display: flex; align-items: center; justify-content: center; position: relative; transition: all 0.3s ease; overflow: hidden; }
+      #overlayDisplayArea:empty::before { content: "Interactive overlays appear here during playback"; color: #666; font-style: italic; display: block; text-align: center; }
+      .timeline-overlay-content { border: 1px solid black; padding: 10px; margin: 5px 0; background-color: rgba(255, 255, 255, 0.9); position: relative; animation: slideInFromBottom 0.3s ease-out; border-radius: 8px; max-width: 90%; margin: 5px auto; /* Combined from .timeline-overlay */ }
+      .overlay-dismiss-button { position: absolute; top: 5px; right: 5px; cursor: pointer; background: #ccc; border: 1px solid #999; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; text-align: center; font-size: 12px; z-index:11; /* Ensure on top */ }
+      .overlay-action-button { cursor: pointer; background-color: var(--theme-primary-color); color: white; border: none; border-radius: 4px; padding: 5px 10px; margin-top: 5px; font-size: 0.9em; }
+      @keyframes slideInFromBottom { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      #viewerCanvasContainer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: flex; justify-content: center; align-items: center; pointer-events: none; background-color: transparent; }
+      #viewerFabricCanvas { max-width: 100%; max-height: 100%; }
+      #youtubePlayerContainer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
+      #youtubePlayerContainer iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+      button { padding: 8px 16px; cursor: pointer; background-color: var(--theme-primary-color); color: white; border: none; border-radius: 4px; font-size: 0.875rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.089em; transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out; box-shadow: 0 1px 2px 0 rgba(60,64,67,0.2), 0 1px 3px 1px rgba(60,64,67,0.1); }
+      button:hover { background-color: var(--theme-primary-hover); box-shadow: 0 1px 3px 0 rgba(60,64,67,0.25), 0 2px 5px 2px rgba(60,64,67,0.15); }
+      button:focus { outline: 2px solid var(--theme-primary-hover); outline-offset: 2px; }
+      button:disabled { background-color: #ccc; color: #666; cursor: not-allowed; box-shadow: none; }
+      #backToViewerListButton { background-color: var(--theme-background-card); color: var(--theme-primary-color); border: 1px solid var(--theme-input-border-color); box-shadow: none; margin-bottom: 20px; text-transform: none; letter-spacing: normal; }
+      #backToViewerListButton:hover { background-color: rgba(0,0,0,0.03); border-color: var(--theme-primary-hover); }
+      #viewerSlideNavigation { margin-top: 20px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 12px; }
+      #viewerSlideNavigation button { text-transform: none; letter-spacing: normal; }
+      #viewerSlideIndicator { font-size: 1rem; color: var(--theme-text-color-secondary); font-weight: 500; }
+      #viewerAudioPlayer { width: 100%; max-width: 600px; margin: 10px auto 0; display: none; }
+      #viewerTimelineTrack { position: relative; height: 12px; background-color: #e0e0e0; border-radius: 6px; cursor: pointer; }
+      #viewerTimelineProgress { position: absolute; height: 100%; background-color: var(--theme-primary-color); border-radius: 6px; width: 0%; transition: width 0.1s linear; }
+      #viewerTimelineTimeDisplay { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-top: 5px; }
+      #imageEventNavigation { text-align: center; margin-top: 10px; }
+      .image-event-nav-button { background-color: var(--theme-primary-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8em; margin: 0 5px; }
+      .image-event-nav-button:hover { background-color: var(--theme-primary-hover); }
+      .image-event-nav-button:disabled { background-color: #ccc; cursor: not-allowed; }
+      #imageEventIndicator { margin: 0 10px; font-size: 0.9em; color: #555; }
+      /* Responsive Design */
+      @media (max-width: 768px) { body { margin: 10px; } .container { padding: 15px; } h1 { font-size: 1.5em; } .project-card-viewer { flex-direction: column; align-items: flex-start; } .view-project-button { width: 100%; } }
+      @media (max-width: 480px) { body { margin: 5px; } .container { padding: 10px; } h1 { font-size: 1.3em; } #backToViewerListButton { width: 100%; } #viewerSlideNavigation { flex-direction: column; } #viewerSlideNavigation button { width: 100%; } }
+      /* Add other template-specific overlay styles if needed: .overlay-lowerThird, .overlay-cornerCallout etc. */
+</style>

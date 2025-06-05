@@ -166,9 +166,11 @@
       aom.renderOverlayList();
       // If player auto-plays or has initial duration, update time display
       if (window.mediaManager && mediaManager.state.ytPlayer) {
-          const duration = mediaManager.state.ytPlayer.getDuration();
+          const duration = mediaManager.getDuration();
           const currentTime = mediaManager.safeGetCurrentTime();
-          aom.handleMediaTimeUpdate(currentTime, duration, mediaType);
+          if (duration > 0) {
+              aom.handleMediaTimeUpdate(currentTime, duration, mediaType);
+          }
       }
     }
   };
@@ -611,8 +613,8 @@
       track.innerHTML = ''; // Clear
       if (!slide || !slide.slideMedia || !slide.slideMedia.videoOverlays || !window.mediaManager || !mediaManager.state.ytPlayer) return;
 
-      const duration = mediaManager.state.ytPlayer.getDuration();
-      if (duration === 0) return; // No duration, cannot render timeline
+      const duration = mediaManager.getDuration();
+      if (!duration || duration <= 0) return; // No valid duration, cannot render timeline
 
       slide.slideMedia.videoOverlays.forEach(overlay => {
           const item = document.createElement('div');

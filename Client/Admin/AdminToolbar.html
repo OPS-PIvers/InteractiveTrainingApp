@@ -55,6 +55,13 @@
     const ats = adminToolbar.state;
 
     ats.overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar');
+    console.log("AdminToolbar: overlayPropertiesToolbarEl found:", !!ats.overlayPropertiesToolbarEl);
+    
+    // Immediately show toolbar if element is found
+    if (ats.overlayPropertiesToolbarEl) {
+        console.log("AdminToolbar: Immediately showing toolbar");
+        ats.overlayPropertiesToolbarEl.style.display = 'block';
+    }
     ats.objXEl = document.getElementById('objX'); ats.objYEl = document.getElementById('objY');
     ats.objWidthEl = document.getElementById('objWidth'); ats.objHeightEl = document.getElementById('objHeight');
     ats.objAngleEl = document.getElementById('objAngle');
@@ -114,7 +121,13 @@
 
     atb.attachToolbarEventListeners();
     atb.hideActivePopover();
-    atb.populateToolbar(null); // Initialize toolbar for no selection
+    
+    // Add small delay to ensure DOM is ready
+    setTimeout(() => {
+        console.log("AdminToolbar: About to call populateToolbar after delay");
+        atb.populateToolbar(null); // Initialize toolbar for no selection
+    }, 100);
+    
     console.log("AdminToolbar: Edit View specific parts initialized.");
   };
 
@@ -281,6 +294,9 @@
   adminToolbar.populateToolbar = function(activeObject) {
     const ats = adminToolbar.state;
     const atb = adminToolbar;
+    console.log("AdminToolbar.populateToolbar called with activeObject:", !!activeObject);
+    console.log("AdminToolbar.populateToolbar: overlayPropertiesToolbarEl exists:", !!ats.overlayPropertiesToolbarEl);
+    
     // Ensure popoverTriggersCache is populated if not already
     if (ats.popoverTriggersCache.length === 0) {
         ats.popoverTriggersCache = [
@@ -297,7 +313,11 @@
     }
     ats.currentActiveObject = activeObject; // Store ref
 
-    if (!ats.overlayPropertiesToolbarEl) return;
+    if (!ats.overlayPropertiesToolbarEl) {
+        console.log("AdminToolbar.populateToolbar: overlayPropertiesToolbarEl not found, returning early");
+        return;
+    }
+    console.log("AdminToolbar.populateToolbar: Setting toolbar display to block");
     sharedUtils.safeDOMUpdate(ats.overlayPropertiesToolbarEl, el => el.style.display = 'block');
 
     const isObjectSelected = !!activeObject;

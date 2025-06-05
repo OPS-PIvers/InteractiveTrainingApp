@@ -3,12 +3,9 @@
     window.adminApp = {};
 
     // --- Constants ---
-    const FONT_FAMILIES = ["Arial", "Verdana", "Times New Roman", "Georgia", "Courier New", "Comic Sans MS", "Impact", "Tahoma"];
     const ADMIN_DEFAULT_CANVAS_WIDTH = 960;
     const ADMIN_DEFAULT_CANVAS_HEIGHT = 540;
     const ADMIN_MAX_HISTORY_SIZE = 20;
-    const ADMIN_MESSAGE_TIMEOUT = 7000; 
-    const ADMIN_DEBOUNCE_DELAY = 250;
     const ADMIN_SHORT_DELAY = 100; 
     const ADMIN_RECT_DEFAULT_FILL = 'rgba(255,0,0,0.7)';
     const ADMIN_RECT_DEFAULT_WIDTH = 150;
@@ -20,7 +17,6 @@
     const ADMIN_TEXTBOX_DEFAULT_WIDTH = 200;
     const ADMIN_CANVAS_BACKGROUND_COLOR = '#e9e9e9';
     const ADMIN_MAX_IMAGE_WIDTH_ON_UPLOAD = 960;
-    const ADMIN_NOTIFICATION_DURATION = 5000;
     const ADMIN_PREVIEW_OVERLAY_Z_INDEX = 1050;
     // Note: Other Z-indexes (like for modals, popovers) are primarily CSS-controlled.
 
@@ -43,20 +39,21 @@
       history: [],
       historyIndex: -1,
       isApplyingHistory: false, // Flag to prevent re-saving state during undo and redo
-      adminYouTubePlayer: null, // Reference to the admin's YouTube player instance
-      isYouTubeApiReady: false, // Flag for YouTube API readiness
+      // adminYouTubePlayer: null, // Will use mediaManager.state.ytPlayer
+      // isYouTubeApiReady: false, // Will use mediaManager.state.isYouTubeApiReady
+      // deferredYouTubeSetup: null, // Will use mediaManager.state.deferredMediaSetup
       placingOverlay: null,
       editingOverlayId: null,
       previewingOverlays: false,
-      overlayPreviewInterval: null
+      overlayPreviewInterval: null // This specific interval for admin preview might remain or be adapted
     };
 
 // ADD interval tracking:
 adminApp.intervals = {
-  playerUpdate: null,
-  overlayPreview: null,
+  // playerUpdate: null, // To be managed by MediaManager
+  overlayPreview: null, // This specific interval for admin preview might remain or be adapted
   autoSave: null, // If you add autosave later
-  playerQuestionCheckInterval: null
+  // playerQuestionCheckInterval: null // To be managed by MediaManager
 };
 
 // Helper to safely clear interval
@@ -72,72 +69,15 @@ adminApp.clearInterval = function(intervalName) {
 adminApp.eventListeners = new WeakMap(); // Track event listeners for cleanup
 adminApp.activeListeners = []; // Array of {element, event, handler} for global listeners
 
-// --- safeDOMUpdate Helper Function ---
-function safeDOMUpdate(element, operation, errorMessage = "DOM operation failed") {
-  if (!element) {
-    console.warn(`${errorMessage}: Element is null/undefined`);
-    return false;
-  }
-  
-  try {
-    operation(element);
-    return true;
-  } catch (e) {
-    console.error(`${errorMessage}:`, e);
-    return false;
-  }
-}
+// --- Global function for YouTube API is now handled by MediaManager.html ---
+// function onYouTubeIframeAPIReady() { ... } // Removed
 
-// --- Global function for YouTube API ---
-function onYouTubeIframeAPIReady() {
-  adminApp.state.isYouTubeApiReady = true;
-  console.log('Admin YouTube API Ready.');
-  
-  // Add null check
-  if (adminApp.state.deferredYouTubeSetup && adminApp.state.deferredYouTubeSetup.videoId) {
-    const { videoId, retryCount = 0 } = adminApp.state.deferredYouTubeSetup;
-    setTimeout(() => {
-      if (isYouTubePlayerAvailable()) {
-        setupAdminYouTubePlayer(videoId);
-        adminApp.state.deferredYouTubeSetup = null;
-      } else if (retryCount < 3) {
-        adminApp.state.deferredYouTubeSetup.retryCount = retryCount + 1;
-        onYouTubeIframeAPIReady(); // Retry
-      } else {
-        displayMessage("YouTube player failed to initialize after retries.", false);
-        adminApp.state.deferredYouTubeSetup = null;
-      }
-    }, 100);
-  }
-}
+// function isYouTubePlayerAvailable() { ... } // Removed, use mediaManager.isYouTubePlayerAvailable()
 
-function isYouTubePlayerAvailable() {
-    return adminApp.state.isYouTubeApiReady &&
-           typeof YT !== 'undefined' &&
-           typeof YT.Player !== 'undefined';
-}
+// function validateYouTubeEnvironment() { ... } // Removed, or logic incorporated into MediaManager or app callbacks
 
-// ADD after isYouTubePlayerAvailable function:
-function validateYouTubeEnvironment() {
-    return adminApp.state.isYouTubeApiReady && 
-           typeof YT !== 'undefined' && 
-           typeof YT.Player !== 'undefined' &&
-           typeof YT.PlayerState !== 'undefined' &&
-           adminYouTubePlayerContainerEl && 
-           adminYouTubePlayerContainerEl.parentNode;
-}
+// function safeGetCurrentTime(player) { ... } // Removed, use mediaManager.safeGetCurrentTime()
 
-function safeGetCurrentTime(player) {
-    if (!player || typeof player.getCurrentTime !== 'function') {
-        return 0;
-    }
-    try {
-        return player.getCurrentTime();
-    } catch (e) {
-        console.warn("Could not get current time from YouTube player:", e);
-        return 0;
-    }
-}
     // --- DOM Element References ---
     let projectTitleInputEl, createProjectButtonEl, messageAreaEl, loadingSpinnerEl;
     let listViewContainerEl, adminProjectListContainerEl;
@@ -427,7 +367,7 @@ function safeGetCurrentTime(player) {
       };
       safelyAddListener(createProjectButtonEl, 'click', handleCreateProject, 'createProjectButtonEl');
       
-      window.addEventListener('resize', debounce(handleWindowResize, 250));
+      window.addEventListener('resize', sharedUtils.debounce(handleWindowResize, 250));
 
       console.log("Admin_JS: Initial event listeners attached.");
 
@@ -578,9 +518,9 @@ function safeDisposeCanvas() {
 
       safeDisposeCanvas(); // Use the new safe disposal function
 
-      safeDOMUpdate(listViewContainerEl, el => el.style.display = 'block', "Failed to show list view container");
-      safeDOMUpdate(editViewContainerEl, el => el.style.display = 'none', "Failed to hide edit view container");
-      safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area in switchToListView");
+      sharedUtils.safeDOMUpdate(listViewContainerEl, el => el.style.display = 'block', "Failed to show list view container");
+      sharedUtils.safeDOMUpdate(editViewContainerEl, el => el.style.display = 'none', "Failed to hide edit view container");
+      sharedUtils.safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area in switchToListView");
       
       loadAdminProjectsList(); 
     }
@@ -593,18 +533,18 @@ function safeDisposeCanvas() {
         adminApp.state.currentSlideIndex = -1; 
         hideActivePopover(); 
 
-        safeDOMUpdate(listViewContainerEl, el => el.style.display = 'none', "Failed to hide list view container for edit view");
-        safeDOMUpdate(editViewContainerEl, el => el.style.display = 'block', "Failed to show edit view container");
+        sharedUtils.safeDOMUpdate(listViewContainerEl, el => el.style.display = 'none', "Failed to hide list view container for edit view");
+        sharedUtils.safeDOMUpdate(editViewContainerEl, el => el.style.display = 'block', "Failed to show edit view container");
 
-        safeDOMUpdate(editingProjectTitleEl, 
+        sharedUtils.safeDOMUpdate(editingProjectTitleEl,
           el => el.textContent = `Loading Project (ID: ${projectIdToEdit})...`,
           "Failed to update editing project title on view switch"
         );
 
         safeDisposeCanvas(); // Use the new safe disposal function before initializing a new one
 
-        safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area for edit view");
-        safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '', "Failed to clear slide thumbnails for edit view"); 
+        sharedUtils.safeDOMUpdate(messageAreaEl, el => el.innerHTML = '', "Failed to clear message area for edit view");
+        sharedUtils.safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '', "Failed to clear slide thumbnails for edit view");
 
         const ensureEditViewListener = (elementVarName, id, eventType, handler, critical = false) => {
             let element = window[elementVarName]; 
@@ -676,7 +616,7 @@ function safeDisposeCanvas() {
              adminApp.state.fabricCanvasInstance.on('object:removed', () => saveCanvasStateForHistory()); // Save on remove
 
 
-            safeDOMUpdate(overlayPropertiesToolbarEl, el => el.style.display = 'block', "Failed to show overlay properties toolbar in switchToEditView");
+            sharedUtils.safeDOMUpdate(overlayPropertiesToolbarEl, el => el.style.display = 'block', "Failed to show overlay properties toolbar in switchToEditView");
             populateToolbar(null); 
             hideActivePopover(); 
 
@@ -690,8 +630,9 @@ function safeDisposeCanvas() {
 
         } else {
             console.error("Fabric.js library or canvas element #fabricCanvasElement not found in switchToEditView.");
-            displayMessage("Critical error: Editor canvas could not be initialized.", false);
-            showLoading(false); 
+            baseApp.displayMessage("Critical error: Editor canvas could not be initialized.", false, 'messageArea');
+            baseApp.showLoading(false, 'loadingSpinner');
+            adminApp.state.isLoading = false;
         }
     }
 
@@ -704,7 +645,7 @@ function safeDisposeCanvas() {
             
             const popover = document.getElementById(popoverId);
             if (popover && triggerButtonEl) {
-                safeDOMUpdate(popover, el => {
+                sharedUtils.safeDOMUpdate(popover, el => {
                     el.style.display = 'block';
                     el.style.position = 'absolute';
                     el.style.top = 'auto';
@@ -752,10 +693,10 @@ function safeDisposeCanvas() {
                                        currentSlide.slideMedia.type === 'audio' && 
                                        currentSlide.slideMedia.driveFileId;
                        const audioControlsEl = document.getElementById('audioControls');
-                       safeDOMUpdate(audioControlsEl, audioEl => { // Changed el to audioEl for clarity
+                       sharedUtils.safeDOMUpdate(audioControlsEl, audioEl => { // Changed el to audioEl for clarity
                            audioEl.style.display = hasAudio ? 'block' : 'none';
                            if (hasAudio) {
-                               safeDOMUpdate(attachedAudioNameEl, 
+                               sharedUtils.safeDOMUpdate(attachedAudioNameEl,
                                  nameEl => nameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`, // Changed el to nameEl
                                  "Failed to update attached audio name in popover");
                            }
@@ -771,7 +712,7 @@ function safeDisposeCanvas() {
     function hideActivePopover() {
         if (adminApp.state.activePopoverId) {
             const popover = document.getElementById(adminApp.state.activePopoverId);
-            safeDOMUpdate(popover, el => el.style.display = 'none', "Failed to hide active popover in hideActivePopover");
+            sharedUtils.safeDOMUpdate(popover, el => el.style.display = 'none', "Failed to hide active popover in hideActivePopover");
             
             document.querySelectorAll('.toolbar-button.popover-active').forEach(btn => {
                 btn.classList.remove('popover-active');
@@ -799,10 +740,10 @@ function safeDisposeCanvas() {
                             currentSlide.slideMedia.type === 'audio' && 
                             currentSlide.slideMedia.driveFileId;
             const audioControlsEl = document.getElementById('audioControls');
-            safeDOMUpdate(audioControlsEl, el => {
+            sharedUtils.safeDOMUpdate(audioControlsEl, el => {
                 el.style.display = hasAudio ? 'block' : 'none';
                 if (hasAudio) {
-                    safeDOMUpdate(attachedAudioNameEl, 
+                    sharedUtils.safeDOMUpdate(attachedAudioNameEl,
                       nameEl => nameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`,
                       "Failed to update attached audio name in media tab (switchMediaTab)");
                 }
@@ -822,27 +763,29 @@ function safeDisposeCanvas() {
     // --- Project Loading/Saving ---
     function loadProjectForEditing(projectId) {
       console.log(`loadProjectForEditing: Called for projectId: ${projectId}`);
-      if (!projectId) { console.error("loadProjectForEditing: No projectId."); displayMessage("Error: Cannot load project.", false); return; }
-      showLoading(true);
-      displayMessage("Loading project data...", true);
+      if (!projectId) { console.error("loadProjectForEditing: No projectId."); baseApp.displayMessage("Error: Cannot load project.", false, 'messageArea'); return; }
+      baseApp.showLoading(true, 'loadingSpinner');
+      adminApp.state.isLoading = true;
+      baseApp.displayMessage("Loading project data...", true, 'messageArea');
       google.script.run
           .withSuccessHandler(onProjectDataLoaded)
-          .withFailureHandler(onServerError)
+          .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
           .getProjectDataForEditing(projectId);
     }
 
     function onProjectDataLoaded(response) { // Argument changed
-    // Note: showLoading(false) is handled within specific paths below as per original logic,
+    // Note: baseApp.showLoading(false, 'loadingSpinner') is handled within specific paths below as per original logic,
     // or in the new error block.
 
     if (!response || !response.success) {
-        showLoading(false); // Call showLoading(false) in this new error block.
-        onServerError(response || { error: "Failed to load project data" });
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
+        baseApp.onServerError(response || { error: "Failed to load project data" }, 'messageArea');
         // Attempt to set a generic error title if project ID is known
         if (adminApp.state.currentProjectId) {
              adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading Project", slides: [] };
              adminApp.state.currentSlideIndex = -1;
-             safeDOMUpdate(editingProjectTitleEl, 
+             sharedUtils.safeDOMUpdate(editingProjectTitleEl,
                 el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`,
                 "Failed to update editing project title on server error in onProjectDataLoaded (new handler)");
              updateSlideThumbnailsUI(); // Update UI to reflect error state
@@ -858,12 +801,13 @@ function safeDisposeCanvas() {
 
     // Existing null/undefined check for the extracted jsonString
     if (jsonString === null || jsonString === undefined) {
-        showLoading(false); // Original showLoading(false) call for this path preserved
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
         console.error("onProjectDataLoaded: Extracted null or undefined projectDataJSON from server response.");
-        displayMessage("Error: Could not load project data. Project or its data file may not exist or the data is empty.", false);
+        baseApp.displayMessage("Error: Could not load project data. Project or its data file may not exist or the data is empty.", false, 'messageArea');
         adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Error Loading", slides: [] };
         adminApp.state.currentSlideIndex = -1;
-        safeDOMUpdate(editingProjectTitleEl, 
+        sharedUtils.safeDOMUpdate(editingProjectTitleEl,
             el => el.textContent = `Error Loading Project (ID: ${adminApp.state.currentProjectId})`, // Message consistent with other errors
             "Failed to update editing project title on null data in onProjectDataLoaded");
         updateSlideThumbnailsUI();
@@ -873,8 +817,9 @@ function safeDisposeCanvas() {
     try {
         if (typeof jsonString !== 'string') {
             // This specific error implies the data format is incorrect even if response.success was true.
-            // Call showLoading(false) here before throwing, as the catch block will also call it.
-            showLoading(false); 
+            // Call baseApp.showLoading(false, 'loadingSpinner') here before throwing, as the catch block will also call it.
+            baseApp.showLoading(false, 'loadingSpinner');
+            adminApp.state.isLoading = false;
             throw new Error("Received project data is not a JSON string.");
         }
         const loadedData = JSON.parse(jsonString);
@@ -923,7 +868,7 @@ function safeDisposeCanvas() {
 
           adminApp.state.projectData = loadedData;
 
-          safeDOMUpdate(editingProjectTitleEl, 
+          sharedUtils.safeDOMUpdate(editingProjectTitleEl,
             el => el.textContent = `Editing Project: ${adminApp.state.projectData.title || '(Untitled)'}`,
             "Failed to update editing project title after data load in onProjectDataLoaded");
 
@@ -931,21 +876,23 @@ function safeDisposeCanvas() {
 
           if (adminApp.state.projectData.slides.length > 0) {
               selectSlide(0); 
-              displayMessage("Project loaded successfully.", true);
+              baseApp.displayMessage("Project loaded successfully.", true, 'messageArea');
           } else {
-              displayMessage("Project loaded, but it has no slides. Adding one.", true);
+              baseApp.displayMessage("Project loaded, but it has no slides. Adding one.", true, 'messageArea');
               handleAddSlide(); 
           }
-          showLoading(false); 
+          baseApp.showLoading(false, 'loadingSpinner');
+          adminApp.state.isLoading = false;
 
       } catch (e) {
-          showLoading(false);
+          baseApp.showLoading(false, 'loadingSpinner');
+          adminApp.state.isLoading = false;
           console.error("onProjectDataLoaded: Error parsing JSON data or invalid structure:", e);
           console.error("Received JSON string that failed parsing:", jsonString);
-          displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false);
+          baseApp.displayMessage(`Error: Failed to parse loaded project data. ${e.message}`, false, 'messageArea');
           adminApp.state.projectData = { projectId: adminApp.state.currentProjectId, title: "Invalid Data", slides: [] };
           adminApp.state.currentSlideIndex = -1;
-          safeDOMUpdate(editingProjectTitleEl, 
+          sharedUtils.safeDOMUpdate(editingProjectTitleEl,
             el => el.textContent = `Invalid Project Data (ID: ${adminApp.state.currentProjectId})`,
             "Failed to update editing project title on parse error in onProjectDataLoaded");
           updateSlideThumbnailsUI(); 
@@ -984,17 +931,19 @@ function safeDisposeCanvas() {
           console.log(`Slide ${adminApp.state.currentSlideIndex + 1} state saved. Media:`, JSON.stringify(currentSlide.slideMedia));
         } catch(e) {
             console.error(`Error saving slide state for index ${adminApp.state.currentSlideIndex}:`, e);
-            displayMessage(`Error saving current slide state: ${e.message}`, false);
+            baseApp.displayMessage(`Error saving current slide state: ${e.message}`, false, 'messageArea');
         }
     }
 
     function handleSaveProject() {
-        if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { displayMessage("No project data to save.", false); return; }
+        if (!adminApp.state.projectData || !adminApp.state.currentProjectId) { baseApp.displayMessage("No project data to save.", false, 'messageArea'); return; }
         if (adminApp.state.isLoading) { console.log("handleSaveProject: Already saving."); return; }
 
         saveCurrentSlideState(); 
 
-        showLoading(true); displayMessage("Saving project...", true);
+        baseApp.showLoading(true, 'loadingSpinner');
+        adminApp.state.isLoading = true;
+        baseApp.displayMessage("Saving project...", true, 'messageArea');
         try {
             const projectDataToSave = JSON.parse(JSON.stringify(adminApp.state.projectData));
 
@@ -1013,9 +962,10 @@ function safeDisposeCanvas() {
                 .withFailureHandler(onServerError)
                 .saveProjectData(adminApp.state.currentProjectId, jsonDataString);
         } catch (e) {
-             showLoading(false);
+             baseApp.showLoading(false, 'loadingSpinner');
+             adminApp.state.isLoading = false;
              console.error("Error stringifying project data for saving:", e);
-             displayMessage("Error preparing data for saving.", false);
+             baseApp.displayMessage("Error preparing data for saving.", false, 'messageArea');
         }
     }
 
@@ -1050,9 +1000,10 @@ function safeDisposeCanvas() {
     }
 
     function onProjectSaved(response) {
-        showLoading(false);
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
         if (response && response.success) {
-            showNotification(response.message || "Project saved successfully!", "success");
+            sharedUtils.showNotification(response.message || "Project saved successfully!", "success");
         } else {
             onServerError((response && response.error) ? response.error : "Failed to save.");
         }
@@ -1063,7 +1014,7 @@ function safeDisposeCanvas() {
         console.log("handleAddSlide called");
         if (!adminApp.state.projectData) { console.error("handleAddSlide: projectData not initialized."); return; }
         saveCurrentSlideState(); 
-        const newSlideId = 'slide_' + generateClientUuid();
+        const newSlideId = 'slide_' + sharedUtils.generateClientUuid();
         const newSlide = {
             slideId: newSlideId,
             canvasWidth: adminApp.state.defaultCanvasWidth,
@@ -1077,7 +1028,7 @@ function safeDisposeCanvas() {
         const newSlideIndex = adminApp.state.projectData.slides.length - 1;
         selectSlide(newSlideIndex); 
         console.log("Added new slide. Total slides:", adminApp.state.projectData.slides.length);
-        showNotification("New slide added.", "success");
+        sharedUtils.showNotification("New slide added.", "success");
         saveCanvasStateForHistory(); // Save initial state of new slide
     }
 
@@ -1124,16 +1075,19 @@ function safeDisposeCanvas() {
             selectedSlideData.slideMedia.youtubeOptions = { showClickToBeginButton: false };
         }
 
-        // In selectSlide() function, before setting up YouTube
-        if (adminApp.state.adminYouTubePlayer) {
-            stopAndDestroyAdminYouTubePlayer();
+        // In selectSlide() function
+        if (typeof mediaManager !== 'undefined') {
+            if (mediaManager.stopAndDestroyPlayer) mediaManager.stopAndDestroyPlayer();
+            if (mediaManager.stopAndClearAudioPlayer) mediaManager.stopAndClearAudioPlayer();
         }
-        safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
+
+        sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
             el.style.display = 'none';
             el.innerHTML = ''; 
         }, "Failed to reset YouTube player container in selectSlide");
+        // TODO: Add similar for an admin audio player container if one is introduced
         
-        safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity in selectSlide");
+        sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity in selectSlide");
 
         canvas.clear(); 
         canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas)); 
@@ -1145,23 +1099,25 @@ function safeDisposeCanvas() {
         if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
         if (audioUploaderEl) audioUploaderEl.value = null;
         
-        safeDOMUpdate(attachedAudioNameEl, el => el.textContent = '', "Failed to clear attached audio name in selectSlide");
+        sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => el.textContent = '', "Failed to clear attached audio name in selectSlide");
         const audioControls = document.getElementById('audioControls');
-        safeDOMUpdate(audioControls, el => el.style.display = 'none', "Failed to hide audio controls in selectSlide");
-        safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none', "Failed to hide remove audio button in selectSlide");
-        safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder in selectSlide");
+        sharedUtils.safeDOMUpdate(audioControls, el => el.style.display = 'none', "Failed to hide audio controls in selectSlide");
+        sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none', "Failed to hide remove audio button in selectSlide");
+        sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder in selectSlide");
 
         const media = selectedSlideData.slideMedia;
-        updateVideoToolsVisibility(false);
+        updateVideoToolsVisibility(false); // Default to false, MediaManager callbacks will enable if YT
 
         if (media && media.type === 'image' && media.driveFileId) {
-            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for image bg in selectSlide");
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for image bg in selectSlide");
             console.log(`Background needs fetch from Drive ID for slide ${slideIndex + 1}:`, media.driveFileId);
-            showLoading(true); 
-            displayMessage("Loading slide background...", true);
+            baseApp.showLoading(true, 'loadingSpinner');
+            adminApp.state.isLoading = true;
+            baseApp.displayMessage("Loading slide background...", true, 'messageArea');
             
             google.script.run.withSuccessHandler(function(response) {
-                showLoading(false);
+                baseApp.showLoading(false, 'loadingSpinner');
+                adminApp.state.isLoading = false;
                 if (adminApp.state.currentSlideIndex !== slideIndex) { 
                     console.log("Slide changed before background could be fetched for index", slideIndex); 
                     return; 
@@ -1177,7 +1133,7 @@ function safeDisposeCanvas() {
                     }, { crossOrigin: 'anonymous' });
                 } else { 
                     console.error("Failed to fetch background", response); 
-                    displayMessage("Error loading slide background image.", false); 
+                    baseApp.displayMessage("Error loading slide background image.", false, 'messageArea');
                     canvas.backgroundColor = '#e9e9e9'; 
                     canvas.renderAll(); 
                 }
@@ -1189,60 +1145,73 @@ function safeDisposeCanvas() {
             canvas.renderAll(); 
             
         } else if (media && media.type === 'youtube' && media.url) {
-            console.log("Attempting to load YouTube player for URL:", media.url);
-            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for YouTube bg in selectSlide");
+            console.log("AdminApp: Preparing YouTube player via MediaManager for URL:", media.url);
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none');
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = media.url;
             
-            safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity for YouTube bg in selectSlide");
-            canvas.backgroundColor = 'rgba(0,0,0,0)'; 
+            // Opacity and background color are more complex with MediaManager, as it controls the player visibility.
+            // The canvas itself might remain transparent or be styled via CSS.
+            // sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1');
+            canvas.backgroundColor = 'rgba(0,0,0,0)'; // Keep canvas transparent for YT
 
-            const videoId = extractYouTubeVideoId(media.url);
+            const videoId = sharedUtils.extractYouTubeVideoId(media.url);
             if (videoId && adminYouTubePlayerContainerEl) {
-                if (validateYouTubeEnvironment()) { 
-                    safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
-                        el.style.display = 'block';
-                        el.style.position = 'absolute';
-                        el.style.top = '0';
-                        el.style.left = '0';
-                        el.style.width = '100%';
-                        el.style.height = '100%';
-                        el.style.pointerEvents = 'none'; // Prevent interference
-                    }, "Failed to show YouTube player container in selectSlide");
-                    setupAdminYouTubePlayer(videoId); 
-                } else {
-                    console.warn("YouTube API not ready or environment invalid. Deferring setup for videoId:", videoId);
-                    adminApp.state.deferredYouTubeSetup = { videoId, retryCount: 0 };
-                    safeDOMUpdate(adminMediaPlaceholderEl, el => {
-                        el.textContent = "YouTube player is loading...";
-                        el.style.display = 'block';
-                    }, "Failed to show YouTube loading placeholder in selectSlide");
-                    if (adminApp.state.isYouTubeApiReady) {
-                         onYouTubeIframeAPIReady();
-                    }
-                }
+                sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
+                    el.style.display = 'block'; // Ensure container is visible for MediaManager
+                    // MediaManager will handle player's internal styling (position, size)
+                });
+
+                const playerVars = {
+                    'playsinline': 1,
+                    'controls': 1, // Admin might want controls
+                    'showinfo': 0,
+                    'rel': 0,
+                    // No 'disablekb': 1 for admin, as admin might use keyboard for testing.
+                    // width/height will be set by MediaManager based on container.
+                };
+
+                // These are the handlers MediaManager will call internally
+                const eventHandlersForMediaManager = {
+                    'onReady': mediaManager.onPlayerReady,
+                    'onStateChange': mediaManager.onPlayerStateChange,
+                    'onError': mediaManager.onPlayerError
+                };
+
+                // Configure admin-specific callbacks for MediaManager to use
+                mediaManager.state.callbacks.onReady = adminApp.handleMediaPlayerReady;
+                mediaManager.state.callbacks.onStateChange = adminApp.handleMediaPlayerStateChange;
+                mediaManager.state.callbacks.onError = adminApp.handleMediaPlayerError;
+                mediaManager.state.callbacks.onTimeUpdate = adminApp.handleMediaTimeUpdate;
+                mediaManager.state.callbacks.onQuestionTrigger = adminApp.handleMediaQuestionTrigger;
+                mediaManager.state.callbacks.onOverlayUpdateNeeded = adminApp.handleMediaOverlayUpdate;
+                mediaManager.state.callbacks.onEnded = adminApp.handleMediaEnded;
+
+                mediaManager.setupPlayer(videoId, 'adminYouTubePlayerContainer', playerVars, eventHandlersForMediaManager);
+
             } else {
-                console.error("Invalid YouTube setup: Video ID could not be extracted or player container missing.", { videoId, container: !!adminYouTubePlayerContainerEl, url: media.url });
-                updateVideoToolsVisibility(false);
-                safeDOMUpdate(adminMediaPlaceholderEl, el => {
-                    el.textContent = `Error: Could not load YouTube video. Check URL or player setup. URL: ${media.url}`;
+                console.error("AdminApp: Invalid YouTube setup. Video ID or container missing.", { videoId, container: !!adminYouTubePlayerContainerEl, url: media.url });
+                updateVideoToolsVisibility(false); // Hide YT specific tools
+                sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => {
+                    el.textContent = `Error: Could not load YouTube video. Check URL. URL: ${media.url}`;
                     el.style.display = 'block';
-                }, "Failed to show YouTube error placeholder in selectSlide");
-                safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '1', "Failed to set canvas opacity on YouTube error in selectSlide");
-                canvas.backgroundColor = '#444';
+                });
+                canvas.backgroundColor = '#444'; // Show a dark background if player fails
             }
             canvas.renderAll();
             
         } else if (media && media.type === 'audio' && (media.driveFileId)) {
-            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'block', "Failed to show admin media placeholder for audio in selectSlide"); 
+             // TODO: Integrate with MediaManager for audio if admin needs audio editing features like questions/overlays for audio.
+             // For now, keeping it simple or assuming admin doesn't edit audio timeline events.
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'block');
             console.log("Indicating attached audio:", media.originalName || media.driveFileId);
-            safeDOMUpdate(attachedAudioNameEl, el => {
+            sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => {
                 el.textContent = `Attached: ${media.originalName || 'Audio File'}`;
                 const currentAudioControls = document.getElementById('audioControls'); // Re-fetch or ensure it's in scope
-                safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block', "Failed to show audio controls for audio in selectSlide");
+                sharedUtils.safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block', "Failed to show audio controls for audio in selectSlide");
             }, "Failed to update attached audio name for audio in selectSlide");
-            safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block', "Failed to show remove audio button for audio in selectSlide");
+            sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block', "Failed to show remove audio button for audio in selectSlide");
             
-            safeDOMUpdate(adminMediaPlaceholderEl, el => {
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => {
                 el.textContent = `Audio Attached: ${media.originalName || 'Audio File'}`;
                 el.style.display = 'block';
             }, "Failed to update admin media placeholder for audio in selectSlide");
@@ -1251,7 +1220,7 @@ function safeDisposeCanvas() {
             
         } else {
             console.log("No background media found or configured for slide", slideIndex);
-            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for no media in selectSlide");
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder for no media in selectSlide");
             canvas.backgroundColor = '#e9e9e9'; 
             canvas.renderAll();
         }
@@ -1294,11 +1263,11 @@ function safeDisposeCanvas() {
         if (!adminApp.state.projectData) { 
             console.warn("updateSlideThumbnailsUI: Project data missing."); 
             // Ensure the container is cleared if there's no project data or no slides.
-            safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '<p>No slides available.</p>', "Failed to clear slide thumbnails container on no project data");
+            sharedUtils.safeDOMUpdate(slideThumbnailsContainerEl, el => el.innerHTML = '<p>No slides available.</p>', "Failed to clear slide thumbnails container on no project data");
             return; 
         }
         
-        safeDOMUpdate(slideThumbnailsContainerEl, el => {
+        sharedUtils.safeDOMUpdate(slideThumbnailsContainerEl, el => {
             el.innerHTML = ''; // Clear existing thumbnails
             if (!adminApp.state.projectData.slides || adminApp.state.projectData.slides.length === 0) {
                 el.innerHTML = '<p>No slides. Click "Add Slide" to begin.</p>'; // Message when no slides exist
@@ -1319,7 +1288,7 @@ function safeDisposeCanvas() {
 
     function handleDeleteSlide(slideIndex) {
         if (!adminApp.state.projectData || !adminApp.state.projectData.slides || slideIndex < 0 || slideIndex >= adminApp.state.projectData.slides.length) { console.error("handleDeleteSlide: Invalid index."); return; }
-        if (adminApp.state.projectData.slides.length <= 1) { displayMessage("Cannot delete the last slide.", false); return; }
+        if (adminApp.state.projectData.slides.length <= 1) { baseApp.displayMessage("Cannot delete the last slide.", false, 'messageArea'); return; }
         if (!confirm(`Are you sure you want to delete Slide ${slideIndex + 1}?`)) return;
         
         const wasCurrentSlide = adminApp.state.currentSlideIndex === slideIndex;
@@ -1347,7 +1316,8 @@ function safeDisposeCanvas() {
     // --- Project Management (Status/Delete) ---
     function handleProjectStatusChange(projectId, newStatus, selectElement) {
         console.log(`Attempting to update status for project ${projectId} to ${newStatus}`);
-        showLoading(true);
+        baseApp.showLoading(true, 'loadingSpinner');
+        adminApp.state.isLoading = true;
         const originalStatus = selectElement.getAttribute('data-original-status') ||
                                (adminApp.state.projectListCache.find(p => p.projectId === projectId) || {}).status;
         selectElement.setAttribute('data-original-status', originalStatus);
@@ -1355,7 +1325,7 @@ function safeDisposeCanvas() {
         google.script.run
             .withSuccessHandler(function(response) { onProjectStatusUpdated(response, projectId, newStatus, selectElement); })
             .withFailureHandler(function(error) {
-                onServerError(error);
+                baseApp.onServerError(error, 'messageArea');
                 if (selectElement) {
                     console.log("Reverting status dropdown due to server error for project:", projectId);
                     selectElement.value = originalStatus;
@@ -1365,9 +1335,10 @@ function safeDisposeCanvas() {
     }
 
     function onProjectStatusUpdated(response, projectId, newStatus, selectElement) {
-        showLoading(false);
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
         if (response && response.success) {
-            displayMessage(response.message || "Project status updated successfully!", true);
+            baseApp.displayMessage(response.message || "Project status updated successfully!", true, 'messageArea');
 
             const projectInCache = adminApp.state.projectListCache.find(p => p.projectId === projectId);
             if (projectInCache) projectInCache.status = newStatus;
@@ -1380,7 +1351,7 @@ function safeDisposeCanvas() {
                 adminApp.state.projectData.status = newStatus;
             }
         } else {
-            onServerError((response && response.error) ? response.error : "Failed to update status.");
+            baseApp.onServerError((response && response.error) ? response.error : "Failed to update status.", 'messageArea');
             if (selectElement) {
                  console.log("Reverting status dropdown due to server failure for project:", projectId);
                  const originalStatus = selectElement.getAttribute('data-original-status');
@@ -1394,136 +1365,90 @@ function safeDisposeCanvas() {
             return;
         }
         console.log(`Attempting to delete project ${projectId}`);
-        showLoading(true);
+        baseApp.showLoading(true, 'loadingSpinner');
+        adminApp.state.isLoading = true;
         google.script.run
             .withSuccessHandler(onProjectDeleted)
-            .withFailureHandler(onServerError)
+            .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
             .deleteProject(projectId);
     }
 
     function onProjectDeleted(response) {
-        showLoading(false);
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
         if (response && response.success) {
-            displayMessage(response.message || "Project deleted successfully!", true);
+            baseApp.displayMessage(response.message || "Project deleted successfully!", true, 'messageArea');
             if (adminApp.state.currentView === 'edit' && adminApp.state.currentProjectId === response.deletedProjectId) {
                 switchToListView();
             } else {
                 loadAdminProjectsList();
             }
         } else {
-            onServerError((response && response.error) ? response.error : "Failed to delete project.");
+            baseApp.onServerError((response && response.error) ? response.error : "Failed to delete project.", 'messageArea');
         }
     }
 
     // --- Error Handling & UI Utils ---
-    function showLoading(show) {
-        adminApp.state.isLoading = show;
-        safeDOMUpdate(loadingSpinnerEl, 
-          el => el.style.display = show ? 'flex' : 'none',
-          "Failed to update loading spinner display"
-        );
-        if (show && !loadingSpinnerEl) console.warn("showLoading(true) loadingSpinnerEl not found."); // Keep console warn if element itself is missing.
-    }
-
-    function showNotification(message, type = 'info', duration = 5000) {
-        let container = document.getElementById('notificationContainer');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'notificationContainer';
-            document.body.appendChild(container);
-        }
-        
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = message;
-        
-        container.appendChild(notification);
-        
-        setTimeout(() => notification.classList.add('visible'), 10);
-        
-        setTimeout(() => {
-            notification.classList.remove('visible');
-            setTimeout(() => notification.remove(), 300); 
-        }, duration);
-    }
-
-    function displayMessage(message, isSuccess) {
-        showNotification(message, isSuccess ? 'success' : 'error');
-        
-        safeDOMUpdate(messageAreaEl, el => {
-            el.innerHTML = ''; 
-            const p = document.createElement('p'); 
-            p.textContent = message; 
-            el.appendChild(p); 
-            el.className = isSuccess ? 'success' : 'error'; 
-            setTimeout(() => { 
-                safeDOMUpdate(el, innerEl => {
-                    innerEl.innerHTML = ''; 
-                    innerEl.className = ''; 
-                }, "Failed to clear message area after timeout in displayMessage");
-            }, 7000); 
-        }, "Failed to display message in messageAreaEl");
-
-        if (!messageAreaEl) { // Keep console warn if element itself is missing.
-            console.warn("displayMessage messageAreaEl not found. Message:", message); 
-        }
-    }
-
 // MODIFY onServerError function to check for session errors:
-    function onServerError(errorObject) {
-      console.error("onServerError triggered:", errorObject);
-      showLoading(false);
+    // function onServerError(errorObject) { // This function is being removed
+    //   console.error("onServerError triggered:", errorObject);
+    //   baseApp.showLoading(false, 'loadingSpinner');
+    //   adminApp.state.isLoading = false;
       
-      // Check if it's a session error first
-      if (handleDriveSessionError(errorObject)) {
-        return; // Session error handled
-      }
+    //   // Check if it's a session error first
+    //   if (handleDriveSessionError(errorObject)) {
+    //     return; // Session error handled
+    //   }
       
-      let errorMessage = "An unknown server error occurred.";
-       if (typeof errorObject === 'string') { errorMessage = errorObject; }
-       else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
-       else if (errorObject && errorObject.error && typeof errorObject.error === 'string') { errorMessage = errorObject.error; }
-      console.error('Formatted Server Error Message:', errorMessage);
-      displayMessage('Server Error: ' + errorMessage, false);
-    }
+    //   let errorMessage = "An unknown server error occurred.";
+    //    if (typeof errorObject === 'string') { errorMessage = errorObject; }
+    //    else if (errorObject && errorObject.message) { errorMessage = errorObject.message; }
+    //    else if (errorObject && errorObject.error && typeof errorObject.error === 'string') { errorMessage = errorObject.error; }
+    //   console.error('Formatted Server Error Message:', errorMessage);
+    //   baseApp.displayMessage('Server Error: ' + errorMessage, false, 'messageArea');
+    // }
 
     function handleCreateProject() {
         if (adminApp.state.isLoading) return;
         const currentProjectTitle = projectTitleInputEl.value.trim();
-        if (!currentProjectTitle) { displayMessage('Project title cannot be empty.', false); projectTitleInputEl.focus(); return; }
-        showLoading(true);
-        google.script.run.withSuccessHandler(onProjectCreated).withFailureHandler(onServerError).createProject(currentProjectTitle);
+        if (!currentProjectTitle) { baseApp.displayMessage('Project title cannot be empty.', false, 'messageArea'); projectTitleInputEl.focus(); return; }
+        baseApp.showLoading(true, 'loadingSpinner');
+        adminApp.state.isLoading = true;
+        google.script.run.withSuccessHandler(onProjectCreated).withFailureHandler(error => baseApp.onServerError(error, 'messageArea')).createProject(currentProjectTitle);
     }
     function onProjectCreated(response) {
-        showLoading(false);
-        if (response && response.success) { displayMessage(response.message || 'Project created!', true); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); }
-        else { onServerError((response && response.error) ? response.error : 'Failed to create project.'); }
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
+        if (response && response.success) { baseApp.displayMessage(response.message || 'Project created!', true, 'messageArea'); if(projectTitleInputEl) projectTitleInputEl.value = ''; loadAdminProjectsList(); }
+        else { baseApp.onServerError((response && response.error) ? response.error : 'Failed to create project.', 'messageArea'); }
     }
 
     function loadAdminProjectsList() {
       console.log("loadAdminProjectsList: Function called.");
-      if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found."); showLoading(false); return; }
-      if (!google || !google.script || !google.script.run) { console.error("loadAdminProjectsList: google.script.run unavailable."); displayMessage("Error: Client-server bridge unavailable.", false); return; }
-      showLoading(true);
+      if (!adminProjectListContainerEl) { console.error("loadAdminProjectsList: adminProjectListContainerEl not found."); baseApp.showLoading(false, 'loadingSpinner'); adminApp.state.isLoading = false; return; }
+      if (!google || !google.script || !google.script.run) { console.error("loadAdminProjectsList: google.script.run unavailable."); baseApp.displayMessage("Error: Client-server bridge unavailable.", false, 'messageArea'); return; }
+      baseApp.showLoading(true, 'loadingSpinner');
+      adminApp.state.isLoading = true;
       console.log("loadAdminProjectsList: Calling google.script.run.getAllProjectsForAdmin...");
       google.script.run
         .withSuccessHandler(displayAdminProjects)
-        .withFailureHandler(onServerError)
+        .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
         .getAllProjectsForAdmin();
        console.log("loadAdminProjectsList: google.script.run.getAllProjectsForAdmin call initiated.");
     }
     function displayAdminProjects(response) { // Argument changed from projectsArray to response
-    showLoading(false); // Ensure this is at the top
+    baseApp.showLoading(false, 'loadingSpinner');
+    adminApp.state.isLoading = false;
 
     if (!response || !response.success) {
-        onServerError(response || { error: "Failed to load projects" });
+        baseApp.onServerError(response || { error: "Failed to load projects" }, 'messageArea');
         return;
     }
     
     const projectsArray = response.data && response.data.projects ? response.data.projects : [];
     console.log("displayAdminProjects (Success Handler) received response. Processing projects:", projectsArray); // Keep or adapt console log
 
-      safeDOMUpdate(adminProjectListContainerEl, el => {
+      sharedUtils.safeDOMUpdate(adminProjectListContainerEl, el => {
           el.innerHTML = ''; // Clear previous projects
           if (!projectsArray || projectsArray.length === 0) { 
               el.innerHTML = '<p>No projects found. Create one above!</p>';
@@ -1597,7 +1522,7 @@ function handleDriveSessionError(error) {
        error.message.includes("403"))) {
     
     // Session expired
-    displayMessage("Your session has expired. The page will reload to re-authenticate.", false);
+    baseApp.displayMessage("Your session has expired. The page will reload to re-authenticate.", false, 'messageArea');
     
     // Save current state if possible
     if (adminApp.state.projectData) {
@@ -1631,45 +1556,50 @@ function handleDriveSessionError(error) {
 
         saveCurrentSlideState(); 
 
-        showLoading(true); displayMessage("Uploading image...", true);
+        baseApp.showLoading(true, 'loadingSpinner');
+        adminApp.state.isLoading = true;
+        baseApp.displayMessage("Uploading image...", true, 'messageArea');
         const reader = new FileReader();
         reader.onload = function(e) {
             const fileData = { fileName: file.name, mimeType: file.type, data: e.target.result.split(',')[1] };
-            if (!adminApp.state.currentProjectId) { showLoading(false); displayMessage("Error: No project selected.", false); if(event.target) event.target.value = null; return; }
-            google.script.run.withSuccessHandler(onImageUploaded).withFailureHandler(onServerError).uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
+            if (!adminApp.state.currentProjectId) { baseApp.showLoading(false, 'loadingSpinner'); adminApp.state.isLoading = false; baseApp.displayMessage("Error: No project selected.", false, 'messageArea'); if(event.target) event.target.value = null; return; }
+            google.script.run.withSuccessHandler(onImageUploaded).withFailureHandler(error => baseApp.onServerError(error, 'messageArea')).uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
         };
-        reader.onerror = function(error) { showLoading(false); displayMessage("Error reading file.", false); console.error(error); if(event.target) event.target.value = null; };
+        reader.onerror = function(error) { baseApp.showLoading(false, 'loadingSpinner'); adminApp.state.isLoading = false; baseApp.displayMessage("Error reading file.", false, 'messageArea'); console.error(error); if(event.target) event.target.value = null; };
         reader.readAsDataURL(file);
     }
 
     function onImageUploaded(response) {
-        showLoading(false);
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
         if (imageUploaderEl) imageUploaderEl.value = null;
         if (response && response.success && response.driveFileId) {
-            displayMessage("Image processed. Fetching for preview...", true);
-            showLoading(true);
+            baseApp.displayMessage("Image processed. Fetching for preview...", true, 'messageArea');
+            baseApp.showLoading(true, 'loadingSpinner');
+            adminApp.state.isLoading = true;
             adminApp.state.lastUploadedDriveId = response.driveFileId;
             adminApp.state.lastUploadedMimeType = response.mimeType;
             adminApp.state.lastUploadedFileName = response.fileName;
             google.script.run
                 .withSuccessHandler(onBase64ImageReceived)
-                .withFailureHandler(onServerError)
+                .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
                 .getImageAsBase64(response.driveFileId);
         } else {
-            onServerError({ message: (response && response.error) ? response.error : "Image processing failed." });
+            baseApp.onServerError({ message: (response && response.error) ? response.error : "Image processing failed." }, 'messageArea');
         }
     }
 
     function onBase64ImageReceived(response) {
-        showLoading(false);
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
         if (response && response.success && response.base64Data) {
             if (!adminApp.state.fabricCanvasInstance || adminApp.state.currentSlideIndex === -1) { 
-                displayMessage("Error: Canvas/Slide not ready.", false); 
+                baseApp.displayMessage("Error: Canvas/Slide not ready.", false, 'messageArea');
                 return; 
             }
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
             if (!currentSlide) { 
-                displayMessage("Error: Slide data missing.", false); 
+                baseApp.displayMessage("Error: Slide data missing.", false, 'messageArea');
                 return; 
             }
 
@@ -1698,7 +1628,7 @@ function handleDriveSessionError(error) {
                     scaleX: cvWidth / imgWidth, 
                     scaleY: cvHeight / imgHeight 
                 });
-                displayMessage("Background image set.", true);
+                baseApp.displayMessage("Background image set.", true, 'messageArea');
 
                 if (!currentSlide.slideMedia) currentSlide.slideMedia = {};
                 currentSlide.slideMedia.type = 'image';
@@ -1718,20 +1648,20 @@ function handleDriveSessionError(error) {
 
             }, { crossOrigin: 'anonymous' });
         } else {
-            onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." });
+            baseApp.onServerError({ message: (response && response.error) ? response.error : "Failed to fetch image data." }, 'messageArea');
         }
     }
 
     function handleSetYoutubeBackground() {
         if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) {
-            displayMessage("Please select a slide first.", false); return;
+            baseApp.displayMessage("Please select a slide first.", false, 'messageArea'); return;
         }
         if (!youtubeUrlInputEl || !youtubeUrlInputEl.value) {
-            displayMessage("Please enter a YouTube URL.", false); return;
+            baseApp.displayMessage("Please enter a YouTube URL.", false, 'messageArea'); return;
         }
         const url = youtubeUrlInputEl.value.trim();
         if (!url.includes("youtube.com/") && !url.includes("youtu.be/")) { // Simplified check
-            displayMessage("Please enter a valid YouTube URL.", false);
+            baseApp.displayMessage("Please enter a valid YouTube URL.", false, 'messageArea');
             return;
         }
 
@@ -1752,7 +1682,7 @@ function handleDriveSessionError(error) {
 
         console.log(`Set YouTube background for slide ${adminApp.state.currentSlideIndex + 1} to: ${url}`);
         selectSlide(adminApp.state.currentSlideIndex); // Reload slide to show YouTube player
-        displayMessage("YouTube background set for this slide.", true);
+        baseApp.displayMessage("YouTube background set for this slide.", true, 'messageArea');
     }
 
     function handleAudioUpload(event) {
@@ -1763,14 +1693,16 @@ function handleDriveSessionError(error) {
             return;
         }
         if (!adminApp.state.projectData || adminApp.state.currentSlideIndex < 0) {
-             displayMessage("Please select a slide first before uploading audio.", false);
+             baseApp.displayMessage("Please select a slide first before uploading audio.", false, 'messageArea');
              if (event.target) event.target.value = null;
              return;
         }
 
         saveCurrentSlideState(); 
 
-        showLoading(true); displayMessage("Uploading audio...", true);
+        baseApp.showLoading(true, 'loadingSpinner');
+        adminApp.state.isLoading = true;
+        baseApp.displayMessage("Uploading audio...", true, 'messageArea');
         const reader = new FileReader();
         reader.onload = function(e) {
             const fileData = {
@@ -1780,12 +1712,13 @@ function handleDriveSessionError(error) {
             };
             google.script.run
                 .withSuccessHandler(onAudioUploaded)
-                .withFailureHandler(onServerError)
+                .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
                 .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'audio');
         };
         reader.onerror = function(error) {
-            showLoading(false);
-            displayMessage("Error reading audio file.", false);
+            baseApp.showLoading(false, 'loadingSpinner');
+            adminApp.state.isLoading = false;
+            baseApp.displayMessage("Error reading audio file.", false, 'messageArea');
             console.error(error);
             if (event.target) event.target.value = null;
         };
@@ -1793,11 +1726,12 @@ function handleDriveSessionError(error) {
     }
 
      function onAudioUploaded(response) {
-        showLoading(false);
+        baseApp.showLoading(false, 'loadingSpinner');
+        adminApp.state.isLoading = false;
         if (audioUploaderEl) audioUploaderEl.value = null;
 
         if (response && response.success && response.driveFileId) {
-            displayMessage("Audio processed successfully.", true);
+            baseApp.displayMessage("Audio processed successfully.", true, 'messageArea');
 
             const currentSlide = adminApp.state.projectData.slides[adminApp.state.currentSlideIndex];
              if (!currentSlide.slideMedia) {
@@ -1811,12 +1745,12 @@ function handleDriveSessionError(error) {
 
             console.log(`Audio attached for slide ${adminApp.state.currentSlideIndex + 1}:`, currentSlide.slideMedia);
             
-            safeDOMUpdate(attachedAudioNameEl, el => {
+            sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => {
                 el.textContent = `Attached: ${response.fileName}`;
                 const currentAudioControls = document.getElementById('audioControls');
-                safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block', "Failed to show audio controls on audio upload");
+                sharedUtils.safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'block', "Failed to show audio controls on audio upload");
             }, "Failed to update attached audio name on upload");
-            safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block', "Failed to show remove audio button on upload");
+            sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block', "Failed to show remove audio button on upload");
 
             if (youtubeUrlInputEl) youtubeUrlInputEl.value = '';
             if (imageUploaderEl) imageUploaderEl.value = null;
@@ -1825,7 +1759,7 @@ function handleDriveSessionError(error) {
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9'; 
                 adminApp.state.fabricCanvasInstance.renderAll();
             }
-            safeDOMUpdate(adminMediaPlaceholderEl, el => {
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => {
                  el.textContent = `Audio Attached: ${response.fileName}`;
                  el.style.display = 'block';
             }, "Failed to update admin media placeholder on audio upload");
@@ -1848,20 +1782,20 @@ function handleDriveSessionError(error) {
             currentSlide.slideMedia.mimeType = null;
             currentSlide.slideMedia.originalName = null;
 
-            safeDOMUpdate(attachedAudioNameEl, el => {
+            sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => {
                 el.textContent = '';
                 const currentAudioControls = document.getElementById('audioControls');
-                safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'none', "Failed to hide audio controls on audio removal");
+                sharedUtils.safeDOMUpdate(currentAudioControls, audioEl => audioEl.style.display = 'none', "Failed to hide audio controls on audio removal");
             }, "Failed to clear attached audio name on removal");
-            safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none', "Failed to hide remove audio button on removal");
+            sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'none', "Failed to hide remove audio button on removal");
             if (audioUploaderEl) audioUploaderEl.value = null; 
-            safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder on audio removal");
+            sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => el.style.display = 'none', "Failed to hide admin media placeholder on audio removal");
             
             if(adminApp.state.fabricCanvasInstance) {
                 adminApp.state.fabricCanvasInstance.backgroundColor = '#e9e9e9';
                 adminApp.state.fabricCanvasInstance.renderAll();
              }
-            displayMessage("Audio removed from this slide.", true);
+            baseApp.displayMessage("Audio removed from this slide.", true, 'messageArea');
         }
     }
 
@@ -1879,8 +1813,9 @@ function handleDriveSessionError(error) {
                 event.preventDefault();
                 console.log("Image pasted from clipboard:", blob.name || 'pasted_image', blob.type);
                 saveCurrentSlideState(); 
-                showLoading(true);
-                displayMessage("Processing pasted image...", true);
+                baseApp.showLoading(true, 'loadingSpinner');
+                adminApp.state.isLoading = true;
+                baseApp.displayMessage("Processing pasted image...", true, 'messageArea');
                 const reader = new FileReader();
                 reader.onload = function(e_reader) {
                     const fileData = {
@@ -1889,18 +1824,20 @@ function handleDriveSessionError(error) {
                         data: e_reader.target.result.split(',')[1]
                     };
                     if (!adminApp.state.currentProjectId) {
-                        showLoading(false);
-                        displayMessage("Error: No project selected for pasted image.", false);
+                        baseApp.showLoading(false, 'loadingSpinner');
+                        adminApp.state.isLoading = false;
+                        baseApp.displayMessage("Error: No project selected for pasted image.", false, 'messageArea');
                         return;
                     }
                     google.script.run
                         .withSuccessHandler(onImageUploaded) 
-                        .withFailureHandler(onServerError)
+                        .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
                         .uploadFileToDrive(fileData, adminApp.state.currentProjectId, 'image');
                 };
                 reader.onerror = function(error) {
-                    showLoading(false);
-                    displayMessage("Error reading pasted image data.", false);
+                    baseApp.showLoading(false, 'loadingSpinner');
+                    adminApp.state.isLoading = false;
+                    baseApp.displayMessage("Error reading pasted image data.", false, 'messageArea');
                     console.error("FileReader error:", error);
                 };
                 reader.readAsDataURL(blob);
@@ -1916,7 +1853,7 @@ function handleDriveSessionError(error) {
 
     function handleMediaSelection(mediaType) {
         if (adminApp.state.currentView !== 'edit' || !adminApp.state.currentProjectId || adminApp.state.isLoading) {
-            showNotification("Cannot add media now. Please wait...", "error");
+            sharedUtils.showNotification("Cannot add media now. Please wait...", "error");
             return;
         }
         
@@ -1925,14 +1862,14 @@ function handleDriveSessionError(error) {
                 if (imageUploaderEl) {
                     imageUploaderEl.click();
                 } else {
-                    showNotification("Image upload not available", "error");
+                    sharedUtils.showNotification("Image upload not available", "error");
                 }
                 break;
             case 'audio':
                 if (audioUploaderEl) {
                     audioUploaderEl.click();
                 } else {
-                    showNotification("Audio upload not available", "error");
+                    sharedUtils.showNotification("Audio upload not available", "error");
                 }
                 break;
             case 'youtube':
@@ -1942,12 +1879,12 @@ function handleDriveSessionError(error) {
                         youtubeUrlInputEl.value = youtubeUrl;
                         handleSetYoutubeBackground();
                     } else {
-                        showNotification("YouTube background functionality not available", "error");
+                        sharedUtils.showNotification("YouTube background functionality not available", "error");
                     }
                 }
                 break;
             default:
-                showNotification("Unknown media type: " + mediaType, "error");
+                sharedUtils.showNotification("Unknown media type: " + mediaType, "error");
         }
     }
 
@@ -2012,23 +1949,27 @@ function handleDriveSessionError(error) {
             canvas.renderAll();
             saveCanvasStateForHistory(); 
             populateToolbar(null); 
-            showNotification("Object deleted", "info");
+            sharedUtils.showNotification("Object deleted", "info");
         } else {
-            showNotification("No object selected to delete.", "info");
+            sharedUtils.showNotification("No object selected to delete.", "info");
         }
     }
 
 // Overlay creation workflow
 function initiateOverlayPlacement() {
-    if (!isYouTubePlayerAvailable() || !adminApp.state.adminYouTubePlayer) return;
+    // Use MediaManager's player and availability check
+    if (!mediaManager.isYouTubePlayerAvailable() || !mediaManager.state.ytPlayer) {
+        baseApp.displayMessage("YouTube player is not available or ready.", false, "messageArea");
+        return;
+    }
     
     // Pause video at current time
-    adminApp.state.adminYouTubePlayer.pauseVideo();
-    const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
+    mediaManager.state.ytPlayer.pauseVideo();
+    const currentTime = mediaManager.safeGetCurrentTime(); // Uses MediaManager's player
     
     // Show placement overlay
     const placementMode = document.getElementById('overlayPlacementMode');
-    safeDOMUpdate(placementMode, el => el.style.display = 'block', "Failed to show overlay placement mode in initiateOverlayPlacement");
+    sharedUtils.safeDOMUpdate(placementMode, el => el.style.display = 'block', "Failed to show overlay placement mode in initiateOverlayPlacement");
     
     // Store placement state
     adminApp.state.placingOverlay = {
@@ -2054,7 +1995,7 @@ function handleOverlayPlacement(event) {
     
     // Hide placement mode
     const placementMode = document.getElementById('overlayPlacementMode');
-    safeDOMUpdate(placementMode, el => el.style.display = 'none', "Failed to hide overlay placement mode in handleOverlayPlacement");
+    sharedUtils.safeDOMUpdate(placementMode, el => el.style.display = 'none', "Failed to hide overlay placement mode in handleOverlayPlacement");
     
     // Show editor modal
     showOverlayEditor();
@@ -2079,7 +2020,7 @@ function showOverlayEditor(overlayId = null) {
     if (overlayTemplateEl) overlayTemplateEl.value = overlay.template; // Input value
     
     const overlayStartTimeDisplayEl = document.getElementById('overlayStartTimeDisplay');
-    safeDOMUpdate(overlayStartTimeDisplayEl, el => el.textContent = formatTime(overlay.startTime), "Failed to set overlay start time display in showOverlayEditor");
+    sharedUtils.safeDOMUpdate(overlayStartTimeDisplayEl, el => el.textContent = sharedUtils.formatTime(overlay.startTime), "Failed to set overlay start time display in showOverlayEditor");
     
     const overlayDurationEl = document.getElementById('overlayDuration');
     if (overlayDurationEl) overlayDurationEl.value = overlay.duration; // Input value
@@ -2098,7 +2039,7 @@ function showOverlayEditor(overlayId = null) {
     
     // Show position
     const overlayPositionDisplayEl = document.getElementById('overlayPositionDisplay');
-    safeDOMUpdate(overlayPositionDisplayEl, el => {
+    sharedUtils.safeDOMUpdate(overlayPositionDisplayEl, el => {
         if (overlay.position) {
             el.textContent = `X: ${overlay.position.x.toFixed(0)}%, Y: ${overlay.position.y.toFixed(0)}%`;
         } else {
@@ -2108,9 +2049,9 @@ function showOverlayEditor(overlayId = null) {
     
     // Show/hide delete button
     const deleteOverlayBtnEl = document.getElementById('deleteOverlayBtn');
-    safeDOMUpdate(deleteOverlayBtnEl, el => el.style.display = overlayId ? 'inline-block' : 'none', "Failed to update delete overlay button display in showOverlayEditor");
+    sharedUtils.safeDOMUpdate(deleteOverlayBtnEl, el => el.style.display = overlayId ? 'inline-block' : 'none', "Failed to update delete overlay button display in showOverlayEditor");
     
-    safeDOMUpdate(modal, el => el.style.display = 'block', "Failed to show overlay editor modal in showOverlayEditor");
+    sharedUtils.safeDOMUpdate(modal, el => el.style.display = 'block', "Failed to show overlay editor modal in showOverlayEditor");
     adminApp.state.editingOverlayId = overlayId;
 }
 
@@ -2126,14 +2067,14 @@ function createNewOverlay() {
         if (adminApp.state.placingOverlay.position) {
             position = adminApp.state.placingOverlay.position;
         }
-    } else if (isYouTubePlayerAvailable() && adminApp.state.adminYouTubePlayer) {
+    } else if (mediaManager.isYouTubePlayerAvailable() && mediaManager.state.ytPlayer) { // Use MediaManager
         // Fallback if placingOverlay is not set, use current video time
-        startTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
+        startTime = mediaManager.safeGetCurrentTime(); // Uses MediaManager's player
     }
 
 
     return {
-        id: 'overlay_' + generateClientUuid(),
+        id: 'overlay_' + sharedUtils.generateClientUuid(),
         template: 'lowerThird',
         startTime: startTime,
         duration: 5,
@@ -2192,7 +2133,7 @@ function saveOverlay() {
     hideOverlayEditor();
     renderOverlayTimeline();
     renderOverlayList();
-    showNotification('Overlay saved.', 'success'); // Added user feedback
+    sharedUtils.showNotification('Overlay saved.', 'success'); // Added user feedback
 }
 
 // Render overlay bars on timeline
@@ -2207,7 +2148,7 @@ function renderOverlayTimeline() {
         track.innerHTML = '<p>Video player not ready.</p>'; // User feedback
         return;
     }
-    safeDOMUpdate(track, el => {
+    sharedUtils.safeDOMUpdate(track, el => {
         el.innerHTML = ''; // Clear previous timeline
         const duration = adminApp.state.adminYouTubePlayer.getDuration(); // getDuration() is generally safe
         if (duration === 0) { // Handle case where duration might not be available yet
@@ -2246,7 +2187,7 @@ function renderOverlayTimeline() {
             box-sizing: border-box; /* Added for better layout */
         `;
         
-        bar.title = `${overlay.content.text || overlay.template} (${formatTime(overlay.startTime)})`;
+        bar.title = `${overlay.content.text || overlay.template} (${sharedUtils.formatTime(overlay.startTime)})`;
         bar.onclick = () => showOverlayEditor(overlay.id);
         
         el.appendChild(bar); // Appending to el (the track)
@@ -2275,11 +2216,11 @@ function toggleOverlayPreview() {
         renderVideoOverlaysAdmin();
         adminApp.clearInterval('overlayPreview'); // Clear previous before setting new
         adminApp.intervals.overlayPreview = setInterval(updateOverlayPreview, 100);
-        safeDOMUpdate(previewButton, el => el.textContent = 'Stop Preview', "Failed to update preview button text to Stop in toggleOverlayPreview");
+        sharedUtils.safeDOMUpdate(previewButton, el => el.textContent = 'Stop Preview', "Failed to update preview button text to Stop in toggleOverlayPreview");
     } else {
         adminApp.clearInterval('overlayPreview');
         clearVideoOverlaysAdmin();
-        safeDOMUpdate(previewButton, el => el.textContent = 'Preview Overlays', "Failed to update preview button text to Preview in toggleOverlayPreview");
+        sharedUtils.safeDOMUpdate(previewButton, el => el.textContent = 'Preview Overlays', "Failed to update preview button text to Preview in toggleOverlayPreview");
     }
 }
 
@@ -2294,19 +2235,19 @@ function findOverlayById(overlayId) {
 
 function hideOverlayEditor() {
     const modal = document.getElementById('overlayEditorModal');
-    safeDOMUpdate(modal, el => el.style.display = 'none', "Failed to hide overlay editor modal in hideOverlayEditor");
+    sharedUtils.safeDOMUpdate(modal, el => el.style.display = 'none', "Failed to hide overlay editor modal in hideOverlayEditor");
     adminApp.state.editingOverlayId = null;
 }
 
 function deleteCurrentOverlay() {
     if (!adminApp.state.editingOverlayId) {
-        showNotification('No overlay selected to delete.', 'error');
+        sharedUtils.showNotification('No overlay selected to delete.', 'error');
         return;
     }
 
     const currentSlide = getCurrentSlide();
     if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) { // Check if array
-        showNotification('Cannot find overlay data for this slide.', 'error');
+        sharedUtils.showNotification('Cannot find overlay data for this slide.', 'error');
         return;
     }
 
@@ -2317,9 +2258,9 @@ function deleteCurrentOverlay() {
     );
 
     if (currentSlide.slideMedia.videoOverlays.length < initialLength) {
-        showNotification('Overlay deleted.', 'success');
+        sharedUtils.showNotification('Overlay deleted.', 'success');
     } else {
-        showNotification('Could not delete overlay. Not found.', 'error');
+        sharedUtils.showNotification('Could not delete overlay. Not found.', 'error');
     }
 
     hideOverlayEditor();
@@ -2372,7 +2313,7 @@ function gatherOverlayFromForm() {
     const actionValue = overlayActionEl ? overlayActionEl.value : 'none';
 
     return {
-        id: editingId || ('overlay_' + generateClientUuid()),
+        id: editingId || ('overlay_' + sharedUtils.generateClientUuid()),
         template: templateValue,
         startTime: startTime,
         duration: durationValue,
@@ -2397,7 +2338,7 @@ function renderOverlayList() {
         console.warn("renderOverlayList: adminOverlayList element not found.");
         return;
     }
-    safeDOMUpdate(listEl, el => {
+    sharedUtils.safeDOMUpdate(listEl, el => {
         el.innerHTML = ''; // Clear previous list
         const currentSlide = getCurrentSlide();
         const overlays = (currentSlide && currentSlide.slideMedia && Array.isArray(currentSlide.slideMedia.videoOverlays)) 
@@ -2415,7 +2356,7 @@ function renderOverlayList() {
             item.setAttribute('data-overlay-id', overlay.id); 
 
             const textSpan = document.createElement('span');
-            textSpan.textContent = `[${formatTime(overlay.startTime)}] ${overlay.content.text || overlay.template} (Duration: ${overlay.duration}s)`;
+            textSpan.textContent = `[${sharedUtils.formatTime(overlay.startTime)}] ${overlay.content.text || overlay.template} (Duration: ${overlay.duration}s)`;
             
             const editButton = document.createElement('button');
             editButton.textContent = 'Edit';
@@ -2473,13 +2414,17 @@ function renderVideoOverlaysAdmin() {
 }
 
 function updateOverlayPreview() {
-    if (!isYouTubePlayerAvailable() || !adminApp.state.adminYouTubePlayer || typeof adminApp.state.adminYouTubePlayer.getCurrentTime !== 'function') {
-        // console.warn("updateOverlayPreview: YouTube player not ready or getCurrentTime not available.");
+    // This function's core logic is now part of adminApp.handleMediaOverlayUpdate,
+    // which is called by MediaManager's checkMediaTime interval.
+    // This direct function `updateOverlayPreview` might be removable if `toggleOverlayPreview`
+    // correctly triggers the display via `handleMediaOverlayUpdate`.
+    // For now, let's update it to use MediaManager if it were to be called directly.
+    if (!mediaManager.isYouTubePlayerAvailable() || !mediaManager.state.ytPlayer || typeof mediaManager.state.ytPlayer.getCurrentTime !== 'function') {
         return;
     }
-    if (!adminApp.state.previewingOverlays) return; // Only run if previewing
+    if (!adminApp.state.previewingOverlays) return;
 
-    const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
+    const currentTime = mediaManager.safeGetCurrentTime();
     const currentSlide = getCurrentSlide();
     if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) return;
 
@@ -2498,7 +2443,7 @@ function updateOverlayPreview() {
 
 function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     const playerContainer = document.getElementById('adminYouTubePlayerContainer');
-    safeDOMUpdate(playerContainer, el => {
+    sharedUtils.safeDOMUpdate(playerContainer, el => {
         const previewOverlays = el.querySelectorAll('.video-overlay-preview');
         previewOverlays.forEach(previewEl => previewEl.remove());
     }, "Failed to clear video overlays from admin player container in clearVideoOverlaysAdmin");
@@ -2507,13 +2452,13 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         adminApp.clearInterval('overlayPreview');
         adminApp.state.previewingOverlays = false; 
         const previewButton = document.getElementById('previewOverlaysBtn');
-        safeDOMUpdate(previewButton, btnEl => btnEl.textContent = 'Preview Overlays', "Failed to reset preview button text in clearVideoOverlaysAdmin");
+        sharedUtils.safeDOMUpdate(previewButton, btnEl => btnEl.textContent = 'Preview Overlays', "Failed to reset preview button text in clearVideoOverlaysAdmin");
     }
 }
 
     // --- Overlay Creation ---
     function addRectangle() {
-      if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
+      if (!adminApp.state.fabricCanvasInstance) { console.error("addRectangle: Fabric canvas not initialized."); baseApp.displayMessage("Error: Canvas not ready to add shapes.", false, 'messageArea'); return; }
       const canvas = adminApp.state.fabricCanvasInstance;
       const rect = new fabric.Rect({ 
           left: 50, top: 50, fill: 'rgba(255,0,0,0.7)', width: 150, height: 100, 
@@ -2529,7 +2474,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     }
 
     function addCircle() {
-      if (!adminApp.state.fabricCanvasInstance) { console.error("addCircle: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add shapes.", false); return; }
+      if (!adminApp.state.fabricCanvasInstance) { console.error("addCircle: Fabric canvas not initialized."); baseApp.displayMessage("Error: Canvas not ready to add shapes.", false, 'messageArea'); return; }
       const canvas = adminApp.state.fabricCanvasInstance;
       const circle = new fabric.Circle({ 
           left: 150, top: 150, radius: 50, fill: 'rgba(0,0,255,0.7)', 
@@ -2545,7 +2490,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
     }
 
     function addTextbox() {
-      if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); displayMessage("Error: Canvas not ready to add text.", false); return; }
+      if (!adminApp.state.fabricCanvasInstance) { console.error("addTextbox: Fabric canvas not initialized."); baseApp.displayMessage("Error: Canvas not ready to add text.", false, 'messageArea'); return; }
       const canvas = adminApp.state.fabricCanvasInstance;
       const textbox = new fabric.Textbox('Editable Text', {
           left: 100, top: 100, width: 200, fontSize: 24, fill: '#000000',
@@ -2583,7 +2528,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
 
         if(objFontFamilyEl) {
             objFontFamilyEl.innerHTML = ''; 
-            FONT_FAMILIES.forEach(font => {
+            sharedUtils.FONT_FAMILIES.forEach(font => {
                 const option = document.createElement('option'); option.value = font; option.textContent = font; objFontFamilyEl.appendChild(option);
             });
             if (!objFontFamilyEl.hasAttribute('listener-attached')) {
@@ -2644,7 +2589,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
                             const mockEvent = { target: { files: [file] } };
                             uploadHandler(mockEvent);
                         } else {
-                            displayMessage(`Please drop a ${fileTypePrefix.split('/')[0]} file.`, false);
+                            baseApp.displayMessage(`Please drop a ${fileTypePrefix.split('/')[0]} file.`, false, 'messageArea');
                         }
                     }
                 });
@@ -2996,9 +2941,9 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         const showNavigate = action === 'navigateToSlide' || action === 'navigateToURL';
         const showPanZoomConfig = action === 'panZoomToTarget';
 
-        safeDOMUpdate(modalConfig, el => el.style.display = showModal ? 'block' : 'none', "Failed to update modal config visibility in updateInteractionConfigVisibility");
-        safeDOMUpdate(navigateConfig, el => el.style.display = showNavigate ? 'block' : 'none', "Failed to update navigate config visibility in updateInteractionConfigVisibility");
-        safeDOMUpdate(panZoomConfig, el => el.style.display = showPanZoomConfig ? 'block' : 'none', "Failed to update pan/zoom config visibility in updateInteractionConfigVisibility");
+        sharedUtils.safeDOMUpdate(modalConfig, el => el.style.display = showModal ? 'block' : 'none', "Failed to update modal config visibility in updateInteractionConfigVisibility");
+        sharedUtils.safeDOMUpdate(navigateConfig, el => el.style.display = showNavigate ? 'block' : 'none', "Failed to update navigate config visibility in updateInteractionConfigVisibility");
+        sharedUtils.safeDOMUpdate(panZoomConfig, el => el.style.display = showPanZoomConfig ? 'block' : 'none', "Failed to update pan/zoom config visibility in updateInteractionConfigVisibility");
     }
 
     function updateAnimationStrengthUnit(animationType) {
@@ -3011,7 +2956,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
             case 'float': unitText = "(pixels)"; break;
             case 'growShrink': unitText = "(scale factor e.g., 1.2)"; break;
         }
-        safeDOMUpdate(strengthUnitEl, el => el.textContent = unitText, "Failed to update animation strength unit text in updateAnimationStrengthUnit");
+        sharedUtils.safeDOMUpdate(strengthUnitEl, el => el.textContent = unitText, "Failed to update animation strength unit text in updateAnimationStrengthUnit");
     }
 
     function handleAnimationChange() {
@@ -3029,7 +2974,7 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
         
         const showAnimParams = !!(activeObject.customAnimation.trigger && activeObject.customAnimation.type);
         const animParamsConfig = animationPopoverEl ? animationPopoverEl.querySelector('#animationParamsConfig') : null;
-        safeDOMUpdate(animParamsConfig, el => el.style.display = showAnimParams ? 'block' : 'none', "Failed to update animation params config display on change in handleAnimationChange");
+        sharedUtils.safeDOMUpdate(animParamsConfig, el => el.style.display = showAnimParams ? 'block' : 'none', "Failed to update animation params config display on change in handleAnimationChange");
 
         if (showAnimParams) {
             if (objAnimationSpeedEl) activeObject.customAnimation.speed = objAnimationSpeedEl.value;
@@ -3147,48 +3092,10 @@ function clearVideoOverlaysAdmin(stopPreviewLogicAndButtonUpdate = true) {
       }
     }
 
-function generateClientUuid() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, 
-            v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-
     // --- Utilities ---
     // var Utilities = { 
     //     getUuid: function() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) { var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); }
     // };
-
-    function extractYouTubeVideoId(url) {
-        if (!url) return null;
-        let videoId = null;
-        try {
-            const urlObj = new URL(url); // Try direct URL parsing first
-            if ((urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com') && urlObj.searchParams.has('v')) {
-                videoId = urlObj.searchParams.get('v');
-            } else if (urlObj.hostname === 'youtu.be') {
-                videoId = urlObj.pathname.substring(1);
-            }
-        } catch (e) {
-            // Fallback for simpler regex if URL parsing fails (e.g. not a full URL)
-            // This regex is more robust for various YouTube URL formats.
-            const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-            const match = url.match(regex);
-            if (match) videoId = match[1];
-        }
-        if (!videoId) console.warn("Could not extract YouTube Video ID from URL:", url);
-        return videoId;
-    }
-
-    function debounce(func, delay) {
-        let timeout;
-        return function(...args) {
-            const context = this;
-            clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(context, args), delay);
-        };
-    }
 
     function handleWindowResize() {
         if (adminApp.state.currentView === 'edit' && adminApp.state.fabricCanvasInstance) {
@@ -3200,23 +3107,117 @@ function generateClientUuid() {
         }
     }
 
+    // --- New AdminApp Media Handling Callbacks ---
+    adminApp.handleMediaPlayerReady = function(event) {
+        // event.target is the player instance (from MediaManager)
+        console.log("AdminApp: Media Player Ready. Video ID:", mediaManager.state.ytPlayer.getVideoData().video_id);
+        updateVideoToolsVisibility(true);
+        renderVideoQuestionsList(); // Questions for the current slide
+        renderOverlayTimeline();    // Overlays for the current slide
+        // If admin wants to autoplay or do other things on ready, it can be done here.
+        // For example: mediaManager.state.ytPlayer.playVideo();
+    };
+
+    adminApp.handleMediaPlayerStateChange = function(event) {
+        console.log("AdminApp: Media Player State Change:", event.data);
+        // Admin-specific logic based on player state, if any, beyond what MediaManager handles.
+        // For example, if specific UI elements need to change based on PLAYING, PAUSED, ENDED.
+        // The core interval for time updates and question/overlay checks is managed by MediaManager.
+    };
+
+    adminApp.handleMediaPlayerError = function(eventData) { // eventData is { type: 'youtube', errorData: event.data }
+        console.error("AdminApp: Media Player Error:", eventData.errorData);
+        baseApp.displayMessage(`YouTube Player Error in Admin: Code ${eventData.errorData}`, false, 'messageArea');
+        updateVideoToolsVisibility(false);
+    };
+
+    adminApp.handleMediaTimeUpdate = function(currentTime, duration) {
+        // Update Admin-specific timeline UI
+        if (videoTimelineSliderEl) {
+            videoTimelineSliderEl.max = duration;
+            videoTimelineSliderEl.value = currentTime;
+        }
+        safeDOMUpdate(videoCurrentTimeDisplayEl, el => el.textContent = sharedUtils.formatTime(currentTime));
+        safeDOMUpdate(videoTotalDurationDisplayEl, el => el.textContent = sharedUtils.formatTime(duration));
+    };
+
+    adminApp.handleMediaQuestionTrigger = function(currentTime) {
+        const currentSlide = getCurrentSlide();
+        if (!currentSlide || !currentSlide.slideMedia || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
+            return;
+        }
+
+        currentSlide.slideMedia.videoQuestions.forEach((question, index) => {
+            // Check if question should be triggered (within a small window, not already triggered)
+            // The 'triggered' flag management needs to be robust, potentially reset when a video starts over.
+            // For now, let's assume 'triggered' is a property on the question object in projectData.
+            if (!question.triggered && currentTime >= question.timestamp && currentTime < question.timestamp + 1.5) { // 1.5s window
+                console.log(`AdminApp: Triggering question ${index} at ${sharedUtils.formatTime(question.timestamp)} (current: ${sharedUtils.formatTime(currentTime)})`);
+                if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
+                    mediaManager.state.ytPlayer.pauseVideo();
+                }
+                question.triggered = true; // Mark as triggered
+
+                safeDOMUpdate(questionTimestampDisplayEl, el => {
+                    el.textContent = sharedUtils.formatTime(question.timestamp);
+                    if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
+                });
+                if(questionTextEl) questionTextEl.value = question.questionText;
+                optionInputsEl.forEach((input, i) => { if(input) input.value = question.options[i] || ''; });
+                correctAnswerRadiosEl.forEach((radio, i) => { if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length); });
+                if(editingQuestionIndexEl) editingQuestionIndexEl.value = index;
+
+                safeDOMUpdate(questionModalEl, el => el.style.display = 'block');
+            }
+        });
+    };
+
+    adminApp.handleMediaOverlayUpdate = function(currentTime) {
+        // This is where Admin's specific overlay preview logic would go, if it depends on media time.
+        // This replaces the core logic of the old `updateOverlayPreview`.
+        if (!adminApp.state.previewingOverlays || !mediaManager.state.ytPlayer) return;
+
+        const currentSlide = getCurrentSlide();
+        if (!currentSlide || !currentSlide.slideMedia || !Array.isArray(currentSlide.slideMedia.videoOverlays)) return;
+
+        const overlays = currentSlide.slideMedia.videoOverlays;
+        const activeOverlaysContainer = document.getElementById('adminYouTubePlayerContainer');
+        if (!activeOverlaysContainer) return;
+
+        overlays.forEach(overlay => {
+            const overlayEl = activeOverlaysContainer.querySelector(`.video-overlay-preview[data-preview-overlay-id="${overlay.id}"]`);
+            if (!overlayEl) return;
+
+            const isVisible = currentTime >= overlay.startTime && currentTime < (overlay.startTime + overlay.duration);
+            overlayEl.style.display = isVisible ? 'block' : 'none';
+        });
+    };
+
+    adminApp.handleMediaEnded = function(mediaType) { // mediaType is {type: 'youtube'} or {type: 'audio'}
+        console.log(`AdminApp: ${mediaType.type} media ended.`);
+        // Admin-specific logic for when media finishes, if any.
+    };
+
+
     adminApp.attachVideoQuestionEventListeners = function() {
         if (videoTimelineSliderEl) {
             videoTimelineSliderEl.addEventListener('input', function() {
-                if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.seekTo === 'function') {
-                    adminApp.state.adminYouTubePlayer.seekTo(this.value, true);
+                // Use mediaManager.state.ytPlayer
+                if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.seekTo === 'function') {
+                    mediaManager.state.ytPlayer.seekTo(this.value, true);
                 }
             });
         }
 
         if (addQuestionBtnEl) {
             addQuestionBtnEl.addEventListener('click', function() {
-                if (isYouTubePlayerAvailable() && adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
-                    adminApp.state.adminYouTubePlayer.pauseVideo();
+                // Use mediaManager.state.ytPlayer and mediaManager.safeGetCurrentTime
+                if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
+                    mediaManager.state.ytPlayer.pauseVideo();
                 }
-                const currentTime = safeGetCurrentTime(adminApp.state.adminYouTubePlayer);
+                const currentTime = mediaManager.safeGetCurrentTime(); // Uses MediaManager's player
                 safeDOMUpdate(questionTimestampDisplayEl, el => {
-                    el.textContent = formatTime(currentTime);
+                    el.textContent = sharedUtils.formatTime(currentTime);
                     if(questionModalEl) questionModalEl.dataset.rawTimestamp = currentTime;
                 }, "Failed to set question timestamp display in addQuestionBtn click");
 
@@ -3233,19 +3234,19 @@ function generateClientUuid() {
             saveQuestionBtnEl.addEventListener('click', function() {
                 const currentSlide = getCurrentSlide();
                 if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube') {
-                    displayMessage("Not a YouTube slide or slide data missing.", false);
+                    baseApp.displayMessage("Not a YouTube slide or slide data missing.", false, 'messageArea');
                     return;
                 }
 
                 const questionText = questionTextEl ? questionTextEl.value.trim() : '';
                 if (!questionText) {
-                    displayMessage("Question text cannot be empty.", false);
+                    baseApp.displayMessage("Question text cannot be empty.", false, 'messageArea');
                     return;
                 }
 
                 const options = optionInputsEl.map(input => input ? input.value.trim() : '').filter(opt => opt !== '');
                 if (options.length < 2) { 
-                    displayMessage("Please provide at least two options.", false);
+                    baseApp.displayMessage("Please provide at least two options.", false, 'messageArea');
                     return;
                 }
 
@@ -3257,7 +3258,7 @@ function generateClientUuid() {
                     }
                 }
                 if (correctOptionIndex === -1 || correctOptionIndex >= options.length) { 
-                    displayMessage("Please select a correct answer from the provided options.", false);
+                    baseApp.displayMessage("Please select a correct answer from the provided options.", false, 'messageArea');
                     return;
                 }
                 
@@ -3286,7 +3287,7 @@ function generateClientUuid() {
 
                 console.log("videoQuestions array after save:", currentSlide.slideMedia.videoQuestions); 
 
-                displayMessage("Question saved!", true);
+                baseApp.displayMessage("Question saved!", true, 'messageArea');
                 safeDOMUpdate(questionModalEl, el => el.style.display = 'none', "Failed to hide question modal after save in saveQuestionBtn click");
                 renderVideoQuestionsList(); 
             });
@@ -3298,23 +3299,7 @@ function generateClientUuid() {
             });
         }
 
-        // --- Timestamp Overlay Modal Button Listeners ---
-        // Removed event listeners for manageTimestampOverlaysButtonEl and addTimestampOverlayButtonEl as per plan
-        
-        // The close button for timestampOverlayModal already has an inline onclick in AdminView.html
-        // If you prefer to manage it here:
-        // if (closeTimestampOverlayModalBtnEl && !closeTimestampOverlayModalBtnEl.hasAttribute('listener-attached')) {
-        //    closeTimestampOverlayModalBtnEl.onclick = null; // Remove inline listener if any
-        //    closeTimestampOverlayModalBtnEl.addEventListener('click', () => {
-        //        if (timestampOverlayModalEl) timestampOverlayModalEl.style.display = 'none';
-        //        if (adminApp.state.activePopoverId === 'timestampOverlayModal') {
-        //            adminApp.state.activePopoverId = null; // Clear active state
-        //        }
-        //    });
-        //    closeTimestampOverlayModalBtnEl.setAttribute('listener-attached', 'true');
-        // }
-
-    // --- NEW Video Overlay Event Listeners ---
+    // --- NEW Video Overlay Event Listeners (These seem fine as they are UI interaction, not core player logic) ---
     const addTimelineOverlayBtn = document.getElementById('addTimelineOverlayBtn');
     if (addTimelineOverlayBtn) {
         addTimelineOverlayBtn.addEventListener('click', initiateOverlayPlacement);
@@ -3345,7 +3330,7 @@ function generateClientUuid() {
         previewOverlaysBtn.addEventListener('click', toggleOverlayPreview);
     }
     
-    console.log("Video overlay event listeners attached.");
+    console.log("Video question and overlay UI event listeners attached.");
     };
 
     function updateVideoToolsVisibility(show) {
@@ -3395,7 +3380,7 @@ function generateClientUuid() {
                 li.style.alignItems = "center"; 
 
                 const questionTextSpan = document.createElement('span'); 
-                questionTextSpan.textContent = `[${formatTime(question.timestamp)}] ${question.questionText.substring(0, 40)}${question.questionText.length > 40 ? '...' : ''}`;
+                questionTextSpan.textContent = `[${sharedUtils.formatTime(question.timestamp)}] ${question.questionText.substring(0, 40)}${question.questionText.length > 40 ? '...' : ''}`;
                 questionTextSpan.style.flexGrow = "1"; 
                 
                 const actionsDiv = document.createElement('div');
@@ -3410,11 +3395,12 @@ function generateClientUuid() {
                 editBtn.onclick = function() {
                     console.log("Editing question index:", index, questions[index]); 
 
-                    if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.pauseVideo === 'function') {
-                        adminApp.state.adminYouTubePlayer.pauseVideo();
+                    // Use mediaManager.state.ytPlayer
+                    if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.pauseVideo === 'function') {
+                        mediaManager.state.ytPlayer.pauseVideo();
                     }
                     
-                    safeDOMUpdate(questionTimestampDisplayEl, tsEl => tsEl.textContent = formatTime(question.timestamp), "Failed to set question timestamp display on edit in renderVideoQuestionsList");
+                    safeDOMUpdate(questionTimestampDisplayEl, tsEl => tsEl.textContent = sharedUtils.formatTime(question.timestamp), "Failed to set question timestamp display on edit in renderVideoQuestionsList");
                     if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
                     if(questionTextEl) questionTextEl.value = question.questionText;
 
@@ -3441,7 +3427,7 @@ function generateClientUuid() {
 
                         currentSlide.slideMedia.videoQuestions.splice(index, 1);
                         renderVideoQuestionsList(); 
-                        displayMessage("Question deleted.", true);
+                        baseApp.displayMessage("Question deleted.", true, 'messageArea');
                     }
                 };
                 
@@ -3456,179 +3442,11 @@ function generateClientUuid() {
         }, "Failed to render video questions list");
     }
 
-    function formatTime(totalSeconds) {
-        totalSeconds = Math.floor(totalSeconds);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-    }
+// function setupAdminYouTubePlayer(videoId) { ... } // Removed;
+// function checkVideoQuestions() { ... } // Removed;
+// function updateVideoTimeline() { ... } // Removed;
+// function stopAndDestroyAdminYouTubePlayer() { ... } // Removed
 
-function setupAdminYouTubePlayer(videoId) {
-    console.log('Setting up Admin YouTube player for video ID:', videoId);
-    if (!adminYouTubePlayerContainerEl) {
-        console.error('Admin YouTube player container not found.');
-        displayMessage('Player container missing. Cannot load video.', false);
-        return;
-    }
-    if (!validateYouTubeEnvironment()) {
-        console.warn('YouTube environment not ready, deferring player setup for videoId:', videoId);
-        adminApp.state.deferredYouTubeSetup = { videoId, retryCount: (adminApp.state.deferredYouTubeSetup?.retryCount || 0) +1 };
-        // Try to re-init API if it was supposed to be ready
-        if (!adminApp.state.isYouTubeApiReady && typeof onYouTubeIframeAPIReady !== 'function') {
-             console.error("onYouTubeIframeAPIReady is not defined. Cannot retry API init.");
-        } else if (!adminApp.state.isYouTubeApiReady) {
-            onYouTubeIframeAPIReady(); // Attempt to re-initialize
-        }
-        return;
-    }
-
-    // Clear existing player and intervals if any
-    if (adminApp.state.adminYouTubePlayer) {
-        stopAndDestroyAdminYouTubePlayer(); 
-    }
-    // Also ensure intervals are cleared here, as stopAndDestroy might not be called if player object doesn't exist yet
-    adminApp.clearInterval('playerUpdate');
-    adminApp.clearInterval('playerQuestionCheckInterval');
-
-
-    adminApp.state.adminYouTubePlayer = new YT.Player('adminYouTubePlayerContainer', {
-        height: '390',
-        width: '640',
-        videoId: videoId,
-        playerVars: {
-            'playsinline': 1,
-            'controls': 1, 
-            'showinfo': 0,
-            'rel': 0 
-        },
-        events: {
-            'onReady': function(event) {
-                console.log("Admin Player Ready. Video ID:", videoId);
-                adminApp.state.adminYouTubePlayer.playVideo(); // Autoplay
-            },
-            'onStateChange': function(event) {
-                // If an interval is already running, clear it
-                adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
-
-                if (event.data === YT.PlayerState.PLAYING) {
-                    console.log("Admin Player PLAYING: Setting up question check interval.");
-                    adminApp.intervals.playerQuestionCheckInterval = setInterval(checkVideoQuestions, 500); 
-                    adminApp.intervals.playerUpdate = setInterval(updateVideoTimeline, 1000);
-                } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
-                    console.log("Admin Player PAUSED or ENDED: Clearing question check and player update intervals.");
-                    adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
-                    adminApp.clearInterval('playerUpdate');
-                }
-            },
-            'onError': function(event) {
-                console.error("Admin YouTube Player Error:", event.data);
-                displayMessage("Error with YouTube player: " + event.data, false);
-                updateVideoToolsVisibility(false); // Hide tools on error
-                // Clear intervals on error too
-                adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
-                adminApp.clearInterval('playerUpdate');
-            }
-        }
-    });
-    updateVideoToolsVisibility(true);
-    renderVideoQuestionsList();
-    renderOverlayTimeline(); // Render overlay timeline when player is ready
-}
-
-function checkVideoQuestions() {
-    if (!adminApp.state.adminYouTubePlayer || typeof adminApp.state.adminYouTubePlayer.getCurrentTime !== 'function' || typeof adminApp.state.adminYouTubePlayer.getPlayerState !== 'function') {
-        return;
-    }
-    if (adminApp.state.adminYouTubePlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
-        return; 
-    }
-
-    const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
-    const currentSlide = getCurrentSlide();
-
-    if (!currentSlide || !currentSlide.slideMedia || !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
-        return;
-    }
-
-    currentSlide.slideMedia.videoQuestions.forEach((question, index) => {
-        if (!question.triggered && currentTime >= question.timestamp && currentTime < question.timestamp + 1) { // Check within a 1s window
-            console.log(`Triggering question ${index} at ${question.timestamp} (current: ${currentTime})`);
-            adminApp.state.adminYouTubePlayer.pauseVideo();
-            
-            // Mark as triggered to avoid re-triggering if the user scrubs back and forth
-            question.triggered = true; 
-
-            safeDOMUpdate(questionTimestampDisplayEl, el => {
-                el.textContent = formatTime(question.timestamp);
-                if(questionModalEl) questionModalEl.dataset.rawTimestamp = question.timestamp;
-            }, "Failed to set question timestamp display in checkVideoQuestions");
-            
-            if(questionTextEl) questionTextEl.value = question.questionText;
-            optionInputsEl.forEach((input, i) => {
-                if(input) input.value = question.options[i] || '';
-            });
-            correctAnswerRadiosEl.forEach((radio, i) => {
-                if(radio) radio.checked = (i === question.correctOptionIndex && i < question.options.length);
-            });
-            if(editingQuestionIndexEl) editingQuestionIndexEl.value = index; // Store index for potential re-saving
-
-            safeDOMUpdate(questionModalEl, el => el.style.display = 'block', "Failed to show question modal in checkVideoQuestions");
-
-            // Optional: Clear interval while question is shown, resume on close/save
-            // adminApp.clearInterval('playerQuestionCheckInterval'); // Use helper
-        }
-    });
-}
-
-function updateVideoTimeline() {
-    if (adminApp.state.adminYouTubePlayer && typeof adminApp.state.adminYouTubePlayer.getCurrentTime === 'function' && typeof adminApp.state.adminYouTubePlayer.getDuration === 'function') {
-        const currentTime = adminApp.state.adminYouTubePlayer.getCurrentTime();
-        const duration = adminApp.state.adminYouTubePlayer.getDuration();
-        if (videoTimelineSliderEl) {
-            videoTimelineSliderEl.max = duration;
-            videoTimelineSliderEl.value = currentTime;
-        }
-        safeDOMUpdate(videoCurrentTimeDisplayEl, el => el.textContent = formatTime(currentTime), "Failed to update current time display in updateVideoTimeline");
-        safeDOMUpdate(videoTotalDurationDisplayEl, el => el.textContent = formatTime(duration), "Failed to update total duration display in updateVideoTimeline");
-    } else {
-        // adminApp.clearInterval('playerUpdate'); // Clear if player is no longer valid
-    }
-}
-
-function stopAndDestroyAdminYouTubePlayer() {
-    try {
-        // Clear any running intervals
-        adminApp.clearInterval('playerUpdate');
-        adminApp.clearInterval('overlayPreview'); // Also clear overlay preview if player is destroyed
-        // Clear playerQuestionCheckInterval specifically if it's managed here
-        if (adminApp.intervals.playerQuestionCheckInterval) {
-            clearInterval(adminApp.intervals.playerQuestionCheckInterval);
-            adminApp.intervals.playerQuestionCheckInterval = null;
-            console.log('Cleared playerQuestionCheckInterval during YouTube player destruction.');
-        }
-        
-        // Stop and destroy player
-        if (adminApp.state.adminYouTubePlayer) {
-            if (typeof adminApp.state.adminYouTubePlayer.stopVideo === 'function') {
-                adminApp.state.adminYouTubePlayer.stopVideo();
-            }
-            if (typeof adminApp.state.adminYouTubePlayer.destroy === 'function') {
-                adminApp.state.adminYouTubePlayer.destroy();
-            }
-        }
-    } catch (e) {
-        console.error("Error destroying admin YouTube player:", e);
-    } finally {
-        adminApp.state.adminYouTubePlayer = null;
-        
-        // Clean up container
-        safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
-            el.innerHTML = '';
-            el.style.display = 'none';
-        }, "Failed to clean up YouTube player container on destroy in stopAndDestroyAdminYouTubePlayer");
-        
-        // Hide timeline controls
-        updateVideoToolsVisibility(false);
-    }
-}
+// --- All old commented out YouTube functions are now fully removed ---
 </script>
+[end of Client/Admin/Admin_JS.html]

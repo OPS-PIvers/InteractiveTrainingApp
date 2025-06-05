@@ -1,0 +1,105 @@
+<script>
+  window.baseApp = {};
+
+  window.baseApp.showLoading = function(show, spinnerId) {
+    const spinnerElement = document.getElementById(spinnerId);
+    if (window.sharedUtils && typeof window.sharedUtils.safeDOMUpdate === 'function') {
+      window.sharedUtils.safeDOMUpdate(spinnerElement,
+        el => el.style.display = show ? 'flex' : 'none',
+        `Failed to update loading spinner display for ID: ${spinnerId}`
+      );
+    } else {
+      console.error("sharedUtils.safeDOMUpdate is not available. Cannot update spinner display.");
+      if (spinnerElement) {
+          spinnerElement.style.display = show ? 'flex' : 'none';
+      }
+    }
+  };
+
+  window.baseApp.displayMessage = function(message, isSuccess, messageAreaId) {
+    const messageAreaElement = document.getElementById(messageAreaId);
+    if (window.sharedUtils && typeof window.sharedUtils.showNotification === 'function' && typeof window.sharedUtils.safeDOMUpdate === 'function') {
+      sharedUtils.showNotification(message, isSuccess ? 'success' : 'error');
+
+      sharedUtils.safeDOMUpdate(messageAreaElement, el => {
+          el.innerHTML = '';
+          const p = document.createElement('p');
+          p.textContent = message;
+          el.appendChild(p);
+          el.className = isSuccess ? 'success' : 'error';
+          setTimeout(() => {
+              sharedUtils.safeDOMUpdate(el, innerEl => {
+                  innerEl.innerHTML = '';
+                  innerEl.className = '';
+              }, `Failed to clear message area after timeout for ID: ${messageAreaId}`);
+          }, sharedUtils.MESSAGE_TIMEOUT);
+      }, `Failed to display message in messageAreaEl for ID: ${messageAreaId}`);
+
+      if (!messageAreaElement) {
+          console.warn(`displayMessage: messageAreaEl with ID '${messageAreaId}' not found. Message:`, message);
+      }
+    } else {
+      console.error("sharedUtils.showNotification or sharedUtils.safeDOMUpdate is not available. Cannot display message.");
+      // Basic fallback if sharedUtils are not available
+      if (messageAreaElement) {
+        messageAreaElement.innerHTML = `<p class="${isSuccess ? 'success' : 'error'}">${message}</p>`;
+        setTimeout(() => {
+          messageAreaElement.innerHTML = '';
+          messageAreaElement.className = '';
+        }, 7000); // Fallback timeout
+      } else {
+        console.warn(`displayMessage: messageAreaEl with ID '${messageAreaId}' not found. Message:`, message);
+      }
+    }
+  };
+
+  window.baseApp.onServerError = function(error, messageAreaId) {
+    console.error("Server error:", error);
+    const userMessage = "An unexpected error occurred. Please try again later. If the issue persists, please contact support.";
+    // Assuming displayMessage is already defined in baseApp
+    if (typeof window.baseApp.displayMessage === 'function') {
+      window.baseApp.displayMessage(userMessage, false, messageAreaId);
+    } else {
+      console.error("baseApp.displayMessage is not available. Cannot display server error message.");
+      // Fallback for critical failure
+      const messageAreaElement = document.getElementById(messageAreaId);
+      if (messageAreaElement) {
+        messageAreaElement.innerHTML = `<p class="error">${userMessage}</p>`;
+      }
+    }
+  };
+
+  window.baseApp.showLoadingTextMessage = function(text, elementId) {
+    const messageElement = document.getElementById(elementId);
+    if (window.sharedUtils && typeof window.sharedUtils.safeDOMUpdate === 'function') {
+      window.sharedUtils.safeDOMUpdate(messageElement, el => {
+        el.textContent = text;
+        el.style.display = 'block';
+        el.classList.add('loading-message-style'); // Optional: for specific styling
+      }, `Failed to show loading text message for ID: ${elementId}`);
+    } else {
+      console.error("sharedUtils.safeDOMUpdate is not available. Cannot show loading text message.");
+      if (messageElement) {
+        messageElement.textContent = text;
+        messageElement.style.display = 'block';
+      }
+    }
+  };
+
+  window.baseApp.hideLoadingTextMessage = function(elementId) {
+    const messageElement = document.getElementById(elementId);
+    if (window.sharedUtils && typeof window.sharedUtils.safeDOMUpdate === 'function') {
+      window.sharedUtils.safeDOMUpdate(messageElement, el => {
+        el.textContent = '';
+        el.style.display = 'none';
+        el.classList.remove('loading-message-style'); // Optional: remove specific styling
+      }, `Failed to hide loading text message for ID: ${elementId}`);
+    } else {
+      console.error("sharedUtils.safeDOMUpdate is not available. Cannot hide loading text message.");
+      if (messageElement) {
+        messageElement.textContent = '';
+        messageElement.style.display = 'none';
+      }
+    }
+  };
+</script>

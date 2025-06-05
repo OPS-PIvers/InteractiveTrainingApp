@@ -1,418 +1,533 @@
 <script>
-  window.mediaManager = {};
+  var YT = YT || {}; // Declare YT namespace
+  window.mediaManager = {
+    state: {
+      isYouTubeApiReady: false,
+      ytPlayer: null, // Instance of the YouTube player
+      audioPlayer: null, // Instance of the HTML5 audio player
+      currentVideoId: null,
+      currentAudioSrc: null,
+      currentVideoDuration: 0,
+      currentAudioDuration: 0,
+      playerStateInterval: null, // Timer for periodic checks (using baseApp.timerManager)
+      resourceNameForPlayerStateInterval: 'mediaManager-playerStateInterval', // For baseApp.resourceManager
 
-  mediaManager.state = {
-    ytPlayer: null,
-    audioPlayer: null, // Added for audio
-    isYouTubeApiReady: false,
-    deferredMediaSetup: null, // Generalized for YT or other deferred setups
-    currentVideoDuration: 0, // For YouTube
-    currentAudioDuration: 0, // For Audio
-    playerCheckInterval: null, // For YouTube time/event checking
-    audioCheckInterval: null,  // For Audio time/event checking
+      // Callbacks to be implemented by Admin or Viewer apps
+      callbacks: {
+        onReady: null, // (mediaTypeInfo: {type: 'youtube' | 'audio'}) => void
+        onStateChange: null, // (eventData: {type: 'youtube', data: YT.PlayerState} | {type: 'audio', data: string}) => void
+        onError: null, // (errorData: {type: 'youtube', data: YT.OnErrorEvent} | {type: 'audio', error: Event}) => void
+        onTimeUpdate: null, // (currentTime: number, duration: number, mediaType: 'youtube' | 'audio') => void
+        onQuestionTrigger: null, // (currentTime: number) => void (Primarily for YouTube)
+        onOverlayUpdateNeeded: null, // (currentTime: number, mediaType: 'youtube' | 'audio') => void
+        onEnded: null // (mediaTypeInfo: {type: 'youtube' | 'audio'}) => void
+      },
+      currentMediaType: null, // 'youtube' or 'audio'
 
-    // Callbacks to be set by the consuming application (Admin or Viewer)
-    // These will be structured within an object, e.g., mediaManager.callbacks.onReady
-    callbacks: {
-        onReady: null, // Called when player/audio is ready
-        onStateChange: null, // YT specific state change
-        onError: null, // Generic error for YT or Audio
-        onQuestionTrigger: null, // Called when a question timestamp is hit
-        onOverlayUpdateNeeded: null, // Called when media time updates, for apps to refresh their overlays
-        onEnded: null // Called when media ends (YT or Audio)
-    }
-  };
+      // Internal state for YouTube
+      deferredYouTubeSetups: [], // To queue player setups if API isn't ready
 
-  mediaManager.onYouTubeIframeAPIReady = function() {
-    console.log("MediaManager: YouTube API IFrame Ready.");
-    mediaManager.state.isYouTubeApiReady = true;
+      // Internal state for Audio
+      isAudioMetadataLoaded: false,
+    },
 
-    const deferred = mediaManager.state.deferredMediaSetup;
-    if (deferred && deferred.type === 'youtube' && typeof mediaManager.setupPlayer === 'function') {
-      console.log("MediaManager: Processing deferred YouTube player setup for videoId:", deferred.videoId);
-      mediaManager.setupPlayer(
-        deferred.videoId,
-        deferred.playerContainerId,
-        deferred.playerVars,
-        deferred.eventHandlers,
-        true // Indicate this is a deferred call, skip deferring again
-      );
-      mediaManager.state.deferredMediaSetup = null;
-    } else if (deferred && deferred.type === 'youtube') {
-        console.warn("MediaManager: YouTube API ready, deferred setup present, but mediaManager.setupPlayer is not yet defined.");
-    }
-  };
-
-  // Make onYouTubeIframeAPIReady globally accessible for the YouTube API script
-  // This should be one of the last things in this script, or managed carefully if scripts are loaded async.
-  // For now, placing it here is fine as other functions are defined below it.
-  window.onYouTubeIframeAPIReady = mediaManager.onYouTubeIframeAPIReady;
-
-  mediaManager.isYouTubePlayerAvailable = function() {
-    // Check both API readiness flag and actual YT object availability
-    if (!mediaManager.state.isYouTubeApiReady) {
-        // console.log("isYouTubePlayerAvailable: API not ready yet.");
-        return false;
-    }
-    if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
-        // console.log("isYouTubePlayerAvailable: YT object or YT.Player is undefined.");
-        return false;
-    }
-    return true;
-  };
-
-  mediaManager.setupPlayer = function(videoId, playerContainerId, playerVars, eventHandlers, isDeferredCall = false) {
-    if (!mediaManager.isYouTubePlayerAvailable()) {
-      if (!isDeferredCall) {
-        console.log(`MediaManager: YouTube Player API not available. Deferring setup for videoId: ${videoId}`);
-        mediaManager.state.deferredMediaSetup = {
-          type: 'youtube',
-          videoId: videoId,
-          playerContainerId: playerContainerId,
-          playerVars: playerVars,
-          eventHandlers: eventHandlers
-        };
-        // Ensure the global API ready function is set, in case this is the first call.
-        if (typeof window.onYouTubeIframeAPIReady !== 'function') {
-            window.onYouTubeIframeAPIReady = mediaManager.onYouTubeIframeAPIReady;
-        }
+    // --- YouTube API and Player Management ---
+    loadYouTubeAPI: function() {
+      if (document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        return;
+      }
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
       } else {
-        console.error("MediaManager: Deferred YouTube setup called, but API still not available. This shouldn't happen.");
+        document.head.appendChild(tag);
       }
-      return;
-    }
+    },
 
-    console.log(`MediaManager: Setting up player for videoId: ${videoId} in container: ${playerContainerId}`);
-
-    // Ensure any existing player is stopped and destroyed first
-    if (mediaManager.state.ytPlayer) {
-      mediaManager.stopAndDestroyPlayer();
-    }
-
-    // Clear any pending deferred setup since we are proceeding now
-    mediaManager.state.deferredMediaSetup = null;
-
-    try {
-      mediaManager.state.ytPlayer = new YT.Player(playerContainerId, {
-        height: playerVars.height || '100%', // Default if not provided
-        width: playerVars.width || '100%',   // Default if not provided
-        videoId: videoId,
-        playerVars: playerVars,
-        events: eventHandlers
+    onYouTubeIframeAPIReady: function() {
+      console.log("MediaManager: YouTube Iframe API is ready.");
+      mediaManager.state.isYouTubeApiReady = true;
+      mediaManager.state.deferredYouTubeSetups.forEach(s => {
+        mediaManager.setupPlayer(s.videoId, s.targetContainerId, s.playerVarsFromApp);
       });
-      console.log("MediaManager: YT.Player instance created for", videoId);
-    } catch (e) {
-      console.error("MediaManager: Error creating YT.Player instance:", e);
-      if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onError === 'function') {
-        mediaManager.state.callbacks.onError({ type: 'youtube', error: e });
-      } else if (typeof baseApp !== 'undefined' && baseApp.displayMessage) {
-        baseApp.displayMessage(`Error initializing YouTube player: ${e.message}`, false, 'messageArea'); // Fallback message area
-      }
-    }
-  };
+      mediaManager.state.deferredYouTubeSetups = [];
+    },
 
-  mediaManager.stopAndDestroyPlayer = function() {
-    try {
-      if (mediaManager.state.playerCheckInterval) {
-        clearInterval(mediaManager.state.playerCheckInterval);
-        mediaManager.state.playerCheckInterval = null;
+    setupPlayer: function(videoId, targetContainerId, playerVarsFromApp) {
+      if (!mediaManager.state.isYouTubeApiReady) {
+        mediaManager.state.deferredYouTubeSetups.push({ videoId, targetContainerId, playerVarsFromApp });
+        console.log("MediaManager: YouTube API not ready, deferring player setup for videoId:", videoId);
+        return;
       }
 
-      const player = mediaManager.state.ytPlayer;
-      if (player) {
-        if (typeof player.stopVideo === 'function') {
-          player.stopVideo();
+      if (mediaManager.state.ytPlayer) {
+        mediaManager.stopAndDestroyPlayer();
+      }
+
+      const defaultPlayerVars = {
+        enablejsapi: 1,
+        playsinline: 1,
+        origin: window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : '')
+      };
+
+      const finalPlayerVars = { ...defaultPlayerVars, ...playerVarsFromApp };
+
+      mediaManager.state.ytPlayer = new YT.Player(targetContainerId, {
+        videoId: videoId,
+        playerVars: finalPlayerVars,
+        events: {
+          'onReady': mediaManager.internalOnPlayerReady,
+          'onStateChange': mediaManager.internalOnPlayerStateChange,
+          'onError': mediaManager.internalOnPlayerError
         }
-        if (typeof player.destroy === 'function') {
-          // The destroy method also removes the iframe.
-          // We need to know the container ID to potentially clear it if YT.Player didn't.
-          // However, YT.Player is supposed to handle its own iframe removal.
-          player.destroy();
-          console.log("MediaManager: YouTube player destroyed.");
-        } else {
-           // If no destroy, attempt to clear the container manually if possible
-           // This requires knowing the container ID, which isn't stored directly with the player instance by YT API.
-           // This part might need improvement if destroy() is not always available/effective.
-           console.warn("MediaManager: player.destroy is not a function. Manual cleanup of container might be needed.");
+      });
+      mediaManager.state.currentVideoId = videoId;
+      mediaManager.state.currentMediaType = 'youtube';
+      console.log("MediaManager: YouTube player setup initiated for videoId:", videoId);
+    },
+
+    internalOnPlayerReady: function(event) {
+      mediaManager.state.currentVideoDuration = mediaManager.state.ytPlayer.getDuration();
+      // Do not start interval here, let app decide when to play
+      if (typeof mediaManager.state.callbacks.onReady === 'function') {
+        mediaManager.state.callbacks.onReady({ type: 'youtube' });
+      }
+      console.log("MediaManager: YouTube player ready for videoId:", mediaManager.state.currentVideoId);
+    },
+
+    internalOnPlayerStateChange: function(event) {
+      if (typeof mediaManager.state.callbacks.onStateChange === 'function') {
+        mediaManager.state.callbacks.onStateChange({ type: 'youtube', data: event.data });
+      }
+      if (event.data === YT.PlayerState.PLAYING || event.data === YT.PlayerState.BUFFERING) {
+        mediaManager.startPlayerStateInterval();
+      } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED || event.data === YT.PlayerState.CUED) {
+        mediaManager.stopPlayerStateInterval();
+        if (event.data === YT.PlayerState.ENDED && typeof mediaManager.state.callbacks.onEnded === 'function') {
+          mediaManager.state.callbacks.onEnded({ type: 'youtube' });
         }
       }
-    } catch (e) {
-      console.error("MediaManager: Error stopping/destroying YouTube player:", e);
-    } finally {
-      mediaManager.state.ytPlayer = null;
-      mediaManager.state.currentVideoDuration = 0;
-      // Note: The container's innerHTML clearing should ideally be handled by the destroy method.
-      // If not, the application (Admin/Viewer) might need to clear its specific player container if issues arise.
-    }
-  };
+    },
 
-  mediaManager.safeGetCurrentTime = function() {
-    if (mediaManager.state.ytPlayer && typeof mediaManager.state.ytPlayer.getCurrentTime === 'function') {
-      try {
+    internalOnPlayerError: function(event) {
+      if (typeof mediaManager.state.callbacks.onError === 'function') {
+        mediaManager.state.callbacks.onError({ type: 'youtube', data: event.data });
+      }
+      mediaManager.stopPlayerStateInterval();
+      console.error("MediaManager: YouTube player error:", event.data, "for videoId:", mediaManager.state.currentVideoId);
+    },
+
+    // --- YouTube Player Control Functions ---
+    playVideo: function() {
+      if (mediaManager.isYouTubePlayerAvailable()) {
+        mediaManager.state.ytPlayer.playVideo();
+      }
+    },
+    pauseVideo: function() {
+      if (mediaManager.isYouTubePlayerAvailable()) {
+        mediaManager.state.ytPlayer.pauseVideo();
+      }
+    },
+    seekTo: function(seconds) {
+      if (mediaManager.isYouTubePlayerAvailable()) {
+        mediaManager.state.ytPlayer.seekTo(seconds, true);
+      }
+    },
+    getPlayerState: function() {
+      if (mediaManager.isYouTubePlayerAvailable()) {
+        return mediaManager.state.ytPlayer.getPlayerState();
+      }
+      return -1; // YT.PlayerState.UNSTARTED or an equivalent general "unavailable" state
+    },
+    safeGetCurrentTime: function() {
+      if (mediaManager.isYouTubePlayerAvailable() && typeof mediaManager.state.ytPlayer.getCurrentTime === 'function') {
         return mediaManager.state.ytPlayer.getCurrentTime();
-      } catch (e) {
-        console.warn("MediaManager: Could not get current time from YouTube player:", e);
-        return 0;
       }
-    }
-    return 0;
-  };
-
-  mediaManager.checkMediaTime = function() {
-    const player = mediaManager.state.ytPlayer; // Assuming ytPlayer for now, can extend for audio
-    if (!player || typeof player.getPlayerState !== 'function') return;
-
-    const currentTime = mediaManager.safeGetCurrentTime();
-
-    // Callbacks for app-specific logic
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onTimeUpdate === 'function') {
-        mediaManager.state.callbacks.onTimeUpdate(currentTime, mediaManager.state.currentVideoDuration);
-    }
-
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onQuestionTrigger === 'function') {
-      // App is responsible for checking its questions against currentTime
-      mediaManager.state.callbacks.onQuestionTrigger(currentTime);
-    }
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onOverlayUpdateNeeded === 'function') {
-      // App is responsible for updating its overlays based on currentTime
-      mediaManager.state.callbacks.onOverlayUpdateNeeded(currentTime);
-    }
-  };
-
-  mediaManager.onPlayerReady = function(event) {
-    console.log("MediaManager: Player Ready. Video ID:", event.target.getVideoData().video_id);
-    try {
-        mediaManager.state.currentVideoDuration = event.target.getDuration();
-        if (isNaN(mediaManager.state.currentVideoDuration) || mediaManager.state.currentVideoDuration <= 0) {
-            console.warn("MediaManager: Invalid video duration received:", mediaManager.state.currentVideoDuration);
-        }
-    } catch (e) {
-        console.error("MediaManager: Error getting duration in onPlayerReady", e);
-    }
-
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onReady === 'function') {
-      mediaManager.state.callbacks.onReady(event); // Pass the whole event
-    }
-    // It's up to the app's onReady callback to start playback if desired.
-  };
-
-  mediaManager.onPlayerStateChange = function(event) {
-    console.log("MediaManager: Player State Change:", event.data);
-    if (mediaManager.state.playerCheckInterval) {
-      clearInterval(mediaManager.state.playerCheckInterval);
-      mediaManager.state.playerCheckInterval = null;
-    }
-
-    if (event.data === YT.PlayerState.PLAYING) {
-      mediaManager.state.playerCheckInterval = setInterval(mediaManager.checkMediaTime, 250); // Check 4 times a second
-    } else if (event.data === YT.PlayerState.ENDED) {
-        if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onEnded === 'function') {
-            mediaManager.state.callbacks.onEnded({type: 'youtube'});
-        }
-    }
-    // Allow app to handle specific state changes (like PAUSED, BUFFERING)
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onStateChange === 'function') {
-      mediaManager.state.callbacks.onStateChange(event);
-    }
-  };
-
-  mediaManager.onPlayerError = function(event) {
-    console.error("MediaManager: YouTube Player Error:", event.data);
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onError === 'function') {
-      mediaManager.state.callbacks.onError({ type: 'youtube', errorData: event.data });
-    } else if (typeof baseApp !== 'undefined' && baseApp.displayMessage) { // Fallback
-      baseApp.displayMessage(`YouTube Player Error: Code ${event.data}`, false, 'messageArea');
-    }
-    // Stop any attempts to check time if an error occurs
-    if (mediaManager.state.playerCheckInterval) {
-      clearInterval(mediaManager.state.playerCheckInterval);
-      mediaManager.state.playerCheckInterval = null;
-    }
-  };
-
-  mediaManager.getTemplateColor = function(templateName) { // Moved from Viewer
-    switch (templateName) {
-        case 'hotspot': return '#ff5722';
-        case 'quizBubble': return '#673ab7';
-        default: return '#4CAF50'; // Default color for generic overlays or fallback
-    }
-  };
-
-  mediaManager.renderTimelineMarkers = function(trackElementId, questions = [], overlays = []) {
-    const trackEl = document.getElementById(trackElementId);
-    if (!trackEl) {
-      console.warn(`MediaManager: Timeline track element '${trackElementId}' not found for rendering markers.`);
-      return;
-    }
-
-    const duration = mediaManager.state.currentVideoDuration; // Assuming this is for YouTube for now
-    if (!duration || duration <= 0) {
-      console.warn("MediaManager: Invalid media duration for timeline markers.");
-      trackEl.innerHTML = ''; // Clear if no duration
-      return;
-    }
-
-    trackEl.innerHTML = ''; // Clear existing markers
-
-    questions.forEach(question => {
-      if (typeof question.timestamp !== 'number') return;
-      const marker = document.createElement('div');
-      marker.className = 'timeline-marker question-marker';
-      marker.style.position = 'absolute';
-      marker.style.width = '3px'; // Standardized style
-      marker.style.height = '100%';
-      marker.style.backgroundColor = 'orange';
-      marker.style.top = '0px';
-      marker.style.zIndex = '2';
-      const percentagePosition = Math.max(0, Math.min(100, (question.timestamp / duration) * 100));
-      marker.style.left = percentagePosition + '%';
-      marker.title = `Question: ${question.questionText ? question.questionText.substring(0,30) : 'Q'}... at ${sharedUtils.formatTime(question.timestamp)}`;
-      trackEl.appendChild(marker);
-    });
-
-    overlays.forEach(overlay => {
-      if (typeof overlay.startTime !== 'number') return;
-      const marker = document.createElement('div');
-      marker.className = 'timeline-marker overlay-marker'; // Generic and specific class
-      marker.style.position = 'absolute';
-      marker.style.width = '3px'; // Standardized style
-      marker.style.height = '100%';
-      marker.style.backgroundColor = mediaManager.getTemplateColor(overlay.template);
-      marker.style.top = '0px';
-      marker.style.zIndex = '2'; // Ensure visible
-      const percentagePosition = Math.max(0, Math.min(100, (overlay.startTime / duration) * 100));
-      marker.style.left = percentagePosition + '%';
-      marker.title = `Overlay: ${overlay.content && overlay.content.text ? overlay.content.text.substring(0,30) : (overlay.template || 'Overlay')}... at ${sharedUtils.formatTime(overlay.startTime)}`;
-      trackEl.appendChild(marker);
-    });
-  };
-
-  // --- Audio Player Logic ---
-  mediaManager.setupAudio = function(audioDataURI, audioElementId, eventHandlersFromApp) {
-    console.log("MediaManager: Setting up audio player for element:", audioElementId);
-    const audioPlayer = document.getElementById(audioElementId);
-
-    if (!audioPlayer) {
-      console.error(`MediaManager: Audio element with ID '${audioElementId}' not found.`);
-      if (typeof eventHandlersFromApp.onError === 'function') {
-        eventHandlersFromApp.onError({ type: 'audio', error: 'Audio element not found' });
+      return 0;
+    },
+    getDuration: function() {
+      if (mediaManager.isYouTubePlayerAvailable() && typeof mediaManager.state.ytPlayer.getDuration === 'function') {
+        return mediaManager.state.ytPlayer.getDuration();
       }
-      return;
-    }
+      return 0;
+    },
+    stopAndDestroyPlayer: function() {
+      mediaManager.stopPlayerStateInterval();
+      if (mediaManager.state.ytPlayer) {
+        if (typeof mediaManager.state.ytPlayer.destroy === 'function') {
+          // console.log("MediaManager: Destroying YouTube player for videoId:", mediaManager.state.currentVideoId);
+          mediaManager.state.ytPlayer.stopVideo(); // Stop video before destroying
+          mediaManager.state.ytPlayer.destroy();
+        }
+      }
+      mediaManager.state.ytPlayer = null;
+      mediaManager.state.currentVideoId = null;
+      mediaManager.state.currentVideoDuration = 0;
+      if(mediaManager.state.currentMediaType === 'youtube') mediaManager.state.currentMediaType = null;
+      // console.log("MediaManager: YouTube player stopped and destroyed.");
+    },
 
-    mediaManager.stopAndClearAudioPlayer(); // Clear any previous audio instance
+    // --- Audio Player Management ---
+    setupAudio: function(audioSrc, targetAudioElementId /* eventHandlersFromApp - ignored */) {
+      if (mediaManager.state.audioPlayer) {
+        mediaManager.stopAndClearAudioPlayer();
+      }
 
-    mediaManager.state.audioPlayer = audioPlayer;
+      const audioElement = document.getElementById(targetAudioElementId);
+      if (!audioElement) {
+        console.error("MediaManager: Audio element not found for ID:", targetAudioElementId);
+        return;
+      }
 
-    // Store or merge app-specific callbacks
-    // For simplicity, directly using eventHandlersFromApp for now, can be more structured via mediaManager.state.callbacks
-    mediaManager.currentAudioEventHandlers = {
-        onLoadedMetadata: eventHandlersFromApp.onLoadedMetadata || function() {},
-        onEnded: eventHandlersFromApp.onEnded || function() {},
-        onError: eventHandlersFromApp.onError || function(e) { console.error("Audio Error:", e); }
-    };
+      mediaManager.state.audioPlayer = audioElement;
+      mediaManager.state.currentAudioSrc = audioSrc;
+      mediaManager.state.isAudioMetadataLoaded = false;
 
-    audioPlayer.addEventListener('loadedmetadata', mediaManager.onAudioLoadedMetadata);
-    audioPlayer.addEventListener('ended', mediaManager.onAudioEnded);
-    audioPlayer.addEventListener('error', mediaManager.onAudioError);
-    // Consider 'timeupdate' for more frequent updates if needed, but interval is often better for control.
+      // Remove existing listeners before adding new ones to prevent duplicates
+      mediaManager.state.audioPlayer.removeEventListener('loadedmetadata', mediaManager.internalOnAudioLoadedMetadata);
+      mediaManager.state.audioPlayer.removeEventListener('timeupdate', mediaManager.internalOnAudioTimeUpdate);
+      mediaManager.state.audioPlayer.removeEventListener('ended', mediaManager.internalOnAudioEnded);
+      mediaManager.state.audioPlayer.removeEventListener('error', mediaManager.internalOnAudioError);
+      mediaManager.state.audioPlayer.removeEventListener('play', mediaManager.internalOnAudioPlay);
+      mediaManager.state.audioPlayer.removeEventListener('pause', mediaManager.internalOnAudioPause);
 
-    try {
-      audioPlayer.src = audioDataURI;
-      audioPlayer.load();
-      const playPromise = audioPlayer.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          console.log("MediaManager: Audio playback initiated.");
-        }).catch(error => {
-          console.error("MediaManager: Audio playback failed.", error);
-          mediaManager.currentAudioEventHandlers.onError({ type: 'audio', error: 'Playback failed: ' + error });
+      // Add event listeners
+      mediaManager.state.audioPlayer.addEventListener('loadedmetadata', mediaManager.internalOnAudioLoadedMetadata);
+      mediaManager.state.audioPlayer.addEventListener('timeupdate', mediaManager.internalOnAudioTimeUpdate);
+      mediaManager.state.audioPlayer.addEventListener('ended', mediaManager.internalOnAudioEnded);
+      mediaManager.state.audioPlayer.addEventListener('error', mediaManager.internalOnAudioError);
+      mediaManager.state.audioPlayer.addEventListener('play', mediaManager.internalOnAudioPlay);
+      mediaManager.state.audioPlayer.addEventListener('pause', mediaManager.internalOnAudioPause);
+
+      mediaManager.state.audioPlayer.src = audioSrc; // Set src after attaching listeners that might depend on it or initial state
+      mediaManager.state.audioPlayer.load(); // Call load to process the new source
+      mediaManager.state.currentMediaType = 'audio'; // Set current media type
+      console.log("MediaManager: Audio player setup for src:", audioSrc, "on element:", targetAudioElementId);
+    },
+
+    internalOnAudioLoadedMetadata: function(event) {
+      if (!mediaManager.state.audioPlayer) return;
+      mediaManager.state.currentAudioDuration = mediaManager.state.audioPlayer.duration;
+      mediaManager.state.isAudioMetadataLoaded = true;
+      if (typeof mediaManager.state.callbacks.onReady === 'function') {
+        mediaManager.state.callbacks.onReady({ type: 'audio' });
+      }
+      // Interval will be started on 'play'
+      console.log("MediaManager: Audio metadata loaded. Duration:", mediaManager.state.currentAudioDuration);
+    },
+
+    internalOnAudioTimeUpdate: function(event) {
+      if (mediaManager.state.audioPlayer && mediaManager.state.audioPlayer.duration && !isNaN(mediaManager.state.audioPlayer.duration)) {
+        mediaManager.state.currentAudioDuration = mediaManager.state.audioPlayer.duration;
+      }
+      // Main time update logic is in checkMediaTime
+    },
+
+    internalOnAudioEnded: function(event) {
+      if (typeof mediaManager.state.callbacks.onEnded === 'function') {
+        mediaManager.state.callbacks.onEnded({ type: 'audio' });
+      }
+      mediaManager.stopPlayerStateInterval();
+      console.log("MediaManager: Audio ended.");
+    },
+
+    internalOnAudioError: function(event) {
+      if (typeof mediaManager.state.callbacks.onError === 'function') {
+        mediaManager.state.callbacks.onError({ type: 'audio', error: event });
+      }
+      mediaManager.stopPlayerStateInterval();
+      console.error("MediaManager: Audio player error:", event);
+    },
+
+    internalOnAudioPlay: function(event) {
+      mediaManager.startPlayerStateInterval();
+      if (typeof mediaManager.state.callbacks.onStateChange === 'function') {
+        mediaManager.state.callbacks.onStateChange({ type: 'audio', data: 'playing' });
+      }
+      console.log("MediaManager: Audio playing.");
+    },
+
+    internalOnAudioPause: function(event) {
+      mediaManager.stopPlayerStateInterval();
+      if (typeof mediaManager.state.callbacks.onStateChange === 'function') {
+        mediaManager.state.callbacks.onStateChange({ type: 'audio', data: 'paused' });
+      }
+      console.log("MediaManager: Audio paused.");
+    },
+
+    // --- Audio Player Control Functions ---
+    playAudio: function() {
+      if (mediaManager.isAudioPlayerAvailable()) {
+        mediaManager.state.currentMediaType = 'audio'; // Ensure media type is set
+        mediaManager.state.audioPlayer.play().catch(error => {
+            console.error("MediaManager: Error trying to play audio:", error);
+            if (typeof mediaManager.state.callbacks.onError === 'function') {
+                mediaManager.state.callbacks.onError({ type: 'audio', error: error });
+            }
         });
       }
-      audioPlayer.style.display = 'block'; // Or as per app's styling needs
-    } catch (e) {
-      console.error("MediaManager: Error setting up audio player:", e);
-      mediaManager.currentAudioEventHandlers.onError({ type: 'audio', error: 'Setup error: ' + e.message });
-    }
-  };
-
-  mediaManager.stopAndClearAudioPlayer = function() {
-    if (mediaManager.state.audioCheckInterval) {
-      clearInterval(mediaManager.state.audioCheckInterval);
-      mediaManager.state.audioCheckInterval = null;
-    }
-
-    const audioPlayer = mediaManager.state.audioPlayer;
-    if (audioPlayer) {
-      try {
-        if (!audioPlayer.paused) {
-          audioPlayer.pause();
-        }
-        // Remove event listeners that were added by mediaManager
-        audioPlayer.removeEventListener('loadedmetadata', mediaManager.onAudioLoadedMetadata);
-        audioPlayer.removeEventListener('ended', mediaManager.onAudioEnded);
-        audioPlayer.removeEventListener('error', mediaManager.onAudioError);
-
-        audioPlayer.removeAttribute('src');
-        audioPlayer.load(); // Resets the audio element
-        // App should handle hiding the element if needed: audioPlayer.style.display = 'none';
-        console.log("MediaManager: Audio player stopped and cleared.");
-      } catch (e) {
-        console.error("MediaManager: Error stopping/clearing audio player:", e);
+    },
+    pauseAudio: function() {
+      if (mediaManager.isAudioPlayerAvailable()) {
+        mediaManager.state.audioPlayer.pause();
       }
+    },
+    seekAudioTo: function(seconds) {
+      if (mediaManager.isAudioPlayerAvailable()) {
+        mediaManager.state.audioPlayer.currentTime = seconds;
+      }
+    },
+    getAudioCurrentTime: function() {
+      if (mediaManager.isAudioPlayerAvailable()) {
+        return mediaManager.state.audioPlayer.currentTime;
+      }
+      return 0;
+    },
+    getAudioDuration: function() {
+      if (mediaManager.isAudioPlayerAvailable() && mediaManager.state.isAudioMetadataLoaded) {
+        return mediaManager.state.audioPlayer.duration;
+      }
+      return 0;
+    },
+    stopAndClearAudioPlayer: function() {
+      mediaManager.stopPlayerStateInterval();
+      if (mediaManager.state.audioPlayer) {
+        mediaManager.state.audioPlayer.pause();
+        mediaManager.state.audioPlayer.removeEventListener('loadedmetadata', mediaManager.internalOnAudioLoadedMetadata);
+        mediaManager.state.audioPlayer.removeEventListener('timeupdate', mediaManager.internalOnAudioTimeUpdate);
+        mediaManager.state.audioPlayer.removeEventListener('ended', mediaManager.internalOnAudioEnded);
+        mediaManager.state.audioPlayer.removeEventListener('error', mediaManager.internalOnAudioError);
+        mediaManager.state.audioPlayer.removeEventListener('play', mediaManager.internalOnAudioPlay);
+        mediaManager.state.audioPlayer.removeEventListener('pause', mediaManager.internalOnAudioPause);
+        mediaManager.state.audioPlayer.src = ''; // Or 'data:audio/wav;base64,'
+        mediaManager.state.audioPlayer.load(); // Apply src change and stop buffering
+        // console.log("MediaManager: Audio player stopped, listeners removed, src cleared.");
+      }
+      mediaManager.state.audioPlayer = null;
+      mediaManager.state.currentAudioSrc = null;
+      mediaManager.state.currentAudioDuration = 0;
+      mediaManager.state.isAudioMetadataLoaded = false;
+      if(mediaManager.state.currentMediaType === 'audio') mediaManager.state.currentMediaType = null;
+    },
+
+    // --- Common Media Logic ---
+    checkMediaTime: function() {
+      if (mediaManager.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+        const player = mediaManager.state.ytPlayer;
+        const currentTime = player.getCurrentTime();
+        const duration = player.getDuration();
+        mediaManager.state.currentVideoDuration = duration; // Keep this specific to video
+
+        if (typeof mediaManager.state.callbacks.onTimeUpdate === 'function') {
+          mediaManager.state.callbacks.onTimeUpdate(currentTime, duration, 'youtube');
+        }
+        if (typeof mediaManager.state.callbacks.onQuestionTrigger === 'function') {
+          // YouTube specific question triggering
+          mediaManager.state.callbacks.onQuestionTrigger(currentTime);
+        }
+        if (typeof mediaManager.state.callbacks.onOverlayUpdateNeeded === 'function') {
+          mediaManager.state.callbacks.onOverlayUpdateNeeded(currentTime, 'youtube');
+        }
+      } else if (mediaManager.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable()) {
+        const player = mediaManager.state.audioPlayer;
+        const currentTime = player.currentTime;
+        const duration = player.duration;
+
+        // Only update if duration is valid (metadata loaded)
+        if (duration && !isNaN(duration) && isFinite(duration)) {
+             mediaManager.state.currentAudioDuration = duration;
+        }
+
+        if (typeof mediaManager.state.callbacks.onTimeUpdate === 'function') {
+          mediaManager.state.callbacks.onTimeUpdate(currentTime, mediaManager.state.currentAudioDuration, 'audio');
+        }
+        // No questions for audio in this iteration
+        if (typeof mediaManager.state.callbacks.onOverlayUpdateNeeded === 'function') {
+          mediaManager.state.callbacks.onOverlayUpdateNeeded(currentTime, 'audio');
+        }
+      }
+    },
+
+    startPlayerStateInterval: function() {
+      mediaManager.stopPlayerStateInterval(); // Clear existing interval first
+      if (window.baseApp && baseApp.timerManager && baseApp.resourceManager) {
+        const timerId = baseApp.timerManager.setInterval(mediaManager.checkMediaTime, 250);
+        mediaManager.state.playerStateInterval = timerId;
+        // Ensure this resource is properly cleaned up
+        baseApp.resourceManager.trackDisposable(mediaManager.state.resourceNameForPlayerStateInterval, () => {
+          if (baseApp.timerManager && mediaManager.state.playerStateInterval !== null) {
+            baseApp.timerManager.clearTimer(mediaManager.state.playerStateInterval);
+            mediaManager.state.playerStateInterval = null;
+            // console.log("MediaManager: playerStateInterval cleared via resourceManager for " + mediaManager.state.resourceNameForPlayerStateInterval);
+          }
+        });
+        // console.log("MediaManager: playerStateInterval started with timerId:", timerId);
+      } else {
+        console.error("MediaManager: baseApp.timerManager or baseApp.resourceManager not available. Cannot start player state interval.");
+        // Fallback or alternative timing mechanism could be considered if baseApp is not present
+        // For now, just log the error.
+      }
+    },
+
+    stopPlayerStateInterval: function() {
+      if (window.baseApp && baseApp.resourceManager) {
+        // This will call the dispose function tracked with trackDisposable, which clears the timer.
+        baseApp.resourceManager.disposeByName(mediaManager.state.resourceNameForPlayerStateInterval);
+        // console.log("MediaManager: Disposed playerStateInterval via resourceManager for " + mediaManager.state.resourceNameForPlayerStateInterval);
+      } else if (mediaManager.state.playerStateInterval !== null) {
+        // Fallback if baseApp or resourceManager is not available but an interval was somehow set
+        // This case should ideally not happen if baseApp components are always present when startPlayerStateInterval is called
+        clearInterval(mediaManager.state.playerStateInterval); // Assuming a standard setInterval was used as a fallback
+        mediaManager.state.playerStateInterval = null;
+        // console.log("MediaManager: playerStateInterval cleared directly (fallback).");
+      }
+      // Ensure state is null even if resource manager wasn't available or didn't find the resource.
+      mediaManager.state.playerStateInterval = null;
+    },
+
+    // --- Timeline and UI Helpers ---
+    renderTimelineMarkers: function(timelineTrackElementId, questions, overlays) {
+      const trackElement = document.getElementById(timelineTrackElementId);
+      if (!trackElement) {
+        console.error("MediaManager: Timeline track element not found:", timelineTrackElementId);
+        return;
+      }
+      trackElement.innerHTML = ''; // Clear existing markers
+
+      let duration = 0;
+      if (mediaManager.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+        duration = mediaManager.getDuration();
+      } else if (mediaManager.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable()) {
+        duration = mediaManager.getAudioDuration();
+      }
+
+      if (!duration || duration <= 0) {
+        console.warn("MediaManager: Media duration is 0 or unavailable. Cannot render timeline markers.");
+        // Optionally display a message in the track element
+        // trackElement.textContent = "Duration not available for markers.";
+        return;
+      }
+
+      const eventMarkers = [];
+
+      // Process Questions
+      if (questions && Array.isArray(questions)) {
+        questions.forEach((question, index) => {
+          eventMarkers.push({
+            time: question.timestamp,
+            type: 'question',
+            id: question.id || 'q_' + index,
+            label: question.questionText ? question.questionText.substring(0, 20) + '...' : 'Question'
+          });
+        });
+      }
+
+      // Process Overlays
+      if (overlays && Array.isArray(overlays)) {
+        overlays.forEach(overlay => {
+          eventMarkers.push({
+            time: overlay.startTime,
+            type: 'overlay_start',
+            id: overlay.id + '_start',
+            relatedOverlayId: overlay.id,
+            template: overlay.template,
+            label: overlay.content && overlay.content.text ? overlay.content.text.substring(0, 20) + '...' : (overlay.template || 'Overlay')
+          });
+          if (overlay.duration && overlay.duration > 0) {
+            eventMarkers.push({
+              time: overlay.startTime + overlay.duration,
+              type: 'overlay_end',
+              id: overlay.id + '_end',
+              relatedOverlayId: overlay.id,
+              template: overlay.template,
+              label: 'End ' + (overlay.content && overlay.content.text ? overlay.content.text.substring(0, 15) + '...' : (overlay.template || 'Overlay'))
+            });
+          }
+        });
+      }
+
+      // Sort Markers
+      eventMarkers.sort((a, b) => a.time - b.time);
+
+      // Render Markers
+      eventMarkers.forEach(marker => {
+        if (marker.time > duration) { // Do not render markers beyond the known duration
+            // console.warn(`Marker ${marker.id} time ${marker.time} exceeds duration ${duration}. Skipping.`);
+            return;
+        }
+        const markerEl = document.createElement('div');
+        markerEl.className = 'timeline-marker';
+        markerEl.classList.add('timeline-marker-' + marker.type.replace(/_/g, '-')); // e.g., timeline-marker-overlay-start
+
+        const percentPosition = (marker.time / duration) * 100;
+        markerEl.style.position = 'absolute';
+        markerEl.style.left = Math.min(100, Math.max(0, percentPosition)) + '%'; // Clamp between 0% and 100%
+        markerEl.style.transform = 'translateX(-50%)'; // Center the marker
+
+        // Use sharedUtils.formatTime if available, otherwise a simple placeholder.
+        const formattedTime = typeof sharedUtils !== 'undefined' && sharedUtils.formatTime ? sharedUtils.formatTime(marker.time) : marker.time.toFixed(1) + 's';
+        markerEl.title = (marker.label || marker.type) + ' (' + formattedTime + ')';
+
+        markerEl.dataset.markerId = marker.id;
+        markerEl.dataset.markerTime = marker.time;
+        markerEl.dataset.markerType = marker.type;
+        if (marker.relatedOverlayId) {
+          markerEl.dataset.relatedOverlayId = marker.relatedOverlayId;
+        }
+         if (marker.template) {
+          markerEl.dataset.markerTemplate = marker.template;
+        }
+
+
+        if (marker.type === 'question') {
+          markerEl.style.backgroundColor = mediaManager.getTemplateColor('question');
+          markerEl.style.width = '8px';
+          markerEl.style.height = '8px';
+          markerEl.style.borderRadius = '50%';
+          markerEl.style.top = '25%'; // Position question markers differently
+          markerEl.style.zIndex = '2';
+        } else if (marker.type.includes('overlay')) {
+          markerEl.style.backgroundColor = mediaManager.getTemplateColor(marker.template);
+          markerEl.style.width = '3px'; // Slightly thicker for visibility
+          markerEl.style.height = '100%';
+          markerEl.style.zIndex = '1';
+          if (marker.type === 'overlay_end') {
+            markerEl.style.opacity = '0.6'; // More visible than 0.5
+          }
+        }
+        trackElement.appendChild(markerEl);
+      });
+    },
+
+    getTemplateColor: function(templateName) {
+      const colors = {
+        lowerThird: '#2196F3', // Blue
+        cornerCallout: '#4CAF50', // Green
+        centerCard: '#FF9800', // Orange
+        hotspot: '#E91E63', // Pink
+        quizBubble: '#9C27B0', // Purple
+        question: '#FFC107', // Amber (for questions)
+        // Add more as needed
+      };
+      return colors[templateName] || '#607D8B'; // Default color (Blue Grey)
+    },
+
+    // --- Utilities ---
+    isYouTubePlayerAvailable: function() {
+      return !!(mediaManager.state.ytPlayer && mediaManager.state.ytPlayer.getPlayerState);
+    },
+
+    isAudioPlayerAvailable: function() {
+        return !!(mediaManager.state.audioPlayer && typeof mediaManager.state.audioPlayer.play === 'function');
     }
-    mediaManager.state.audioPlayer = null;
-    mediaManager.state.currentAudioDuration = 0;
-    mediaManager.currentAudioEventHandlers = null; // Clear stored handlers
   };
 
-  mediaManager.onAudioLoadedMetadata = function(event) {
-    console.log("MediaManager: Audio metadata loaded.");
-    mediaManager.state.currentAudioDuration = event.target.duration;
-
-    if (mediaManager.currentAudioEventHandlers && typeof mediaManager.currentAudioEventHandlers.onLoadedMetadata === 'function') {
-        mediaManager.currentAudioEventHandlers.onLoadedMetadata(event); // Call app's specific handler
-    }
-
-    if (mediaManager.state.audioCheckInterval) clearInterval(mediaManager.state.audioCheckInterval);
-    mediaManager.state.audioCheckInterval = setInterval(mediaManager.checkAudioTime, 250);
-  };
-
-  mediaManager.onAudioEnded = function(event) {
-    console.log("MediaManager: Audio ended.");
-    if (mediaManager.state.audioCheckInterval) {
-      clearInterval(mediaManager.state.audioCheckInterval);
-      mediaManager.state.audioCheckInterval = null;
-    }
-    if (mediaManager.currentAudioEventHandlers && typeof mediaManager.currentAudioEventHandlers.onEnded === 'function') {
-      mediaManager.currentAudioEventHandlers.onEnded({type: 'audio'});
-    }
-  };
-
-  mediaManager.onAudioError = function(event) {
-    console.error("MediaManager: Audio Player Error", event);
-    if (mediaManager.state.audioCheckInterval) {
-      clearInterval(mediaManager.state.audioCheckInterval);
-      mediaManager.state.audioCheckInterval = null;
-    }
-    if (mediaManager.currentAudioEventHandlers && typeof mediaManager.currentAudioEventHandlers.onError === 'function') {
-      mediaManager.currentAudioEventHandlers.onError({ type: 'audio', errorData: event });
-    }
-  };
-
-  mediaManager.checkAudioTime = function() {
-    const audioPlayer = mediaManager.state.audioPlayer;
-    if (!audioPlayer || typeof audioPlayer.currentTime === 'undefined') return;
-
-    const currentTime = audioPlayer.currentTime;
-
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onTimeUpdate === 'function') {
-        mediaManager.state.callbacks.onTimeUpdate(currentTime, mediaManager.state.currentAudioDuration);
-    }
-    // Audio doesn't have questions in current spec, but overlay updates are relevant
-    if (mediaManager.state.callbacks && typeof mediaManager.state.callbacks.onOverlayUpdateNeeded === 'function') {
-      mediaManager.state.callbacks.onOverlayUpdateNeeded(currentTime);
-    }
-  };
-
+  // Global function for YouTube API callback
+  // This MUST be in the global scope.
+  function onYouTubeIframeAPIReady() {
+    // console.log("Global onYouTubeIframeAPIReady called, delegating to mediaManager.");
+    mediaManager.onYouTubeIframeAPIReady();
+  }
 </script>

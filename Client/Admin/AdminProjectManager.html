@@ -1,0 +1,410 @@
+<script>
+  window.adminProjectManager = window.adminProjectManager || {};
+  adminProjectManager.state = {
+    projectListCache: [],
+    // currentProjectData: null, // This will be fetched and passed to AdminApp via callback
+    // currentProjectId: null // Managed by AdminApp, but PM needs it for operations
+  };
+
+  console.log("AdminProjectManager.html loaded");
+
+  adminProjectManager.initialize = function() {
+    // Initialization logic if needed, e.g., pre-fetching something
+    // For now, most functions will be called by AdminApp
+    console.log("AdminProjectManager initialized.");
+  };
+
+  // --- Utility to get current project ID from AdminApp ---
+  // This avoids duplicating state and ensures AdminApp is the source of truth for current project context
+  adminProjectManager.getCurrentProjectId = function() {
+    return window.adminApp && window.adminApp.state ? window.adminApp.state.currentProjectId : null;
+  };
+
+  // --- Project Listing ---
+  adminProjectManager.loadProjects = function() {
+    const adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+    if (!adminProjectListContainerEl) {
+      console.error("AdminProjectManager.loadProjects: adminProjectListContainerEl not found.");
+      baseApp.showLoading(false, 'loadingSpinner'); // Ensure loading is stopped if it was on
+      return;
+    }
+    if (!window.google || !google.script || !google.script.run) {
+      console.error("AdminProjectManager.loadProjects: google.script.run unavailable.");
+      baseApp.displayMessage("Error: Client-server communication bridge (google.script.run) is not available. Cannot load projects.", false, 'messageArea');
+      baseApp.showLoading(false, 'loadingSpinner');
+      return;
+    }
+    baseApp.showLoading(true, 'loadingSpinner');
+
+    google.script.run
+      .withSuccessHandler(adminProjectManager.displayProjects)
+      .withFailureHandler(error => {
+          baseApp.onServerError(error, 'messageArea');
+          // Ensure loading spinner is hidden even on failure to load projects
+          baseApp.showLoading(false, 'loadingSpinner');
+      })
+      .getAllProjectsForAdmin();
+  };
+
+  adminProjectManager.displayProjects = function(response) {
+    baseApp.showLoading(false, 'loadingSpinner');
+
+    if (!response || !response.success) {
+      baseApp.onServerError(response || { error: "Failed to load projects or received an invalid response." }, 'messageArea');
+      return;
+    }
+
+    const projectsArray = response.data && response.data.projects ? response.data.projects : [];
+    adminProjectManager.state.projectListCache = projectsArray;
+    const adminProjectListContainerEl = document.getElementById('adminProjectListContainer');
+
+    sharedUtils.safeDOMUpdate(adminProjectListContainerEl, el => {
+      el.innerHTML = ''; // Clear previous projects
+      if (!projectsArray || projectsArray.length === 0) {
+        el.innerHTML = '<p>No projects found. Create one using the form above!</p>';
+        return;
+      }
+
+      projectsArray.forEach(project => {
+        if (!project || !project.projectId) {
+            console.warn("AdminProjectManager.displayProjects: Skipping a project due to missing data or projectId.", project);
+            return;
+        }
+        const projectItem = document.createElement('div');
+        projectItem.className = 'project-item';
+        projectItem.setAttribute('data-project-id', project.projectId);
+
+
+        const titleAndStatusDiv = document.createElement('div');
+        titleAndStatusDiv.className = 'project-item-title-status';
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = project.projectTitle || 'Untitled Project';
+        titleSpan.style.fontWeight = 'bold';
+        const statusTextSpan = document.createElement('span');
+        statusTextSpan.className = 'status-text';
+        statusTextSpan.textContent = ` (${project.status || 'N/A'})`;
+        titleAndStatusDiv.appendChild(titleSpan);
+        titleAndStatusDiv.appendChild(statusTextSpan);
+
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'project-item-controls';
+        const statusSelect = document.createElement('select');
+        statusSelect.className = 'project-status-select admin-form-select';
+        statusSelect.setAttribute('data-project-id', project.projectId);
+        statusSelect.setAttribute('data-original-status', project.status || "Draft");
+        ['Draft', 'Active', 'Inactive'].forEach(statusValue => {
+          const option = document.createElement('option');
+          option.value = statusValue; option.textContent = statusValue;
+          if (project.status === statusValue) { option.selected = true; }
+          statusSelect.appendChild(option);
+        });
+
+        const statusChangeHandler = function() { adminProjectManager.handleProjectStatusChange(project.projectId, this.value, this); };
+        statusSelect.addEventListener('change', statusChangeHandler);
+        baseApp.resourceManager.trackDisposable(`project-status-${project.projectId}`, () => {
+          statusSelect.removeEventListener('change', statusChangeHandler);
+        });
+
+        const editButton = document.createElement('button');
+        editButton.textContent = 'Edit'; editButton.className = 'edit-button admin-button';
+        const editClickHandler = function() { window.adminApp.switchToEditView(project.projectId); };
+        editButton.addEventListener('click', editClickHandler);
+        baseApp.resourceManager.trackDisposable(`project-edit-${project.projectId}`, () => {
+          editButton.removeEventListener('click', editClickHandler);
+        });
+
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete'; deleteButton.className = 'danger-button admin-button admin-button-danger';
+        deleteButton.style.marginLeft = '5px';
+        const deleteClickHandler = function() { adminProjectManager.handleDeleteProject(project.projectId, project.projectTitle || 'Untitled Project'); };
+        deleteButton.addEventListener('click', deleteClickHandler);
+        baseApp.resourceManager.trackDisposable(`project-delete-${project.projectId}`, () => {
+          deleteButton.removeEventListener('click', deleteClickHandler);
+        });
+
+        controlsDiv.appendChild(statusSelect);
+        controlsDiv.appendChild(editButton);
+        controlsDiv.appendChild(deleteButton);
+        projectItem.appendChild(titleAndStatusDiv);
+        projectItem.appendChild(controlsDiv);
+        el.appendChild(projectItem);
+      });
+    }, "Failed to display admin projects in list container");
+  };
+
+  // --- Project Creation ---
+  adminProjectManager.createProject = function(projectTitle) {
+    const projectTitleInputEl = document.getElementById('projectTitleInput');
+
+    if (!projectTitle || projectTitle.trim() === "") {
+      baseApp.displayMessage('Project title cannot be empty.', false, 'messageArea');
+      if (projectTitleInputEl) projectTitleInputEl.focus();
+      return;
+    }
+    if (!window.google || !google.script || !google.script.run) {
+      console.error("AdminProjectManager.createProject: google.script.run unavailable.");
+      baseApp.displayMessage("Error: Client-server communication bridge unavailable. Cannot create project.", false, 'messageArea');
+      return;
+    }
+    baseApp.showLoading(true, 'loadingSpinner');
+    google.script.run
+      .withSuccessHandler(adminProjectManager.onProjectCreated)
+      .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+      .createProject(projectTitle.trim());
+  };
+
+  adminProjectManager.onProjectCreated = function(response) {
+    baseApp.showLoading(false, 'loadingSpinner');
+    const projectTitleInputEl = document.getElementById('projectTitleInput');
+
+    if (response && response.success) {
+      baseApp.displayMessage(response.message || 'Project created successfully!', true, 'messageArea');
+      if (projectTitleInputEl) projectTitleInputEl.value = '';
+      adminProjectManager.loadProjects(); // Reload project list
+    } else {
+      baseApp.onServerError((response && response.error) ? response.error : { error: 'Failed to create project or received an invalid response.' }, 'messageArea');
+    }
+  };
+
+  // --- Project Editing/Loading ---
+  adminProjectManager.loadProjectForEditing = function(projectId, onLoadedCallback) {
+    if (!projectId) {
+      console.error("AdminProjectManager.loadProjectForEditing: No projectId provided.");
+      baseApp.displayMessage("Error: Cannot load project details. Project ID is missing.", false, 'messageArea');
+      if (typeof onLoadedCallback === 'function') onLoadedCallback(null);
+      return;
+    }
+    if (!window.google || !google.script || !google.script.run) {
+      console.error("AdminProjectManager.loadProjectForEditing: google.script.run unavailable.");
+      baseApp.displayMessage("Error: Client-server communication bridge unavailable. Cannot load project data.", false, 'messageArea');
+      if (typeof onLoadedCallback === 'function') onLoadedCallback(null);
+      return;
+    }
+    // AdminApp shows loading spinner before calling this.
+    baseApp.displayMessage("Loading project data...", true, 'messageArea');
+    google.script.run
+      .withSuccessHandler(response => adminProjectManager.onProjectDataLoaded(response, onLoadedCallback))
+      .withFailureHandler(error => {
+        baseApp.onServerError(error, 'messageArea');
+        if (typeof onLoadedCallback === 'function') onLoadedCallback(null);
+      })
+      .getProjectDataForEditing(projectId);
+  };
+
+  adminProjectManager.onProjectDataLoaded = function(response, onLoadedCallback) {
+    // AdminApp handles hiding the main loading spinner in the callback.
+    const editingProjectTitleEl = document.getElementById('editingProjectTitle'); // This element is in AdminMain.html
+
+    if (!response || !response.success) {
+      const errorMsg = (response && response.error && response.error.message) ? response.error.message : (response && response.error ? response.error : "Failed to load project data or received an invalid response.");
+      console.error("AdminProjectManager.onProjectDataLoaded: Error - ", errorMsg, "Full response:", response);
+      baseApp.displayMessage(`Error: ${errorMsg}`, false, 'messageArea');
+      if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminProjectManager.getCurrentProjectId()})`;
+      if (typeof onLoadedCallback === 'function') onLoadedCallback(null);
+      return;
+    }
+
+    const jsonString = response.data && response.data.projectDataJSON ? response.data.projectDataJSON : null;
+    if (jsonString === null || jsonString === undefined || typeof jsonString !== 'string') {
+      console.error("AdminProjectManager.onProjectDataLoaded: projectDataJSON is null, undefined, or not a string. Received:", jsonString);
+      const errorDetail = jsonString === null ? "is null" : (jsonString === undefined ? "is undefined" : "is not a string");
+      baseApp.displayMessage(`Error: Project data received from server is invalid (${errorDetail}). File might be corrupted or empty.`, false, 'messageArea');
+      if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Error Loading Project (ID: ${adminProjectManager.getCurrentProjectId()})`;
+      if (typeof onLoadedCallback === 'function') onLoadedCallback(null);
+      return;
+    }
+
+    try {
+      const loadedData = JSON.parse(jsonString);
+      if (!loadedData || typeof loadedData !== 'object' || !loadedData.projectId) {
+          throw new Error("Parsed data is not a valid project object or is missing the 'projectId' field.");
+      }
+
+      // Standardize slide structure (important for consistency)
+      if (!Array.isArray(loadedData.slides)) loadedData.slides = [];
+      loadedData.slides.forEach((slide, slideIndex) => {
+        if (!slide.slideMedia) slide.slideMedia = { type: null, url: null, driveFileId: null, mimeType: null, originalName: null, videoQuestions: [], videoOverlays: [] };
+        if (slide.slideMedia && !Array.isArray(slide.slideMedia.videoQuestions)) slide.slideMedia.videoQuestions = [];
+        if (slide.slideMedia && !Array.isArray(slide.slideMedia.videoOverlays)) slide.slideMedia.videoOverlays = [];
+        if (!Array.isArray(slide.timelineEvents)) slide.timelineEvents = [];
+
+        if (slide.slideMedia && slide.slideMedia.type === 'youtube' && typeof slide.slideMedia.youtubeOptions === 'undefined') {
+          slide.slideMedia.youtubeOptions = { showClickToBeginButton: false }; // Default for existing projects
+        }
+
+        // Ensure customInteraction and customAnimation objects exist with all their properties
+        if (slide.fabricCanvasJSON && slide.fabricCanvasJSON.objects && Array.isArray(slide.fabricCanvasJSON.objects)) {
+          slide.fabricCanvasJSON.objects.forEach(obj => {
+            obj.customInteraction = {
+              trigger: "", action: "", modalContent: "", navigateTo: "", panZoomLevel: 1.5,
+              ...obj.customInteraction // Spread to preserve existing values
+            };
+            obj.customAnimation = {
+              trigger: "", type: "", speed: "normal", strength: 5, loop: false,
+              ...obj.customAnimation // Spread to preserve existing values
+            };
+          });
+        } else if (slide.fabricCanvasJSON && !slide.fabricCanvasJSON.objects) {
+            slide.fabricCanvasJSON.objects = []; // Ensure objects array exists
+        }
+      });
+
+      if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Editing Project: ${loadedData.title || loadedData.projectTitle || '(Untitled)'}`;
+      baseApp.displayMessage("Project data loaded successfully. Ready for editing.", true, 'messageArea');
+      if (typeof onLoadedCallback === 'function') onLoadedCallback(loadedData);
+
+    } catch (e) {
+      console.error("AdminProjectManager.onProjectDataLoaded: Error parsing JSON or invalid project structure:", e, "Received JSON:", jsonString);
+      baseApp.displayMessage(`Error: Failed to parse project data. ${e.message}. The data might be corrupted.`, false, 'messageArea');
+      if (editingProjectTitleEl) editingProjectTitleEl.textContent = `Invalid Project Data (ID: ${adminProjectManager.getCurrentProjectId()})`;
+      if (typeof onLoadedCallback === 'function') onLoadedCallback(null);
+    }
+  };
+
+  // --- Project Saving ---
+  adminProjectManager.saveProject = function(projectDataToSave) {
+    const currentProjectId = adminProjectManager.getCurrentProjectId();
+    if (!projectDataToSave || !currentProjectId) {
+      baseApp.displayMessage("Error: No project data or project ID available to save.", false, 'messageArea');
+      return;
+    }
+    if (!window.google || !google.script || !google.script.run) {
+      console.error("AdminProjectManager.saveProject: google.script.run unavailable.");
+      baseApp.displayMessage("Error: Client-server communication bridge unavailable. Cannot save project.", false, 'messageArea');
+      return;
+    }
+
+    baseApp.showLoading(true, 'loadingSpinner');
+    baseApp.displayMessage("Saving project data...", true, 'messageArea');
+    try {
+      // Ensure no image data URLs are saved for non-image media types (important for data hygiene)
+      const cleanProjectData = JSON.parse(JSON.stringify(projectDataToSave)); // Deep clone
+      if (cleanProjectData.slides && Array.isArray(cleanProjectData.slides)) {
+          cleanProjectData.slides.forEach(slide => {
+            if (slide.slideMedia && slide.slideMedia.type !== 'image' &&
+                slide.slideMedia.url && typeof slide.slideMedia.url === 'string' &&
+                slide.slideMedia.url.startsWith('data:image')) {
+              console.warn(`AdminProjectManager.saveProject: Stripped data URL from non-image media type '${slide.slideMedia.type}' for slide.`)
+              slide.slideMedia.url = null; // Or set to a placeholder indicating it was stripped
+            }
+          });
+      }
+      const jsonDataString = JSON.stringify(cleanProjectData);
+
+      google.script.run
+        .withSuccessHandler(adminProjectManager.onProjectSaved)
+        .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+        .saveProjectData(currentProjectId, jsonDataString);
+    } catch (e) {
+      baseApp.showLoading(false, 'loadingSpinner');
+      console.error("Error stringifying project data for saving:", e, projectDataToSave);
+      baseApp.displayMessage("Error preparing data for saving: " + e.message, false, 'messageArea');
+    }
+  };
+
+  adminProjectManager.onProjectSaved = function(response) {
+    baseApp.showLoading(false, 'loadingSpinner');
+    if (response && response.success) {
+      sharedUtils.showNotification(response.message || "Project saved successfully!", "success");
+      // Optionally, if AdminApp or other modules need the latest saved data:
+      // if (window.adminApp && typeof window.adminApp.confirmProjectSaved === 'function') {
+      //   window.adminApp.confirmProjectSaved(response.data); // response.data might contain the saved project or version info
+      // }
+    } else {
+      baseApp.onServerError((response && response.error) ? response.error : { error: "Failed to save project or received an invalid response." }, 'messageArea');
+    }
+  };
+
+  // --- Project Status/Delete ---
+  adminProjectManager.handleProjectStatusChange = function(projectId, newStatus, selectElement) {
+    if (!window.google || !google.script || !google.script.run) {
+      console.error("AdminProjectManager.handleProjectStatusChange: google.script.run unavailable.");
+      baseApp.displayMessage("Error: Client-server communication bridge unavailable. Cannot update status.", false, 'messageArea');
+      if (selectElement) selectElement.value = selectElement.getAttribute('data-original-status'); // Revert
+      return;
+    }
+    baseApp.showLoading(true, 'loadingSpinner');
+    const originalStatus = selectElement.getAttribute('data-original-status') ||
+                           (adminProjectManager.state.projectListCache.find(p => p.projectId === projectId) || {}).status || "Draft";
+
+    // Optimistically update data-original-status in case of multiple rapid changes before server response
+    // selectElement.setAttribute('data-original-status', newStatus); // Or better, disable till response.
+
+    google.script.run
+      .withSuccessHandler(response => adminProjectManager.onProjectStatusUpdated(response, projectId, newStatus, selectElement, originalStatus))
+      .withFailureHandler(error => {
+        baseApp.onServerError(error, 'messageArea');
+        if (selectElement && originalStatus) selectElement.value = originalStatus; // Revert on server error
+         baseApp.showLoading(false, 'loadingSpinner');
+      })
+      .updateProjectStatus(projectId, newStatus);
+  };
+
+  adminProjectManager.onProjectStatusUpdated = function(response, projectId, newStatus, selectElement, originalStatusForRevert) {
+    baseApp.showLoading(false, 'loadingSpinner');
+    if (response && response.success) {
+      baseApp.displayMessage(response.message || "Project status updated successfully!", true, 'messageArea');
+      const projectInCache = adminProjectManager.state.projectListCache.find(p => p.projectId === projectId);
+      if (projectInCache) projectInCache.status = newStatus;
+      if (selectElement) selectElement.setAttribute('data-original-status', newStatus); // Confirm new original status
+
+      const projectItemEl = selectElement.closest('.project-item');
+      if (projectItemEl) {
+          const statusSpan = projectItemEl.querySelector('.status-text');
+          if(statusSpan) statusSpan.textContent = ` (${newStatus})`;
+      }
+
+      // If this project is currently being edited, its data in AdminApp might need update
+      // This is complex if AdminApp holds a deep copy. Simpler if AdminApp re-fetches or is just a view coordinator.
+      // For now, this manager only updates its cache.
+    } else {
+      baseApp.onServerError((response && response.error) ? response.error : { error: "Failed to update project status." }, 'messageArea');
+      if (selectElement) {
+          selectElement.value = originalStatusForRevert; // Revert to actual original status on failure
+      }
+    }
+  };
+
+  adminProjectManager.handleDeleteProject = function(projectId, projectTitle) {
+    if (!confirm(`Are you sure you want to delete project "${projectTitle || 'Untitled Project'}" (ID: ${projectId})? This action cannot be undone.`)) {
+      return;
+    }
+    if (!window.google || !google.script || !google.script.run) {
+      console.error("AdminProjectManager.handleDeleteProject: google.script.run unavailable.");
+      baseApp.displayMessage("Error: Client-server communication bridge unavailable. Cannot delete project.", false, 'messageArea');
+      return;
+    }
+    baseApp.showLoading(true, 'loadingSpinner');
+    google.script.run
+      .withSuccessHandler(response => adminProjectManager.onProjectDeleted(response, projectId)) // Pass projectId for context
+      .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+      .deleteProject(projectId);
+  };
+
+  adminProjectManager.onProjectDeleted = function(response, deletedProjectIdContext) {
+    baseApp.showLoading(false, 'loadingSpinner');
+    if (response && response.success) {
+      baseApp.displayMessage(response.message || "Project deleted successfully!", true, 'messageArea');
+
+      // Remove from cache
+      adminProjectManager.state.projectListCache = adminProjectManager.state.projectListCache.filter(p => p.projectId !== deletedProjectIdContext);
+
+      // If the deleted project was the one currently being edited, AdminApp needs to switch views.
+      if (adminProjectManager.getCurrentProjectId() === deletedProjectIdContext) {
+        // AdminApp's state.currentProjectId will be cleared by switchToListView
+        window.adminApp.switchToListView();
+      } else {
+        // Refresh the list from the (now updated) cache or reload from server
+        // For simplicity and to reflect any other server-side changes, a full reload is safer here if not too costly.
+        // However, if displayProjects can correctly render from the modified cache, that's more efficient.
+        // Let's try re-displaying from cache first.
+        const currentResponseFormat = { success: true, data: { projects: adminProjectManager.state.projectListCache }};
+        adminProjectManager.displayProjects(currentResponseFormat);
+        // Or, if a full server refresh is preferred: adminProjectManager.loadProjects();
+      }
+    } else {
+      baseApp.onServerError((response && response.error) ? response.error : { error: "Failed to delete project." }, 'messageArea');
+    }
+  };
+
+</script>

@@ -1,0 +1,540 @@
+<script>
+  window.adminToolbar = window.adminToolbar || {};
+  adminToolbar.state = {
+    // DOM Elements for the toolbar
+    overlayPropertiesToolbarEl: null,
+    objXEl: null, objYEl: null, objWidthEl: null, objHeightEl: null, objAngleEl: null,
+    objFillEl: null, objStrokeColorEl: null, objStrokeWidthEl: null, objOpacityEl: null, objOpacityValueDisplayEl: null,
+
+    textSpecificControlsEl: null, objTextContentEl: null,
+    objFontFamilyEl: null, objFontSizeEl: null,
+    objFontWeightEl: null, // Hidden select, actual control is fontWeightButtonEl
+    objFontStyleEl: null,  // Hidden select, actual control is fontStyleButtonEl
+    objTextAlignEl: null,  // Hidden select, actual control is textAlignGroupEl
+    objLineHeightEl: null, objCharSpacingEl: null,
+    fontWeightButtonEl: null, fontStyleButtonEl: null, textAlignGroupEl: null,
+
+    // Popover trigger buttons
+    fillColorButtonEl: null, strokeColorButtonEl: null, opacityButtonEl: null,
+    shadowSettingsButtonEl: null, interactionSettingsButtonEl: null, animationSettingsButtonEl: null,
+    fontFamilyButtonEl: null, // This is the actual select for font family
+    mediaToolsButtonEl: null, addShapeButtonEl: null, positionToolsButtonEl: null,
+
+    // Popover elements
+    fillColorPopoverEl: null, strokeColorPopoverEl: null, opacityPopoverEl: null,
+    shadowPopoverEl: null, interactionPopoverEl: null, animationPopoverEl: null,
+    fontFamilyPopoverEl: null, // May not be needed if objFontFamilyEl is the select itself
+    mediaToolsPopoverEl: null, shapesPopoverEl: null, positionToolsPopoverEl: null,
+
+    // Specific inputs within popovers
+    objShadowColorEl: null, objShadowBlurEl: null, objShadowOffsetXEl: null, objShadowOffsetYEl: null,
+    objShadowAffectStrokeEl: null, objShadowNonScalingEl: null,
+
+    // Interaction inputs (references to elements in AdminOverlayManager's state, but Toolbar interacts with them)
+    // These are ALREADY fetched by AdminOverlayManager. Toolbar will call AOM methods.
+    // objInteractionTriggerEl, objInteractionActionEl, objModalContentEl, objNavigateToEl, objPanZoomLevelEl,
+
+    // Animation inputs (similarly, fetched by AOM)
+    // objAnimationTriggerEl, objAnimationTypeEl, objAnimationSpeedEl, objAnimationStrengthEl,
+    // objAnimationLoopEl, objAnimationLoopCountEl, objAnimationLoopDelayEl,
+
+    activePopoverId: null, // ID of the currently visible popover managed by this toolbar
+    currentActiveObject: null, // Keep a reference to the object being edited by the toolbar
+    popoverTriggersCache: [] // Cache for popover trigger definitions
+  };
+
+  console.log("AdminToolbar.html loaded");
+
+  adminToolbar.initialize = function() {
+    console.log("AdminToolbar initialized (general).");
+  };
+
+  adminToolbar.initializeEditView = function() {
+    console.log("AdminToolbar: Initializing Edit View specific parts.");
+    const atb = adminToolbar;
+    const ats = adminToolbar.state;
+
+    ats.overlayPropertiesToolbarEl = document.getElementById('overlayPropertiesToolbar');
+    ats.objXEl = document.getElementById('objX'); ats.objYEl = document.getElementById('objY');
+    ats.objWidthEl = document.getElementById('objWidth'); ats.objHeightEl = document.getElementById('objHeight');
+    ats.objAngleEl = document.getElementById('objAngle');
+    ats.objFillEl = document.getElementById('objFill'); ats.objStrokeColorEl = document.getElementById('objStrokeColor');
+    ats.objStrokeWidthEl = document.getElementById('objStrokeWidth');
+    ats.objOpacityEl = document.getElementById('objOpacity'); ats.objOpacityValueDisplayEl = document.getElementById('objOpacityValueDisplay');
+
+    ats.textSpecificControlsEl = document.getElementById('textSpecificControls');
+    ats.objTextContentEl = document.getElementById('objTextContent');
+    ats.objFontFamilyEl = document.getElementById('objFontFamily'); ats.objFontSizeEl = document.getElementById('objFontSize');
+    ats.objFontWeightEl = document.getElementById('objFontWeight'); // Hidden select
+    ats.objFontStyleEl = document.getElementById('objFontStyle');   // Hidden select
+    ats.objTextAlignEl = document.getElementById('objTextAlign');   // Hidden select
+    ats.objLineHeightEl = document.getElementById('objLineHeight'); ats.objCharSpacingEl = document.getElementById('objCharSpacing');
+    ats.fontWeightButtonEl = document.getElementById('fontWeightButton');
+    ats.fontStyleButtonEl = document.getElementById('fontStyleButton');
+    ats.textAlignGroupEl = document.getElementById('textAlignGroup');
+
+    ats.fillColorButtonEl = document.getElementById('fillColorButton');
+    ats.strokeColorButtonEl = document.getElementById('strokeColorButton');
+    ats.opacityButtonEl = document.getElementById('opacityButton');
+    ats.shadowSettingsButtonEl = document.getElementById('shadowSettingsButton');
+    ats.interactionSettingsButtonEl = document.getElementById('interactionSettingsButton');
+    ats.animationSettingsButtonEl = document.getElementById('animationSettingsButton');
+    // ats.fontFamilyButtonEl = document.getElementById('fontFamilyButton'); // objFontFamilyEl is the select
+    ats.mediaToolsButtonEl = document.getElementById('mediaToolsButton');
+    ats.addShapeButtonEl = document.getElementById('addShapeButton');
+    ats.positionToolsButtonEl = document.getElementById('positionToolsButton');
+
+    ats.fillColorPopoverEl = document.getElementById('fillColorPopover');
+    ats.strokeColorPopoverEl = document.getElementById('strokeColorPopover');
+    ats.opacityPopoverEl = document.getElementById('opacityPopover');
+    ats.shadowPopoverEl = document.getElementById('shadowPopover');
+    ats.interactionPopoverEl = document.getElementById('interactionPopover'); // Popover content for interactions
+    ats.animationPopoverEl = document.getElementById('animationPopover');     // Popover content for animations
+    // ats.fontFamilyPopoverEl = document.getElementById('fontFamilyPopover'); // Not needed if using select
+    ats.mediaToolsPopoverEl = document.getElementById('mediaToolsPopover');
+    ats.shapesPopoverEl = document.getElementById('shapesPopover');
+    ats.positionToolsPopoverEl = document.getElementById('positionToolsPopover');
+
+    ats.objShadowColorEl = document.getElementById('objShadowColor');
+    ats.objShadowBlurEl = document.getElementById('objShadowBlur');
+    ats.objShadowOffsetXEl = document.getElementById('objShadowOffsetX');
+    ats.objShadowOffsetYEl = document.getElementById('objShadowOffsetY');
+    ats.objShadowAffectStrokeEl = document.getElementById('objShadowAffectStroke');
+    ats.objShadowNonScalingEl = document.getElementById('objShadowNonScaling');
+
+    // Interaction & Animation inputs are fetched by AdminOverlayManager.
+    // AdminToolbar methods will call AdminOverlayManager methods which use those refs.
+
+    if (ats.objFontFamilyEl && ats.objFontFamilyEl.options && ats.objFontFamilyEl.options.length === 0) {
+      sharedUtils.FONT_FAMILIES.forEach(font => {
+        const option = document.createElement('option'); option.value = font; option.textContent = font;
+        ats.objFontFamilyEl.appendChild(option);
+      });
+    }
+
+    atb.attachToolbarEventListeners();
+    atb.hideActivePopover();
+    atb.populateToolbar(null); // Initialize toolbar for no selection
+    console.log("AdminToolbar: Edit View specific parts initialized.");
+  };
+
+  adminToolbar.attachToolbarEventListeners = function() {
+    const ats = adminToolbar.state;
+    const atb = adminToolbar;
+
+    const safelyAttach = (el, eventType, handler, idSuffix = eventType) => {
+        if (el) {
+            const resourceName = `atb-${el.id || el.dataset.action || 'toolbarCtrl'}-${idSuffix}`;
+            el.addEventListener(eventType, handler);
+            baseApp.resourceManager.trackDisposable(resourceName, () => el.removeEventListener(eventType, handler));
+        } else { /* console.warn(`AdminToolbar: Element for listener ${idSuffix} not found.`); */ }
+    };
+
+    // Direct Property Inputs (delegating to AdminCanvasManager)
+    const acmUpdateProp = (prop, isFloat = false, isSpecial = false) => (e) => {
+        if(window.adminCanvasManager && adminCanvasManager.updateFabricObjectProperty) {
+            let value = e.target.value;
+            if (isSpecial === 'color') value = sharedUtils.toHexColor(value); // Ensure hex for fabric
+            adminCanvasManager.updateFabricObjectProperty(prop, value, e.target.type, isFloat);
+        }
+    };
+    const acmUpdateShadowProp = (prop) => (e) => {
+        if(window.adminCanvasManager && adminCanvasManager.updateFabricObjectShadowProperty) {
+            const value = e.target.type === 'checkbox' ? e.target.checked : (e.target.type === 'color' ? sharedUtils.toHexColor(e.target.value) : e.target.value);
+            adminCanvasManager.updateFabricObjectShadowProperty(prop, value, e.target.type);
+        }
+    };
+
+    safelyAttach(ats.objXEl, 'change', acmUpdateProp('left'));
+    safelyAttach(ats.objYEl, 'change', acmUpdateProp('top'));
+    safelyAttach(ats.objWidthEl, 'change', acmUpdateProp('width')); // Will be scaleX internally in ACM
+    safelyAttach(ats.objHeightEl, 'change', acmUpdateProp('height')); // Will be scaleY internally in ACM
+    safelyAttach(ats.objAngleEl, 'change', acmUpdateProp('angle'));
+    safelyAttach(ats.objFillEl, 'input', acmUpdateProp('fill', false, 'color'));
+    safelyAttach(ats.objStrokeColorEl, 'input', acmUpdateProp('stroke', false, 'color'));
+    safelyAttach(ats.objStrokeWidthEl, 'change', acmUpdateProp('strokeWidth'));
+    safelyAttach(ats.objOpacityEl, 'input', (e) => {
+        acmUpdateProp('opacity')(e);
+        if(ats.objOpacityValueDisplayEl) ats.objOpacityValueDisplayEl.textContent = Math.round(parseFloat(e.target.value) * 100) + '%';
+    });
+
+    safelyAttach(ats.objTextContentEl, 'input', acmUpdateProp('text'));
+    safelyAttach(ats.objFontFamilyEl, 'change', acmUpdateProp('fontFamily'));
+    safelyAttach(ats.objFontSizeEl, 'change', acmUpdateProp('fontSize'));
+    safelyAttach(ats.objLineHeightEl, 'change', acmUpdateProp('lineHeight', true));
+    safelyAttach(ats.objCharSpacingEl, 'change', acmUpdateProp('charSpacing'));
+
+    const toggleTextHandler = (prop, val1, val2) => () => {
+        if(window.adminCanvasManager && adminCanvasManager.getActiveObject && adminCanvasManager.updateFabricObjectProperty) {
+            const activeObj = adminCanvasManager.getActiveObject();
+            if (!activeObj || !(activeObj.isType('textbox') || activeObj.isType('i-text'))) return;
+            const currentVal = activeObj.get(prop);
+            const newVal = currentVal === val1 ? val2 : val1;
+            adminCanvasManager.updateFabricObjectProperty(prop, newVal);
+            atb.populateToolbar(activeObj); // Re-populate to reflect button state
+        }
+    };
+    safelyAttach(ats.fontWeightButtonEl, 'click', toggleTextHandler('fontWeight', 'bold', 'normal'));
+    safelyAttach(ats.fontStyleButtonEl, 'click', toggleTextHandler('fontStyle', 'italic', 'normal'));
+    if (ats.textAlignGroupEl) {
+      ats.textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(button => {
+        safelyAttach(button, 'click', () => {
+          if(window.adminCanvasManager && adminCanvasManager.updateFabricObjectProperty) {
+              adminCanvasManager.updateFabricObjectProperty('textAlign', button.dataset.align);
+              atb.populateToolbar(adminCanvasManager.getActiveObject());
+          }
+        }, `textAlign-${button.dataset.align}`);
+      });
+    }
+
+    // Popover Triggers
+    const popoverTriggers = [
+      { btn: ats.fillColorButtonEl, popoverId: 'fillColorPopover' }, { btn: ats.strokeColorButtonEl, popoverId: 'strokeColorPopover' },
+      { btn: ats.opacityButtonEl, popoverId: 'opacityPopover' }, { btn: ats.shadowSettingsButtonEl, popoverId: 'shadowPopover' },
+      { btn: ats.interactionSettingsButtonEl, popoverId: 'interactionPopover' }, { btn: ats.animationSettingsButtonEl, popoverId: 'animationPopover' },
+      { btn: ats.mediaToolsButtonEl, popoverId: 'mediaToolsPopover' }, { btn: ats.addShapeButtonEl, popoverId: 'shapesPopover' },
+      { btn: ats.positionToolsButtonEl, popoverId: 'positionToolsPopover' }
+    ];
+    popoverTriggers.forEach(item => {
+      if (item.btn) {
+        safelyAttach(item.btn, 'click', (e) => { e.stopPropagation(); atb.togglePopover(item.popoverId, item.btn); }, `toggle-${item.popoverId}`);
+      }
+    });
+
+    // Listeners for inputs WITHIN popovers
+    safelyAttach(ats.objShadowColorEl, 'input', acmUpdateShadowProp('color'));
+    safelyAttach(ats.objShadowBlurEl, 'input', acmUpdateShadowProp('blur'));
+    safelyAttach(ats.objShadowOffsetXEl, 'change', acmUpdateShadowProp('offsetX'));
+    safelyAttach(ats.objShadowOffsetYEl, 'change', acmUpdateShadowProp('offsetY'));
+    safelyAttach(ats.objShadowAffectStrokeEl, 'change', acmUpdateShadowProp('affectStroke'));
+    safelyAttach(ats.objShadowNonScalingEl, 'change', acmUpdateShadowProp('nonScaling'));
+
+    // Interaction & Animation inputs are in AdminOverlayManager's popovers.
+    // Their 'change' or 'input' events should directly call AdminOverlayManager methods.
+    // Example for one interaction input (assuming AOM's state.objInteractionTriggerEl is the element)
+    if (window.adminOverlayManager && adminOverlayManager.state.objInteractionTriggerEl) {
+        safelyAttach(adminOverlayManager.state.objInteractionTriggerEl, 'change', adminOverlayManager.handleInteractionChange, 'aom-interaction-trigger');
+        safelyAttach(adminOverlayManager.state.objInteractionActionEl, 'change', adminOverlayManager.handleInteractionChange, 'aom-interaction-action');
+        // ... and for all other interaction/animation config elements that AOM manages.
+        // This ensures that when user changes a value in a popover (even if popover HTML is in AdminMain), the correct manager handles it.
+        const aomInteractionElements = ['objInteractionModalContentEl', 'objInteractionNavigateToSlideEl', 'objInteractionNavigateToURLEl', 'objInteractionTargetObjectIdEl', 'objInteractionPanZoomLevelEl'];
+        aomInteractionElements.forEach(key => {
+            if (adminOverlayManager.state[key]) {
+                safelyAttach(adminOverlayManager.state[key], adminOverlayManager.state[key].type === 'textarea' || adminOverlayManager.state[key].type === 'range' ? 'input' : 'change', adminOverlayManager.handleInteractionChange, `aom-${key}`);
+            }
+        });
+
+        const aomAnimationElements = ['objAnimationTriggerEl', 'objAnimationTypeEl', 'objAnimationSpeedEl', 'objAnimationStrengthEl', 'objAnimationLoopEl', 'objAnimationLoopCountEl', 'objAnimationLoopDelayEl', 'objAnimationTargetEl', 'objAnimationCustomPathEl'];
+         aomAnimationElements.forEach(key => {
+            if (adminOverlayManager.state[key]) {
+                safelyAttach(adminOverlayManager.state[key], adminOverlayManager.state[key].type === 'range' ? 'input' : 'change', adminOverlayManager.handleAnimationChange, `aom-${key}`);
+            }
+        });
+    }
+
+    // Shape adding buttons
+    const shapeButtons = ats.shapesPopoverEl ? ats.shapesPopoverEl.querySelectorAll('button[data-shape]') : [];
+    shapeButtons.forEach(btn => {
+      safelyAttach(btn, 'click', () => {
+        if(window.adminCanvasManager && adminCanvasManager.addShape) adminCanvasManager.addShape(btn.dataset.shape);
+        atb.hideActivePopover(); // Hide shapes popover after selection
+      }, `addShape-${btn.dataset.shape}`);
+    });
+
+    // Media selection tabs & buttons in mediaToolsPopover
+    const mediaTabButtons = ats.mediaToolsPopoverEl ? ats.mediaToolsPopoverEl.querySelectorAll('.media-tab-btn') : [];
+    mediaTabButtons.forEach(tab => {
+       safelyAttach(tab, 'click', () => atb.switchMediaTab(tab.dataset.tab, ats.mediaToolsPopoverEl), `mediaTab-${tab.dataset.tab}`);
+    });
+    // Specific media buttons inside mediaToolsPopover (e.g., image upload, set YT URL)
+    // These should call AdminCanvasManager methods
+    const popoverImageUploaderBtn = ats.mediaToolsPopoverEl ? ats.mediaToolsPopoverEl.querySelector('#mediaPopoverImageUploadBtn') : null;
+    safelyAttach(popoverImageUploaderBtn, 'click', () => {
+        const mainImageUploader = document.getElementById('imageUploader'); // The one ACM listens to
+        if (mainImageUploader) mainImageUploader.click();
+        atb.hideActivePopover();
+    }, 'mediaPopoverImageUpload');
+
+    const popoverSetYoutubeBtn = ats.mediaToolsPopoverEl ? ats.mediaToolsPopoverEl.querySelector('#mediaPopoverSetYoutubeUrlBtn') : null;
+    safelyAttach(popoverSetYoutubeBtn, 'click', () => {
+        if(window.adminCanvasManager) adminCanvasManager.handleSetMediaBackground('youtube'); // ACM reads from its own input ref
+        atb.hideActivePopover();
+    }, 'mediaPopoverSetYoutube');
+
+    const popoverAudioUploaderBtn = ats.mediaToolsPopoverEl ? ats.mediaToolsPopoverEl.querySelector('#mediaPopoverAudioUploadBtn') : null;
+    safelyAttach(popoverAudioUploaderBtn, 'click', () => {
+        const mainAudioUploader = document.getElementById('audioUploader'); // The one ACM listens to
+        if (mainAudioUploader) mainAudioUploader.click();
+        atb.hideActivePopover();
+    }, 'mediaPopoverAudioUpload');
+
+    // Global click to hide popovers (managed by AdminApp for all popovers, or here if specific to toolbar)
+    // For now, let AdminApp's global click handler manage this, assuming AdminToolbar.hideActivePopover is callable.
+    // If AdminToolbar needs its own independent global click handler:
+    // const popoverGlobalClickHandler = (event) => { /* ... as in step 3 ... */ };
+    // document.addEventListener('click', popoverGlobalClickHandler, true);
+    // baseApp.resourceManager.trackDisposable('atb-global-popover-hide', () => document.removeEventListener('click', popoverGlobalClickHandler, true));
+
+    console.log("AdminToolbar: Event listeners attached.");
+  };
+
+  adminToolbar.populateToolbar = function(activeObject) {
+    const ats = adminToolbar.state;
+    const atb = adminToolbar;
+    // Ensure popoverTriggersCache is populated if not already
+    if (ats.popoverTriggersCache.length === 0) {
+        ats.popoverTriggersCache = [
+            { btn: ats.fillColorButtonEl, popoverId: 'fillColorPopover' },
+            { btn: ats.strokeColorButtonEl, popoverId: 'strokeColorPopover' },
+            { btn: ats.opacityButtonEl, popoverId: 'opacityPopover' },
+            { btn: ats.shadowSettingsButtonEl, popoverId: 'shadowPopover' },
+            { btn: ats.interactionSettingsButtonEl, popoverId: 'interactionPopover' },
+            { btn: ats.animationSettingsButtonEl, popoverId: 'animationPopover' },
+            { btn: ats.mediaToolsButtonEl, popoverId: 'mediaToolsPopover' },
+            { btn: ats.addShapeButtonEl, popoverId: 'shapesPopover' },
+            { btn: ats.positionToolsButtonEl, popoverId: 'positionToolsPopover' }
+        ].filter(item => item.btn); // Filter out items where button might be null if DOM element is missing
+    }
+    ats.currentActiveObject = activeObject; // Store ref
+
+    if (!ats.overlayPropertiesToolbarEl) return;
+    sharedUtils.safeDOMUpdate(ats.overlayPropertiesToolbarEl, el => el.style.display = 'block');
+
+    const isObjectSelected = !!activeObject;
+    const isTextObject = isObjectSelected && (activeObject.isType('textbox') || activeObject.isType('i-text'));
+
+    const generalControls = [ ats.objXEl, ats.objYEl, ats.objWidthEl, ats.objHeightEl, ats.objAngleEl, ats.objFillEl,
+                              ats.objStrokeColorEl, ats.objStrokeWidthEl, ats.objOpacityEl, ats.fillColorButtonEl,
+                              ats.strokeColorButtonEl, ats.opacityButtonEl, ats.shadowSettingsButtonEl,
+                              ats.interactionSettingsButtonEl, ats.animationSettingsButtonEl, ats.positionToolsButtonEl ];
+    generalControls.forEach(el => { if(el) el.disabled = !isObjectSelected; });
+
+    const textControls = [ ats.objTextContentEl, ats.objFontFamilyEl, ats.objFontSizeEl, ats.objLineHeightEl,
+                           ats.objCharSpacingEl, ats.fontWeightButtonEl, ats.fontStyleButtonEl ];
+    if(ats.textAlignGroupEl) ats.textAlignGroupEl.querySelectorAll('button').forEach(b => textControls.push(b));
+    textControls.forEach(el => { if(el) el.disabled = !isTextObject; });
+    sharedUtils.safeDOMUpdate(ats.textSpecificControlsEl, el => el.style.display = isTextObject ? 'flex' : 'none');
+
+    if(ats.mediaToolsButtonEl) ats.mediaToolsButtonEl.disabled = false;
+    if(ats.addShapeButtonEl) ats.addShapeButtonEl.disabled = false;
+
+    if (!isObjectSelected) {
+        atb.hideActivePopover(); // Close any open popover
+        // Reset some fields to default when no object is selected
+        ['objX', 'objY', 'objWidth', 'objHeight', 'objAngle', 'objStrokeWidth', 'objFontSize', 'objLineHeight', 'objCharSpacing']
+            .forEach(key => { if(ats[key+'El']) ats[key+'El'].value = ''; });
+        if(ats.objFillEl) ats.objFillEl.value = '#000000';
+        if(ats.objStrokeColorEl) ats.objStrokeColorEl.value = '#000000';
+        if(ats.objOpacityEl) ats.objOpacityEl.value = 1;
+        if(ats.objOpacityValueDisplayEl) ats.objOpacityValueDisplayEl.textContent = '100%';
+        if(ats.objTextContentEl) ats.objTextContentEl.value = '';
+        if(ats.objFontFamilyEl) ats.objFontFamilyEl.value = 'Arial';
+
+        // Reset active state of popover trigger buttons
+        ats.popoverTriggersCache.forEach(item => { if(item.btn) item.btn.classList.remove('active', 'popover-active'); });
+        if(ats.fontWeightButtonEl) ats.fontWeightButtonEl.classList.remove('active');
+        if(ats.fontStyleButtonEl) ats.fontStyleButtonEl.classList.remove('active');
+        if(ats.textAlignGroupEl) ats.textAlignGroupEl.querySelectorAll('.toolbar-button').forEach(b => b.classList.remove('active'));
+        return;
+    }
+
+    // Populate general properties
+    if(ats.objXEl) ats.objXEl.value = activeObject.left !== undefined ? activeObject.left.toFixed(0) : '';
+    if(ats.objYEl) ats.objYEl.value = activeObject.top !== undefined ? activeObject.top.toFixed(0) : '';
+    if(ats.objWidthEl) ats.objWidthEl.value = activeObject.getScaledWidth ? activeObject.getScaledWidth().toFixed(0) : (activeObject.width || '');
+    if(ats.objHeightEl) ats.objHeightEl.value = activeObject.getScaledHeight ? activeObject.getScaledHeight().toFixed(0) : (activeObject.height || '');
+    if(ats.objAngleEl) ats.objAngleEl.value = activeObject.angle !== undefined ? activeObject.angle.toFixed(0) : '';
+
+    if(ats.objFillEl) ats.objFillEl.value = sharedUtils.toHexColor(activeObject.fill || '#000000');
+    if(ats.objStrokeColorEl) ats.objStrokeColorEl.value = sharedUtils.toHexColor(activeObject.stroke || '#000000');
+    if(ats.objStrokeWidthEl) ats.objStrokeWidthEl.value = activeObject.strokeWidth === undefined ? 0 : activeObject.strokeWidth;
+    if(ats.objOpacityEl) {
+        ats.objOpacityEl.value = activeObject.opacity === undefined ? 1 : activeObject.opacity;
+        if(ats.objOpacityValueDisplayEl) ats.objOpacityValueDisplayEl.textContent = Math.round(parseFloat(ats.objOpacityEl.value) * 100) + '%';
+    }
+
+    // Populate text properties
+    if (isTextObject) {
+        if(ats.objTextContentEl) ats.objTextContentEl.value = activeObject.text || '';
+        if(ats.objFontFamilyEl) ats.objFontFamilyEl.value = activeObject.fontFamily || 'Arial';
+        if(ats.objFontSizeEl) ats.objFontSizeEl.value = activeObject.fontSize || 24;
+        if(ats.objLineHeightEl) ats.objLineHeightEl.value = activeObject.lineHeight === undefined ? 1.16 : activeObject.lineHeight;
+        if(ats.objCharSpacingEl) ats.objCharSpacingEl.value = activeObject.charSpacing === undefined ? 0 : activeObject.charSpacing;
+        if(ats.fontWeightButtonEl) ats.fontWeightButtonEl.classList.toggle('active', activeObject.fontWeight === 'bold');
+        if(ats.fontStyleButtonEl) ats.fontStyleButtonEl.classList.toggle('active', activeObject.fontStyle === 'italic');
+        if(ats.textAlignGroupEl) {
+            ats.textAlignGroupEl.querySelectorAll('.toolbar-button[data-align]').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.align === activeObject.textAlign);
+            });
+        }
+    }
+
+    // Populate Shadow properties from object into shadowPopoverEl inputs
+    const shadow = activeObject.shadow instanceof fabric.Shadow ? activeObject.shadow : null;
+    if(ats.objShadowColorEl) ats.objShadowColorEl.value = shadow ? sharedUtils.toHexColor(shadow.color || '#000000') : '#000000';
+    if(ats.objShadowBlurEl) ats.objShadowBlurEl.value = shadow ? shadow.blur || 0 : 0;
+    if(ats.objShadowOffsetXEl) ats.objShadowOffsetXEl.value = shadow ? shadow.offsetX || 0 : 0;
+    if(ats.objShadowOffsetYEl) ats.objShadowOffsetYEl.value = shadow ? shadow.offsetY || 0 : 0;
+    if(ats.objShadowAffectStrokeEl) ats.objShadowAffectStrokeEl.checked = shadow ? shadow.affectStroke || false : false;
+    if(ats.objShadowNonScalingEl) ats.objShadowNonScalingEl.checked = shadow ? shadow.nonScaling || false : false;
+    if(ats.shadowSettingsButtonEl) ats.shadowSettingsButtonEl.classList.toggle('active', !!shadow);
+
+    // Populate Interaction & Animation properties (from object to AOM-managed popover inputs)
+    if (window.adminOverlayManager) {
+        const interaction = activeObject.customInteraction || adminOverlayManager.getDefaultInteractionProps();
+        if(adminOverlayManager.state.objInteractionTriggerEl) adminOverlayManager.state.objInteractionTriggerEl.value = interaction.trigger;
+        if(adminOverlayManager.state.objInteractionActionEl) adminOverlayManager.state.objInteractionActionEl.value = interaction.action;
+        if(adminOverlayManager.state.objInteractionModalContentEl) adminOverlayManager.state.objInteractionModalContentEl.value = interaction.modalContent || '';
+        if(interaction.action === 'navigateToSlide' && adminOverlayManager.state.objInteractionNavigateToSlideEl) adminOverlayManager.state.objInteractionNavigateToSlideEl.value = interaction.navigateTo || '';
+        if(interaction.action === 'navigateToURL' && adminOverlayManager.state.objInteractionNavigateToURLEl) adminOverlayManager.state.objInteractionNavigateToURLEl.value = interaction.navigateTo || '';
+        if(adminOverlayManager.state.objInteractionTargetObjectIdEl) adminOverlayManager.state.objInteractionTargetObjectIdEl.value = interaction.targetObjectId || '';
+        if(adminOverlayManager.state.objInteractionPanZoomLevelEl) adminOverlayManager.state.objInteractionPanZoomLevelEl.value = interaction.panZoomLevel === undefined ? 1.5 : interaction.panZoomLevel;
+        adminOverlayManager.updateInteractionConfigVisibility(interaction.action);
+        if(ats.interactionSettingsButtonEl) ats.interactionSettingsButtonEl.classList.toggle('active', !!(interaction.trigger && interaction.action));
+
+        const animation = activeObject.customAnimation || adminOverlayManager.getDefaultAnimationProps();
+        if(adminOverlayManager.state.objAnimationTriggerEl) adminOverlayManager.state.objAnimationTriggerEl.value = animation.trigger;
+        if(adminOverlayManager.state.objAnimationTypeEl) adminOverlayManager.state.objAnimationTypeEl.value = animation.type;
+        if(adminOverlayManager.state.objAnimationSpeedEl) adminOverlayManager.state.objAnimationSpeedEl.value = animation.speed || 'normal';
+        if(adminOverlayManager.state.objAnimationStrengthEl) adminOverlayManager.state.objAnimationStrengthEl.value = animation.strength === undefined ? 5 : animation.strength;
+        if(adminOverlayManager.state.objAnimationLoopEl) adminOverlayManager.state.objAnimationLoopEl.checked = animation.loop || false;
+        if(adminOverlayManager.state.objAnimationLoopCountEl) adminOverlayManager.state.objAnimationLoopCountEl.value = animation.loopCount === undefined ? 0 : animation.loopCount;
+        if(adminOverlayManager.state.objAnimationLoopDelayEl) adminOverlayManager.state.objAnimationLoopDelayEl.value = animation.loopDelay === undefined ? 500 : animation.loopDelay;
+        if(adminOverlayManager.state.objAnimationTargetEl) adminOverlayManager.state.objAnimationTargetEl.value = animation.targetObjectId || '';
+        if(adminOverlayManager.state.objAnimationCustomPathEl) adminOverlayManager.state.objAnimationCustomPathEl.value = animation.customPath || '';
+        adminOverlayManager.updateAnimationStrengthUnit(animation.type);
+        if(ats.animationSettingsButtonEl) ats.animationSettingsButtonEl.classList.toggle('active', !!(animation.trigger && animation.type));
+    }
+
+    // Update active state of direct popover trigger buttons based on object state
+    if(ats.fillColorButtonEl) ats.fillColorButtonEl.classList.toggle('active', activeObject.fill && activeObject.fill !== 'transparent');
+    if(ats.strokeColorButtonEl) ats.strokeColorButtonEl.classList.toggle('active', activeObject.stroke && activeObject.strokeWidth > 0);
+    if(ats.opacityButtonEl) ats.opacityButtonEl.classList.toggle('active', activeObject.opacity !== undefined && activeObject.opacity < 1);
+
+    // console.log("AdminToolbar: Toolbar populated for object:", activeObject);
+  };
+
+  // const popoverTriggers array that was here is removed to avoid re-declaration.
+  // It's now populated into adminToolbar.state.popoverTriggersCache in populateToolbar.
+
+  adminToolbar.togglePopover = function(popoverId, triggerButtonEl) {
+      { btnKey: 'opacityButtonEl', popoverId: 'opacityPopover' },
+      { btnKey: 'shadowSettingsButtonEl', popoverId: 'shadowPopover' },
+      { btnKey: 'interactionSettingsButtonEl', popoverId: 'interactionPopover' },
+      { btnKey: 'animationSettingsButtonEl', popoverId: 'animationPopover' },
+      { btnKey: 'mediaToolsButtonEl', popoverId: 'mediaToolsPopover' },
+      { btnKey: 'addShapeButtonEl', popoverId: 'shapesPopover' },
+    const ats = adminToolbar.state;
+    const atb = adminToolbar;
+    const isAlreadyActive = ats.activePopoverId === popoverId;
+
+    atb.hideActivePopover(); // Always hide current before showing new (or if toggling same)
+
+    if (!isAlreadyActive) {
+      const popover = document.getElementById(popoverId);
+      if (popover && triggerButtonEl) {
+        sharedUtils.safeDOMUpdate(popover, el => {
+          el.style.display = 'block';
+          // Positioning logic (simplified, consider more robust solution if issues)
+          const btnRect = triggerButtonEl.getBoundingClientRect();
+          const popoverRect = el.getBoundingClientRect(); // Get dimensions after display:block
+          let posTop = btnRect.bottom + 5;
+          let posLeft = btnRect.left;
+
+          // Adjust if goes off-screen
+          if (posLeft + popoverRect.width > window.innerWidth) posLeft = window.innerWidth - popoverRect.width - 5;
+          if (posLeft < 0) posLeft = 5;
+          if (posTop + popoverRect.height > window.innerHeight && (btnRect.top - popoverRect.height - 5 > 0)) {
+              posTop = btnRect.top - popoverRect.height - 5; // Try above
+          } else if (posTop + popoverRect.height > window.innerHeight) {
+              posTop = window.innerHeight - popoverRect.height - 5; // Stick to bottom
+          }
+          if (posTop < 0) posTop = 5;
+
+          el.style.top = `${posTop}px`;
+          el.style.left = `${posLeft}px`;
+        });
+        ats.activePopoverId = popoverId;
+        triggerButtonEl.classList.add('popover-active');
+
+        if (popoverId === 'mediaToolsPopover') {
+          const activeTab = popover.querySelector('.media-tab-btn.active');
+          if (!activeTab) atb.switchMediaTab('image-tab', popover);
+        }
+      }
+    }
+  };
+
+  adminToolbar.hideActivePopover = function() {
+    const ats = adminToolbar.state;
+    if (ats.activePopoverId) {
+      const popover = document.getElementById(ats.activePopoverId);
+      sharedUtils.safeDOMUpdate(popover, el => el.style.display = 'none');
+
+      // Find the trigger button for this popover and remove its active class
+      const activeTriggerDef = ats.popoverTriggersCache.find(p => p.popoverId === ats.activePopoverId);
+      if (activeTriggerDef && activeTriggerDef.btn) {
+          activeTriggerDef.btn.classList.remove('popover-active');
+      } else {
+          // Fallback if not in predefined list or button ref is somehow null
+          document.querySelectorAll('.toolbar-button.popover-active').forEach(btn => btn.classList.remove('popover-active'));
+      }
+      ats.activePopoverId = null;
+    }
+  };
+
+  adminToolbar.switchMediaTab = function(tabId, mediaPopoverEl) {
+      if (!mediaPopoverEl) mediaPopoverEl = adminToolbar.state.mediaToolsPopoverEl;
+      if (!mediaPopoverEl) return;
+
+      mediaPopoverEl.querySelectorAll('.media-tab-pane').forEach(pane => pane.classList.remove('active'));
+      mediaPopoverEl.querySelectorAll('.media-tab-btn').forEach(tab => tab.classList.remove('active'));
+
+      const tabPaneToActivate = mediaPopoverEl.querySelector(`#${tabId}-pane`); // Assuming pane IDs are like 'image-tab-pane'
+      if (tabPaneToActivate) tabPaneToActivate.classList.add('active');
+
+      const activeTabBtn = mediaPopoverEl.querySelector(`.media-tab-btn[data-tab="${tabId}"]`);
+      if (activeTabBtn) activeTabBtn.classList.add('active');
+
+      if (tabId === 'audio-tab' && window.adminCanvasManager) {
+          const currentSlide = adminCanvasManager.getCurrentSlideData();
+          const hasAudio = currentSlide && currentSlide.slideMedia && currentSlide.slideMedia.type === 'audio';
+          const audioControlsEl = mediaPopoverEl.querySelector('#mediaPopoverAudioControls');
+          if(audioControlsEl) sharedUtils.safeDOMUpdate(audioControlsEl, el => el.style.display = hasAudio ? 'block' : 'none');
+          if (hasAudio) {
+              const attachedAudioNameEl = mediaPopoverEl.querySelector('#mediaPopoverAttachedAudioName');
+              if(attachedAudioNameEl) sharedUtils.safeDOMUpdate(attachedAudioNameEl, nameEl => nameEl.textContent = `Attached: ${currentSlide.slideMedia.originalName || 'Audio File'}`);
+          }
+      }
+  };
+
+  // Method to be called by AdminApp's global click handler
+  adminToolbar.hideActivePopoverIfClickedOutside = function(event) {
+    const ats = adminToolbar.state;
+    if (ats.activePopoverId) {
+        const popover = document.getElementById(ats.activePopoverId);
+        let triggerButton = null;
+
+        const activeTriggerDef = ats.popoverTriggersCache.find(p => p.popoverId === ats.activePopoverId);
+        if(activeTriggerDef && activeTriggerDef.btn) triggerButton = activeTriggerDef.btn;
+
+        if (popover && !popover.contains(event.target) && (!triggerButton || !triggerButton.contains(event.target))) {
+            adminToolbar.hideActivePopover();
+        }
+    }
+  };
+
+  // Update button active states for Interaction/Animation (called by AOM)
+  adminToolbar.updateInteractionButtonActiveState = function(isActive) {
+      if (adminToolbar.state.interactionSettingsButtonEl) {
+          adminToolbar.state.interactionSettingsButtonEl.classList.toggle('active', isActive);
+      }
+  };
+  adminToolbar.updateAnimationButtonActiveState = function(isActive) {
+      if (adminToolbar.state.animationSettingsButtonEl) {
+          adminToolbar.state.animationSettingsButtonEl.classList.toggle('active', isActive);
+      }
+  };
+
+
+</script>

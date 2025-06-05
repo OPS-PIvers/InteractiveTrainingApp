@@ -1,0 +1,796 @@
+<script>
+window.viewerManager = {
+  state: {
+    isLoading: false,
+    currentProjectData: null,
+    currentSlideIndex: 0,
+    currentMediaType: null, // 'youtube', 'audio', 'image', 'none'
+    viewerFabricCanvas: null,
+    askedQuestionIndices: [],
+    activeOverlays: new Map(),
+    currentImageTimelineEvents: [],
+    currentImageSlideEventIndex: -1,
+    defaultCanvasWidth: 960,
+    defaultCanvasHeight: 540,
+    isCanvasPannedOrZoomed: false
+  },
+  dom: {},
+
+  init: function() {
+    console.log("ViewerManager: init() called.");
+    this.setupDOMReferences();
+    this.attachEventListeners();
+    this.setupMediaManagerCallbacks(); // New call
+    this.loadViewerProjectsList();
+  },
+
+  setupDOMReferences: function() {
+    // ... (same as previous step, ensure all IDs from ViewerView.html are captured)
+    this.dom.viewerProjectListContainerEl = document.getElementById('viewerProjectListContainer');
+    this.dom.messageAreaElViewer = document.getElementById('messageAreaViewer');
+    this.dom.loadingSpinnerElViewer = document.getElementById('loadingSpinner');
+    this.dom.viewerListViewContainerEl = document.getElementById('viewerListViewContainer');
+    this.dom.viewerProjectDisplayAreaEl = document.getElementById('viewerProjectDisplayArea');
+    this.dom.viewingProjectTitleEl = document.getElementById('viewingProjectTitle');
+    this.dom.viewerMediaContainerEl = document.getElementById('viewerMediaContainer');
+    this.dom.youtubePlayerContainerEl = document.getElementById('youtubePlayerContainer');
+    this.dom.viewerAudioPlayerEl = document.getElementById('viewerAudioPlayer');
+    this.dom.viewerCanvasContainerEl = document.getElementById('viewerCanvasContainer');
+    this.dom.viewerFabricCanvasEl = document.getElementById('viewerFabricCanvas');
+    this.dom.viewerPrevSlideButtonEl = document.getElementById('viewerPrevSlideButton');
+    this.dom.viewerNextSlideButtonEl = document.getElementById('viewerNextSlideButton');
+    this.dom.viewerSlideIndicatorEl = document.getElementById('viewerSlideIndicator');
+    this.dom.backToViewerListButtonEl = document.getElementById('backToViewerListButton');
+    this.dom.viewerModalEl = document.getElementById('viewerModal');
+    this.dom.viewerModalCloseButtonEl = document.getElementById('viewerModalCloseButton');
+    this.dom.viewerModalBodyEl = document.getElementById('viewerModalBody');
+    this.dom.modalPrevButtonEl = document.getElementById('modalPrevButton');
+    this.dom.modalNextButtonEl = document.getElementById('modalNextButton');
+    this.dom.viewerTimelineTrackEl = document.getElementById('viewerTimelineTrack');
+    this.dom.viewerTimelineProgressEl = document.getElementById('viewerTimelineProgress');
+    this.dom.viewerCurrentTimeEl = document.getElementById('viewerCurrentTime');
+    this.dom.viewerTotalDurationEl = document.getElementById('viewerTotalDuration');
+    this.dom.viewerPrevImageEventButtonEl = document.getElementById('viewerPrevImageEventButton');
+    this.dom.viewerImageEventIndicatorEl = document.getElementById('viewerImageEventIndicator');
+    this.dom.viewerNextImageEventButtonEl = document.getElementById('viewerNextImageEventButton');
+    this.dom.interactiveTimelineBarEl = document.getElementById('interactiveTimelineBar'); // Added for renderSlide
+    this.dom.overlayDisplayAreaEl = document.getElementById('overlayDisplayArea'); // Added
+    this.dom.imageEventNavigationEl = document.getElementById('imageEventNavigation'); // Added
+    console.log("ViewerManager: DOM references set up.");
+  },
+
+  attachEventListeners: function() {
+    // ... (same as previous step)
+    const dom = this.dom;
+    if (dom.backToViewerListButtonEl) dom.backToViewerListButtonEl.addEventListener('click', this.showProjectListView.bind(this));
+    if (dom.viewerPrevSlideButtonEl) dom.viewerPrevSlideButtonEl.addEventListener('click', this.navigateToPrevSlide.bind(this));
+    if (dom.viewerNextSlideButtonEl) dom.viewerNextSlideButtonEl.addEventListener('click', this.navigateToNextSlide.bind(this));
+    if (dom.viewerModalCloseButtonEl) dom.viewerModalCloseButtonEl.addEventListener('click', this.hideViewerModal.bind(this));
+    if (dom.viewerModalEl) {
+        dom.viewerModalEl.addEventListener('click', (event) => {
+            if (event.target === dom.viewerModalEl) this.hideViewerModal();
+        });
+    }
+    if (dom.modalPrevButtonEl) dom.modalPrevButtonEl.addEventListener('click', this.navigateModalPrevious.bind(this));
+    if (dom.modalNextButtonEl) dom.modalNextButtonEl.addEventListener('click', this.navigateModalNext.bind(this));
+    if (dom.viewerTimelineTrackEl) {
+        dom.viewerTimelineTrackEl.addEventListener('click', (e) => {
+            const mediaType = this.state.currentMediaType;
+            let duration = 0;
+            if (mediaType === 'youtube') duration = mediaManager.getDuration();
+            else if (mediaType === 'audio') duration = mediaManager.getAudioDuration();
+
+            if (duration > 0) {
+                const rect = dom.viewerTimelineTrackEl.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const percentage = clickX / rect.width;
+                const seekTime = percentage * duration;
+                if (mediaType === 'youtube') {
+                    mediaManager.seekTo(seekTime);
+                    if (mediaManager.getPlayerState() !== YT.PlayerState.PLAYING) mediaManager.playVideo();
+                } else if (mediaType === 'audio') {
+                    mediaManager.seekAudioTo(seekTime);
+                    if (!mediaManager.state.audioPlayer || mediaManager.state.audioPlayer.paused) mediaManager.playAudio();
+                }
+            }
+        });
+    }
+    console.log("ViewerManager: Event listeners attached.");
+  },
+
+  setupMediaManagerCallbacks: function() {
+    mediaManager.state.callbacks.onReady = this.handleMediaPlayerReady.bind(this);
+    mediaManager.state.callbacks.onStateChange = this.handleMediaPlayerStateChange.bind(this);
+    mediaManager.state.callbacks.onError = this.handleMediaPlayerError.bind(this);
+    mediaManager.state.callbacks.onTimeUpdate = this.handleMediaTimeUpdate.bind(this);
+    mediaManager.state.callbacks.onQuestionTrigger = this.handleMediaQuestionTrigger.bind(this);
+    mediaManager.state.callbacks.onOverlayUpdateNeeded = this.handleMediaOverlayUpdate.bind(this);
+    mediaManager.state.callbacks.onEnded = this.handleMediaEnded.bind(this);
+    console.log("ViewerManager: MediaManager callbacks configured.");
+  },
+
+  loadViewerProjectsList: function() { /* ... (same as previous step) ... */
+    console.log("ViewerManager: loadViewerProjectsList called");
+    if (!google || !google.script || !google.script.run) {
+      baseApp.displayMessage("Error: Client-server communication bridge unavailable.", false, 'messageAreaViewer');
+      return;
+    }
+    if (!this.dom.viewerProjectListContainerEl) {
+      console.warn("ViewerManager: viewerProjectListContainerEl not found. Cannot display projects.");
+      return;
+    }
+    baseApp.showLoading(true, 'loadingSpinner');
+    this.state.isLoading = true;
+    google.script.run
+      .withSuccessHandler(this.displayViewerProjects.bind(this))
+      .withFailureHandler((error) => baseApp.onServerError(error, 'messageAreaViewer'))
+      .getActiveProjectsList();
+  },
+
+  displayViewerProjects: function(response) { /* ... (same as previous step) ... */
+    baseApp.showLoading(false, 'loadingSpinner');
+    this.state.isLoading = false;
+    if (!response || !response.success) {
+      return;
+    }
+    const projectsArray = response.data && response.data.projects ? response.data.projects : [];
+    if (!this.dom.viewerProjectListContainerEl) {
+      console.error("ViewerManager: displayViewerProjects - viewerProjectListContainerEl is not found!");
+      return;
+    }
+    this.dom.viewerProjectListContainerEl.innerHTML = '';
+
+    if (!projectsArray || projectsArray.length === 0) {
+      this.dom.viewerProjectListContainerEl.innerHTML = '<p>No active training modules found at this time.</p>';
+      return;
+    }
+
+    const ul = document.createElement('ul');
+    ul.className = 'project-list-viewer';
+    projectsArray.forEach(project => {
+      if (!project || !project.projectId) {
+        console.warn("ViewerManager: Skipping display of invalid project object:", project);
+        return;
+      }
+      const listItem = document.createElement('li');
+      listItem.className = 'project-card-viewer';
+      const titleHeader = document.createElement('h3');
+      titleHeader.textContent = project.projectTitle || 'Untitled Project';
+      const viewButton = document.createElement('button');
+      viewButton.textContent = 'View Project';
+      viewButton.className = 'view-project-button';
+      viewButton.setAttribute('data-project-id', project.projectId);
+      viewButton.onclick = () => this.loadProjectForViewing(project.projectId);
+
+      listItem.appendChild(titleHeader);
+      listItem.appendChild(viewButton);
+      ul.appendChild(listItem);
+    });
+    this.dom.viewerProjectListContainerEl.appendChild(ul);
+  },
+
+  showProjectListView: function() { /* ... (same as previous step, ensure mediaManager calls are correct) ... */
+    console.log("ViewerManager: showProjectListView called");
+    sharedUtils.showElement(this.dom.viewerListViewContainerEl);
+    sharedUtils.hideElement(this.dom.viewerProjectDisplayAreaEl);
+
+    if (this.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+        mediaManager.stopAndDestroyPlayer();
+    } else if (this.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable()) {
+        mediaManager.stopAndClearAudioPlayer();
+    }
+    this.state.currentMediaType = null;
+
+    if (this.state.viewerFabricCanvas) {
+        this.state.viewerFabricCanvas.dispose();
+        this.state.viewerFabricCanvas = null;
+    }
+    this.state.currentProjectData = null;
+    this.state.currentSlideIndex = 0;
+    this.loadViewerProjectsList();
+  },
+
+  // --- Project Viewing and Slide Rendering ---
+  loadProjectForViewing: function(projectId) {
+    if (!projectId) {
+      baseApp.displayMessage("Invalid project ID.", false, 'messageAreaViewer');
+      return;
+    }
+    console.log(`ViewerManager: Loading project ID: ${projectId}`);
+    baseApp.showLoading(true, 'loadingSpinner');
+    this.state.isLoading = true;
+    google.script.run
+      .withSuccessHandler(this.onProjectViewDataReceived.bind(this))
+      .withFailureHandler(error => baseApp.onServerError(error, 'messageAreaViewer'))
+      .getProjectViewById(projectId);
+  },
+
+  onProjectViewDataReceived: function(response) {
+    baseApp.showLoading(false, 'loadingSpinner');
+    this.state.isLoading = false;
+    if (!response || !response.success || !response.data || !response.data.projectDataJSON) {
+      baseApp.onServerError(response || { error: "Failed to load project data." }, 'messageAreaViewer');
+      this.state.currentProjectData = null;
+      return;
+    }
+    try {
+      const projectData = JSON.parse(response.data.projectDataJSON);
+      if (!projectData.slides || projectData.slides.length === 0) {
+        baseApp.displayMessage("This project has no slides.", true, 'messageAreaViewer'); // true for info, not error
+        this.state.currentProjectData = null;
+        this.showProjectListView(); // Go back to list if project is empty
+        return;
+      }
+      this.state.currentProjectData = projectData;
+      this.state.currentSlideIndex = 0;
+      if (this.dom.viewingProjectTitleEl) this.dom.viewingProjectTitleEl.textContent = projectData.title || 'Untitled Project';
+
+      if (!this.state.viewerFabricCanvas && this.dom.viewerFabricCanvasEl) {
+        this.initializeViewerCanvas();
+      }
+
+      this.renderSlideForViewing(0);
+      this.showProjectView();
+    } catch (e) {
+      console.error("Error parsing project data:", e);
+      baseApp.onServerError({ message: "Error processing project data: " + e.message }, 'messageAreaViewer');
+      this.state.currentProjectData = null;
+    }
+  },
+
+  showProjectView: function() {
+    console.log("ViewerManager: showProjectView called");
+    sharedUtils.hideElement(this.dom.viewerListViewContainerEl);
+    sharedUtils.showElement(this.dom.viewerProjectDisplayAreaEl);
+  },
+
+  getCurrentSlide: function() {
+    if (this.state.currentProjectData && this.state.currentProjectData.slides &&
+        this.state.currentProjectData.slides.length > this.state.currentSlideIndex) {
+      return this.state.currentProjectData.slides[this.state.currentSlideIndex];
+    }
+    return null;
+  },
+
+  initializeViewerCanvas: function() {
+    if (!this.dom.viewerFabricCanvasEl) {
+      console.error("ViewerManager: viewerFabricCanvasEl not found. Cannot initialize Fabric.js canvas.");
+      return;
+    }
+    if (this.state.viewerFabricCanvas) { // Dispose existing if any
+        this.state.viewerFabricCanvas.dispose();
+    }
+    this.state.viewerFabricCanvas = new fabric.Canvas(this.dom.viewerFabricCanvasEl, {
+        // Default options
+        width: this.state.defaultCanvasWidth,
+        height: this.state.defaultCanvasHeight,
+        preserveObjectStacking: true,
+        renderOnAddRemove: false // Manual renderAll for performance
+    });
+    console.log("ViewerManager: Fabric.js canvas initialized.");
+    // Add any default event listeners or configurations for the canvas if needed
+  },
+
+  renderSlideForViewing: function(slideIndex) {
+    console.log(`ViewerManager: renderSlideForViewing - slideIndex: ${slideIndex}`);
+    if (!this.state.currentProjectData || !this.state.viewerFabricCanvas) {
+        console.error("ViewerManager: Project data or Fabric canvas not available for rendering slide.");
+        return;
+    }
+    const slides = this.state.currentProjectData.slides;
+    if (slideIndex < 0 || slideIndex >= slides.length) {
+        console.warn(`ViewerManager: Invalid slideIndex ${slideIndex}. Max is ${slides.length -1}`);
+        return;
+    }
+
+    // Stop any currently playing media from previous slide
+    if (this.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) mediaManager.stopAndDestroyPlayer();
+    else if (this.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable()) mediaManager.stopAndClearAudioPlayer();
+
+    // this.hideSpotlightSVG(); // Implement if spotlight is used
+    // if(this.state.isCanvasPannedOrZoomed) this.resetPanZoomWithAnimation(true); // Implement if pan/zoom is used
+
+    const slideData = slides[slideIndex];
+    const canvas = this.state.viewerFabricCanvas;
+    this.state.currentSlideIndex = slideIndex;
+    this.state.currentMediaType = (slideData.slideMedia && slideData.slideMedia.type) ? slideData.slideMedia.type : 'none';
+    this.state.askedQuestionIndices = []; // Reset for new slide
+    this.state.currentImageTimelineEvents = (slideData.timelineEvents && Array.isArray(slideData.timelineEvents)) ? slideData.timelineEvents : [];
+    this.state.currentImageSlideEventIndex = 0; // Reset for new slide
+
+    sharedUtils.safeDOMUpdate(this.dom.interactiveTimelineBarEl, el => el.style.display = (this.state.currentMediaType === 'youtube' || this.state.currentMediaType === 'audio') ? 'block' : 'none');
+
+    this.initializeVideoOverlays(); // Placeholder - clears/prepares overlay area
+
+    // Clear any old canvas timestamp overlays if they exist
+    if (canvas) {
+        canvas.getObjects().forEach(obj => {
+            if (obj.customType === 'videoTimestampOverlay' || obj.isTimestampOverlay) canvas.remove(obj);
+        });
+    }
+    // Ensure slideMedia exists with a type
+    if (!slideData.slideMedia) slideData.slideMedia = { type: 'none' };
+
+
+    const slideWidth = slideData.canvasWidth || this.state.defaultCanvasWidth;
+    const slideHeight = slideData.canvasHeight || this.state.defaultCanvasHeight;
+    canvas.setWidth(slideWidth);
+    canvas.setHeight(slideHeight);
+    if (this.dom.viewerFabricCanvasEl) { this.dom.viewerFabricCanvasEl.width = slideWidth; this.dom.viewerFabricCanvasEl.height = slideHeight; }
+    if (this.dom.viewerMediaContainerEl) { this.dom.viewerMediaContainerEl.style.width = slideWidth + 'px'; this.dom.viewerMediaContainerEl.style.height = slideHeight + 'px'; }
+
+    canvas.clear(); // Clears objects and background
+    canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
+    canvas.backgroundColor = 'transparent'; // Default, slideData might override
+
+    const media = slideData.slideMedia;
+    sharedUtils.hideElement(this.dom.youtubePlayerContainerEl);
+    sharedUtils.hideElement(this.dom.viewerAudioPlayerEl); // Hide actual audio controls, use custom
+    sharedUtils.showElement(this.dom.viewerCanvasContainerEl); // Canvas is always visible (might be transparent)
+
+    console.log(`ViewerManager: Rendering slide ${slideIndex + 1}, media type: ${this.state.currentMediaType}`);
+
+    switch(this.state.currentMediaType) {
+        case 'image':
+            sharedUtils.safeDOMUpdate(this.dom.viewerMediaContainerEl, el => el.style.backgroundColor = slideData.backgroundColor || '#FFFFFF');
+            sharedUtils.safeDOMUpdate(this.dom.viewerFabricCanvasEl, el => el.style.opacity = '1'); // Ensure canvas is visible
+            sharedUtils.safeDOMUpdate(this.dom.viewerCanvasContainerEl, el => el.style.pointerEvents = 'auto'); // Allow canvas interaction
+            if (media && media.driveFileId) {
+                baseApp.showLoading(true, 'loadingSpinner');
+                this.state.isLoading = true;
+                google.script.run
+                    .withSuccessHandler((imageResponse) => {
+                        baseApp.showLoading(false, 'loadingSpinner');
+                        this.state.isLoading = false;
+                        if (this.state.currentSlideIndex !== slideIndex) return; // Slide changed
+                        if (imageResponse && imageResponse.success && imageResponse.base64Data) {
+                            fabric.Image.fromURL(imageResponse.base64Data, (img) => {
+                                if (!this.state.viewerFabricCanvas) return;
+                                this.state.viewerFabricCanvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                                    scaleX: canvas.width / img.width,
+                                    scaleY: canvas.height / img.height
+                                });
+                            });
+                        } else { baseApp.onServerError(imageResponse || {error:"Failed to load image"}, 'messageAreaViewer');}
+                        if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                    })
+                    .withFailureHandler(error => {baseApp.onServerError(error, 'messageAreaViewer'); canvas.renderAll(); this.state.isLoading = false;})
+                    .getImageAsBase64(media.driveFileId);
+            } else {
+                 if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+            }
+            break;
+        case 'youtube':
+            sharedUtils.safeDOMUpdate(this.dom.viewerMediaContainerEl, el => el.style.backgroundColor = 'transparent');
+            canvas.backgroundColor = 'rgba(0,0,0,0)'; // Make Fabric canvas transparent for YT background
+            const videoId = sharedUtils.extractYouTubeVideoId(media.url);
+            if (videoId && this.dom.youtubePlayerContainerEl) {
+                sharedUtils.safeDOMUpdate(this.dom.youtubePlayerContainerEl, el => {
+                    el.innerHTML = '<div id="viewerYouTubePlayerDiv" style="width: 100%; height: 100%;"></div>'; // Target for YT player
+                    el.style.display = 'block';
+                });
+                const playerVars = { /* ... common player vars from old Viewer_JS ... */
+                    'autoplay': 0, 'controls': 0, 'rel': 0, 'showinfo': 0,
+                    'modestbranding': 1, 'iv_load_policy': 3, 'fs': 0, 'disablekb': 1, 'playsinline': 1
+                };
+                mediaManager.setupPlayer(videoId, 'viewerYouTubePlayerDiv', playerVars); // MediaManager handles API readiness
+            } else {
+                baseApp.displayMessage("Invalid YouTube URL for this slide.", false, 'messageAreaViewer');
+            }
+            if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+            break;
+        case 'audio':
+            sharedUtils.safeDOMUpdate(this.dom.viewerMediaContainerEl, el => el.style.backgroundColor = slideData.backgroundColor || '#EEEEEE');
+            // Audio element is this.dom.viewerAudioPlayerEl, but controls are via timeline
+            sharedUtils.showElement(this.dom.interactiveTimelineBarEl);
+
+            if (media && media.driveFileId) {
+                baseApp.showLoading(true, 'loadingSpinner');
+                this.state.isLoading = true;
+                google.script.run
+                    .withSuccessHandler((audioResponse) => {
+                        baseApp.showLoading(false, 'loadingSpinner');
+                        this.state.isLoading = false;
+                        if (this.state.currentSlideIndex !== slideIndex) return; // Slide changed
+                        if (audioResponse && audioResponse.success && audioResponse.base64Data) {
+                             // viewerAudioPlayerEl is the <audio> tag ID
+                            mediaManager.setupAudio(audioResponse.base64Data, 'viewerAudioPlayer', {});
+                        } else {
+                           baseApp.onServerError(audioResponse || {error: "Failed to load audio data."}, 'messageAreaViewer');
+                        }
+                        if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                    })
+                    .withFailureHandler(error => {
+                        baseApp.onServerError(error, 'messageAreaViewer');
+                        this.state.isLoading = false;
+                        if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+                    })
+                    .getAudioAsBase64(media.driveFileId);
+            } else {
+                baseApp.displayMessage("Audio source missing for this slide.", false, 'messageAreaViewer');
+                if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+            }
+            break;
+        default: // 'none' or unknown
+            sharedUtils.safeDOMUpdate(this.dom.viewerMediaContainerEl, el => el.style.backgroundColor = slideData.backgroundColor || '#FFFFFF');
+            if (slideData.fabricCanvasJSON) canvas.loadFromJSON(slideData.fabricCanvasJSON, canvas.renderAll.bind(canvas)); else canvas.renderAll();
+            break;
+    }
+    this.updateViewerCanvasInteractivity(); // Placeholder
+    this.updateSlideNavigationUI(); // Placeholder
+  },
+
+  // --- MediaManager Callbacks ---
+  handleMediaPlayerReady: function(mediaTypeInfo) {
+    console.log(`ViewerManager: Media Player Ready. Type: ${mediaTypeInfo.type}`);
+    baseApp.showLoading(false, 'loadingSpinner'); // Hide general loading spinner if one was shown for media loading
+    sharedUtils.showElement(this.dom.interactiveTimelineBarEl);
+    this.renderTimelineMarkers(); // Now part of viewerManager
+
+    const currentSlide = this.getCurrentSlide();
+    if (!currentSlide || !currentSlide.slideMedia) return;
+
+    // Auto-play or click-to-begin logic (simplified from Viewer_JS)
+    let startBehavior = 'clickToBegin'; // Default
+    if (mediaTypeInfo.type === 'youtube' && currentSlide.slideMedia.youtubeOptions) {
+        startBehavior = currentSlide.slideMedia.youtubeOptions.startBehavior || startBehavior;
+    } else if (mediaTypeInfo.type === 'audio' && currentSlide.slideMedia.audioOptions) {
+        startBehavior = currentSlide.slideMedia.audioOptions.startBehavior || startBehavior;
+    }
+    // Assuming a clickToBeginButton exists or this logic is handled differently (e.g. play on timeline click)
+    // const clickToBeginButton = document.getElementById('viewerClickToBeginButton');
+    // if (clickToBeginButton) sharedUtils.hideElement(clickToBeginButton); // Hide by default
+
+    if (startBehavior === 'autoPlay') {
+        if (mediaTypeInfo.type === 'youtube') mediaManager.playVideo();
+        else if (mediaTypeInfo.type === 'audio') mediaManager.playAudio();
+    } // else if (startBehavior === 'clickToBegin' && clickToBeginButton) sharedUtils.showElement(clickToBeginButton);
+
+    this.updateViewerCanvasInteractivity();
+  },
+  handleMediaPlayerStateChange: function(eventData) {
+    console.log(`ViewerManager: Media Player State Change. Type: ${eventData.type}, Data: ${eventData.data}`);
+    this.updateViewerCanvasInteractivity();
+  },
+  handleMediaPlayerError: function(errorData) {
+    console.error(`ViewerManager: Media Player Error. Type: ${errorData.type}`, errorData);
+    baseApp.displayMessage(`${errorData.type.toUpperCase()} Player Error: ${errorData.data || (errorData.error ? errorData.error.message : 'Unknown error')}`, false, 'messageAreaViewer');
+    this.updateViewerCanvasInteractivity();
+  },
+  handleMediaTimeUpdate: function(currentTime, duration, mediaType) {
+    if (this.dom.viewerCurrentTimeEl) this.dom.viewerCurrentTimeEl.textContent = sharedUtils.formatTime(currentTime);
+    if (this.dom.viewerTotalDurationEl) this.dom.viewerTotalDurationEl.textContent = sharedUtils.formatTime(duration);
+    if (this.dom.viewerTimelineProgressEl && duration > 0) {
+        this.dom.viewerTimelineProgressEl.style.width = (currentTime / duration) * 100 + '%';
+    }
+    // Call question and overlay handlers if they exist
+    if (typeof this.handleMediaQuestionTrigger === 'function') this.handleMediaQuestionTrigger(currentTime);
+    if (typeof this.handleMediaOverlayUpdate === 'function') this.handleMediaOverlayUpdate(currentTime, mediaType);
+  },
+  handleMediaQuestionTrigger: function(currentTime) {
+  const currentSlide = this.getCurrentSlide();
+  if (!currentSlide || !currentSlide.slideMedia || currentSlide.slideMedia.type !== 'youtube' ||
+      !currentSlide.slideMedia.videoQuestions || currentSlide.slideMedia.videoQuestions.length === 0) {
+    return;
+  }
+  for (let i = 0; i < currentSlide.slideMedia.videoQuestions.length; i++) {
+    const question = currentSlide.slideMedia.videoQuestions[i];
+    if (!this.state.askedQuestionIndices.includes(i) &&
+        currentTime >= question.timestamp && currentTime < question.timestamp + 1.5) { // 1.5s window
+      if (mediaManager.isYouTubePlayerAvailable()) mediaManager.pauseVideo();
+      this.state.askedQuestionIndices.push(i);
+      this.displayQuestion(question);
+      break;
+    }
+  }
+},
+
+displayQuestion: function(question) {
+  console.log("ViewerManager: Displaying Question:", question);
+  const questionHtml = `
+      <h4>Question at ${sharedUtils.formatTime(question.timestamp)}</h4>
+      <p>${question.questionText}</p>
+      ${question.options ? question.options.map((opt, idx) => `<button class="question-option-btn" data-idx="${idx}">${opt.text}</button><br>`).join('') : ''}
+      <button onclick="viewerManager.closeQuestionModal()" class="modal-close-btn">Close</button>
+  `;
+  this.showViewerModal(questionHtml);
+  // Future: Add event listeners for dynamically created question option buttons.
+},
+
+closeQuestionModal: function() {
+  this.hideViewerModal();
+  if (this.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+       mediaManager.playVideo();
+  }
+},
+
+handleMediaOverlayUpdate: function(currentTime, mediaType) {
+  // This is the callback from MediaManager.
+  this.updateVideoOverlays(currentTime); // Call to placeholder
+},
+
+handleMediaEnded: function(mediaTypeInfo) {
+    console.log(`ViewerManager: ${mediaTypeInfo.type} media ended.`);
+    if (mediaTypeInfo.type === 'youtube') {
+        this.state.askedQuestionIndices = []; // Reset for replay
+    }
+    // Potentially auto-advance or show end message
+  },
+
+  // --- Placeholder/Utility functions to be fully implemented later ---
+  renderTimelineMarkers: function() {
+  if (!this.dom.viewerTimelineTrackEl || !this.state.currentProjectData) {
+    console.warn("ViewerManager: Timeline track or project data not ready for markers.");
+    if(this.dom.viewerTimelineTrackEl) this.dom.viewerTimelineTrackEl.innerHTML = ''; // Clear if no data
+    return;
+  }
+  const currentSlide = this.getCurrentSlide();
+  if (!currentSlide || !currentSlide.slideMedia) {
+    this.dom.viewerTimelineTrackEl.innerHTML = ''; // Clear if no slide media
+    return;
+  }
+  const questions = (currentSlide.slideMedia.type === 'youtube' && Array.isArray(currentSlide.slideMedia.videoQuestions))
+                     ? currentSlide.slideMedia.videoQuestions : [];
+  const overlays = (Array.isArray(currentSlide.slideMedia.videoOverlays))
+                     ? currentSlide.slideMedia.videoOverlays : [];
+  mediaManager.renderTimelineMarkers('viewerTimelineTrack', questions, overlays);
+  console.log("ViewerManager: Timeline markers rendered via MediaManager.");
+},
+
+updateSlideNavigationUI: function() {
+  if (!this.dom.viewerPrevSlideButtonEl || !this.dom.viewerNextSlideButtonEl || !this.dom.viewerSlideIndicatorEl) {
+    console.warn("ViewerManager: Slide navigation UI elements not found.");
+    return;
+  }
+
+  const currentSlideIndex = this.state.currentSlideIndex;
+  const totalSlides = this.state.currentProjectData ? this.state.currentProjectData.slides.length : 0;
+
+  this.dom.viewerPrevSlideButtonEl.disabled = (currentSlideIndex <= 0);
+  this.dom.viewerNextSlideButtonEl.disabled = (currentSlideIndex >= totalSlides - 1);
+  this.dom.viewerSlideIndicatorEl.textContent = `Slide ${totalSlides > 0 ? currentSlideIndex + 1 : 0} / ${totalSlides}`;
+
+  // Image Event Navigation (basic placeholder logic, can be expanded)
+  const currentSlide = this.getCurrentSlide();
+  const hasImageEvents = currentSlide && currentSlide.slideMedia && currentSlide.slideMedia.type === 'image' && this.state.currentImageTimelineEvents && this.state.currentImageTimelineEvents.length > 0;
+
+  sharedUtils.safeDOMUpdate(this.dom.imageEventNavigationEl, el => el.style.display = hasImageEvents ? 'block' : 'none');
+  if (hasImageEvents) {
+      // Placeholder for updating image event specific buttons and indicator
+      // this.updateImageTimelineNavUI(); // This function would need to be moved/created
+      sharedUtils.safeDOMUpdate(this.dom.viewerImageEventIndicatorEl, el => el.textContent = `Event ${this.state.currentImageSlideEventIndex + 1} / ${this.state.currentImageTimelineEvents.length}`);
+      sharedUtils.safeDOMUpdate(this.dom.viewerPrevImageEventButtonEl, el => el.disabled = (this.state.currentImageSlideEventIndex <= 0));
+      sharedUtils.safeDOMUpdate(this.dom.viewerNextImageEventButtonEl, el => el.disabled = (this.state.currentImageSlideEventIndex >= this.state.currentImageTimelineEvents.length - 1));
+  }
+  console.log("ViewerManager: Slide navigation UI updated.");
+},
+
+initializeVideoOverlays: function() {
+  console.log('ViewerManager: initializeVideoOverlays called');
+  if(this.dom.overlayDisplayAreaEl) this.dom.overlayDisplayAreaEl.innerHTML = '';
+  this.state.activeOverlays.forEach(el => el.remove()); // Defensive removal
+  this.state.activeOverlays.clear();
+},
+
+// Add this new placeholder function
+updateVideoOverlays: function(currentTime) {
+  const slide = this.getCurrentSlide();
+  if (!slide || !slide.slideMedia || !Array.isArray(slide.slideMedia.videoOverlays)) {
+    // Clear any existing overlays if there are none for this slide
+    this.state.activeOverlays.forEach(overlayInfo => overlayInfo.element.remove());
+    this.state.activeOverlays.clear();
+    return;
+  }
+
+  const videoOverlays = slide.slideMedia.videoOverlays;
+
+  videoOverlays.forEach(overlayData => {
+    const overlayId = overlayData.id;
+    const isActive = currentTime >= overlayData.startTime && currentTime < (overlayData.startTime + overlayData.duration);
+    const isDisplayed = this.state.activeOverlays.has(overlayId);
+
+    if (isActive && !isDisplayed) {
+      // Create and display the overlay
+      const overlayElement = this.createOverlayElementDOM(overlayData);
+      if (this.dom.overlayDisplayAreaEl && overlayElement) {
+        this.dom.overlayDisplayAreaEl.appendChild(overlayElement);
+        this.state.activeOverlays.set(overlayId, { element: overlayElement, data: overlayData });
+        console.log(`ViewerManager: Displayed overlay ${overlayId} at ${currentTime}`);
+      }
+    } else if (!isActive && isDisplayed) {
+      // Remove the overlay
+      const overlayInfo = this.state.activeOverlays.get(overlayId);
+      if (overlayInfo && overlayInfo.element) {
+        overlayInfo.element.remove();
+      }
+      this.state.activeOverlays.delete(overlayId);
+      console.log(`ViewerManager: Removed overlay ${overlayId} at ${currentTime}`);
+    }
+  });
+},
+
+createOverlayElementDOM: function(overlayData) {
+  // Simplified version of createOverlayElement from original Viewer_JS
+  // This will be expanded later if more complex templates are needed.
+  const element = document.createElement('div');
+  element.id = 'overlay-' + overlayData.id; // Ensure unique ID for DOM element
+  element.className = 'timeline-overlay-content'; // General class for styling
+
+  // Basic styling based on template name (can be expanded)
+  element.style.border = '1px solid black';
+  element.style.padding = '10px';
+  element.style.margin = '5px';
+  element.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+  element.style.position = 'relative'; // For positioning controls like dismiss button
+
+  if (overlayData.template) {
+    element.classList.add('overlay-' + overlayData.template); // e.g., overlay-lowerThird
+  }
+
+  let contentHtml = '';
+  if (overlayData.content) {
+    if (overlayData.content.title) {
+      contentHtml += `<h4>${overlayData.content.title}</h4>`;
+    }
+    if (overlayData.content.text) {
+      contentHtml += `<p>${overlayData.content.text}</p>`;
+    }
+    // Add more content types as needed (image, button etc.)
+  }
+  element.innerHTML = contentHtml;
+
+  // Add a dismiss button (simplified)
+  const dismissButton = document.createElement('button');
+  dismissButton.textContent = 'X';
+  dismissButton.className = 'overlay-dismiss-button';
+  dismissButton.style.position = 'absolute';
+  dismissButton.style.top = '5px';
+  dismissButton.style.right = '5px';
+  dismissButton.onclick = () => {
+    element.remove();
+    this.state.activeOverlays.delete(overlayData.id);
+    console.log(`ViewerManager: Dismissed overlay ${overlayData.id} by user action.`);
+    // Potentially resume media if paused by an overlay action
+    if (this.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable() && mediaManager.getPlayerState() === YT.PlayerState.PAUSED) {
+        // Check if pause was due to this overlay type, if so, play. This needs more sophisticated state.
+        // For now, just play if it was paused.
+        // mediaManager.playVideo();
+    }
+  };
+  element.appendChild(dismissButton);
+
+  // Add action button if specified (simplified)
+  if (overlayData.action && overlayData.action.type !== 'none') {
+    const actionButton = document.createElement('button');
+    actionButton.textContent = overlayData.action.label || 'Action';
+    actionButton.className = 'overlay-action-button';
+    actionButton.onclick = () => this.handleOverlayActionDOM(overlayData);
+    element.appendChild(actionButton);
+  }
+
+  return element;
+},
+
+handleOverlayActionDOM: function(overlayData) {
+  console.log("ViewerManager: handleOverlayActionDOM for:", overlayData);
+  // Simplified action handler
+  const action = overlayData.action;
+  if (!action) return;
+
+  switch (action.type) {
+    case 'link':
+      if (action.url) {
+        window.open(action.url, '_blank');
+      }
+      break;
+    case 'seek':
+      if (this.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable() && action.time !== undefined) {
+        mediaManager.seekTo(action.time);
+        mediaManager.playVideo(); // Often want to play after seek from action
+      } else if (this.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable() && action.time !== undefined) {
+        mediaManager.seekAudioTo(action.time);
+        mediaManager.playAudio();
+      }
+      break;
+    case 'pause': // Example: an overlay that explicitly pauses media
+      if (this.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) {
+        mediaManager.pauseVideo();
+      } else if (this.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable()) {
+        mediaManager.pauseAudio();
+      }
+      break;
+    // Add more actions like 'play', 'showModal', etc.
+    default:
+      console.warn("Unknown overlay action type:", action.type);
+  }
+  // Overlays with actions often should be dismissed or automatically hidden after action
+  // For now, manual dismiss is the primary way. Consider adding auto-dismiss for certain actions.
+},
+
+updateViewerCanvasInteractivity: function() {
+  if (!this.state.viewerFabricCanvas || !this.dom.viewerCanvasContainerEl) return;
+
+  const canvas = this.state.viewerFabricCanvas;
+  const currentMediaType = this.state.currentMediaType;
+  let allowInteraction = false;
+
+  if (currentMediaType === 'image' || currentMediaType === 'none' || !currentMediaType) {
+    allowInteraction = true; // Allow interaction for static images or non-media slides
+  } else if (currentMediaType === 'youtube' || currentMediaType === 'audio') {
+    // For media, usually non-interactive unless specific overlays or elements require it.
+    // Or if media is paused and interaction is desired.
+    // This is a simplified version. The original might have had more nuanced logic.
+    const playerState = (currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) ? mediaManager.getPlayerState() : null;
+    const audioPaused = (currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable() && mediaManager.state.audioPlayer) ? mediaManager.state.audioPlayer.paused : true;
+
+    if ((currentMediaType === 'youtube' && (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.ENDED || playerState === YT.PlayerState.CUED)) ||
+        (currentMediaType === 'audio' && audioPaused)) {
+      // Potentially allow interaction when media is paused/ended.
+      // For now, let's keep it simple: canvas is generally not interactive during media playback.
+      // allowInteraction = true;
+    }
+  }
+
+  // This logic might need to be more refined based on specific interactive canvas elements.
+  // For now, if there are ANY objects on the canvas, assume it might need to be interactive.
+  // A more robust approach would be to check if any of those objects are themselves interactive.
+  if (canvas.getObjects().length > 0) {
+      allowInteraction = true;
+  }
+
+
+  this.dom.viewerCanvasContainerEl.style.pointerEvents = allowInteraction ? 'auto' : 'none';
+  canvas.selection = allowInteraction; // Enable/disable fabric object selection
+  canvas.forEachObject(obj => obj.selectable = allowInteraction);
+
+  console.log(`ViewerManager: Canvas interactivity set to ${allowInteraction ? 'auto' : 'none'}`);
+},
+
+  navigateToPrevSlide: function() {
+  if (this.state.currentSlideIndex > 0) {
+    this.renderSlideForViewing(this.state.currentSlideIndex - 1);
+  } else {
+    console.log("ViewerManager: Already on the first slide.");
+  }
+},
+
+navigateToNextSlide: function() {
+  if (this.state.currentProjectData && this.state.currentProjectData.slides &&
+      this.state.currentSlideIndex < this.state.currentProjectData.slides.length - 1) {
+    this.renderSlideForViewing(this.state.currentSlideIndex + 1);
+  } else {
+    console.log("ViewerManager: Already on the last slide or no project data.");
+  }
+},
+
+hideViewerModal: function() {
+  if (this.dom.viewerModalEl) {
+    this.dom.viewerModalEl.style.display = 'none';
+    this.dom.viewerModalBodyEl.innerHTML = ''; // Clear content
+    console.log("ViewerManager: Modal hidden.");
+  }
+  // If media was paused due to a modal (e.g. question), it should be resumed by the logic that opened the modal (like closeQuestionModal)
+},
+
+showViewerModal: function(htmlContent) { // Ensure this function exists and is robust
+  if (this.dom.viewerModalBodyEl && this.dom.viewerModalEl) {
+    this.dom.viewerModalBodyEl.innerHTML = htmlContent;
+    this.dom.viewerModalEl.style.display = 'flex'; // Or 'block' depending on CSS for centering
+    console.log("ViewerManager: Modal shown.");
+  } else {
+    console.error("ViewerManager: Modal body or overlay element not found.");
+  }
+},
+
+// Placeholders for modal sequence navigation if needed later
+navigateModalPrevious: function() {
+  console.log('ViewerManager: navigateModalPrevious (Placeholder)');
+  // Add logic if sequence modals are used
+},
+
+navigateModalNext: function() {
+  console.log('ViewerManager: navigateModalNext (Placeholder)');
+  // Add logic if sequence modals are used
+}
+};
+</script>

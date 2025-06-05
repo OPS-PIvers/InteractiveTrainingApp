@@ -1351,10 +1351,19 @@
     <div id="messageArea"></div>
 
     <?!= include('Client/Shared/LoadingSpinner'); ?>
+    <!-- Shared Libraries -->
     <script src="../Shared/SharedUtils.html"></script>
     <script src="../Shared/BaseApp.html"></script>
     <script src="../Shared/MediaManager.html"></script>
-    <?!= include('Client/Admin/Admin_JS'); ?>
+
+    <!-- Admin Modules -->
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminApp').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminProjectManager').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminCanvasManager').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminOverlayManager').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Admin/AdminToolbar').getContent(); ?>
+    <!-- <?!= include('Client/Admin/Admin_JS'); ?> --> <!-- Old script removed -->
+
     </div> <!-- End of main-content-wrapper -->
 
     <div id="questionModal" class="toolbar-popover" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; z-index: 1001;">

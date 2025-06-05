@@ -1,0 +1,809 @@
+<script>
+  window.adminOverlayManager = window.adminOverlayManager || {};
+  adminOverlayManager.state = {
+    projectDataRef: null,
+    currentSlideRef: null,
+    currentMediaType: null,
+
+    // Video Overlay specific state
+    placingOverlay: null, // { startTime: number, position: {x: number, y: number} }
+    editingOverlayId: null,
+    previewingOverlays: false,
+
+    // DOM Elements
+    mediaTimelineControlsEl: null, videoTimelineSliderEl: null, videoCurrentTimeDisplayEl: null, videoTotalDurationDisplayEl: null,
+    addQuestionBtnEl: null, questionModalEl: null, questionTimestampDisplayEl: null, questionTextEl: null,
+    saveQuestionBtnEl: null, cancelQuestionBtnEl: null, editingQuestionIndexEl: null, // Hidden input for index
+    videoQuestionsListContainerEl: null, videoQuestionsListEl: null,
+    optionInputsEl: [], correctAnswerRadiosEl: [],
+
+    addTimelineOverlayBtnEl: null, overlayPlacementModeEl: null, overlayPlacementOverlayEl: null,
+    overlayEditorModalEl: null, overlayTemplateEl: null, overlayStartTimeDisplayEl: null,
+    overlayDurationEl: null, overlayTextContentEditorEl: null,
+    overlayPauseVideoEl: null, overlayDismissibleEl: null, overlayActionEl: null,
+    overlayPositionDisplayEl: null, deleteOverlayBtnEditorEl: null,
+    saveOverlayBtnEl: null, cancelOverlayBtnEditorEl: null,
+    previewOverlaysBtnEl: null, overlayTimelineTrackEl: null, adminOverlayListEl: null,
+
+    // For canvas object interactions/animations (elements are in AdminToolbar, AOM methods are called)
+    objInteractionTriggerEl: null, objInteractionActionEl: null, objInteractionModalContentEl: null,
+    objInteractionNavigateToSlideEl: null, objInteractionNavigateToURLEl: null, objInteractionTargetObjectIdEl: null,
+    objInteractionPanZoomLevelEl: null,
+    objAnimationTriggerEl: null, objAnimationTypeEl: null, objAnimationSpeedEl: null,
+    objAnimationStrengthEl: null, objAnimationLoopEl: null, objAnimationTargetEl: null,
+    objAnimationCustomPathEl: null,
+    animationStrengthUnitEl: null // Span to show unit (s, px, %)
+  };
+
+  console.log("AdminOverlayManager.html loaded");
+
+  adminOverlayManager.initialize = function() {
+    console.log("AdminOverlayManager initialized (general).");
+    // This could pre-fetch templates or other general setup if needed.
+  };
+
+  adminOverlayManager.initializeEditView = function(projectData) {
+    console.log("AdminOverlayManager: Initializing Edit View.");
+    const aom = adminOverlayManager;
+    aom.state.projectDataRef = projectData;
+    aom.state.currentSlideRef = null;
+    aom.state.currentMediaType = null;
+    aom.state.placingOverlay = null;
+    aom.state.editingOverlayId = null;
+    aom.state.previewingOverlays = false;
+
+    // Fetch DOM Elements for Video Questions & Timeline
+    aom.state.mediaTimelineControlsEl = document.getElementById('mediaTimelineControls');
+    aom.state.videoTimelineSliderEl = document.getElementById('videoTimelineSlider');
+    aom.state.videoCurrentTimeDisplayEl = document.getElementById('videoCurrentTimeDisplay');
+    aom.state.videoTotalDurationDisplayEl = document.getElementById('videoTotalDurationDisplay');
+    aom.state.addQuestionBtnEl = document.getElementById('addQuestionBtn');
+    aom.state.questionModalEl = document.getElementById('questionModal');
+    aom.state.questionTimestampDisplayEl = document.getElementById('questionTimestampDisplay');
+    aom.state.questionTextEl = document.getElementById('questionText');
+    aom.state.saveQuestionBtnEl = document.getElementById('saveQuestionBtn');
+    aom.state.cancelQuestionBtnEl = document.getElementById('cancelQuestionBtn');
+    aom.state.editingQuestionIndexEl = document.getElementById('editingQuestionIndex');
+    aom.state.videoQuestionsListContainerEl = document.getElementById('videoQuestionsListContainer');
+    aom.state.videoQuestionsListEl = document.getElementById('videoQuestionsList');
+    aom.state.optionInputsEl = []; aom.state.correctAnswerRadiosEl = [];
+    for (let i = 0; i < 4; i++) { // Assuming 4 options
+      aom.state.optionInputsEl.push(document.getElementById(`option${i+1}`));
+      aom.state.correctAnswerRadiosEl.push(document.getElementById(`correctAnswer${i}`));
+    }
+
+    // Fetch DOM Elements for Video Overlays
+    aom.state.addTimelineOverlayBtnEl = document.getElementById('addTimelineOverlayBtn');
+    aom.state.overlayPlacementModeEl = document.getElementById('overlayPlacementMode'); // Div shown during placement
+    aom.state.overlayPlacementOverlayEl = document.getElementById('overlayPlacementCanvasOverlay'); // Clickable overlay on canvas/video area
+    aom.state.overlayEditorModalEl = document.getElementById('overlayEditorModal');
+    aom.state.overlayTemplateEl = document.getElementById('overlayTemplate'); // The actual overlay element in the editor
+    aom.state.overlayStartTimeDisplayEl = document.getElementById('overlayStartTimeDisplay');
+    aom.state.overlayDurationEl = document.getElementById('overlayDuration');
+    aom.state.overlayTextContentEditorEl = document.getElementById('overlayTextContent');
+    aom.state.overlayPauseVideoEl = document.getElementById('overlayPauseVideo');
+    aom.state.overlayDismissibleEl = document.getElementById('overlayDismissible');
+    aom.state.overlayActionEl = document.getElementById('overlayAction'); // E.g. URL for click
+    aom.state.overlayPositionDisplayEl = document.getElementById('overlayPositionDisplay'); // Shows X, Y
+    aom.state.deleteOverlayBtnEditorEl = document.getElementById('deleteOverlayBtnEditor'); // Delete button in modal
+    aom.state.saveOverlayBtnEl = document.getElementById('saveOverlayBtn');
+    aom.state.cancelOverlayBtnEditorEl = document.getElementById('cancelOverlayBtnEditor');
+    aom.state.previewOverlaysBtnEl = document.getElementById('previewOverlaysBtn');
+    aom.state.overlayTimelineTrackEl = document.getElementById('overlayTimelineTrack'); // Visual track for overlays
+    aom.state.adminOverlayListEl = document.getElementById('adminOverlayList'); // List display of overlays
+
+    // Fetch DOM elements for Canvas Object Interaction/Animation (from AdminToolbar)
+    // These are for AOM to read values if AdminToolbar doesn't pass them directly.
+    aom.state.objInteractionTriggerEl = document.getElementById('objInteractionTrigger');
+    aom.state.objInteractionActionEl = document.getElementById('objInteractionAction');
+    aom.state.objInteractionModalContentEl = document.getElementById('objInteractionModalContent');
+    aom.state.objInteractionNavigateToSlideEl = document.getElementById('objInteractionNavigateToSlide');
+    aom.state.objInteractionNavigateToURLEl = document.getElementById('objInteractionNavigateToURL');
+    aom.state.objInteractionTargetObjectIdEl = document.getElementById('objInteractionTargetObjectId');
+    aom.state.objInteractionPanZoomLevelEl = document.getElementById('objInteractionPanZoomLevel');
+
+    aom.state.objAnimationTriggerEl = document.getElementById('objAnimationTrigger');
+    aom.state.objAnimationTypeEl = document.getElementById('objAnimationType');
+    aom.state.objAnimationSpeedEl = document.getElementById('objAnimationSpeed');
+    aom.state.objAnimationStrengthEl = document.getElementById('objAnimationStrength');
+    aom.state.objAnimationLoopEl = document.getElementById('objAnimationLoop');
+    aom.state.objAnimationTargetEl = document.getElementById('objAnimationTarget'); // For path animation target
+    aom.state.objAnimationCustomPathEl = document.getElementById('objAnimationCustomPath'); // For custom path SVG
+
+    aom.state.animationStrengthUnitEl = document.getElementById('animationStrengthUnit');
+
+
+    aom.attachInteractionEventListeners();
+    aom.updateVideoToolsVisibility(false); // Initially hide video-specific tools
+    console.log("AdminOverlayManager: Edit View Initialized, DOM refs fetched.");
+  };
+
+  adminOverlayManager.setCurrentMediaType = function(mediaType, currentSlideData) {
+    const aom = adminOverlayManager;
+    aom.state.currentMediaType = mediaType;
+    aom.state.currentSlideRef = currentSlideData;
+    console.log("AdminOverlayManager: Media type set to -", mediaType, "for slide:", currentSlideData ? currentSlideData.slideId : "N/A");
+
+    const isYouTube = mediaType === 'youtube';
+    aom.updateVideoToolsVisibility(isYouTube);
+
+    if (isYouTube) {
+      if (!currentSlideData.slideMedia.videoQuestions) currentSlideData.slideMedia.videoQuestions = [];
+      if (!currentSlideData.slideMedia.videoOverlays) currentSlideData.slideMedia.videoOverlays = [];
+      aom.renderVideoQuestionsList();
+      aom.renderOverlayTimeline();
+      aom.renderOverlayList();
+      aom.clearVideoOverlaysAdmin(true); // Stop preview and clear existing visual overlays
+    } else {
+      // Clear any YouTube specific UI elements if switching away from a YouTube slide
+      sharedUtils.safeDOMUpdate(aom.state.videoQuestionsListEl, el => el.innerHTML = '');
+      sharedUtils.safeDOMUpdate(aom.state.overlayTimelineTrackEl, el => el.innerHTML = '');
+      sharedUtils.safeDOMUpdate(aom.state.adminOverlayListEl, el => el.innerHTML = '');
+    }
+  };
+
+  adminOverlayManager.setupMediaCallbacks = function(mediaType) {
+    if (!window.mediaManager) { console.error("MediaManager not available for setting callbacks."); return; }
+    const aom = adminOverlayManager;
+    mediaManager.state.callbacks.onReady = (mtInfo) => aom.handleMediaPlayerReady(mtInfo.type);
+    mediaManager.state.callbacks.onStateChange = (evData) => aom.handleMediaPlayerStateChange(evData.type, evData.data);
+    mediaManager.state.callbacks.onError = (errData) => aom.handleMediaPlayerError(errData.type, errData.data || errData.error);
+    mediaManager.state.callbacks.onTimeUpdate = (time, duration, mt) => aom.handleMediaTimeUpdate(time, duration, mt);
+    // YouTube specific callbacks (will only be called if mediaManager identifies type as youtube)
+    mediaManager.state.callbacks.onQuestionTrigger = (time) => aom.handleMediaQuestionTrigger(time);
+    mediaManager.state.callbacks.onOverlayUpdateNeeded = (time, mt) => aom.handleMediaOverlayUpdate(time, mt);
+    mediaManager.state.callbacks.onEnded = (mtInfo) => aom.handleMediaEnded(mtInfo.type);
+    console.log("AdminOverlayManager: MediaManager callbacks configured for", mediaType);
+  };
+
+  adminOverlayManager.handleMediaPlayerReady = function(mediaType) {
+    console.log("AOM: Media Player Ready -", mediaType);
+    const aom = adminOverlayManager;
+    if (mediaType === 'youtube') {
+      aom.updateVideoToolsVisibility(true);
+      aom.renderVideoQuestionsList();
+      aom.renderOverlayTimeline();
+      aom.renderOverlayList();
+      // If player auto-plays or has initial duration, update time display
+      if (window.mediaManager && mediaManager.state.ytPlayer) {
+          const duration = mediaManager.state.ytPlayer.getDuration();
+          const currentTime = mediaManager.safeGetCurrentTime();
+          aom.handleMediaTimeUpdate(currentTime, duration, mediaType);
+      }
+    }
+  };
+
+  adminOverlayManager.handleMediaPlayerStateChange = function(mediaType, playerState) {
+    // console.log("AOM: Media Player State Change -", mediaType, playerState);
+    // Example: If playerState is YT.PlayerState.ENDED, call handleMediaEnded
+    // if (mediaType === 'youtube' && playerState === YT.PlayerState.ENDED) {
+    //   adminOverlayManager.handleMediaEnded(mediaType);
+    // }
+    // If playerState is PLAYING, ensure previewingOverlays is respected
+    if (mediaType === 'youtube' && playerState === YT.PlayerState.PLAYING && adminOverlayManager.state.previewingOverlays) {
+        adminOverlayManager.renderVideoOverlaysAdmin(false); // re-render without re-creating, just show/hide based on time
+    }
+  };
+
+  adminOverlayManager.handleMediaPlayerError = function(mediaType, errorData) {
+    console.error("AOM: Media Player Error -", mediaType, errorData);
+    baseApp.displayMessage(`Player error for ${mediaType}. Details: ${errorData}`, false, "messageArea");
+    if (mediaType === 'youtube') adminOverlayManager.updateVideoToolsVisibility(false);
+  };
+
+  adminOverlayManager.handleMediaTimeUpdate = function(currentTime, duration, mediaType) {
+    const aom = adminOverlayManager;
+    if (aom.state.videoTimelineSliderEl) {
+      aom.state.videoTimelineSliderEl.max = duration || 0;
+      aom.state.videoTimelineSliderEl.value = currentTime || 0;
+    }
+    sharedUtils.safeDOMUpdate(aom.state.videoCurrentTimeDisplayEl, el => el.textContent = sharedUtils.formatTime(currentTime || 0));
+    sharedUtils.safeDOMUpdate(aom.state.videoTotalDurationDisplayEl, el => el.textContent = sharedUtils.formatTime(duration || 0));
+
+    // This is also where overlays could be updated if not using onOverlayUpdateNeeded
+    if (aom.state.previewingOverlays && mediaType === 'youtube') {
+        aom.handleMediaOverlayUpdate(currentTime, mediaType);
+    }
+  };
+
+  adminOverlayManager.handleMediaQuestionTrigger = function(currentTime) {
+    const aom = adminOverlayManager;
+    const slide = aom.state.currentSlideRef;
+    if (!slide || !slide.slideMedia || !slide.slideMedia.videoQuestions || slide.slideMedia.videoQuestions.length === 0) return;
+
+    slide.slideMedia.videoQuestions.forEach((question, index) => {
+      // Check if question should be triggered (within a small time window and not already triggered)
+      // Note: mediaManager's onQuestionTrigger is usually precise.
+      if (!question.triggered && Math.abs(currentTime - question.timestamp) < 0.5) { // Allow small deviation
+        if(window.mediaManager) mediaManager.pauseVideo();
+        question.triggered = true; // Mark as triggered to prevent re-triggering immediately
+
+        sharedUtils.safeDOMUpdate(aom.state.questionTimestampDisplayEl, el => el.textContent = sharedUtils.formatTime(question.timestamp));
+        if(aom.state.questionModalEl) aom.state.questionModalEl.dataset.rawTimestamp = question.timestamp;
+        if(aom.state.questionTextEl) aom.state.questionTextEl.value = question.questionText || '';
+
+        aom.state.optionInputsEl.forEach((input, i) => {
+          if(input) input.value = (question.options && question.options[i]) ? question.options[i] : '';
+        });
+        aom.state.correctAnswerRadiosEl.forEach((radio, i) => {
+          if(radio) radio.checked = (i === question.correctOptionIndex);
+        });
+
+        if(aom.state.editingQuestionIndexEl) aom.state.editingQuestionIndexEl.value = index.toString();
+        sharedUtils.safeDOMUpdate(aom.state.questionModalEl, el => el.style.display = 'block');
+      }
+    });
+  };
+
+  adminOverlayManager.handleMediaOverlayUpdate = function(currentTime, mediaType) {
+    const aom = adminOverlayManager;
+    if (!aom.state.previewingOverlays || mediaType !== 'youtube') return;
+    const slide = aom.state.currentSlideRef;
+    if (!slide || !slide.slideMedia || !Array.isArray(slide.slideMedia.videoOverlays)) return;
+
+    const overlays = slide.slideMedia.videoOverlays;
+    const activeOverlaysContainer = document.getElementById('adminYouTubePlayerContainer'); // This is where previews are shown
+    if (!activeOverlaysContainer) return;
+
+    overlays.forEach(overlay => {
+      const overlayEl = activeOverlaysContainer.querySelector(`.video-overlay-preview[data-preview-overlay-id="${overlay.id}"]`);
+      if (overlayEl) { // Element might not exist if renderVideoOverlaysAdmin hasn't run for it yet
+        const isVisible = currentTime >= overlay.startTime && currentTime < (overlay.startTime + overlay.duration);
+        overlayEl.style.display = isVisible ? 'block' : 'none';
+      }
+    });
+  };
+
+  adminOverlayManager.handleMediaEnded = function(mediaType) {
+    console.log("AOM: Media Ended -", mediaType);
+    const aom = adminOverlayManager;
+    const slide = aom.state.currentSlideRef;
+    if (mediaType === 'youtube' && slide && slide.slideMedia && slide.slideMedia.videoQuestions) {
+        slide.slideMedia.videoQuestions.forEach(q => q.triggered = false); // Reset triggered state for replay
+    }
+    if (aom.state.previewingOverlays) {
+        aom.clearVideoOverlaysAdmin(false); // Clear visual overlays, but don't toggle the preview button state
+    }
+    // Reset timeline slider to 0 or end? For now, let it stay at end.
+    // if (aom.state.videoTimelineSliderEl) aom.state.videoTimelineSliderEl.value = 0;
+    // sharedUtils.safeDOMUpdate(aom.state.videoCurrentTimeDisplayEl, el => el.textContent = sharedUtils.formatTime(0));
+  };
+
+  adminOverlayManager.attachInteractionEventListeners = function() {
+    const aom = adminOverlayManager;
+    const safelyAttach = (element, event, handler, id) => {
+        if (element) {
+            // Simple attachment, assuming baseApp.resourceManager handles duplicate tracking by ID if called multiple times
+            const uniqueId = `aom-${id}-${element.id || event}`;
+            element.addEventListener(event, handler);
+            baseApp.resourceManager.trackDisposable(uniqueId, () => element.removeEventListener(event, handler));
+        } else {
+            console.warn(`AOM.attachInteractionEventListeners: Element for ID '${id}' (DOM id: ${element ? element.id : 'N/A'}) not found.`);
+        }
+    };
+
+    if(aom.state.videoTimelineSliderEl) {
+        const handler = function() { if(window.mediaManager && mediaManager.isYouTubePlayerAvailable()) mediaManager.seekTo(parseFloat(this.value)); };
+        aom.state.videoTimelineSliderEl.addEventListener('input', handler);
+        baseApp.resourceManager.trackDisposable('aom-timeline-slider-input', () => aom.state.videoTimelineSliderEl.removeEventListener('input', handler));
+    }
+
+    safelyAttach(aom.state.addQuestionBtnEl, 'click', () => aom.handleAddQuestionClick(), "addQuestionBtn");
+    safelyAttach(aom.state.saveQuestionBtnEl, 'click', () => aom.handleSaveQuestionClick(), "saveQuestionBtn");
+    safelyAttach(aom.state.cancelQuestionBtnEl, 'click', () => aom.handleCancelQuestionClick(), "cancelQuestionBtn");
+
+    safelyAttach(aom.state.addTimelineOverlayBtnEl, 'click', () => aom.initiateOverlayPlacement(), "addTimelineOverlayBtn");
+    safelyAttach(aom.state.overlayPlacementOverlayEl, 'click', (e) => aom.handleOverlayPlacement(e), "overlayPlacementOverlay");
+    safelyAttach(aom.state.saveOverlayBtnEl, 'click', () => aom.saveOverlay(), "saveOverlayBtn");
+    safelyAttach(aom.state.cancelOverlayBtnEditorEl, 'click', () => aom.hideOverlayEditor(), "cancelOverlayBtnEditor");
+    safelyAttach(aom.state.deleteOverlayBtnEditorEl, 'click', () => aom.deleteCurrentOverlay(), "deleteOverlayBtnEditor");
+    safelyAttach(aom.state.previewOverlaysBtnEl, 'click', () => aom.toggleOverlayPreview(), "previewOverlaysBtn");
+
+    console.log("AdminOverlayManager: UI Event listeners attached.");
+  };
+
+  // --- Video Question Logic (Moved and Adapted from Admin_JS.html) ---
+  adminOverlayManager.updateVideoToolsVisibility = function(show) {
+    const aom = adminOverlayManager;
+    const displayStyle = show ? 'block' : 'none';
+    const inlineDisplayStyle = show ? 'inline-block' : 'none';
+
+    sharedUtils.safeDOMUpdate(aom.state.mediaTimelineControlsEl, el => el.style.display = displayStyle);
+    sharedUtils.safeDOMUpdate(aom.state.videoQuestionsListContainerEl, el => el.style.display = displayStyle);
+    // Buttons related to overlays/questions might be inline-block
+    sharedUtils.safeDOMUpdate(aom.state.addQuestionBtnEl, el => el.style.display = inlineDisplayStyle);
+    sharedUtils.safeDOMUpdate(aom.state.addTimelineOverlayBtnEl, el => el.style.display = inlineDisplayStyle);
+    sharedUtils.safeDOMUpdate(aom.state.previewOverlaysBtnEl, el => el.style.display = inlineDisplayStyle);
+    // Overlay timeline track itself
+    sharedUtils.safeDOMUpdate(aom.state.overlayTimelineTrackEl, el => el.style.display = displayStyle);
+    sharedUtils.safeDOMUpdate(aom.state.adminOverlayListEl, el => el.style.display = displayStyle);
+
+
+    // If hiding, also close any open modals related to these tools
+    if (!show) {
+        sharedUtils.safeDOMUpdate(aom.state.questionModalEl, el => el.style.display = 'none');
+        sharedUtils.safeDOMUpdate(aom.state.overlayEditorModalEl, el => el.style.display = 'none');
+        if (aom.state.placingOverlay) { // Cancel placement mode
+            sharedUtils.safeDOMUpdate(aom.state.overlayPlacementModeEl, el => el.style.display = 'none');
+            aom.state.placingOverlay = null;
+        }
+        if (aom.state.previewingOverlays) { // Stop preview
+            aom.toggleOverlayPreview(false); // Force stop
+        }
+    }
+  };
+
+  adminOverlayManager.renderVideoQuestionsList = function() {
+    const aom = adminOverlayManager;
+    const slide = aom.state.currentSlideRef;
+    sharedUtils.safeDOMUpdate(aom.state.videoQuestionsListEl, listEl => {
+        listEl.innerHTML = ''; // Clear existing
+        if (!slide || !slide.slideMedia || !slide.slideMedia.videoQuestions || slide.slideMedia.videoQuestions.length === 0) {
+            listEl.innerHTML = '<li>No questions added for this video.</li>';
+            return;
+        }
+        slide.slideMedia.videoQuestions.sort((a, b) => a.timestamp - b.timestamp).forEach((question, index) => {
+            const item = document.createElement('li');
+            item.innerHTML = `<span>${sharedUtils.formatTime(question.timestamp)} - ${sharedUtils.truncateText(question.questionText, 30)}</span>`;
+
+            const editBtn = document.createElement('button'); editBtn.className = 'admin-button-small'; editBtn.textContent = 'Edit';
+            editBtn.onclick = () => aom.editVideoQuestion(index);
+
+            const deleteBtn = document.createElement('button'); deleteBtn.className = 'admin-button-small admin-button-danger'; deleteBtn.textContent = 'Del';
+            deleteBtn.onclick = () => aom.deleteVideoQuestion(index);
+
+            item.appendChild(editBtn); item.appendChild(deleteBtn);
+            listEl.appendChild(item);
+        });
+    });
+  };
+
+  adminOverlayManager.handleAddQuestionClick = function() {
+    const aom = adminOverlayManager;
+    if (!window.mediaManager || !mediaManager.isYouTubePlayerAvailable()) {
+        baseApp.displayMessage("YouTube player not ready to set question timestamp.", false, "messageArea"); return;
+    }
+    mediaManager.pauseVideo();
+    const currentTime = mediaManager.safeGetCurrentTime();
+
+    sharedUtils.safeDOMUpdate(aom.state.questionTimestampDisplayEl, el => el.textContent = sharedUtils.formatTime(currentTime));
+    if(aom.state.questionModalEl) aom.state.questionModalEl.dataset.rawTimestamp = currentTime.toString();
+    if(aom.state.questionTextEl) aom.state.questionTextEl.value = '';
+    aom.state.optionInputsEl.forEach(input => { if(input) input.value = ''; });
+    aom.state.correctAnswerRadiosEl.forEach(radio => { if(radio) radio.checked = false; });
+    if(aom.state.editingQuestionIndexEl) aom.state.editingQuestionIndexEl.value = '-1'; // Indicates new question
+    sharedUtils.safeDOMUpdate(aom.state.questionModalEl, el => el.style.display = 'block');
+  };
+
+  adminOverlayManager.editVideoQuestion = function(index) {
+    const aom = adminOverlayManager;
+    const slide = aom.state.currentSlideRef;
+    if (!slide || !slide.slideMedia || !slide.slideMedia.videoQuestions || index < 0 || index >= slide.slideMedia.videoQuestions.length) return;
+
+    const question = slide.slideMedia.videoQuestions[index];
+    if (!question) return;
+
+    if(window.mediaManager) mediaManager.pauseVideo();
+
+    sharedUtils.safeDOMUpdate(aom.state.questionTimestampDisplayEl, el => el.textContent = sharedUtils.formatTime(question.timestamp));
+    if(aom.state.questionModalEl) aom.state.questionModalEl.dataset.rawTimestamp = question.timestamp.toString();
+    if(aom.state.questionTextEl) aom.state.questionTextEl.value = question.questionText || '';
+    aom.state.optionInputsEl.forEach((input, i) => { if(input) input.value = (question.options && question.options[i]) ? question.options[i] : ''; });
+    aom.state.correctAnswerRadiosEl.forEach((radio, i) => { if(radio) radio.checked = (i === question.correctOptionIndex); });
+    if(aom.state.editingQuestionIndexEl) aom.state.editingQuestionIndexEl.value = index.toString();
+    sharedUtils.safeDOMUpdate(aom.state.questionModalEl, el => el.style.display = 'block');
+  };
+
+  adminOverlayManager.handleSaveQuestionClick = function() {
+    const aom = adminOverlayManager;
+    const slide = aom.state.currentSlideRef;
+    if (!slide || !slide.slideMedia) return;
+    if (!slide.slideMedia.videoQuestions) slide.slideMedia.videoQuestions = [];
+
+    const timestamp = parseFloat(aom.state.questionModalEl.dataset.rawTimestamp);
+    const questionText = aom.state.questionTextEl ? aom.state.questionTextEl.value.trim() : '';
+    if (!questionText) { baseApp.displayMessage("Question text cannot be empty.", false, "messageArea"); return; }
+
+    const options = aom.state.optionInputsEl.map(input => input ? input.value.trim() : '');
+    if (options.some(opt => !opt)) { baseApp.displayMessage("All option fields must be filled.", false, "messageArea"); return; }
+
+    let correctOptionIndex = -1;
+    aom.state.correctAnswerRadiosEl.forEach((radio, i) => { if (radio && radio.checked) correctOptionIndex = i; });
+    if (correctOptionIndex === -1) { baseApp.displayMessage("Please select a correct answer.", false, "messageArea"); return; }
+
+    const questionData = { timestamp, questionText, options, correctOptionIndex, triggered: false };
+    const editingIndex = parseInt(aom.state.editingQuestionIndexEl.value, 10);
+
+    if (editingIndex > -1 && editingIndex < slide.slideMedia.videoQuestions.length) {
+        slide.slideMedia.videoQuestions[editingIndex] = questionData; // Update existing
+    } else {
+        slide.slideMedia.videoQuestions.push(questionData); // Add new
+    }
+
+    aom.renderVideoQuestionsList();
+    sharedUtils.safeDOMUpdate(aom.state.questionModalEl, el => el.style.display = 'none');
+    if(window.adminCanvasManager) adminCanvasManager.saveCanvasStateForHistory(); // Save project state
+    baseApp.displayMessage("Video question saved.", true, "messageArea");
+  };
+
+  adminOverlayManager.handleCancelQuestionClick = function() {
+    sharedUtils.safeDOMUpdate(adminOverlayManager.state.questionModalEl, el => el.style.display = 'none');
+  };
+
+  adminOverlayManager.deleteVideoQuestion = function(index) {
+    const aom = adminOverlayManager;
+    const slide = aom.state.currentSlideRef;
+    if (!slide || !slide.slideMedia || !slide.slideMedia.videoQuestions || index < 0 || index >= slide.slideMedia.videoQuestions.length) return;
+
+    if (confirm("Are you sure you want to delete this question?")) {
+        slide.slideMedia.videoQuestions.splice(index, 1);
+        aom.renderVideoQuestionsList();
+        if(window.adminCanvasManager) adminCanvasManager.saveCanvasStateForHistory(); // Save project state
+        baseApp.displayMessage("Video question deleted.", true, "messageArea");
+    }
+  };
+
+  // --- Video Overlay Logic (Moved and Adapted from Admin_JS.html) ---
+  // This includes: initiateOverlayPlacement, handleOverlayPlacement, showOverlayEditor,
+  // createNewOverlay, saveOverlay, renderOverlayTimeline, toggleOverlayPreview,
+  // findOverlayById, hideOverlayEditor, deleteCurrentOverlay, gatherOverlayFromForm,
+  // renderOverlayList, renderVideoOverlaysAdmin, clearVideoOverlaysAdmin, getTemplateColor.
+  // (Implementation of these functions would be extensive here, but assume they are copied
+  // and adapted using 'aom.state' and 'aom.state.currentSlideRef' as described in the plan)
+  adminOverlayManager.initiateOverlayPlacement = function() {
+    const aom = adminOverlayManager;
+    if (!window.mediaManager || !mediaManager.isYouTubePlayerAvailable() || !mediaManager.state.ytPlayer) {
+        baseApp.displayMessage("YouTube player not available or ready.", false, "messageArea"); return;
+    }
+    mediaManager.pauseVideo();
+    const currentTime = mediaManager.safeGetCurrentTime();
+    sharedUtils.safeDOMUpdate(aom.state.overlayPlacementModeEl, el => el.style.display = 'block');
+    sharedUtils.safeDOMUpdate(aom.state.overlayPlacementOverlayEl, el => el.style.display = 'block'); // Make clickable overlay visible
+    aom.state.placingOverlay = { startTime: currentTime, position: null, template: 'default' }; // Added template
+    baseApp.displayMessage("Click on the video area to position the overlay.", true, "messageArea");
+  };
+
+  adminOverlayManager.handleOverlayPlacement = function(event) {
+      const aom = adminOverlayManager;
+      if (!aom.state.placingOverlay) return;
+
+      const videoContainer = aom.state.overlayPlacementOverlayEl; // The clickable area
+      const rect = videoContainer.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 100; // Percentage
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+
+      aom.state.placingOverlay.position = { x: parseFloat(x.toFixed(2)), y: parseFloat(y.toFixed(2)) };
+
+      sharedUtils.safeDOMUpdate(aom.state.overlayPlacementModeEl, el => el.style.display = 'none');
+      sharedUtils.safeDOMUpdate(aom.state.overlayPlacementOverlayEl, el => el.style.display = 'none');
+
+      aom.createNewOverlay(); // This will use aom.state.placingOverlay details
+      aom.state.placingOverlay = null; // Reset placement state
+  };
+
+  adminOverlayManager.createNewOverlay = function() {
+      const aom = adminOverlayManager;
+      const slide = aom.state.currentSlideRef;
+      if (!slide || !slide.slideMedia || !aom.state.placingOverlay || !aom.state.placingOverlay.position) {
+          console.error("AOM.createNewOverlay: Missing data for new overlay."); return;
+      }
+      if (!slide.slideMedia.videoOverlays) slide.slideMedia.videoOverlays = [];
+
+      const newOverlay = {
+          id: 'v_overlay_' + sharedUtils.generateClientUuid(),
+          startTime: aom.state.placingOverlay.startTime,
+          duration: 5, // Default duration
+          position: aom.state.placingOverlay.position,
+          template: aom.state.placingOverlay.template || 'default',
+          content: "New Overlay Text",
+          actionUrl: "",
+          pauseVideo: false,
+          isDismissible: true
+      };
+      slide.slideMedia.videoOverlays.push(newOverlay);
+      aom.state.editingOverlayId = newOverlay.id;
+      aom.showOverlayEditor(newOverlay);
+      aom.renderOverlayTimeline();
+      aom.renderOverlayList();
+      if(window.adminCanvasManager) adminCanvasManager.saveCanvasStateForHistory();
+  };
+
+  adminOverlayManager.showOverlayEditor = function(overlayData) {
+      const aom = adminOverlayManager;
+      if (!overlayData) return;
+      aom.state.editingOverlayId = overlayData.id;
+
+      sharedUtils.safeDOMUpdate(aom.state.overlayStartTimeDisplayEl, el => el.textContent = sharedUtils.formatTime(overlayData.startTime));
+      if(aom.state.overlayDurationEl) aom.state.overlayDurationEl.value = overlayData.duration;
+      if(aom.state.overlayTextContentEditorEl) aom.state.overlayTextContentEditorEl.value = overlayData.content || '';
+      if(aom.state.overlayPauseVideoEl) aom.state.overlayPauseVideoEl.checked = overlayData.pauseVideo || false;
+      if(aom.state.overlayDismissibleEl) aom.state.overlayDismissibleEl.checked = typeof overlayData.isDismissible === 'boolean' ? overlayData.isDismissible : true;
+      if(aom.state.overlayActionEl) aom.state.overlayActionEl.value = overlayData.actionUrl || '';
+      sharedUtils.safeDOMUpdate(aom.state.overlayPositionDisplayEl, el => el.textContent = `X: ${overlayData.position.x}%, Y: ${overlayData.position.y}%`);
+
+      // Update overlay template preview in editor
+      sharedUtils.safeDOMUpdate(aom.state.overlayTemplateEl, templatePreviewEl => {
+          templatePreviewEl.innerHTML = overlayData.content || '';
+          templatePreviewEl.className = `video-overlay-preview template-${overlayData.template || 'default'}`;
+          // Apply basic styling for preview - this might need more work for accurate preview
+          templatePreviewEl.style.position = 'relative';
+          templatePreviewEl.style.display = 'block';
+      });
+
+      sharedUtils.safeDOMUpdate(aom.state.overlayEditorModalEl, el => el.style.display = 'block');
+  };
+
+  adminOverlayManager.hideOverlayEditor = function() {
+      sharedUtils.safeDOMUpdate(adminOverlayManager.state.overlayEditorModalEl, el => el.style.display = 'none');
+      adminOverlayManager.state.editingOverlayId = null;
+  };
+
+  adminOverlayManager.gatherOverlayFromForm = function() {
+      const aom = adminOverlayManager;
+      // Duration, content, pause, dismissible, actionUrl are read from form elements.
+      // StartTime and Position are not changed in this modal. Template selection could be added.
+      return {
+          duration: parseFloat(aom.state.overlayDurationEl.value) || 5,
+          content: aom.state.overlayTextContentEditorEl.value || '',
+          pauseVideo: aom.state.overlayPauseVideoEl.checked,
+          isDismissible: aom.state.overlayDismissibleEl.checked,
+          actionUrl: aom.state.overlayActionEl.value.trim()
+          // template: (if a selector is added for template type)
+      };
+  };
+
+  adminOverlayManager.saveOverlay = function() {
+      const aom = adminOverlayManager;
+      const slide = aom.state.currentSlideRef;
+      if (!slide || !slide.slideMedia || !aom.state.editingOverlayId) return;
+
+      const overlay = aom.findOverlayById(aom.state.editingOverlayId);
+      if (!overlay) { baseApp.displayMessage("Error: Overlay not found to save.", false, "messageArea"); return; }
+
+      const updatedData = aom.gatherOverlayFromForm();
+      Object.assign(overlay, updatedData); // Update existing overlay object
+
+      aom.hideOverlayEditor();
+      aom.renderOverlayTimeline();
+      aom.renderOverlayList();
+      if (aom.state.previewingOverlays) aom.renderVideoOverlaysAdmin(false); // Update preview
+      if(window.adminCanvasManager) adminCanvasManager.saveCanvasStateForHistory();
+      baseApp.displayMessage("Overlay saved.", true, "messageArea");
+  };
+
+  adminOverlayManager.deleteCurrentOverlay = function() {
+      const aom = adminOverlayManager;
+      const slide = aom.state.currentSlideRef;
+      if (!slide || !slide.slideMedia || !aom.state.editingOverlayId) return;
+      if (!confirm("Are you sure you want to delete this overlay?")) return;
+
+      const overlayIndex = slide.slideMedia.videoOverlays.findIndex(ov => ov.id === aom.state.editingOverlayId);
+      if (overlayIndex > -1) {
+          slide.slideMedia.videoOverlays.splice(overlayIndex, 1);
+          aom.hideOverlayEditor();
+          aom.renderOverlayTimeline();
+          aom.renderOverlayList();
+          if (aom.state.previewingOverlays) aom.clearVideoOverlaysAdmin(false); // Clear specific preview if needed or re-render
+          if(window.adminCanvasManager) adminCanvasManager.saveCanvasStateForHistory();
+          baseApp.displayMessage("Overlay deleted.", true, "messageArea");
+      } else {
+          baseApp.displayMessage("Error: Overlay not found to delete.", false, "messageArea");
+      }
+  };
+
+  adminOverlayManager.findOverlayById = function(overlayId) {
+      const slide = adminOverlayManager.state.currentSlideRef;
+      if (!slide || !slide.slideMedia || !slide.slideMedia.videoOverlays) return null;
+      return slide.slideMedia.videoOverlays.find(ov => ov.id === overlayId);
+  };
+
+  adminOverlayManager.getTemplateColor = function(templateName = 'default') {
+      // Basic color mapping for timeline visualization
+      const colors = { 'default': '#4CAF50', 'alert': '#f44336', 'poll': '#2196F3', 'product': '#FFC107' };
+      return colors[templateName] || colors['default'];
+  };
+
+  adminOverlayManager.renderOverlayTimeline = function() {
+      const aom = adminOverlayManager;
+      const slide = aom.state.currentSlideRef;
+      const track = aom.state.overlayTimelineTrackEl;
+      if (!track) return;
+      track.innerHTML = ''; // Clear
+      if (!slide || !slide.slideMedia || !slide.slideMedia.videoOverlays || !window.mediaManager || !mediaManager.state.ytPlayer) return;
+
+      const duration = mediaManager.state.ytPlayer.getDuration();
+      if (duration === 0) return; // No duration, cannot render timeline
+
+      slide.slideMedia.videoOverlays.forEach(overlay => {
+          const item = document.createElement('div');
+          item.className = 'overlay-timeline-item';
+          item.style.left = `${(overlay.startTime / duration) * 100}%`;
+          item.style.width = `${(overlay.duration / duration) * 100}%`;
+          item.style.backgroundColor = aom.getTemplateColor(overlay.template);
+          item.title = `Overlay: ${overlay.content.substring(0,20)}...\nTime: ${sharedUtils.formatTime(overlay.startTime)} - ${sharedUtils.formatTime(overlay.startTime + overlay.duration)}`;
+          item.onclick = () => aom.showOverlayEditor(overlay);
+          track.appendChild(item);
+      });
+  };
+
+  adminOverlayManager.renderOverlayList = function() {
+      const aom = adminOverlayManager;
+      const slide = aom.state.currentSlideRef;
+      sharedUtils.safeDOMUpdate(aom.state.adminOverlayListEl, listEl => {
+          listEl.innerHTML = ''; // Clear existing
+          if (!slide || !slide.slideMedia || !slide.slideMedia.videoOverlays || slide.slideMedia.videoOverlays.length === 0) {
+              listEl.innerHTML = '<li>No overlays added for this video.</li>';
+              return;
+          }
+          slide.slideMedia.videoOverlays.sort((a,b) => a.startTime - b.startTime).forEach(overlay => {
+              const item = document.createElement('li');
+              item.innerHTML = `<span>${sharedUtils.formatTime(overlay.startTime)} (${overlay.duration}s) - ${sharedUtils.truncateText(overlay.content, 25)}</span>`;
+              const editBtn = document.createElement('button'); editBtn.className = 'admin-button-small'; editBtn.textContent = 'Edit';
+              editBtn.onclick = () => aom.showOverlayEditor(overlay);
+              item.appendChild(editBtn);
+              listEl.appendChild(item);
+          });
+      });
+  };
+
+  adminOverlayManager.toggleOverlayPreview = function(forceState) {
+      const aom = adminOverlayManager;
+      aom.state.previewingOverlays = typeof forceState === 'boolean' ? forceState : !aom.state.previewingOverlays;
+      sharedUtils.safeDOMUpdate(aom.state.previewOverlaysBtnEl, btn => btn.textContent = aom.state.previewingOverlays ? 'Stop Preview' : 'Preview Overlays');
+      sharedUtils.safeDOMUpdate(aom.state.previewOverlaysBtnEl, btn => btn.classList.toggle('active-preview', aom.state.previewingOverlays));
+
+
+      if (aom.state.previewingOverlays) {
+          aom.renderVideoOverlaysAdmin(true); // Create and show initial state
+      } else {
+          aom.clearVideoOverlaysAdmin(true); // Clear and stop
+      }
+  };
+
+  adminOverlayManager.renderVideoOverlaysAdmin = function(isInitialRender = false) {
+    const aom = adminOverlayManager;
+    const slide = aom.state.currentSlideRef;
+    const videoContainer = document.getElementById('adminYouTubePlayerContainer'); // Previews are shown here
+    if (!slide || !slide.slideMedia || !slide.slideMedia.videoOverlays || !videoContainer) return;
+
+    const currentTime = window.mediaManager ? mediaManager.safeGetCurrentTime() : 0;
+
+    slide.slideMedia.videoOverlays.forEach(overlay => {
+        let overlayEl = videoContainer.querySelector(`.video-overlay-preview[data-preview-overlay-id="${overlay.id}"]`);
+        if (isInitialRender && !overlayEl) { // Create only if it's initial render and not found
+            overlayEl = document.createElement('div');
+            overlayEl.className = `video-overlay-preview template-${overlay.template || 'default'}`;
+            overlayEl.setAttribute('data-preview-overlay-id', overlay.id);
+            overlayEl.style.position = 'absolute';
+            overlayEl.style.left = `${overlay.position.x}%`;
+            overlayEl.style.top = `${overlay.position.y}%`;
+            // Basic styling, specific template styles would be in CSS
+            overlayEl.innerHTML = `<div>${overlay.content}</div>`;
+            if (overlay.isDismissible) {
+                const dismissBtn = document.createElement('button');
+                dismissBtn.className = 'overlay-dismiss-btn';
+                dismissBtn.innerHTML = '&times;';
+                dismissBtn.onclick = (e) => { e.stopPropagation(); overlayEl.style.display = 'none'; };
+                overlayEl.appendChild(dismissBtn);
+            }
+            if (overlay.actionUrl) {
+                overlayEl.style.cursor = 'pointer';
+                overlayEl.onclick = () => { window.open(overlay.actionUrl, '_blank'); };
+            }
+            videoContainer.appendChild(overlayEl);
+        }
+        // Visibility is handled by handleMediaOverlayUpdate or initial check
+        if (overlayEl) {
+            const isVisible = currentTime >= overlay.startTime && currentTime < (overlay.startTime + overlay.duration);
+            overlayEl.style.display = isVisible ? 'block' : 'none';
+        }
+    });
+  };
+
+  adminOverlayManager.clearVideoOverlaysAdmin = function(fullClear = true) {
+      const videoContainer = document.getElementById('adminYouTubePlayerContainer');
+      if (videoContainer) {
+          const previews = videoContainer.querySelectorAll('.video-overlay-preview');
+          previews.forEach(p => p.remove());
+      }
+      if (fullClear && adminOverlayManager.state.previewingOverlays) { // If fullClear, also toggle the state
+          adminOverlayManager.toggleOverlayPreview(false);
+      }
+  };
+
+
+  // --- Canvas Object Interaction & Animation Configuration ---
+  // (Moved and Adapted from Admin_JS.html - these are called by AdminToolbar)
+  adminOverlayManager.handleInteractionChange = function() {
+    const activeObject = window.adminCanvasManager ? adminCanvasManager.getActiveObject() : null;
+    if (!activeObject) return;
+    const canvas = adminCanvasManager.state.fabricCanvasInstance; // Still need canvas for renderAll
+    if (!canvas) return; // Should not happen if activeObject exists, but good check
+
+    // Ensure customInteraction object exists
+    if (!activeObject.customInteraction) {
+        activeObject.customInteraction = adminOverlayManager.getDefaultInteractionProps();
+    }
+
+    // Read values from toolbar elements (assuming their IDs are stable and fetched in initializeEditView or passed)
+    const aomState = adminOverlayManager.state;
+    if (aomState.objInteractionTriggerEl) activeObject.customInteraction.trigger = aomState.objInteractionTriggerEl.value;
+    if (aomState.objInteractionActionEl) activeObject.customInteraction.action = aomState.objInteractionActionEl.value;
+    if (aomState.objInteractionModalContentEl) activeObject.customInteraction.modalContent = aomState.objInteractionModalContentEl.value;
+    if (aomState.objInteractionNavigateToSlideEl) activeObject.customInteraction.navigateTo = aomState.objInteractionNavigateToSlideEl.value; // Assuming one field for nav target
+    if (aomState.objInteractionNavigateToURLEl && activeObject.customInteraction.action === 'navigateToURL') activeObject.customInteraction.navigateTo = aomState.objInteractionNavigateToURLEl.value;
+    if (aomState.objInteractionTargetObjectIdEl) activeObject.customInteraction.targetObjectId = aomState.objInteractionTargetObjectIdEl.value;
+    if (aomState.objInteractionPanZoomLevelEl) activeObject.customInteraction.panZoomLevel = parseFloat(aomState.objInteractionPanZoomLevelEl.value) || 1.5;
+
+
+    adminOverlayManager.updateInteractionConfigVisibility(activeObject.customInteraction.action);
+    if(window.adminToolbar && typeof adminToolbar.updateInteractionButtonActiveState === 'function') {
+      adminToolbar.updateInteractionButtonActiveState(!!(activeObject.customInteraction.trigger && activeObject.customInteraction.action));
+    }
+    canvas.renderAll();
+    if(window.adminCanvasManager) adminCanvasManager.saveCanvasStateForHistory();
+  };
+
+  adminOverlayManager.updateInteractionConfigVisibility = function(action) {
+    // These elements are part of AdminToolbar's popover for interactions
+    const modalConfig = document.getElementById('modalContentConfig');
+    const navigateToSlideConfig = document.getElementById('navigateToSlideConfig');
+    const navigateToURLConfig = document.getElementById('navigateToURLConfig');
+    const targetObjectConfig = document.getElementById('targetObjectConfig'); // For pan/zoom target
+    const panZoomConfig = document.getElementById('panZoomConfigEl'); // For pan/zoom level
+
+    if(modalConfig) sharedUtils.safeDOMUpdate(modalConfig, el => el.style.display = (action === 'showModal' ? 'block' : 'none'));
+    if(navigateToSlideConfig) sharedUtils.safeDOMUpdate(navigateToSlideConfig, el => el.style.display = (action === 'navigateToSlide' ? 'block' : 'none'));
+    if(navigateToURLConfig) sharedUtils.safeDOMUpdate(navigateToURLConfig, el => el.style.display = (action === 'navigateToURL' ? 'block' : 'none'));
+    if(targetObjectConfig) sharedUtils.safeDOMUpdate(targetObjectConfig, el => el.style.display = (action === 'panZoomToTarget' || action === 'animatePathToTarget' ? 'block' : 'none'));
+    if(panZoomConfig) sharedUtils.safeDOMUpdate(panZoomConfig, el => el.style.display = (action === 'panZoomToTarget' ? 'block' : 'none'));
+  };
+
+  adminOverlayManager.handleAnimationChange = function() {
+    const activeObject = window.adminCanvasManager ? adminCanvasManager.getActiveObject() : null;
+    if (!activeObject) return;
+    const canvas = adminCanvasManager.state.fabricCanvasInstance; // Still need canvas for renderAll
+    if (!canvas) return; // Should not happen if activeObject exists
+
+    if (!activeObject.customAnimation) {
+        activeObject.customAnimation = adminOverlayManager.getDefaultAnimationProps();
+    }
+
+    const aomState = adminOverlayManager.state;
+    if(aomState.objAnimationTriggerEl) activeObject.customAnimation.trigger = aomState.objAnimationTriggerEl.value;
+    if(aomState.objAnimationTypeEl) activeObject.customAnimation.type = aomState.objAnimationTypeEl.value;
+    if(aomState.objAnimationSpeedEl) activeObject.customAnimation.speed = aomState.objAnimationSpeedEl.value;
+    if(aomState.objAnimationStrengthEl) activeObject.customAnimation.strength = parseFloat(aomState.objAnimationStrengthEl.value) || 5;
+    if(aomState.objAnimationLoopEl) activeObject.customAnimation.loop = aomState.objAnimationLoopEl.checked;
+    if(aomState.objAnimationTargetEl) activeObject.customAnimation.targetObjectId = aomState.objAnimationTargetEl.value; // For path target
+    if(aomState.objAnimationCustomPathEl) activeObject.customAnimation.customPath = aomState.objAnimationCustomPathEl.value; // For custom path SVG
+
+    adminOverlayManager.updateAnimationStrengthUnit(activeObject.customAnimation.type);
+    if(window.adminToolbar && typeof adminToolbar.updateAnimationButtonActiveState === 'function') {
+        adminToolbar.updateAnimationButtonActiveState(!!(activeObject.customAnimation.trigger && activeObject.customAnimation.type));
+    }
+    canvas.renderAll();
+    if(window.adminCanvasManager) adminCanvasManager.saveCanvasStateForHistory();
+  };
+
+  adminOverlayManager.updateAnimationStrengthUnit = function(animationType) {
+    const aomState = adminOverlayManager.state;
+    let unit = '';
+    switch (animationType) {
+        case 'fade': unit = '% (opacity)'; break;
+        case 'slide': case 'zoom': unit = 'x (multiplier)'; break; // Or px if it's direct translation
+        case 'rotate': unit = 'deg'; break;
+        case 'path': unit = 'ms (duration)'; break; // Strength might be irrelevant or repurposed for path anim
+        default: unit = '';
+    }
+    sharedUtils.safeDOMUpdate(aomState.animationStrengthUnitEl, el => el.textContent = unit);
+  };
+
+  adminOverlayManager.getDefaultInteractionProps = function() { // Helper
+    return { trigger: "", action: "", modalContent: "", navigateTo: "", targetObjectId: "", panZoomLevel: 1.5 };
+  };
+  adminOverlayManager.getDefaultAnimationProps = function() { // Helper
+    return { trigger: "", type: "", speed: "normal", strength: 5, loop: false, targetObjectId: "", customPath: "" };
+  };
+
+</script>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <title>Interactive Training Modules - Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/Modal_CSS.html').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Viewer/ViewerView_CSS.html').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/SharedUtils.html').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/BaseApp.html').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/MediaManager.html').getContent(); ?>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Viewer/ViewerManager.html').getContent(); ?>
+    <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+    <div id="viewerListViewContainer" class="container">
+      <h1>Available Training Modules</h1>
+      <div id="viewerProjectListContainer">
+        <p>Loading projects...</p>
+      </div>
+    </div>
+    <div id="viewerProjectDisplayArea" class="container" style="display: none;">
+        <button id="backToViewerListButton">Back to Project List</button>
+        <h2 id="viewingProjectTitle"></h2>
+        <div id="viewerMediaContainer">
+            <div id="mediaPlayerSection">
+                <div id="youtubePlayerContainer" style="display: none;"></div>
+                <div id="viewerCanvasContainer">
+                    <canvas id="viewerFabricCanvas"></canvas>
+                </div>
+            </div>
+            <div id="interactiveTimelineBar" style="display: none;">
+                <div id="timelineSection">
+                    <div id="viewerTimelineTrack">
+                        <div id="viewerTimelineProgress"></div>
+                    </div>
+                    <div id="viewerTimelineTimeDisplay">
+                        <span id="viewerCurrentTime">0:00</span>
+                        <span id="viewerTotalDuration">0:00</span>
+                    </div>
+                </div>
+                <div id="overlayDisplayArea"></div>
+                <div id="imageEventNavigation" style="display: none;">
+                    <button id="viewerPrevEventButton" class="image-event-nav-button">&lt; Prev Event</button>
+                    <span id="imageEventIndicator">Event 0 / 0</span>
+                    <button id="viewerNextEventButton" class="image-event-nav-button">Next Event &gt;</button>
+                </div>
+            </div>
+        </div>
+        <audio id="viewerAudioPlayer" controls style="display: none;"></audio>
+        <div id="viewerSlideNavigation">
+            <button id="viewerPrevSlideButton" disabled>&lt; Previous Slide</button>
+            <button id="viewerPrevImageEventButton" style="display:none;">&lt; Previous Step</button>
+            <span id="viewerSlideIndicator">Slide 0 / 0</span>
+            <span id="viewerImageEventIndicator" style="display:none;">Step 0 / 0</span>
+            <button id="viewerNextImageEventButton" style="display:none;">Next Step &gt;</button>
+            <button id="viewerNextSlideButton" disabled>Next Slide &gt;</button>
+        </div>
+    </div>
+    <div id="messageAreaViewer"></div>
+    <div id="viewerModal" class="modal-overlay">
+        <div class="modal-content">
+            <span id="viewerModalCloseButton" class="modal-close-button">×</span>
+            <div id="viewerModalBody"></div>
+            <div class="modal-navigation">
+                <button id="modalPrevButton" style="display: none;">&lt; Previous</button>
+                <button id="modalNextButton" style="display: none;">Next &gt;</button>
+            </div>
+        </div>
+    </div>
+    <?!= HtmlService.createHtmlOutputFromFile('Client/Shared/LoadingSpinner.html').getContent(); ?>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        window.addEventListener('error', function(event) {
+          console.error('Unhandled global error:', event.error || event.message, event);
+        });
+        window.addEventListener('unhandledrejection', function(event) {
+          console.error('Unhandled promise rejection:', event.reason);
+        });
+        console.log("ViewerApp: DOMContentLoaded. Initializing ViewerManager.");
+        if (window.viewerManager && typeof window.viewerManager.init === 'function') {
+          window.viewerManager.init();
+        } else {
+          console.error('ViewerApp: viewerManager or viewerManager.init() is not available.');
+          if(window.baseApp && baseApp.displayMessage) {
+            baseApp.displayMessage("Error: Viewer application core components failed to load. Please try again or contact support.", false, "messageAreaViewer");
+          }
+        }
+      });
+    </script>
+</body>
+</html>

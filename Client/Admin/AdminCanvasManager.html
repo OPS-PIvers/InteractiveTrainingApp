@@ -258,7 +258,7 @@
       return;
     }
     try {
-      const propsToInclude = fabric.Object.prototype.getSvgSrc ? fabric.Object.prototype.getSvgSrc.properties : []; // Fabric 5+
+      const propsToInclude = ['slideId', 'customInteraction', 'customAnimation'];
       currentSlide.fabricCanvasJSON = canvas.toJSON(propsToInclude);
       currentSlide.canvasWidth = canvas.getWidth(); // Use logical width
       currentSlide.canvasHeight = canvas.getHeight(); // Use logical height
@@ -578,7 +578,7 @@
     const canvas = adminCanvasManager.state.fabricCanvasInstance;
     if (!canvas || adminCanvasManager.state.isApplyingHistory) return;
 
-    const propsToInclude = fabric.Object.prototype.getSvgSrc ? fabric.Object.prototype.getSvgSrc.properties : [];
+    const propsToInclude = ['slideId', 'customInteraction', 'customAnimation'];
     const currentState = canvas.toJSON(propsToInclude);
 
     // If history was undone, and now a new change is made, truncate future history

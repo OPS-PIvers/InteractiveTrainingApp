@@ -975,7 +975,7 @@ restoreObjectInteractions: function(canvas, fabricCanvasJSON) {
   
   // Restore custom interaction and animation properties that Fabric.js might not serialize properly
   canvas.getObjects().forEach((obj, index) => {
-    const originalObj = fabricCanvasJSON.objects[index];
+    const originalObj = fabricCanvasJSON.objects.find(dataObj => dataObj.slideId === obj.slideId);
     if (originalObj) {
       // Restore custom interaction properties
       if (originalObj.customInteraction) {

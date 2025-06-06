@@ -342,8 +342,8 @@ function createFileInDriveFromBlob(blob, fileName, folderId) {
     Logger.log(`createFileInDriveFromBlob: Creating file "${fileName}" in folder: ${folderId}`);
     
     const folder = DriveApp.getFolderById(folderId);
-    const file = folder.createFile(blob.setName(fileName));
-    
+    const file = folder.createFile(blob);
+    file.setName(fileName); // Set the name AFTER the file is created.    
     Logger.log(`createFileInDriveFromBlob: File "${fileName}" created successfully. File ID: ${file.getId()}`);
     return file;
     

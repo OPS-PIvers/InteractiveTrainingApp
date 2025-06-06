@@ -241,20 +241,28 @@
         // This callback is executed by AdminProjectManager after project data is loaded and parsed
         if (projectData) {
           // Initialize modules that depend on projectData
+          // --- Controlled Initialization Sequence ---
+          // 1. Initialize Toolbar first, as it's a passive UI provider.
           if (window.adminToolbar && typeof adminToolbar.initializeEditView === 'function') {
-            adminToolbar.initializeEditView(projectData); // Toolbar might need project data for context
+            adminToolbar.initializeEditView(projectData);
           } else {
-            console.warn("AdminToolbar.initializeEditView not available or projectData not passed.");
+            console.warn("AdminToolbar.initializeEditView not available.");
           }
-          if (window.adminCanvasManager && typeof adminCanvasManager.initializeEditView === 'function') {
-            adminCanvasManager.initializeEditView(projectData);
-          } else {
-            console.error("AdminCanvasManager.initializeEditView not available.");
-          }
+
+          // 2. Initialize Overlay Manager next. It prepares data structures and finds its DOM elements,
+          // but doesn't actively manipulate other modules yet.
           if (window.adminOverlayManager && typeof adminOverlayManager.initializeEditView === 'function') {
             adminOverlayManager.initializeEditView(projectData);
           } else {
             console.warn("AdminOverlayManager.initializeEditView not available.");
+          }
+
+          // 3. Initialize Canvas Manager LAST. This is the module that actively starts
+          // selecting slides and triggering calls to the other, now-ready, modules.
+          if (window.adminCanvasManager && typeof adminCanvasManager.initializeEditView === 'function') {
+            adminCanvasManager.initializeEditView(projectData);
+          } else {
+            console.error("AdminCanvasManager.initializeEditView not available.");
           }
 
           adminApp.attachEditViewGlobalListeners(); // Attach edit view specific global listeners

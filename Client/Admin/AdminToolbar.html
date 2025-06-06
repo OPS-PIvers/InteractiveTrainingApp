@@ -261,25 +261,29 @@
     });
     // Specific media buttons inside mediaToolsPopover (e.g., image upload, set YT URL)
     // These should call AdminCanvasManager methods
-    const popoverImageUploaderBtn = ats.mediaToolsPopoverEl ? ats.mediaToolsPopoverEl.querySelector('#mediaPopoverImageUploadBtn') : null;
-    safelyAttach(popoverImageUploaderBtn, 'click', () => {
-        const mainImageUploader = document.getElementById('imageUploader'); // The one ACM listens to
-        if (mainImageUploader) mainImageUploader.click();
-        atb.hideActivePopover();
-    }, 'mediaPopoverImageUpload');
+    // Listeners for controls inside the mediaToolsPopover
+    if (ats.mediaToolsPopoverEl) {
+        // Image Upload Zone
+        const imageDropZone = ats.mediaToolsPopoverEl.querySelector('#imageDropZone');
+        safelyAttach(imageDropZone, 'click', () => {
+            document.getElementById('imageUploader')?.click();
+            atb.hideActivePopover();
+        }, 'media-image-zone');
 
-    const popoverSetYoutubeBtn = ats.mediaToolsPopoverEl ? ats.mediaToolsPopoverEl.querySelector('#mediaPopoverSetYoutubeUrlBtn') : null;
-    safelyAttach(popoverSetYoutubeBtn, 'click', () => {
-        if(window.adminCanvasManager) adminCanvasManager.handleSetMediaBackground('youtube'); // ACM reads from its own input ref
-        atb.hideActivePopover();
-    }, 'mediaPopoverSetYoutube');
+        // Audio Upload Zone
+        const audioDropZone = ats.mediaToolsPopoverEl.querySelector('#audioDropZone');
+        safelyAttach(audioDropZone, 'click', () => {
+            document.getElementById('audioUploader')?.click();
+            atb.hideActivePopover();
+        }, 'media-audio-zone');
 
-    const popoverAudioUploaderBtn = ats.mediaToolsPopoverEl ? ats.mediaToolsPopoverEl.querySelector('#mediaPopoverAudioUploadBtn') : null;
-    safelyAttach(popoverAudioUploaderBtn, 'click', () => {
-        const mainAudioUploader = document.getElementById('audioUploader'); // The one ACM listens to
-        if (mainAudioUploader) mainAudioUploader.click();
-        atb.hideActivePopover();
-    }, 'mediaPopoverAudioUpload');
+        // YouTube 'Set BG' Button
+        const setYoutubeBtn = ats.mediaToolsPopoverEl.querySelector('#setYoutubeBackgroundButton');
+        safelyAttach(setYoutubeBtn, 'click', () => {
+            if (window.adminCanvasManager) adminCanvasManager.handleSetMediaBackground('youtube');
+            atb.hideActivePopover();
+        }, 'media-youtube-btn');
+    }
 
     // Global click to hide popovers (managed by AdminApp for all popovers, or here if specific to toolbar)
     // For now, let AdminApp's global click handler manage this, assuming AdminToolbar.hideActivePopover is callable.

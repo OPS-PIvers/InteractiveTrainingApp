@@ -229,7 +229,6 @@
             if (imageUploaderEl) imageUploaderEl.removeEventListener('change', handler);
         });
     }
-    setupListener(setYoutubeBackgroundButtonEl, 'click', () => acm.handleSetMediaBackground('youtube'), 'acm-setYoutubeBackgroundButton-click');
     if (audioUploaderEl) {
         const handler = (e) => acm.handleAudioUploadForBackground(e);
         audioUploaderEl.addEventListener('change', handler);

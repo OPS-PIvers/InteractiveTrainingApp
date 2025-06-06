@@ -172,14 +172,23 @@ function uploadFileToDrive(fileData, projectId, mediaType) {
     
     Logger.log(`Found folder ID: ${projectFolderId} for project ${projectId}.`);
 
+    // --- Direct File Creation Logic ---
+    const folder = DriveApp.getFolderById(projectFolderId);
+    if (!folder) {
+        throw new Error(`Target folder with ID ${projectFolderId} could not be accessed.`);
+    }
+
     const decodedData = Utilities.base64Decode(fileData.data);
     const blob = Utilities.newBlob(decodedData, fileData.mimeType, fileData.fileName);
 
-    const driveFile = createFileInDriveFromBlob(blob, fileData.fileName, projectFolderId);
+    // Use the most reliable DriveApp.createFile() method with all three arguments.
+    const driveFile = folder.createFile(blob);
+    // Note: Creating from blob and then setting name is the most reliable pattern.
 
     if (!driveFile || typeof driveFile.getId !== 'function') {
-        throw new Error("Failed to create file in Google Drive; received invalid response from service.");
+        throw new Error("DriveApp.createFile failed to return a valid file object.");
     }
+    // --- End Direct File Creation Logic ---
 
     driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     

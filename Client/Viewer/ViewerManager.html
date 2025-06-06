@@ -311,10 +311,40 @@ displayViewerProjects: function(response) {
         renderOnAddRemove: false // Manual renderAll for performance
     });
     
-    // Add click event handler for interactive objects
+    // Add interaction event handlers for interactive objects
     this.state.viewerFabricCanvas.on('mouse:down', (e) => {
-      if (e.target && e.target.customInteraction) {
-        this.handleObjectInteraction(e.target, e.target.customInteraction);
+      if (e.target) {
+        // Handle interactions
+        if (e.target.customInteraction) {
+          const interaction = e.target.customInteraction;
+          if (interaction.trigger === 'click' || interaction.trigger === 'onClick') {
+            this.handleObjectInteraction(e.target, interaction);
+          } else if (interaction.trigger === 'clickAndHold') {
+            this.startClickAndHold(e.target, interaction);
+          }
+        }
+        
+        // Handle onClick animations
+        if (e.target.customAnimation && e.target.customAnimation.trigger === 'onClick') {
+          this.startAnimation(e.target, e.target.customAnimation);
+        }
+      }
+    });
+    
+    this.state.viewerFabricCanvas.on('mouse:up', (e) => {
+      this.clearClickAndHold();
+    });
+    
+    this.state.viewerFabricCanvas.on('mouse:over', (e) => {
+      if (e.target) {
+        // Handle hover interactions
+        if (e.target.customInteraction && e.target.customInteraction.trigger === 'hover') {
+          this.handleObjectInteraction(e.target, e.target.customInteraction);
+        }
+        // Handle hover animations
+        if (e.target.customAnimation && e.target.customAnimation.trigger === 'Hover') {
+          this.startAnimation(e.target, e.target.customAnimation);
+        }
       }
     });
     
@@ -337,8 +367,12 @@ displayViewerProjects: function(response) {
     if (this.state.currentMediaType === 'youtube' && mediaManager.isYouTubePlayerAvailable()) mediaManager.stopAndDestroyPlayer();
     else if (this.state.currentMediaType === 'audio' && mediaManager.isAudioPlayerAvailable()) mediaManager.stopAndClearAudioPlayer();
 
-    // this.hideSpotlightSVG(); // Implement if spotlight is used
-    // if(this.state.isCanvasPannedOrZoomed) this.resetPanZoomWithAnimation(true); // Implement if pan/zoom is used
+    // Clean up any active spotlight effects
+    const spotlightOverlay = document.getElementById('spotlight-overlay');
+    if (spotlightOverlay) spotlightOverlay.remove();
+    
+    // Reset pan/zoom if active
+    if(this.state.isCanvasPannedOrZoomed) this.resetPanZoom();
 
     const slideData = slides[slideIndex];
     const canvas = this.state.viewerFabricCanvas;
@@ -874,11 +908,8 @@ handleObjectInteraction: function(obj, interaction) {
     return;
   }
 
-  // Check if the trigger is appropriate (click, hover, etc.)
-  if (interaction.trigger !== 'click' && interaction.trigger !== 'onClick') {
-    console.log(`ViewerManager: Interaction trigger '${interaction.trigger}' not supported for click events`);
-    return;
-  }
+  // All triggers are now supported: click, onClick, hover, clickAndHold
+  console.log(`ViewerManager: Processing ${interaction.trigger} trigger for ${interaction.action} action`);
 
   console.log(`ViewerManager: Executing ${interaction.action} interaction`);
 
@@ -910,18 +941,15 @@ handleObjectInteraction: function(obj, interaction) {
       break;
       
     case 'spotlight':
-      // Future implementation for spotlight effect
-      console.log("ViewerManager: Spotlight effect not yet implemented");
+      this.handleSpotlightEffect(obj, interaction);
       break;
       
     case 'reveal':
-      // Future implementation for reveal effect
-      console.log("ViewerManager: Reveal effect not yet implemented");
+      this.handleRevealEffect(obj, interaction);
       break;
       
     case 'panZoomToTarget':
-      // Future implementation for pan/zoom
-      console.log("ViewerManager: Pan/zoom effect not yet implemented");
+      this.handlePanZoomEffect(obj, interaction);
       break;
       
     default:
@@ -955,9 +983,13 @@ restoreObjectInteractions: function(canvas, fabricCanvasJSON) {
         console.log(`ViewerManager: Restored interaction for object ${index}:`, obj.customInteraction);
       }
       
-      // Restore custom animation properties (for future use)
+      // Restore custom animation properties and start animations
       if (originalObj.customAnimation) {
         obj.customAnimation = { ...originalObj.customAnimation };
+        // Trigger onLoad animations after restore
+        if (obj.customAnimation.trigger === 'onLoad' && obj.customAnimation.type) {
+          this.startAnimation(obj, obj.customAnimation);
+        }
       }
       
       // Set cursor style based on interaction
@@ -969,6 +1001,350 @@ restoreObjectInteractions: function(canvas, fabricCanvasJSON) {
   });
   
   console.log(`ViewerManager: Restored interactions for ${canvas.getObjects().length} objects`);
+},
+
+handleSpotlightEffect: function(obj, interaction) {
+  console.log("ViewerManager: Applying spotlight effect to object", obj);
+  
+  const canvas = this.state.viewerFabricCanvas;
+  if (!canvas) return;
+  
+  // Create a dark overlay with a transparent "hole" over the target object
+  const canvasWidth = canvas.getWidth();
+  const canvasHeight = canvas.getHeight();
+  
+  // Get object bounds
+  const objBounds = obj.getBoundingRect();
+  const padding = 20; // Extra space around the spotlighted object
+  
+  // Create spotlight overlay
+  const spotlightOverlay = document.createElement('div');
+  spotlightOverlay.id = 'spotlight-overlay';
+  spotlightOverlay.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  `;
+  
+  // Create the spotlight hole using CSS clip-path
+  const spotlightX = objBounds.left - padding;
+  const spotlightY = objBounds.top - padding;
+  const spotlightWidth = objBounds.width + (padding * 2);
+  const spotlightHeight = objBounds.height + (padding * 2);
+  
+  spotlightOverlay.style.clipPath = `polygon(
+    0% 0%, 
+    0% 100%, 
+    ${(spotlightX / canvasWidth) * 100}% 100%, 
+    ${(spotlightX / canvasWidth) * 100}% ${(spotlightY / canvasHeight) * 100}%, 
+    ${((spotlightX + spotlightWidth) / canvasWidth) * 100}% ${(spotlightY / canvasHeight) * 100}%, 
+    ${((spotlightX + spotlightWidth) / canvasWidth) * 100}% ${((spotlightY + spotlightHeight) / canvasHeight) * 100}%, 
+    ${(spotlightX / canvasWidth) * 100}% ${((spotlightY + spotlightHeight) / canvasHeight) * 100}%, 
+    ${(spotlightX / canvasWidth) * 100}% 100%, 
+    100% 100%, 
+    100% 0%
+  )`;
+  
+  // Add to canvas container
+  this.dom.viewerCanvasContainerEl.appendChild(spotlightOverlay);
+  
+  // Auto-remove after 5 seconds or on click
+  setTimeout(() => {
+    if (spotlightOverlay.parentNode) {
+      spotlightOverlay.style.opacity = '0';
+      setTimeout(() => spotlightOverlay.remove(), 300);
+    }
+  }, 5000);
+  
+  // Click to dismiss
+  spotlightOverlay.addEventListener('click', () => {
+    spotlightOverlay.style.opacity = '0';
+    setTimeout(() => spotlightOverlay.remove(), 300);
+  });
+  
+  console.log("ViewerManager: Spotlight effect applied");
+},
+
+handleRevealEffect: function(obj, interaction) {
+  console.log("ViewerManager: Applying reveal effect to object", obj);
+  
+  // Make the object initially invisible, then reveal it with animation
+  const originalOpacity = obj.opacity || 1;
+  obj.set('opacity', 0);
+  this.state.viewerFabricCanvas.renderAll();
+  
+  // Animate the reveal
+  obj.animate('opacity', originalOpacity, {
+    duration: 800,
+    easing: fabric.util.ease.easeOutCubic,
+    onChange: () => this.state.viewerFabricCanvas.renderAll(),
+    onComplete: () => {
+      console.log("ViewerManager: Reveal effect completed");
+    }
+  });
+},
+
+handlePanZoomEffect: function(obj, interaction) {
+  console.log("ViewerManager: Applying pan/zoom effect to object", obj);
+  
+  const canvas = this.state.viewerFabricCanvas;
+  if (!canvas) return;
+  
+  // Get zoom level from interaction (default 1.5)
+  const zoomLevel = interaction.panZoomLevel || 1.5;
+  
+  // Get object center
+  const objBounds = obj.getBoundingRect();
+  const centerX = objBounds.left + (objBounds.width / 2);
+  const centerY = objBounds.top + (objBounds.height / 2);
+  
+  // Calculate target viewport transform to center the object
+  const canvasWidth = canvas.getWidth();
+  const canvasHeight = canvas.getHeight();
+  
+  const targetX = (canvasWidth / 2) - (centerX * zoomLevel);
+  const targetY = (canvasHeight / 2) - (centerY * zoomLevel);
+  
+  // Store original transform
+  if (!this.state.originalViewportTransform) {
+    this.state.originalViewportTransform = [...canvas.viewportTransform];
+    this.state.originalZoom = canvas.getZoom();
+  }
+  
+  // Animate to target transform
+  const startTransform = [...canvas.viewportTransform];
+  const startZoom = canvas.getZoom();
+  
+  const animate = (progress) => {
+    const currentZoom = startZoom + (zoomLevel - startZoom) * progress;
+    const currentX = startTransform[4] + (targetX - startTransform[4]) * progress;
+    const currentY = startTransform[5] + (targetY - startTransform[5]) * progress;
+    
+    canvas.setZoom(currentZoom);
+    canvas.viewportTransform[4] = currentX;
+    canvas.viewportTransform[5] = currentY;
+    canvas.calcOffset();
+    canvas.renderAll();
+  };
+  
+  // Smooth animation
+  let start = null;
+  const duration = 1000; // 1 second
+  
+  const animationFrame = (timestamp) => {
+    if (!start) start = timestamp;
+    const progress = Math.min((timestamp - start) / duration, 1);
+    const easeProgress = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+    
+    animate(easeProgress);
+    
+    if (progress < 1) {
+      requestAnimationFrame(animationFrame);
+    } else {
+      console.log("ViewerManager: Pan/zoom effect completed");
+      // Set flag to track that canvas is zoomed
+      this.state.isCanvasPannedOrZoomed = true;
+    }
+  };
+  
+  requestAnimationFrame(animationFrame);
+},
+
+resetPanZoom: function() {
+  console.log("ViewerManager: Resetting pan/zoom to original state");
+  
+  const canvas = this.state.viewerFabricCanvas;
+  if (!canvas || !this.state.originalViewportTransform) return;
+  
+  const targetTransform = [...this.state.originalViewportTransform];
+  const targetZoom = this.state.originalZoom || 1;
+  
+  // Animate back to original transform
+  const startTransform = [...canvas.viewportTransform];
+  const startZoom = canvas.getZoom();
+  
+  const animate = (progress) => {
+    const currentZoom = startZoom + (targetZoom - startZoom) * progress;
+    const currentX = startTransform[4] + (targetTransform[4] - startTransform[4]) * progress;
+    const currentY = startTransform[5] + (targetTransform[5] - startTransform[5]) * progress;
+    
+    canvas.setZoom(currentZoom);
+    canvas.viewportTransform[4] = currentX;
+    canvas.viewportTransform[5] = currentY;
+    canvas.calcOffset();
+    canvas.renderAll();
+  };
+  
+  let start = null;
+  const duration = 800;
+  
+  const animationFrame = (timestamp) => {
+    if (!start) start = timestamp;
+    const progress = Math.min((timestamp - start) / duration, 1);
+    const easeProgress = 1 - Math.pow(1 - progress, 3);
+    
+    animate(easeProgress);
+    
+    if (progress < 1) {
+      requestAnimationFrame(animationFrame);
+    } else {
+      this.state.isCanvasPannedOrZoomed = false;
+      console.log("ViewerManager: Pan/zoom reset completed");
+    }
+  };
+  
+  requestAnimationFrame(animationFrame);
+},
+
+startClickAndHold: function(obj, interaction) {
+  console.log("ViewerManager: Starting click and hold for object", obj);
+  
+  // Clear any existing click and hold
+  this.clearClickAndHold();
+  
+  // Start timer for click and hold (default 800ms)
+  this.state.clickAndHoldTimeout = setTimeout(() => {
+    this.handleObjectInteraction(obj, interaction);
+    this.state.clickAndHoldTimeout = null;
+  }, 800);
+},
+
+clearClickAndHold: function() {
+  if (this.state.clickAndHoldTimeout) {
+    clearTimeout(this.state.clickAndHoldTimeout);
+    this.state.clickAndHoldTimeout = null;
+  }
+},
+
+startAnimation: function(obj, animation) {
+  console.log("ViewerManager: Starting animation", animation.type, "on object", obj);
+  
+  if (!animation || !animation.type) {
+    console.warn("ViewerManager: Invalid animation object");
+    return;
+  }
+  
+  const canvas = this.state.viewerFabricCanvas;
+  if (!canvas) return;
+  
+  switch (animation.type.toLowerCase()) {
+    case 'fadeIn':
+      const originalOpacity = obj.opacity || 1;
+      obj.set('opacity', 0);
+      obj.animate('opacity', originalOpacity, {
+        duration: animation.duration || 500,
+        easing: fabric.util.ease.easeOutCubic,
+        onChange: () => canvas.renderAll()
+      });
+      break;
+      
+    case 'fadeOut':
+      obj.animate('opacity', 0, {
+        duration: animation.duration || 500,
+        easing: fabric.util.ease.easeOutCubic,
+        onChange: () => canvas.renderAll()
+      });
+      break;
+      
+    case 'slideIn':
+      const direction = animation.direction || 'left';
+      const originalLeft = obj.left;
+      const originalTop = obj.top;
+      const canvasWidth = canvas.getWidth();
+      const canvasHeight = canvas.getHeight();
+      
+      // Set starting position based on direction
+      switch (direction) {
+        case 'left':
+          obj.set('left', -obj.width);
+          break;
+        case 'right':
+          obj.set('left', canvasWidth);
+          break;
+        case 'top':
+          obj.set('top', -obj.height);
+          break;
+        case 'bottom':
+          obj.set('top', canvasHeight);
+          break;
+      }
+      
+      // Animate to original position
+      obj.animate(direction === 'left' || direction === 'right' ? 'left' : 'top', 
+                  direction === 'left' || direction === 'right' ? originalLeft : originalTop, {
+        duration: animation.duration || 800,
+        easing: fabric.util.ease.easeOutCubic,
+        onChange: () => canvas.renderAll()
+      });
+      break;
+      
+    case 'bounce':
+      const originalScale = obj.scaleX || 1;
+      obj.animate('scaleX', originalScale * 1.2, {
+        duration: 150,
+        easing: fabric.util.ease.easeOutBounce,
+        onChange: () => canvas.renderAll(),
+        onComplete: () => {
+          obj.animate('scaleX', originalScale, {
+            duration: 150,
+            easing: fabric.util.ease.easeOutBounce,
+            onChange: () => canvas.renderAll()
+          });
+          obj.animate('scaleY', originalScale, {
+            duration: 150,
+            easing: fabric.util.ease.easeOutBounce,
+            onChange: () => canvas.renderAll()
+          });
+        }
+      });
+      obj.animate('scaleY', originalScale * 1.2, {
+        duration: 150,
+        easing: fabric.util.ease.easeOutBounce,
+        onChange: () => canvas.renderAll()
+      });
+      break;
+      
+    case 'pulse':
+      const pulseScale = animation.scale || 1.1;
+      const pulseDuration = animation.duration || 300;
+      const pulseOriginalScaleX = obj.scaleX || 1;
+      const pulseOriginalScaleY = obj.scaleY || 1;
+      
+      obj.animate('scaleX', pulseOriginalScaleX * pulseScale, {
+        duration: pulseDuration / 2,
+        easing: fabric.util.ease.easeOutCubic,
+        onChange: () => canvas.renderAll(),
+        onComplete: () => {
+          obj.animate('scaleX', pulseOriginalScaleX, {
+            duration: pulseDuration / 2,
+            easing: fabric.util.ease.easeOutCubic,
+            onChange: () => canvas.renderAll()
+          });
+        }
+      });
+      obj.animate('scaleY', pulseOriginalScaleY * pulseScale, {
+        duration: pulseDuration / 2,
+        easing: fabric.util.ease.easeOutCubic,
+        onChange: () => canvas.renderAll(),
+        onComplete: () => {
+          obj.animate('scaleY', pulseOriginalScaleY, {
+            duration: pulseDuration / 2,
+            easing: fabric.util.ease.easeOutCubic,
+            onChange: () => canvas.renderAll()
+          });
+        }
+      });
+      break;
+      
+    default:
+      console.warn(`ViewerManager: Unknown animation type: ${animation.type}`);
+  }
 },
 
   navigateToPrevSlide: function() {

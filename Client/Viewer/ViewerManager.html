@@ -654,6 +654,7 @@ closeQuestionModal: function() {
 
 handleMediaOverlayUpdate: function(currentTime, mediaType) {
   // This is the callback from MediaManager.
+  console.log(`ViewerManager: handleMediaOverlayUpdate called - time: ${currentTime}, mediaType: ${mediaType}`);
   this.updateVideoOverlays(currentTime); // Call to placeholder
 },
 
@@ -723,7 +724,11 @@ initializeVideoOverlays: function() {
 // Add this new placeholder function
 updateVideoOverlays: function(currentTime) {
   const slide = this.getCurrentSlide();
+  console.log(`ViewerManager: updateVideoOverlays - currentTime: ${currentTime}`);
+  console.log('ViewerManager: Current slide:', slide);
+  
   if (!slide || !slide.slideMedia || !Array.isArray(slide.slideMedia.videoOverlays)) {
+    console.log('ViewerManager: No overlays found for this slide');
     // Clear any existing overlays if there are none for this slide
     this.state.activeOverlays.forEach(overlayInfo => overlayInfo.element.remove());
     this.state.activeOverlays.clear();
@@ -731,6 +736,7 @@ updateVideoOverlays: function(currentTime) {
   }
 
   const videoOverlays = slide.slideMedia.videoOverlays;
+  console.log(`ViewerManager: Found ${videoOverlays.length} overlays for this slide:`, videoOverlays);
 
   videoOverlays.forEach(overlayData => {
     const overlayId = overlayData.id;
@@ -859,10 +865,12 @@ updateViewerCanvasInteractivity: function() {
     const canvas = this.state.viewerFabricCanvas;
     if (!canvas || !this.dom.viewerCanvasContainerEl) return;
 
-    // An object is interactive if it has a defined interaction trigger and action.
-    const hasInteractiveObjects = canvas.getObjects().some(obj =>
-        obj.customInteraction && obj.customInteraction.trigger && obj.customInteraction.action
-    );
+    // An object is interactive if it has interactions OR animations with triggers
+    const hasInteractiveObjects = canvas.getObjects().some(obj => {
+        const hasInteraction = obj.customInteraction && obj.customInteraction.trigger && obj.customInteraction.action;
+        const hasAnimation = obj.customAnimation && obj.customAnimation.trigger && obj.customAnimation.type;
+        return hasInteraction || hasAnimation;
+    });
 
     // The canvas should receive pointer events if any object is interactive.
     this.dom.viewerCanvasContainerEl.style.pointerEvents = hasInteractiveObjects ? 'auto' : 'none';
@@ -871,7 +879,12 @@ updateViewerCanvasInteractivity: function() {
     canvas.selection = false; // Disable group selection.
     canvas.forEachObject(obj => {
         obj.selectable = false;
-        obj.evented = !!(obj.customInteraction && obj.customInteraction.trigger); // Object only gets events if it has an interaction.
+        
+        // Object gets events if it has interactions OR animations with triggers
+        const hasInteraction = obj.customInteraction && obj.customInteraction.trigger;
+        const hasAnimation = obj.customAnimation && obj.customAnimation.trigger && obj.customAnimation.type;
+        obj.evented = !!(hasInteraction || hasAnimation);
+        
         obj.hasControls = false;
         obj.hasBorders = false;
         obj.lockMovementX = true;

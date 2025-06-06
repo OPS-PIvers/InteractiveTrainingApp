@@ -1160,6 +1160,22 @@
             <canvas id="fabricCanvasElement" style="position: relative; z-index: 2;"></canvas>
         </div>
 
+        <!-- Interactive Timeline Bar -->
+        <div id="interactiveTimelineBar" style="background: var(--theme-background-card); border-top: 2px solid var(--theme-border-color); padding: 15px; margin-top: 15px; border-radius: 8px; box-shadow: 0 1px 2px 0 rgba(60,64,67,0.08), 0 1px 3px 1px rgba(60,64,67,0.05);">
+            <div id="timelineSection">
+                <div id="adminTimelineTrack" style="width: 100%; height: 8px; background-color: var(--theme-border-color); border-radius: 4px; position: relative; margin-bottom: 10px;">
+                    <div id="adminTimelineProgress" style="height: 100%; background-color: var(--theme-primary-color); border-radius: 4px; width: 0%; transition: width 0.1s ease;"></div>
+                </div>
+                <div id="adminTimelineTimeDisplay" style="display: flex; justify-content: space-between; font-size: 0.9em; color: var(--theme-text-color-secondary);">
+                    <span id="adminCurrentTime">0:00</span>
+                    <span id="adminTotalDuration">0:00</span>
+                </div>
+            </div>
+            <div id="adminOverlayDisplayArea" style="min-height: 60px; background: var(--theme-background-main); border-radius: 6px; margin-top: 15px; padding: 10px; display: flex; align-items: center; justify-content: center; position: relative; border: 1px dashed var(--theme-border-color);">
+                <span style="color: var(--theme-text-color-secondary); font-style: italic;">Interactive overlays appear here during media playback</span>
+            </div>
+        </div>
+
 <!-- Video Overlay Controls -->
 <div id="mediaOverlayControls" style="display:none; margin-top: 10px;">
     <button id="addTimelineOverlayBtn" class="button">

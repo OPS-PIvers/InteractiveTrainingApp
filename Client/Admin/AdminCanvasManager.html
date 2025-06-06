@@ -134,10 +134,17 @@
       canvas.setWidth(contentWidth);
       canvas.setHeight(contentHeight);
 
-      // Get container available space (accounting for padding/borders)
+      // Calculate available space accounting for toolbar and timeline
       const containerPadding = 20; // Reserve space for padding
       const availableWidth = container.clientWidth - containerPadding;
-      const maxContainerHeight = Math.min(window.innerHeight * 0.7, 600); // Reduced max height
+      
+      // Calculate available height considering toolbar and timeline
+      const toolbarHeight = document.getElementById('fabricToolbar')?.offsetHeight || 80;
+      const timelineHeight = 120; // Reserve space for interaction timeline
+      const headerHeight = 160; // Account for page header and margins
+      const reservedHeight = toolbarHeight + timelineHeight + headerHeight + containerPadding;
+      
+      const maxContainerHeight = Math.max(300, window.innerHeight - reservedHeight);
       const minContainerHeight = 300;
       
       // Calculate zoom to fit content within available space
@@ -381,6 +388,11 @@
     }
 
     adminCanvasManager.resizeCanvasToFit(selectedSlideData); // Resize canvas based on slide's dimensions
+
+    // Show the interaction timeline for all slides
+    sharedUtils.safeDOMUpdate(document.getElementById('interactiveTimelineBar'), el => {
+      if (el) el.style.display = 'block';
+    });
 
     // Load Media Background
     const media = selectedSlideData.slideMedia;

@@ -52,6 +52,28 @@
             padding: 20px;
         }
 
+      #editViewContainer {
+          display: flex;
+          flex-direction: column;
+          height: calc(100vh - 40px); /* Full viewport height minus some padding */
+          overflow: hidden;
+      }
+      #fabricCanvasContainer {
+          flex-grow: 1; /* This is the key change - makes the container grow to fill space */
+          min-height: 200px; /* Prevent it from becoming too small */
+          width: auto; /* Allow it to fill width */
+          margin-left: 15px;
+          margin-right: 15px;
+          height: auto; /* Height will be determined by flexbox */
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          border: 1px dashed var(--theme-border-color);
+          position: relative;
+          background-color: var(--theme-background-main);
+          overflow: hidden;
+      }
+
       #messageArea { margin-top: 15px; padding: 10px; border: 1px solid transparent; border-radius: 3px; min-height: 1.5em; font-size: 0.9rem;}
 
       #adminProjectListContainer { margin-top: 15px; }
@@ -111,19 +133,6 @@
       .edit-controls-group input[type="file"] { display: block; width: calc(100% - 22px); margin-bottom: 15px; }
       .edit-controls-group button { margin-top: -5px; margin-bottom: 15px; }
 
-#fabricCanvasContainer { 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    border: 1px dashed var(--theme-border-color); 
-    margin-top: 15px; 
-    position: relative; 
-    background-color: var(--theme-background-main);
-    width: 100%;
-    min-height: 400px; /* Minimum height instead of fixed */
-    max-height: 80vh; /* Maximum height relative to viewport */
-    overflow: hidden; /* Hide overflow to prevent scrollbars */
-}
 #fabricCanvasElement { 
     border: 1px solid var(--theme-text-color-secondary);
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -804,7 +813,7 @@
             max-height: 70vh; /* Reduced max height for mobile */
         }
          /* Ensure video timeline controls are usable */
-        #mediaTimelineControls input[type="range"] {
+        #interactiveTimelinePanel input[type="range"] {
             width: calc(100% - 20px); /* Adjust for padding */
         }
       }
@@ -1214,7 +1223,8 @@
         <div>Position: <span id="overlayPositionDisplay">X: 50%, Y: 50%</span></div>
         
         <!-- Timing Controls -->
-        <label>Start Time: <span id="overlayStartTimeDisplay">0:00</span></label>
+        <label for="overlayStartTime">Start Time (seconds):</label>
+        <input type="number" id="overlayStartTime" min="0" value="0" step="0.1">
         <label>Duration (seconds):</label>
         <input type="number" id="overlayDuration" min="1" value="5" step="0.5">
         
@@ -1247,8 +1257,8 @@
         <button id="deleteOverlayBtn" class="danger-button" style="display:none;">Delete</button>
     </div>
 </div>
-        <div id="mediaTimelineControls" style="display:none; margin-top: 10px; padding: 10px; border: 1px solid var(--theme-border-color); border-radius: 5px; background-color: var(--theme-background-card);">
-            <h4>Video Timeline</h4>
+        <div id="interactiveTimelinePanel" style="display:none; margin-top: 10px; padding: 10px; border: 1px solid var(--theme-border-color); border-radius: 5px; background-color: var(--theme-background-card);">
+            <h4>Event Timeline</h4>
             <input type="range" id="videoTimelineSlider" min="0" max="100" value="0" style="width: 100%;">
             <div>
                 <span>Current Time: <span id="videoCurrentTimeDisplay">0:00</span></span>
@@ -1258,6 +1268,10 @@
             <div id="overlayTimelineTrack" style="height: 30px; background: #f0f0f0; position: relative; margin-top: 5px;">
                 <!-- Overlay bars will be dynamically inserted here -->
             </div>
+            <h5 style="margin-top: 15px; margin-bottom: 5px;">Event Sequence:</h5>
+            <ul id="eventSequenceList" style="list-style: none; padding: 0; border: 1px solid var(--theme-border-color); border-radius: 4px; min-height: 100px; background-color: var(--theme-background-main);">
+                <!-- Event items will be dynamically inserted here -->
+            </ul>
             <button id="addQuestionBtn" style="margin-top: 10px;">Add Question at Timestamp</button>
             <button id="manageTimestampOverlaysButton" style="margin-top: 10px; display: none; background-color: var(--theme-primary-color);">Manage Timestamp Overlays</button>
         </div>

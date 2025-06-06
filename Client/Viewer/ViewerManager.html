@@ -856,48 +856,35 @@ handleOverlayActionDOM: function(overlayData) {
 },
 
 updateViewerCanvasInteractivity: function() {
-  if (!this.state.viewerFabricCanvas || !this.dom.viewerCanvasContainerEl) return;
+    const canvas = this.state.viewerFabricCanvas;
+    if (!canvas || !this.dom.viewerCanvasContainerEl) return;
 
-  const canvas = this.state.viewerFabricCanvas;
-  const currentMediaType = this.state.currentMediaType;
-  let allowClicking = false;
+    // An object is interactive if it has a defined interaction trigger and action.
+    const hasInteractiveObjects = canvas.getObjects().some(obj =>
+        obj.customInteraction && obj.customInteraction.trigger && obj.customInteraction.action
+    );
 
-  // In viewer mode, we want objects to be clickable for interactions, but NEVER selectable/editable
-  if (currentMediaType === 'image' || currentMediaType === 'none' || !currentMediaType) {
-    allowClicking = true; // Allow clicking for static images or non-media slides
-  } else if (currentMediaType === 'youtube' || currentMediaType === 'audio') {
-    // For media slides, allow clicking on interactive objects
-    allowClicking = true;
-  }
+    // The canvas should receive pointer events if any object is interactive.
+    this.dom.viewerCanvasContainerEl.style.pointerEvents = hasInteractiveObjects ? 'auto' : 'none';
 
-  // Check if there are any interactive objects on the canvas
-  const hasInteractiveObjects = canvas.getObjects().some(obj => 
-    obj.customInteraction && 
-    obj.customInteraction.trigger && 
-    obj.customInteraction.trigger !== ''
-  );
+    // Configure all objects for "view-only" mode.
+    canvas.selection = false; // Disable group selection.
+    canvas.forEachObject(obj => {
+        obj.selectable = false;
+        obj.evented = !!(obj.customInteraction && obj.customInteraction.trigger); // Object only gets events if it has an interaction.
+        obj.hasControls = false;
+        obj.hasBorders = false;
+        obj.lockMovementX = true;
+        obj.lockMovementY = true;
+        obj.lockRotation = true;
+        obj.lockScalingX = true;
+        obj.lockScalingY = true;
+        
+        // Set the cursor to a pointer if it's interactive, otherwise default.
+        obj.hoverCursor = obj.evented ? 'pointer' : 'default';
+    });
 
-  // Enable pointer events if we need clicking or have interactive objects
-  const enablePointerEvents = allowClicking || hasInteractiveObjects;
-  this.dom.viewerCanvasContainerEl.style.pointerEvents = enablePointerEvents ? 'auto' : 'none';
-
-  // CRITICAL: In viewer mode, objects should NEVER be selectable or moveable
-  // But they should be clickable for interactions
-  canvas.selection = false; // Disable selection box
-  canvas.forEachObject(obj => {
-    obj.selectable = false;  // Objects cannot be selected
-    obj.evented = enablePointerEvents; // Objects can receive click events
-    obj.moveable = false;    // Objects cannot be moved
-    obj.hasControls = false; // Hide resize/rotate controls
-    obj.hasBorders = false;  // Hide selection borders
-    obj.lockMovementX = true; // Lock horizontal movement
-    obj.lockMovementY = true; // Lock vertical movement
-    obj.lockRotation = true;  // Lock rotation
-    obj.lockScalingX = true;  // Lock horizontal scaling
-    obj.lockScalingY = true;  // Lock vertical scaling
-  });
-
-  console.log(`ViewerManager: Canvas clicking ${enablePointerEvents ? 'enabled' : 'disabled'}, selection disabled, interactive objects: ${hasInteractiveObjects}`);
+    console.log(`Viewer canvas interactivity updated. Pointer events: ${this.dom.viewerCanvasContainerEl.style.pointerEvents}`);
 },
 
 handleObjectInteraction: function(obj, interaction) {

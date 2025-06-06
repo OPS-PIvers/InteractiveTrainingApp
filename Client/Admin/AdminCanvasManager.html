@@ -121,65 +121,29 @@
     }
   };
 
-  adminCanvasManager.resizeCanvasToFit = function(slideData) {
+  adminCanvasManager.resizeCanvasToFit = function() {
       const canvas = adminCanvasManager.state.fabricCanvasInstance;
-      if (!canvas || !fabricCanvasEl) return;
       const container = document.getElementById('fabricCanvasContainer');
-      if (!container) { console.warn("AdminCanvasManager.resizeCanvasToFit: fabricCanvasContainer not found."); return; }
+      if (!canvas || !container) return;
 
-      let contentWidth = (slideData && slideData.canvasWidth) ? slideData.canvasWidth : adminCanvasManager.state.defaultCanvasWidth;
-      let contentHeight = (slideData && slideData.canvasHeight) ? slideData.canvasHeight : adminCanvasManager.state.defaultCanvasHeight;
-
-      // Set the logical size of the canvas
-      canvas.setWidth(contentWidth);
-      canvas.setHeight(contentHeight);
-
-      // Calculate available space accounting for toolbar and timeline
-      const containerPadding = 20; // Reserve space for padding
-      const availableWidth = container.clientWidth - containerPadding;
+      // Set canvas logical size to match the container's physical size
+      const width = container.clientWidth;
+      const height = container.clientHeight;
       
-      // Calculate available height considering toolbar and timeline
-      const toolbarHeight = document.getElementById('fabricToolbar')?.offsetHeight || 80;
-      const timelineHeight = 120; // Reserve space for interaction timeline
-      const headerHeight = 160; // Account for page header and margins
-      const reservedHeight = toolbarHeight + timelineHeight + headerHeight + containerPadding;
+      canvas.setWidth(width);
+      canvas.setHeight(height);
+      canvas.calcOffset();
+      canvas.renderAll();
       
-      const maxContainerHeight = Math.max(300, window.innerHeight - reservedHeight);
-      const minContainerHeight = 300;
-      
-      // Calculate zoom to fit content within available space
-      const scaleX = availableWidth / contentWidth;
-      const scaleY = maxContainerHeight / contentHeight;
-      const scale = Math.min(scaleX, scaleY, 1); // Never scale up beyond 100%
-      
-      // Calculate actual display size
-      const displayWidth = contentWidth * scale;
-      const displayHeight = contentHeight * scale;
-      
-      // Set container height to fit the scaled content
-      const containerHeight = Math.max(minContainerHeight, displayHeight + containerPadding);
-      container.style.height = containerHeight + 'px';
-
-      // Apply zoom to canvas
-      canvas.setZoom(scale);
-      
-      // Reset viewport transform to origin
-      canvas.viewportTransform[4] = 0;
-      canvas.viewportTransform[5] = 0;
-
-      // Update canvas DOM element size to match display size
-      fabricCanvasEl.style.width = displayWidth + 'px';
-      fabricCanvasEl.style.height = displayHeight + 'px';
-
-      canvas.calcOffset(); // Recalculate canvas offsets
-      canvas.renderAll();  // Re-render the canvas
-      
-      console.log(`Canvas resized: logical=${contentWidth}x${contentHeight}, display=${displayWidth}x${displayHeight}, scale=${scale.toFixed(2)}`);
+      console.log(`Canvas resized to fit container: ${width}x${height}`);
   };
 
   adminCanvasManager.handleResize = function() {
       if (adminCanvasManager.state.fabricCanvasInstance && adminCanvasManager.state.currentSlideIndex !== -1) {
-          adminCanvasManager.resizeCanvasToFit(adminCanvasManager.getCurrentSlideData());
+          // Add a small delay to ensure flexbox layout is complete before resizing
+          setTimeout(() => {
+              adminCanvasManager.resizeCanvasToFit();
+          }, 100);
       }
   };
 
@@ -387,7 +351,7 @@
       console.log(`AdminCanvasManager.selectSlide: Setting default canvas dimensions ${selectedSlideData.canvasWidth}x${selectedSlideData.canvasHeight} for slide ${slideIndex + 1}`);
     }
 
-    adminCanvasManager.resizeCanvasToFit(selectedSlideData); // Resize canvas based on slide's dimensions
+    adminCanvasManager.resizeCanvasToFit(); // Resize canvas to fit the container
 
     // Show the interaction timeline for all slides
     sharedUtils.safeDOMUpdate(document.getElementById('interactiveTimelineBar'), el => {
@@ -397,80 +361,51 @@
     // Load Media Background
     const media = selectedSlideData.slideMedia;
     let currentMediaTypeForCallbacks = media ? media.type : null;
+    canvas.backgroundColor = 'transparent'; // ALWAYS transparent in the new model
 
     if (media && media.type === 'image' && media.driveFileId) {
-      baseApp.showLoading(true, 'loadingSpinner');
-      google.script.run
-        .withSuccessHandler(response => {
-          baseApp.showLoading(false, 'loadingSpinner');
-          if (adminCanvasManager.state.currentSlideIndex !== slideIndex) return; // Slide changed during load
-          if (response && response.success && response.base64Data) {
-            fabric.Image.fromURL(response.base64Data, img => {
-              if (!canvas || adminCanvasManager.state.currentSlideIndex !== slideIndex) return;
-              
-              // Use stored canvas dimensions if available, otherwise resize to image
-              let cvWidth = selectedSlideData.canvasWidth || img.width;
-              let cvHeight = selectedSlideData.canvasHeight || img.height;
-              
-              // Apply max limits if resizing to image
-              if (!selectedSlideData.canvasWidth || !selectedSlideData.canvasHeight) {
-                const maxWidth = 1920;
-                const maxHeight = 1080;
-                
-                if (cvWidth > maxWidth || cvHeight > maxHeight) {
-                  const scaleX = maxWidth / cvWidth;
-                  const scaleY = maxHeight / cvHeight;
-                  const scale = Math.min(scaleX, scaleY);
-                  cvWidth = Math.round(cvWidth * scale);
-                  cvHeight = Math.round(cvHeight * scale);
-                }
-                
-                // Update slide data with calculated dimensions
-                selectedSlideData.canvasWidth = cvWidth;
-                selectedSlideData.canvasHeight = cvHeight;
-              }
-              
-              console.log(`AdminCanvasManager.selectSlide: Setting canvas dimensions to ${cvWidth}x${cvHeight} for slide ${slideIndex + 1}`);
-              
-              // Update canvas logical dimensions
-              canvas.setWidth(cvWidth);
-              canvas.setHeight(cvHeight);
-              
-              // Set background image without scaling
-              canvas.setBackgroundImage(img, function() {
-                canvas.renderAll();
-                // Re-fit canvas in container after setting background
-                adminCanvasManager.resizeCanvasToFit(selectedSlideData);
-              });
-            }, { crossOrigin: 'anonymous' });
-          } else { baseApp.displayMessage( (response && response.error) ? response.error.message : "Error loading slide background image.", false, 'messageArea'); }
-        })
-        .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
-        .getImageAsBase64(media.driveFileId);
+        baseApp.showLoading(true, 'loadingSpinner');
+        google.script.run
+            .withSuccessHandler(response => {
+                baseApp.showLoading(false, 'loadingSpinner');
+                if (adminCanvasManager.state.currentSlideIndex !== slideIndex) return; // Slide changed
+                if (response && response.success && response.base64Data) {
+                    fabric.Image.fromURL(response.base64Data, img => {
+                        if (!canvas) return;
+                        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                            // Center and cover the background
+                            originX: 'center',
+                            originY: 'center',
+                            top: canvas.height / 2,
+                            left: canvas.width / 2,
+                            scaleX: canvas.width / img.width,
+                            scaleY: canvas.height / img.height
+                        });
+                    }, { crossOrigin: 'anonymous' });
+                } else { baseApp.displayMessage((response && response.error) ? response.error.message : "Error loading background image.", false, 'messageArea'); }
+            })
+            .withFailureHandler(error => baseApp.onServerError(error, 'messageArea'))
+            .getImageAsBase64(media.driveFileId);
+
     } else if (media && media.type === 'youtube' && media.url) {
-      canvas.setBackgroundColor('rgba(0,0,0,0)', canvas.renderAll.bind(canvas)); // Transparent canvas bg
-      sharedUtils.safeDOMUpdate(fabricCanvasEl, el => el.style.opacity = '0.7'); // Make canvas semi-transparent
-      sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => { el.innerHTML = '<div id="adminYouTubePlayerDiv"></div>'; el.style.display = 'block';});
+        sharedUtils.safeDOMUpdate(adminYouTubePlayerContainerEl, el => {
+            el.innerHTML = '<div id="adminYouTubePlayerDiv"></div>';
+            el.style.display = 'block';
+        });
 
-      if (window.mediaManager && window.adminOverlayManager && typeof adminOverlayManager.setupMediaCallbacks === 'function') {
-          adminOverlayManager.setupMediaCallbacks('youtube'); // Let AOM set the callbacks
-          const videoId = sharedUtils.extractYouTubeVideoId(media.url);
-          if (videoId) {
-            mediaManager.setupPlayer(videoId, 'adminYouTubePlayerDiv', { 'controls': 1, 'showinfo': 0, 'rel': 0, 'width': canvas.width, 'height': canvas.height });
-          } else {
-             console.error("Invalid YouTube URL, cannot extract video ID:", media.url);
-             sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => { el.textContent = `Error: Invalid YouTube URL. ${media.url}`; el.style.display = 'block'; });
-          }
-      } else {
-           console.error("MediaManager or AdminOverlayManager not ready for YouTube playback setup.");
-           sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => { el.textContent = `Error: YouTube player setup failed. URL: ${media.url}`; el.style.display = 'block'; });
-      }
-
+        if (window.mediaManager && window.adminOverlayManager) {
+            adminOverlayManager.setupMediaCallbacks('youtube');
+            const videoId = sharedUtils.extractYouTubeVideoId(media.url);
+            if (videoId) {
+                mediaManager.setupPlayer(videoId, 'adminYouTubePlayerDiv', { 'controls': 1, 'showinfo': 0, 'rel': 0 });
+            } else {
+                console.error("Invalid YouTube URL:", media.url);
+            }
+        }
     } else if (media && media.type === 'audio' && media.driveFileId) {
-      sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => el.textContent = `Attached Audio: ${media.originalName || media.driveFileId}`);
-      sharedUtils.safeDOMUpdate(audioControlsContainer, el => el.style.display = 'block');
-      sharedUtils.safeDOMUpdate(removeAudioButtonEl, el => el.style.display = 'inline-block');
-      sharedUtils.safeDOMUpdate(adminMediaPlaceholderEl, el => { el.textContent = `Audio File: ${media.originalName || 'Audio File'}`; el.style.display = 'block'; });
+        // This logic is mostly for UI feedback, the player is handled by AOM
+        sharedUtils.safeDOMUpdate(attachedAudioNameEl, el => el.textContent = `Attached Audio: ${media.originalName || media.driveFileId}`);
+        // ... other UI updates for audio
     }
 
     if (window.adminOverlayManager && typeof adminOverlayManager.setCurrentMediaType === 'function') {
@@ -515,6 +450,12 @@
         // saveCanvasStateForHistory is called after loadFromJSON or for empty canvas
     }
     adminCanvasManager.updateUndoRedoButtonStates();
+    
+    // Show the main editor timeline panel
+    const timelinePanel = document.getElementById('interactiveTimelinePanel');
+    sharedUtils.safeDOMUpdate(timelinePanel, el => el.style.display = 'block');
+    adminCanvasManager.renderEventTimeline(); // Render the events for the new slide
+    
     console.log(`AdminCanvasManager: Switched to slide ${slideIndex + 1}.`);
   };
 
@@ -596,7 +537,9 @@
       customInteraction: adminCanvasManager.getDefaultInteractionProps(),
       customAnimation: adminCanvasManager.getDefaultAnimationProps(),
       sequenceOrder: null, // Placeholder for sequencing
-      slideId: 'obj_' + sharedUtils.generateClientUuid() // Unique ID for the object within the slide
+      slideId: 'obj_' + sharedUtils.generateClientUuid(), // Unique ID for the object within the slide
+      selectable: true, // Explicitly ensure objects are selectable in admin mode
+      evented: true // Explicitly ensure objects respond to events
     };
 
     switch(shapeType) {
@@ -612,7 +555,16 @@
       default:
         console.warn("AdminCanvasManager.addShape: Unknown shape type requested:", shapeType); return;
     }
-    canvas.add(newObject); canvas.setActiveObject(newObject); canvas.renderAll();
+    canvas.add(newObject); 
+    
+    // Force canvas offset recalculation after adding object
+    setTimeout(() => {
+      canvas.calcOffset();
+      canvas.setActiveObject(newObject); 
+      canvas.renderAll();
+      console.log(`Added ${shapeType} object:`, newObject, 'Canvas offset:', canvas.calcOffset());
+    }, 10);
+    
     // saveCanvasStateForHistory is called by 'object:added' event listener.
     if (window.adminToolbar && typeof adminToolbar.hideActivePopover === 'function') {
       adminToolbar.hideActivePopover(); // Close shape selection popover
@@ -1089,6 +1041,44 @@
     if (window.adminToolbar && adminToolbar.state.shadowSettingsButtonEl) {
        adminToolbar.state.shadowSettingsButtonEl.classList.toggle('active', !!activeObject.shadow);
     }
+  };
+
+  adminCanvasManager.renderEventTimeline = function() {
+      const currentSlide = adminCanvasManager.getCurrentSlideData();
+      const eventListEl = document.getElementById('eventSequenceList');
+      if (!currentSlide || !eventListEl) return;
+
+      // Ensure events array exists and is sorted
+      if (!currentSlide.timelineEvents) currentSlide.timelineEvents = [];
+      currentSlide.timelineEvents.sort((a, b) => (a.startTime || 0) - (b.startTime || 0));
+
+      eventListEl.innerHTML = ''; // Clear old list
+
+      if (currentSlide.timelineEvents.length === 0) {
+          eventListEl.innerHTML = '<li style="padding: 10px; color: #888; text-align: center;">No events scheduled for this slide.</li>';
+          return;
+      }
+
+      currentSlide.timelineEvents.forEach(event => {
+          const item = document.createElement('li');
+          item.style.cssText = "padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;";
+          
+          let eventLabel = `Event: ${event.type}`;
+          if (event.targetObjectId) {
+              const targetObj = adminCanvasManager.state.fabricCanvasInstance.getObjects().find(o => o.slideId === event.targetObjectId);
+              eventLabel = `[${targetObj ? (targetObj.text || targetObj.type) : 'Object'}] - ${event.type}`;
+          } else if (event.type === 'videoQuestion') {
+              eventLabel = `[Video Question] - ${sharedUtils.truncateText(event.details.questionText, 20)}`;
+          }
+
+          const time = (currentSlide.slideMedia.type === 'image') ? `Step ${event.order || 'N/A'}` : sharedUtils.formatTime(event.startTime);
+
+          item.innerHTML = `<span><strong>${time}:</strong> ${eventLabel}</span>`;
+          
+          // Add Edit/Delete buttons here later if needed
+          
+          eventListEl.appendChild(item);
+      });
   };
 
 </script>

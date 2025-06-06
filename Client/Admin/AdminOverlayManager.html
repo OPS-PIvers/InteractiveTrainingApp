@@ -18,7 +18,7 @@
     optionInputsEl: [], correctAnswerRadiosEl: [],
 
     addTimelineOverlayBtnEl: null, overlayPlacementModeEl: null, overlayPlacementOverlayEl: null,
-    overlayEditorModalEl: null, overlayTemplateEl: null, overlayStartTimeDisplayEl: null,
+    overlayEditorModalEl: null, overlayTemplateEl: null, overlayStartTimeEl: null,
     overlayDurationEl: null, overlayTextContentEditorEl: null,
     overlayPauseVideoEl: null, overlayDismissibleEl: null, overlayActionEl: null,
     overlayPositionDisplayEl: null, deleteOverlayBtnEditorEl: null,
@@ -78,7 +78,7 @@
     aom.state.overlayPlacementOverlayEl = document.getElementById('overlayPlacementOverlay'); // Clickable overlay on canvas/video area
     aom.state.overlayEditorModalEl = document.getElementById('overlayEditorModal');
     aom.state.overlayTemplateEl = document.getElementById('overlayTemplate'); // The actual overlay element in the editor
-    aom.state.overlayStartTimeDisplayEl = document.getElementById('overlayStartTimeDisplay');
+    aom.state.overlayStartTimeEl = document.getElementById('overlayStartTime');
     aom.state.overlayDurationEl = document.getElementById('overlayDuration');
     aom.state.overlayTextContentEditorEl = document.getElementById('overlayTextContent');
     aom.state.overlayPauseVideoEl = document.getElementById('overlayPauseVideo');
@@ -515,7 +515,7 @@
       if (!overlayData) return;
       aom.state.editingOverlayId = overlayData.id;
 
-      sharedUtils.safeDOMUpdate(aom.state.overlayStartTimeDisplayEl, el => el.textContent = sharedUtils.formatTime(overlayData.startTime));
+      if(aom.state.overlayStartTimeEl) aom.state.overlayStartTimeEl.value = overlayData.startTime;
       if(aom.state.overlayDurationEl) aom.state.overlayDurationEl.value = overlayData.duration;
       if(aom.state.overlayTextContentEditorEl) aom.state.overlayTextContentEditorEl.value = overlayData.content || '';
       if(aom.state.overlayPauseVideoEl) aom.state.overlayPauseVideoEl.checked = overlayData.pauseVideo || false;
@@ -542,9 +542,10 @@
 
   adminOverlayManager.gatherOverlayFromForm = function() {
       const aom = adminOverlayManager;
-      // Duration, content, pause, dismissible, actionUrl are read from form elements.
-      // StartTime and Position are not changed in this modal. Template selection could be added.
+      // StartTime, duration, content, pause, dismissible, actionUrl are read from form elements.
+      // Position is not changed in this modal. Template selection could be added.
       return {
+          startTime: parseFloat(aom.state.overlayStartTimeEl.value) || 0,
           duration: parseFloat(aom.state.overlayDurationEl.value) || 5,
           content: aom.state.overlayTextContentEditorEl.value || '',
           pauseVideo: aom.state.overlayPauseVideoEl.checked,

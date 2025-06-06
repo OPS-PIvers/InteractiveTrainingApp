@@ -104,8 +104,8 @@
     const popoverGlobalClickHandler = function(event) {
       // This handler now primarily defers to AdminToolbar or other modules
       // if they manage their own popovers and need global closing.
-      if (window.adminToolbar && typeof adminToolbar.handleGlobalClickForPopoverHide === 'function') {
-        adminToolbar.handleGlobalClickForPopoverHide(event);
+      if (window.adminToolbar && typeof adminToolbar.hideActivePopoverIfClickedOutside === 'function') {
+        adminToolbar.hideActivePopoverIfClickedOutside(event);
       }
       // If other modules have global popovers, they could be checked here too.
       // Example:
